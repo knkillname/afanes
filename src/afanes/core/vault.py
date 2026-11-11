@@ -14,6 +14,7 @@ import afanes.core.links
 import afanes.core.names
 from afanes.core.errors import (
     AfanesError,
+    EmptyCaptureError,
     NameCollisionError,
     NoteParseError,
     ReferenceRewriteError,
@@ -27,6 +28,9 @@ from afanes.models.note import NoteType
 
 # Public canonical note extension.
 NOTE_SUFFIX = ".md"
+
+# Public classification directory used as the capture queue.
+INBOX_DIRECTORY = Path("inbox")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -46,6 +50,9 @@ class VaultNote:
         Declared type from frontmatter.
     content_hash : str
         SHA-256 digest of the file bytes, used as an optimistic write guard.
+    modified_ns : int
+        File modification time in nanoseconds since the epoch, used only for
+        display ordering. It is filesystem metadata, not durable vault data.
     body_references : tuple[NoteReference, ...]
         References extracted from the Markdown body.
     frontmatter_references : tuple[NoteReference, ...]
@@ -57,6 +64,7 @@ class VaultNote:
     name: str
     note_type: NoteType
     content_hash: str
+    modified_ns: int
     body_references: tuple[NoteReference, ...]
     frontmatter_references: tuple[NoteReference, ...]
 
@@ -309,6 +317,41 @@ def scan_vault(root: Path) -> VaultSnapshot:
     return VaultSnapshot(root=vault_root, notes=tuple(notes), failures=tuple(failures), catalog=catalog)
 
 
+def inbox_notes(snapshot: VaultSnapshot) -> tuple[VaultNote, ...]:
+    """Return the notes currently in the vault's inbox.
+
+    Parameters
+    ----------
+    snapshot : VaultSnapshot
+        Result of a vault scan.
+
+    Returns
+    -------
+    tuple[VaultNote, ...]
+        Notes under the vault's ``inbox/`` directory, including nested
+        subdirectories, ordered by modification time newest first. Ties are
+        broken by case-folded name and then vault-relative path.
+
+    Notes
+    -----
+    The first path component is matched case-insensitively so the same vault
+    behaves consistently on case-sensitive and case-insensitive filesystems.
+    This function performs no file I/O.
+    """
+    inbox_name = INBOX_DIRECTORY.name.casefold()
+    notes = [
+        note
+        for note in snapshot.notes
+        if len(note.relative_path.parts) > 1 and note.relative_path.parts[0].casefold() == inbox_name
+    ]
+    return tuple(
+        sorted(
+            notes,
+            key=lambda note: (-note.modified_ns, note.name.casefold(), note.relative_path.as_posix()),
+        )
+    )
+
+
 def write_text_atomic(path: Path, text: str) -> None:
     """Write UTF-8 text through a temporary file and an atomic replace.
 
@@ -357,7 +400,7 @@ def create_note(
     *,
     directory: Path | None = None,
     body: str = "",
-    status: str = "inbox",
+    status: str | None = "inbox",
 ) -> Path:
     """Create a note whose sanitized filename stem becomes its title.
 
@@ -374,8 +417,9 @@ def create_note(
         vault root. Missing directories are created.
     body : str
         Initial Markdown body. New files use LF and UTF-8 without a BOM.
-    status : str
-        Initial status value. Defaults to ``inbox``.
+    status : str | None
+        Initial status value. Defaults to ``inbox``. ``None`` omits the
+        ``status`` key entirely.
 
     Returns
     -------
@@ -404,8 +448,11 @@ def create_note(
     name = afanes.core.names.unique_name(afanes.core.names.safe_filename(title), taken)
 
     normalized_body = body.replace("\r\n", "\n").replace("\r", "\n").removeprefix("\ufeff")
+    raw: dict[str, object] = {"type": note_type.value}
+    if status is not None:
+        raw["status"] = status
     document = NoteDocument(
-        raw={"type": note_type.value, "status": status},
+        raw=raw,
         body=normalized_body,
         newline="\n",
         has_frontmatter=True,
@@ -415,6 +462,51 @@ def create_note(
     path = target_directory / f"{name}{NOTE_SUFFIX}"
     write_text_atomic(path, document.to_text())
     return path
+
+
+def capture_note(vault_root: Path, text: str) -> Path:
+    """Capture raw text as an unclassified note in the vault's inbox.
+
+    Parameters
+    ----------
+    vault_root : Path
+        Vault root directory.
+    text : str
+        Captured thought. The first non-blank line becomes the filename stem
+        and the complete text becomes the Markdown body.
+
+    Returns
+    -------
+    Path
+        Absolute path to the created note.
+
+    Raises
+    ------
+    EmptyCaptureError
+        If ``text`` contains no non-blank line.
+    VaultPathError
+        If the inbox directory escapes the vault.
+    VaultError
+        If the inbox path is not a directory or the note cannot be written.
+
+    Notes
+    -----
+    The note declares only ``type: note``; no status, project, people, due
+    date, or references are inferred. The inbox directory is created on
+    demand. This function performs blocking file I/O.
+    """
+    first_line = next((line for line in text.splitlines() if line.strip()), None)
+    if first_line is None:
+        message = "A captured thought must contain text"
+        raise EmptyCaptureError(message)
+    return create_note(
+        vault_root,
+        first_line,
+        NoteType.NOTE,
+        directory=INBOX_DIRECTORY,
+        body=text,
+        status=None,
+    )
 
 
 def move_note(
@@ -741,6 +833,7 @@ def _note_paths(root: Path) -> list[tuple[Path, Path]]:
 
 def _read_note(path: Path, relative_path: Path) -> VaultNote:
     """Read and parse one note, raising on malformed input."""
+    stat = path.stat()
     data = path.read_bytes()
     text = data.decode("utf-8")
     document = NoteDocument.from_text(text)
@@ -754,6 +847,7 @@ def _read_note(path: Path, relative_path: Path) -> VaultNote:
         name=path.stem,
         note_type=document.note_type,
         content_hash=hashlib.sha256(data).hexdigest(),
+        modified_ns=stat.st_mtime_ns,
         body_references=body_references,
         frontmatter_references=document.references,
     )

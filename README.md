@@ -7,16 +7,29 @@
 
 ## Table of Contents
 
-- [Installation](#installation)
+- [Development](#development)
 - [Vault format](#vault-format)
+- [Inbox](#inbox)
 - [Changelog](#changelog)
 - [License](#license)
 
-## Installation
+## Development
+
+Afanes is not yet distributed as a packaged desktop app. Run it from a source checkout:
 
 ```console
-pip install afanes
+hatch env create
+hatch run python -m afanes
 ```
+
+`pip install afanes` installs the Python library only, not a runnable desktop app.
+
+The first run downloads and caches the Flet desktop client under `~/.flet/client/`. This is a
+one-time development provisioning step; the application itself performs no network I/O. Packaged
+builds will bundle the client in a later change.
+
+On first launch, choose a vault folder. Afanes remembers it in the platform configuration
+directory and reopens it next time. The [Inbox](#inbox) then lists notes under `inbox/`.
 
 ## Vault format
 
@@ -39,6 +52,14 @@ Ask [Ada Lovelace](<person:Ada Lovelace>) for the draft and file it under
 
 Use `note:` for notes, actions, and references. Names are matched case-insensitively, so
 `[Ada](<person:ada lovelace>)` resolves to the same note.
+
+## Inbox
+
+Captures live in `inbox/`. Capturing a thought uses the first non-blank line as the filename and
+writes the complete text as the body, with only `type: note` in the frontmatter. No status,
+project, people, or due date is inferred; clarification is a separate step.
+
+The Inbox lists every note under `inbox/`, newest first, and opens notes read-only.
 
 ## Changelog
 

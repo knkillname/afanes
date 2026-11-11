@@ -61,6 +61,9 @@ class TestSafeFilename:
     def test_removes_leading_dots(self) -> None:
         assert afanes.core.names.safe_filename(".hidden") == "hidden"
 
+    def test_removes_a_leading_space_exposed_by_a_forbidden_character(self) -> None:
+        assert afanes.core.names.safe_filename(".|0") == "0"
+
     def test_removes_leading_dot_before_reserved_check(self) -> None:
         assert afanes.core.names.safe_filename(".CON") == "CON-note"
 

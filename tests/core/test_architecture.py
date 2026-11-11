@@ -7,6 +7,7 @@ from pathlib import Path
 SOURCE_ROOT = Path(__file__).resolve().parents[2] / "src" / "afanes"
 MODEL_ROOT = SOURCE_ROOT / "models"
 CORE_ROOT = SOURCE_ROOT / "core"
+UI_ROOT = SOURCE_ROOT / "ui"
 
 
 def _python_files(root: Path) -> list[Path]:
@@ -109,3 +110,26 @@ class TestImportBoundaries:
 
         for module in graph:
             visit(module)
+
+
+class TestUiLayering:
+    def test_ui_does_not_import_cli(self) -> None:
+        offenders: list[str] = []
+        for path in _python_files(UI_ROOT):
+            offenders.extend(
+                f"{path.name}: {module}" for module in _first_party_imports(path) if module.startswith("afanes.cli")
+            )
+        assert offenders == []
+
+    def test_state_does_not_import_views_or_components(self) -> None:
+        path = UI_ROOT / "state.py"
+        forbidden = ("afanes.ui.views", "afanes.ui.components")
+        offenders = [module for module in _first_party_imports(path) if module.startswith(forbidden)]
+        assert offenders == []
+
+    def test_theme_and_strings_are_import_leaves(self) -> None:
+        offenders: list[str] = []
+        for name in ("theme.py", "strings.py"):
+            path = UI_ROOT / name
+            offenders.extend(f"{path.name}: {module}" for module in _first_party_imports(path))
+        assert offenders == []

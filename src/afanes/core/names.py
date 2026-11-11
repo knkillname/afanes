@@ -66,9 +66,9 @@ def safe_filename(title: str) -> str:
 
     The transformation normalizes to NFC, replaces forbidden characters with
     spaces, removes control characters, collapses whitespace, avoids reserved
-    device names, removes leading dots and trailing dots or spaces, and bounds
-    the result to 200 UTF-8 bytes on a character boundary. An empty result
-    becomes ``Untitled``.
+    device names, removes leading and trailing dots or spaces, and bounds the
+    result to 200 UTF-8 bytes on a character boundary. An empty result becomes
+    ``Untitled``.
 
     Parameters
     ----------
@@ -92,9 +92,9 @@ def safe_filename(title: str) -> str:
     name = _WHITESPACE_PATTERN.sub(" ", name).strip()
     name = _avoid_reserved_device_name(name)
     name = name.rstrip(". ")
-    name = name.lstrip(".")
+    name = name.lstrip(". ")
     name = _truncate_to_utf8_bytes(name, MAX_NAME_BYTES)
-    name = name.rstrip(". ").lstrip(".")
+    name = name.rstrip(". ").lstrip(". ")
     name = _avoid_reserved_device_name(name)
     name = _truncate_to_utf8_bytes(name, MAX_NAME_BYTES)
     if not name:

@@ -8,9 +8,11 @@ import afanes.core.errors
 class TestExceptionHierarchy:
     def test_every_error_inherits_from_afanes_error(self) -> None:
         names = [
+            "ConfigurationError",
             "VaultError",
             "VaultPathError",
             "NoteParseError",
+            "EmptyCaptureError",
             "InvalidReferenceError",
             "NameCollisionError",
             "ReferenceRewriteError",

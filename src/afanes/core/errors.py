@@ -19,6 +19,17 @@ class AfanesError(Exception):
     """
 
 
+class ConfigurationError(AfanesError):
+    """Raised when application settings cannot be read, validated, or saved.
+
+    Notes
+    -----
+    Settings live outside the vault, so this error never indicates vault
+    corruption. The UI translates it into an actionable message and leaves
+    the existing settings file untouched.
+    """
+
+
 class VaultError(AfanesError):
     """Base class for vault discovery, containment, and write failures."""
 
@@ -29,6 +40,10 @@ class VaultPathError(VaultError):
 
 class NoteParseError(AfanesError):
     """Raised when a note's frontmatter or metadata cannot be parsed."""
+
+
+class EmptyCaptureError(AfanesError):
+    """Raised when a capture contains no non-blank text."""
 
 
 class InvalidReferenceError(AfanesError):

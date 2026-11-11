@@ -1,12 +1,13 @@
 """Tests for vault scanning, containment, atomic writes, and reference-safe edits."""
 
 import hashlib
+import os
 from pathlib import Path
 
 import pytest
 
 import afanes.core.vault
-from afanes.core.errors import NameCollisionError, VaultError, VaultPathError
+from afanes.core.errors import EmptyCaptureError, NameCollisionError, VaultError, VaultPathError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import ResolutionOutcome
 from afanes.core.vault import ReferenceSite
@@ -39,6 +40,10 @@ def _write_note(
 
 def _tree_state(root: Path) -> dict[str, bytes]:
     return {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+
+
+def _set_modified_ns(path: Path, modified_ns: int) -> None:
+    os.utime(path, ns=(modified_ns, modified_ns))
 
 
 class TestVaultRoot:
@@ -228,6 +233,91 @@ class TestScanVault:
         assert len(result.targets) == TWO
 
 
+class TestInboxNotes:
+    def test_lists_direct_inbox_notes(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        first = _write_note(root / "inbox/A.md")
+        second = _write_note(root / "inbox/B.md")
+        _write_note(root / "work/C.md")
+        _set_modified_ns(first, 1_700_000_000_000_000_000)
+        _set_modified_ns(second, 1_700_000_001_000_000_000)
+
+        snapshot = afanes.core.vault.scan_vault(root)
+        names = [note.name for note in afanes.core.vault.inbox_notes(snapshot)]
+
+        assert names == ["B", "A"]
+
+    def test_lists_nested_inbox_notes(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "inbox/2026/C.md")
+
+        snapshot = afanes.core.vault.scan_vault(root)
+
+        assert [note.name for note in afanes.core.vault.inbox_notes(snapshot)] == ["C"]
+
+    def test_excludes_notes_outside_the_inbox(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "D.md")
+        _write_note(root / "inbox.md")
+        _write_note(root / "work/E.md")
+
+        snapshot = afanes.core.vault.scan_vault(root)
+
+        assert afanes.core.vault.inbox_notes(snapshot) == ()
+
+    def test_matches_the_inbox_directory_case_insensitively(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Inbox/E.md")
+
+        snapshot = afanes.core.vault.scan_vault(root)
+
+        assert [note.name for note in afanes.core.vault.inbox_notes(snapshot)] == ["E"]
+
+    def test_orders_newest_first(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        old = _write_note(root / "inbox/Old.md")
+        middle = _write_note(root / "inbox/Middle.md")
+        new = _write_note(root / "inbox/New.md")
+        _set_modified_ns(old, 1_700_000_000_000_000_000)
+        _set_modified_ns(middle, 1_700_000_001_000_000_000)
+        _set_modified_ns(new, 1_700_000_002_000_000_000)
+
+        snapshot = afanes.core.vault.scan_vault(root)
+
+        assert [note.name for note in afanes.core.vault.inbox_notes(snapshot)] == ["New", "Middle", "Old"]
+
+    def test_equal_timestamps_use_a_case_folded_name_tie_breaker(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        upper = _write_note(root / "inbox/Beta.md")
+        lower = _write_note(root / "inbox/alpha.md")
+        _set_modified_ns(upper, 1_700_000_000_000_000_000)
+        _set_modified_ns(lower, 1_700_000_000_000_000_000)
+
+        snapshot = afanes.core.vault.scan_vault(root)
+
+        assert [note.name for note in afanes.core.vault.inbox_notes(snapshot)] == ["alpha", "Beta"]
+
+    def test_equal_names_use_a_path_tie_breaker(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        second = _write_note(root / "inbox/b/Same.md")
+        first = _write_note(root / "inbox/a/Same.md")
+        _set_modified_ns(first, 1_700_000_000_000_000_000)
+        _set_modified_ns(second, 1_700_000_000_000_000_000)
+
+        snapshot = afanes.core.vault.scan_vault(root)
+
+        paths = [note.relative_path.as_posix() for note in afanes.core.vault.inbox_notes(snapshot)]
+        assert paths == ["inbox/a/Same.md", "inbox/b/Same.md"]
+
+    def test_empty_vault_returns_no_inbox_notes(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        snapshot = afanes.core.vault.scan_vault(root)
+
+        assert afanes.core.vault.inbox_notes(snapshot) == ()
+
+
 class TestCreateNote:
     def test_sanitizes_the_title_into_the_filename(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -293,6 +383,103 @@ class TestCreateNote:
         assert b"\r" not in data
         assert not data.startswith(b"\xef\xbb\xbf")
         assert data.endswith(b"one\ntwo\n")
+
+    def test_status_none_omits_the_key(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        path = afanes.core.vault.create_note(root, "Ada", NoteType.NOTE, status=None)
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.raw == {"type": "note"}
+
+
+class TestCaptureNote:
+    def test_creates_a_minimal_note_in_the_inbox(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.capture_note(root, "Buy milk")
+
+        assert path == root / "inbox" / "Buy milk.md"
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.raw == {"type": "note"}
+        assert document.body == "Buy milk"
+
+    def test_uses_the_first_non_blank_line_as_the_name(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        text = "\n\nCall Ada\nabout the invoice\n"
+
+        path = afanes.core.vault.capture_note(root, text)
+
+        assert path.name == "Call Ada.md"
+        assert NoteDocument.from_text(path.read_text(encoding="utf-8")).body == text
+
+    def test_rejects_whitespace_only_text(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        with pytest.raises(EmptyCaptureError):
+            afanes.core.vault.capture_note(root, " \n\t\n")
+
+        assert not (root / "inbox").exists()
+
+    def test_creates_the_inbox_directory_on_demand(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        afanes.core.vault.capture_note(root, "Buy milk")
+
+        assert (root / "inbox").is_dir()
+
+    def test_repeated_captures_get_distinct_names(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        first = afanes.core.vault.capture_note(root, "Buy milk")
+        second = afanes.core.vault.capture_note(root, "Buy milk")
+
+        assert first.name == "Buy milk.md"
+        assert second.name == "Buy milk 2.md"
+        assert first.is_file()
+        assert second.is_file()
+
+    def test_sanitizes_the_first_line(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.capture_note(root, "Q1: Planning?")
+
+        assert path.name == "Q1 Planning.md"
+
+    def test_does_not_modify_existing_notes(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        existing = _write_note(root / "work/Existing.md", body="Do not touch")
+        before = existing.read_bytes()
+
+        afanes.core.vault.capture_note(root, "Buy milk")
+
+        assert existing.read_bytes() == before
+
+    def test_does_not_infer_references_or_due_dates(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.capture_note(root, "Ask Ada about 2026-11-20")
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.raw == {"type": "note"}
+        assert document.references == ()
+        snapshot = afanes.core.vault.scan_vault(root)
+        assert snapshot.notes[0].body_references == ()
+        assert snapshot.notes[0].frontmatter_references == ()
+
+    def test_reports_a_blocking_inbox_file(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        (root / "inbox").write_text("not a directory", encoding="utf-8")
+
+        with pytest.raises(VaultError, match="not a directory"):
+            afanes.core.vault.capture_note(root, "Buy milk")
 
 
 class TestMoveNote:

@@ -54,12 +54,12 @@ project: "project:Release 1.0"
 Draft the migration checklist and link it to [Release 1.0](<project:Release 1.0>).
 ```
 
-Required frontmatter contract:
+Frontmatter contract:
 
 | Key | Type | Rules |
 | --- | --- | --- |
-| `type` | string enum | Initial values: `note`, `action`, `project`, `reference`, `person`. Extend only through an OpenSpec change. |
-| `status` | string enum | Initial values: `inbox`, `active`, `waiting`, `done`, `cancelled`, `archived`. Per-type validity is defined by `models/` and the relevant spec. |
+| `type` | string enum | Required. Initial values: `note`, `action`, `project`, `reference`, `person`. Extend only through an OpenSpec change. |
+| `status` | string enum or absent | Optional until processing begins. Initial values: `inbox`, `active`, `waiting`, `done`, `cancelled`, `archived`. Per-type validity is defined by `models/` and the relevant spec. A captured note has no `status` key. |
 | `due_date` | ISO date or absent/null | `YYYY-MM-DD`, date-only, no timezone. A due date is a calendar date, not an instant. |
 | `people` | list of strings | Zero or more `person:Name` references, for example `["person:Ada Lovelace"]`. |
 | `project` | string or absent/null | At most one `project:Name` reference, for example `"project:Release 1.0"`. |
@@ -68,6 +68,7 @@ Rules for frontmatter:
 
 - Unknown keys are preserved when a note is rewritten. Never silently drop data.
 - Unknown enum values are not coerced. Surface a validation error and offer a raw edit path.
+- A note without `status` is captured but not yet processed. The Inbox is the `inbox/` directory; capture adds no status, project, people, or due date.
 - The body is standard Markdown. Internal references use `[Label](scheme:Name)` with the schemes `person`, `project`, and `note`; use angle brackets when the name contains spaces, for example `[Ada](<person:Ada Lovelace>)`. Resolution rules live in `core/links.py` and the relevant spec.
 - A malformed frontmatter block is a parse error, not an invitation to guess. Do not overwrite the file.
 - New files use stable key order and canonical YAML. Existing files only have keys modified that the current operation owns.
@@ -78,7 +79,7 @@ Rules for frontmatter:
 
 | Workflow | Required behavior | Primary code |
 | --- | --- | --- |
-| Inbox | Rapid capture of a raw thought as a Markdown file. No classification is required at capture time. | `ui/views/inbox.py`, `core/vault.py` |
+| Inbox | Rapid capture of a raw thought as a Markdown file under `inbox/`. The first non-blank line becomes the filename and the full text becomes the body. No status or other classification is assigned at capture time; the Inbox lists the folder newest first. | `ui/views/inbox.py`, `core/vault.py` |
 | Processing Wizard | Step-by-step clarification: actionable vs reference, project vs single action item, due date, and people assignment. Every step is explicit and reversible where possible. | `ui/views/processing.py`, `core/frontmatter.py` |
 | Clarification Pipeline | The underlying state machine and validation used by the Processing Wizard. Must be testable without Flet. | `core/`, `models/` |
 | Timeline | Dynamic view ordered by `due_date`, including overdue and undated buckets. | `ui/views/timeline.py`, `core/search.py` |
@@ -121,6 +122,9 @@ Rules for frontmatter:
 
 - **Flet** (Python powered by the Flutter engine) is the GUI toolkit.
 - Pin the current stable Flet release exactly in `pyproject.toml`. Upgrade it only through an OpenSpec change.
+- Target Flet 1.x. A Flet 1.x runtime downloads its desktop client on first use unless a packaged build or a pre-provisioned cache supplies it.
+- Pin `flet-desktop` exactly in the development group so source runs have a client. Shipped desktop builds must bundle the client through `flet build`; a bare Python install is not a runnable offline desktop app.
+- Treat the first development run as environment provisioning, never as product behavior. Application code must not trigger the client download from a shipped build.
 - Use public Flet APIs only. Do not depend on private modules, internal widget trees, or undocumented behavior.
 - Do not mix incompatible Flet API generations in the same codebase.
 - The UI must be lightweight and 100% cross-platform on macOS, Linux, and Windows.
@@ -166,7 +170,8 @@ Rules for frontmatter:
 | --- | --- | --- |
 | Python | runtime | 3.13+ only |
 | Hatch | development | 1.18+; sole workflow interface |
-| Flet | runtime | exact pin; public APIs |
+| Flet | runtime | exact pin; library and public APIs only |
+| flet-desktop | development | exact pin; provisions the desktop client for source runs; packaged builds bundle it |
 | markdown-it-py | runtime | exact pin; CommonMark parsing only |
 | PyYAML | runtime | exact pin; `safe_load` / `safe_dump` only |
 | SQLite / FTS5 | runtime | stdlib; optional FTS5 with fallback |

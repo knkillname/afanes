@@ -23,6 +23,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
 ]
 dependencies = [
+  "flet==1.1.2",
   "markdown-it-py==4.3.0",
   "PyYAML==6.0.3",
 ]
@@ -42,6 +43,7 @@ dev = [
   { include-group = "test" },
   "coverage[toml]~=7.11",
   "coverage-enable-subprocess==1.0",
+  "flet-desktop==1.1.2",
   "pyrefly==1.0.0",
   "pytest~=9.0",
   "pytest-mock~=3.12",

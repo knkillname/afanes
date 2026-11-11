@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-10
+
+### Added
+
+- First-run vault selection with a folder picker; the chosen vault is remembered outside the vault and reopened on later launches.
+- An Inbox that captures raw thoughts as notes under `inbox/`, lists them newest first, refreshes external changes, and previews Markdown read-only with inert links.
+- Recoverable startup and scanning behavior for missing or unreadable vaults, corrupt settings, and notes that cannot be parsed.
+- A Flet 1.1.2 desktop interface with keyboard capture and light and dark theme support.
+- Main specifications for the `vault-selection` and `inbox-capture` capabilities.
+
+### Fixed
+
+- Filename sanitization is now idempotent when a forbidden character exposes a leading space, such as `.|0`.
+
 ## [0.1.0] - 2026-11-10
 
 ### Added
