@@ -17,6 +17,69 @@ WELCOME_CHOOSE = "Choose vault"
 WELCOME_NOTE = "You can change the vault later."
 
 INBOX_TITLE = "Inbox"
+REVIEW_TITLE = "Review"
+REVIEW_PENDING_ONE = "1 pending"
+REVIEW_PENDING_MANY = "{count} pending"
+REVIEW_ZERO_TITLE = "Nothing needs review"
+REVIEW_ZERO_BODY = "No inbox captures or projects are waiting for a next step."
+REVIEW_START_ACTION = "Start review"
+REVIEW_COMPLETE_TITLE = "Review complete"
+REVIEW_COMPLETE_BODY = "Reviewed {reviewed} and skipped {skipped}."
+REVIEW_BACK_TO_BROWSER = "Back to browser"
+REVIEW_CAPTURE_TITLE = "Capture"
+REVIEW_PROCESS_ACTION = "Process capture"
+REVIEW_NEXT = "Next"
+REVIEW_SKIP = "Skip"
+REVIEW_OPEN_PROJECT = "Open project"
+REVIEW_OPEN_ACTION = "Open"
+REVIEW_NEXT_STEP = "Next step"
+REVIEW_NO_NEXT_STEP = "This project has no next step yet."
+REVIEW_OTHER_ACTIONS = "Other open actions"
+REVIEW_CREATE_ACTION = "Create next action"
+REVIEW_ACTION_TITLE_LABEL = "Action title"
+REVIEW_ACTION_TITLE_HINT = "What is the next step?"
+REVIEW_ACTION_CONFIRM = "Create action"
+REVIEW_ACTION_CANCEL = "Cancel"
+REVIEW_TITLE_REQUIRED = "Enter a title for the next action."
+REVIEW_MARK_DONE = "Mark project done"
+REVIEW_DEFER = "Defer to later"
+REVIEW_CONFIRM_DONE = "Confirm done"
+REVIEW_CONFIRM_DEFER = "Confirm later"
+REVIEW_CANCEL = "Cancel"
+REVIEW_ACTION_CREATED = "Next action created: {path}"
+REVIEW_ACTION_FAILED = "Could not create the next action: {detail}"
+REVIEW_PROJECT_FAILED = "Could not update this project: {detail}"
+REVIEW_CAPTURE_READ_FAILED = "Could not read this capture: {detail}"
+REVIEW_DUE = "Due {date}"
+WORKSPACE_SECTION_LABELS = MappingProxyType(
+    {
+        "inbox": "Inbox",
+        "projects": "Projects",
+        "actions": "Actions",
+        "people": "People",
+        "references": "References",
+        "notes": "Notes",
+    }
+)
+BROWSER_SEARCH_LABEL = "Search"
+BROWSER_SEARCH_HINT = "Title or identity"
+BROWSER_EMPTY = "No notes in this section."
+BROWSER_NO_MATCH = "No notes match this search."
+BROWSER_FAILURES = "Unreadable notes"
+PROJECT_GROUP_LABELS = MappingProxyType(
+    {
+        "active": "Active",
+        "waiting": "Waiting",
+        "later": "Later",
+        "closed": "Closed",
+    }
+)
+PROJECT_OPEN_ACTIONS_ONE = "1 open action"
+PROJECT_OPEN_ACTIONS_MANY = "{count} open actions"
+PROJECT_NEXT_ACTION = "Next: {title}"
+PROJECT_NO_NEXT_ACTION = "No next action"
+PROJECT_DUE = "Due {date}"
+PROJECT_STATUS = "Status: {status}"
 PROCESS_ACTION = "Process"
 PROCESSING_TITLE = "Process capture"
 PROCESSING_CAPTURE = "Capture"
@@ -196,6 +259,38 @@ def note_count(count: int) -> str:
         Singular or plural count label.
     """
     return NOTE_COUNT_ONE if count == 1 else NOTE_COUNT_MANY.format(count=count)
+
+
+def open_action_count(count: int) -> str:
+    """Return the open-action count label for a project row.
+
+    Parameters
+    ----------
+    count : int
+        Number of open actions.
+
+    Returns
+    -------
+    str
+        Singular or plural label.
+    """
+    return PROJECT_OPEN_ACTIONS_ONE if count == 1 else PROJECT_OPEN_ACTIONS_MANY.format(count=count)
+
+
+def review_pending(count: int) -> str:
+    """Return the review badge label.
+
+    Parameters
+    ----------
+    count : int
+        Number of captures and stalled projects awaiting review.
+
+    Returns
+    -------
+    str
+        Singular or plural pending label, including zero.
+    """
+    return REVIEW_PENDING_ONE if count == 1 else REVIEW_PENDING_MANY.format(count=count)
 
 
 def scan_warning_title(count: int) -> str:

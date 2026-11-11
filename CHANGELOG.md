@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-11-11
+
+### Added
+
+- A persistent workspace browser that lists every parsed note under Inbox, Projects, Actions, People, References, or Notes, with section counts, title-and-identity search, and a separate section for unreadable notes.
+- A Projects view grouped by Active, Waiting, Later, and Closed, showing each project's status, optional due date, open action count, and computed next action.
+- A guided Review queue for pending Inbox captures and open projects, reusing the Processing Wizard and adding project next-step cards with next-action creation, done, later, and skip choices.
+- `VaultNote.due_date` plus read-only browsing, project, and review queries in `afanes.core.search`.
+- `Vault.create_project_action` and `Vault.set_status` for creating a project-linked action and changing a note's status safely.
+
+### Changed
+
+- The startup screen is now the workspace shell: capture, browser, page reading, processing, and review share one layout instead of switching between full screens.
+- A project's next action is computed from its open actions, choosing the earliest due date, then active before waiting, then display title.
+- Browser search covers display titles and identities only; note bodies are not searched.
+- This release implements the `add-review-workspace` OpenSpec change.
+
 ## [0.3.2] - 2026-11-11
 
 ### Added

@@ -47,6 +47,31 @@ CATEGORY_DIRECTORIES: Mapping[ReferenceCategory, Path] = MappingProxyType({Refer
 _MIN_INBOX_PART_COUNT = 2
 
 
+def is_inbox_path(relative_path: Path) -> bool:
+    """Return whether a vault-relative path is inside the inbox directory.
+
+    Parameters
+    ----------
+    relative_path : Path
+        Path relative to the vault root.
+
+    Returns
+    -------
+    bool
+        ``True`` when the first path component names the inbox directory,
+        compared case-insensitively, and the path has a filename component.
+
+    Notes
+    -----
+    Only the first component is checked. Nested inbox folders remain part of
+    the inbox, matching the capture workflow and the scan's classification.
+    """
+    return (
+        len(relative_path.parts) >= _MIN_INBOX_PART_COUNT
+        and relative_path.parts[0].casefold() == INBOX_DIRECTORY.name.casefold()
+    )
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class VaultNote:
     """One note discovered during a read-only vault scan.
@@ -71,6 +96,10 @@ class VaultNote:
         reference or a non-reference note.
     status : Status | None
         Validated workflow status, or ``None`` when absent.
+    due_date : datetime.date | None
+        Calendar due date read from frontmatter, or ``None`` when the key is
+        absent, null, or not a valid date. An invalid value is kept in the
+        file; only the derived scan value is ``None``.
     content_hash : str
         SHA-256 digest of the file bytes, used as an optimistic write guard.
     modified_ns : int
@@ -89,6 +118,7 @@ class VaultNote:
     note_type: NoteType
     category: ReferenceCategory | None
     status: Status | None
+    due_date: datetime.date | None
     content_hash: str
     modified_ns: int
     body_references: tuple[NoteReference, ...]
@@ -251,12 +281,7 @@ class VaultSnapshot:
         vault behaves consistently on case-sensitive and case-insensitive
         filesystems. This method performs no file I/O.
         """
-        inbox_name = INBOX_DIRECTORY.name.casefold()
-        notes = [
-            note
-            for note in self.notes
-            if len(note.relative_path.parts) > 1 and note.relative_path.parts[0].casefold() == inbox_name
-        ]
+        notes = [note for note in self.notes if is_inbox_path(note.relative_path)]
         return tuple(
             sorted(
                 notes,
@@ -1178,6 +1203,179 @@ class Vault:
         afanes.core.atomic.write_text_atomic(target, content)
         return target
 
+    def create_project_action(
+        self,
+        title: str,
+        project: NoteReference,
+        *,
+        status: Status | None = Status.ACTIVE,
+        due_date: datetime.date | None = None,
+        people: Iterable[str] = (),
+    ) -> Path:
+        """Create an action linked to a resolved project.
+
+        Parameters
+        ----------
+        title : str
+            Human title for the action. The first line becomes the note's
+            heading and the sanitized title becomes its identity.
+        project : NoteReference
+            Project reference to write into the action's ``project``
+            frontmatter. It must use the ``project`` scheme and resolve
+            uniquely in the current vault.
+        status : Status | None
+            Initial action status. ``None`` omits the key entirely. Defaults
+            to ``active``.
+        due_date : datetime.date | None
+            Optional calendar due date.
+        people : Iterable[str]
+            Person names assigned to the action. Names may be unresolved.
+
+        Returns
+        -------
+        Path
+            Absolute path to the created action.
+
+        Raises
+        ------
+        VaultError
+            If the title is blank, the project reference does not resolve, or
+            the destination is not a directory.
+        InvalidReferenceError
+            If ``project`` is not a project-scheme reference or a person name
+            is invalid.
+        NoteParseError
+            If the status is not valid for an action.
+        VaultPathError
+            If the action directory escapes the vault.
+        NameCollisionError
+            If the generated filename cannot be made unique.
+
+        Notes
+        -----
+        Existing action identities are preserved: a collision receives the
+        smallest available numeric suffix. Only the new action is written; the
+        project note is never changed. The write is atomic.
+        """
+        trimmed = title.strip()
+        if not trimmed:
+            message = "An action needs a title"
+            raise VaultError(message)
+        if project.scheme is not ReferenceScheme.PROJECT or not project.name.strip():
+            message = "An action needs a project reference"
+            raise InvalidReferenceError(message)
+        if status is not None and status not in afanes.models.note.allowed_statuses(NoteType.ACTION):
+            message = "Status is not valid for an action"
+            raise NoteParseError(message)
+
+        snapshot = self.scan()
+        resolution = snapshot.catalog.resolve(project)
+        if resolution.outcome is not ResolutionOutcome.RESOLVED:
+            message = f"Project reference does not resolve: {project.name}"
+            raise VaultError(message)
+
+        people_references = tuple(_person_reference(name) for name in people)
+        target_directory = self.contained(self.directory_for(NoteType.ACTION))
+        if target_directory.exists() and not target_directory.is_dir():
+            message = f"Note directory is not a directory: {target_directory}"
+            raise VaultError(message)
+        target_directory.mkdir(parents=True, exist_ok=True)
+
+        taken = {
+            note.name
+            for note in snapshot.notes
+            if afanes.core.links.scheme_for_note(note.note_type, note.category) is ReferenceScheme.NOTE
+        }
+        taken.update(entry.stem for entry in target_directory.iterdir())
+        taken.update(entry.name for entry in target_directory.iterdir())
+        name = afanes.core.names.unique_name(afanes.core.names.safe_filename(trimmed), taken)
+
+        document = _new_note_document(NoteType.ACTION, None, status, f"# {trimmed}\n")
+        raw = dict(document.raw)
+        if due_date is not None:
+            raw["due_date"] = due_date.isoformat()
+        if people_references:
+            raw["people"] = [f"{reference.scheme.value}:{reference.name}" for reference in people_references]
+        raw["project"] = f"{project.scheme.value}:{project.name}"
+        document = document.with_metadata(raw)
+
+        path = target_directory / f"{name}{NOTE_SUFFIX}"
+        afanes.core.atomic.write_text_atomic(path, document.to_text())
+        return path
+
+    def set_status(
+        self,
+        note_path: Path,
+        status: Status | None,
+        *,
+        snapshot: VaultSnapshot | None = None,
+        confirm: bool = False,
+    ) -> str:
+        """Change one note's workflow status without touching its body.
+
+        Parameters
+        ----------
+        note_path : Path
+            Relative or absolute path to an existing note inside this vault.
+        status : Status | None
+            New status, or ``None`` to remove the key.
+        snapshot : VaultSnapshot | None
+            Pre-built scan to avoid rescanning, or ``None`` to scan the vault.
+        confirm : bool
+            Explicit confirmation gate. The operation raises unless this is
+            ``True``.
+
+        Returns
+        -------
+        str
+            SHA-256 digest of the written bytes, for a later comparison.
+
+        Raises
+        ------
+        VaultError
+            If confirmation is missing, the note is not part of the vault, or
+            the destination directory is missing.
+        VaultPathError
+            If the path escapes the vault or is not a note file.
+        ContentChangedError
+            If the file changed after the supplied snapshot was taken.
+        NoteParseError
+            If the current note cannot be parsed or the status is not valid
+            for its type.
+
+        Notes
+        -----
+        Only the ``status`` key is modified. Unknown keys, the body, and the
+        newline style are preserved, and the write is atomic.
+        """
+        if not confirm:
+            message = "Changing a status requires explicit confirmation"
+            raise VaultError(message)
+
+        source = self.contained(note_path)
+        if not source.is_file() or source.suffix.casefold() != NOTE_SUFFIX:
+            message = f"Not a note file: {note_path}"
+            raise VaultPathError(message)
+        vault = snapshot or self.scan()
+        note = _find_note(vault, source)
+        if note is None:
+            message = f"Note is not part of the vault: {note_path}"
+            raise VaultError(message)
+        data = source.read_bytes()
+        if hashlib.sha256(data).hexdigest() != note.content_hash:
+            message = f"Note changed on disk: {note_path}"
+            raise ContentChangedError(message)
+
+        document = NoteDocument.from_text(data.decode("utf-8"))
+        raw = dict(document.raw)
+        if status is None:
+            raw.pop("status", None)
+        else:
+            raw["status"] = status.value
+        text = document.with_metadata(raw).to_text()
+        afanes.core.atomic.write_text_atomic(source, text)
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
     def recreate_page(self, note_path: Path, text: str) -> str:
         """Recreate a note that disappeared after it was read for editing.
 
@@ -1905,11 +2103,45 @@ def _read_note(
         note_type=document.note_type,
         category=document.category,
         status=document.status,
+        due_date=_due_date_from_raw(document.raw.get("due_date")),
         content_hash=hashlib.sha256(data).hexdigest(),
         modified_ns=stat.st_mtime_ns,
         body_references=body_references,
         frontmatter_references=document.references,
     )
+
+
+def _due_date_from_raw(value: object) -> datetime.date | None:
+    """Convert a raw frontmatter due date into a calendar date.
+
+    Parameters
+    ----------
+    value : object
+        Raw value from the parsed frontmatter mapping.
+
+    Returns
+    -------
+    datetime.date | None
+        The declared date for a YAML date or a valid ISO date string;
+        otherwise ``None``.
+
+    Notes
+    -----
+    Invalid input is not an error: the scan continues and the page editor is
+    responsible for reporting the invalid text when the note is edited. A YAML
+    timestamp with a time component is not a calendar date and becomes
+    ``None``.
+    """
+    if isinstance(value, datetime.datetime):
+        return None
+    if isinstance(value, datetime.date):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.date.fromisoformat(value.strip())
+        except ValueError:
+            return None
+    return None
 
 
 def _processing_target(

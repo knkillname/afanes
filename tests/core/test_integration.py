@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import afanes.core.search
 import afanes.core.settings
 import afanes.core.vault
 import afanes.ui.state
@@ -268,3 +269,133 @@ class TestPageEditingLifecycle:
         assert snapshot.catalog.resolve(NoteReference(ReferenceScheme.NOTE, "Budget")).targets == (budget,)
         assert snapshot.catalog.resolve(NoteReference(ReferenceScheme.PERSON, "Ada")).targets == (ada,)
         assert [note.path for note in snapshot.inbox_notes()] == [capture]
+
+
+def _write_note(
+    root: Path,
+    relative: str,
+    *,
+    note_type: str,
+    status: str | None = None,
+    project: str | None = None,
+    due_date: str | None = None,
+    body: str = "",
+) -> Path:
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["---", f"type: {note_type}"]
+    if status is not None:
+        lines.append(f"status: {status}")
+    if due_date is not None:
+        lines.append(f"due_date: {due_date}")
+    if project is not None:
+        lines.append(f'project: "{project}"')
+    lines.extend(["---", body])
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+class TestReviewActionCreation:
+    def test_review_action_creation_writes_only_the_new_action(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        root = tmp_path / "vault"
+        project = _write_note(root, "projects/Launch.md", note_type="project", status="active", body="# Launch")
+        action = _write_note(
+            root,
+            "actions/Draft brief.md",
+            note_type="action",
+            status="active",
+            project="project:Launch",
+            body="# Draft brief",
+        )
+        before = {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+        monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        state.reset()
+
+        async def scenario() -> Path | None:
+            await state.choose_vault(root)
+            await state.start_review()
+            return await state.create_review_action("Send the supplier the address")
+
+        try:
+            created = asyncio.run(scenario())
+        finally:
+            state.reset()
+
+        assert created is not None
+        after = {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+        new_files = set(after) - set(before)
+        assert new_files == {"actions/Send the supplier the address.md"}
+        assert project.read_bytes() == before["projects/Launch.md"]
+        assert action.read_bytes() == before["actions/Draft brief.md"]
+        project_document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+        action_document = NoteDocument.from_text(created.read_text(encoding="utf-8"))
+        assert project_document.status is Status.ACTIVE
+        assert action_document.status is Status.ACTIVE
+        assert action_document.raw["project"] == "project:Launch"
+
+
+class TestReviewWorkspaceWorkflow:
+    def test_browse_process_and_create_a_next_step(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        release = _write_note(
+            root, "projects/Release 1.0.md", note_type="project", status="active", body="# Release 1.0"
+        )
+        _write_note(
+            root,
+            "actions/Draft checklist.md",
+            note_type="action",
+            status="active",
+            due_date="2026-11-15",
+            project="project:Release 1.0",
+            body="# Draft checklist",
+        )
+        stalled = _write_note(
+            root, "projects/Office move.md", note_type="project", status="active", body="# Office move"
+        )
+        _write_note(root, "projects/Finished.md", note_type="project", status="done", body="# Finished")
+        _write_note(root, "inbox/Call the printer.md", note_type="note", body="# Call the printer")
+        monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        state.reset()
+
+        async def scenario() -> None:
+            await state.choose_vault(root)
+            listing = state.browser_listing
+            assert listing is not None
+            project_paths = [note.path for note in listing.group(afanes.core.search.BrowserSection.PROJECTS).notes]
+            assert project_paths == [root / "projects/Finished.md", stalled, release]
+            assert await state.open_page(release) is True
+            assert state.page is not None
+            assert state.page.path == release
+            assert await state.start_review() is True
+            plan = await state.plan_processing(ProcessingOutcome.ACTION)
+            assert plan is not None
+            assert await state.apply_processing() == root / "actions/Call the printer.md"
+            assert state.review_session is not None
+            current = state.review_session.current
+            assert current is not None
+            assert current.project is not None
+            assert current.project.note.path == stalled
+            assert await state.create_review_action("Send the supplier the address") is not None
+
+        try:
+            asyncio.run(scenario())
+        finally:
+            state.reset()
+
+        assert (root / "actions" / "Call the printer.md").is_file()
+        assert (root / "actions" / "Send the supplier the address.md").is_file()
+        assert not (root / "inbox" / "Call the printer.md").exists()
+        assert NoteDocument.from_text(stalled.read_text(encoding="utf-8")).status is Status.ACTIVE
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+        assert snapshot.inbox_notes() == ()
+        summaries = {summary.note.name: summary for summary in afanes.core.search.project_summaries(snapshot)}
+        assert summaries["Release 1.0"].next_action is not None
+        assert summaries["Release 1.0"].next_action.name == "Draft checklist"
+        assert summaries["Office move"].next_action is not None
+        assert summaries["Office move"].next_action.name == "Send the supplier the address"
+        assert set(summaries) == {"Release 1.0", "Office move", "Finished"}

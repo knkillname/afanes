@@ -16,11 +16,14 @@ import hashlib
 import logging
 import os
 from collections.abc import Callable
+from enum import StrEnum
 from pathlib import Path
+from typing import Self
 
 import afanes.core.editing
 import afanes.core.links
 import afanes.core.names
+import afanes.core.search
 import afanes.ui.strings
 from afanes.core.editing import DraftMode, PageDraft, PageLabels
 from afanes.core.errors import (
@@ -35,6 +38,14 @@ from afanes.core.errors import (
 )
 from afanes.core.links import DestinationKind
 from afanes.core.processing import ProcessingOutcome, ProcessingPlan
+from afanes.core.search import (
+    BrowserListing,
+    BrowserSection,
+    ProjectGroup,
+    ProjectSummary,
+    ReviewItem,
+    ReviewItemKind,
+)
 from afanes.core.settings import Settings, SettingsStore
 from afanes.core.vault import (
     LinkOutcome,
@@ -56,6 +67,176 @@ PAGE_HISTORY_LIMIT = 50
 AUTOSAVE_SECONDS = 30
 
 
+class WorkspaceSection(StrEnum):
+    """Top-level destinations in the workspace sidebar.
+
+    Attributes
+    ----------
+    REVIEW : str
+        Guided review of pending inbox captures and projects.
+    INBOX : str
+        Captures stored under the inbox directory.
+    PROJECTS : str
+        Project notes grouped by status.
+    ACTIONS : str
+        Action notes.
+    PEOPLE : str
+        Reference notes with ``category: person``.
+    REFERENCES : str
+        Uncategorized reference notes.
+    NOTES : str
+        Free-form notes outside the inbox.
+    """
+
+    REVIEW = "review"
+    INBOX = "inbox"
+    PROJECTS = "projects"
+    ACTIONS = "actions"
+    PEOPLE = "people"
+    REFERENCES = "references"
+    NOTES = "notes"
+
+    @property
+    def browser_section(self) -> BrowserSection | None:
+        """Return the matching browser section, or ``None`` for Review.
+
+        Returns
+        -------
+        BrowserSection | None
+            Section used to select browser entries. Review has no browser
+            section because it changes the main workspace area.
+        """
+        if self is WorkspaceSection.REVIEW:
+            return None
+        return BrowserSection(self.value)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ReviewSession:
+    """Snapshot queue and progress for one guided review.
+
+    Attributes
+    ----------
+    items : tuple[ReviewItem, ...]
+        Queue captured when the session started.
+    index : int
+        Position of the current item in :attr:`items`.
+    reviewed : tuple[Path, ...]
+        Paths the user reviewed, in order.
+    skipped : tuple[Path, ...]
+        Paths the user skipped, in order.
+    """
+
+    items: tuple[ReviewItem, ...]
+    index: int = 0
+    reviewed: tuple[Path, ...] = ()
+    skipped: tuple[Path, ...] = ()
+
+    @property
+    def current(self) -> ReviewItem | None:
+        """Return the current item, or ``None`` when the queue is complete.
+
+        Returns
+        -------
+        ReviewItem | None
+            Item at :attr:`index`, or ``None`` past the end of the queue.
+        """
+        if 0 <= self.index < len(self.items):
+            return self.items[self.index]
+        return None
+
+    @property
+    def complete(self) -> bool:
+        """Return whether every queued item has been passed.
+
+        Returns
+        -------
+        bool
+            ``True`` when :attr:`index` is at or past the end of the queue.
+        """
+        return self.index >= len(self.items)
+
+    @property
+    def reviewed_count(self) -> int:
+        """Return the number of reviewed items.
+
+        Returns
+        -------
+        int
+            Length of :attr:`reviewed`.
+        """
+        return len(self.reviewed)
+
+    @property
+    def skipped_count(self) -> int:
+        """Return the number of skipped items.
+
+        Returns
+        -------
+        int
+            Length of :attr:`skipped`.
+        """
+        return len(self.skipped)
+
+    def record_reviewed(self) -> Self:
+        """Mark the current item reviewed and advance.
+
+        Returns
+        -------
+        ReviewSession
+            New session with the current path recorded and the index advanced.
+            The original is unchanged. A complete session is returned as is.
+        """
+        item = self.current
+        if item is None:
+            return self
+        return dataclasses.replace(
+            self,
+            index=self.index + 1,
+            reviewed=(*self.reviewed, item.path),
+        )
+
+    def record_skipped(self) -> Self:
+        """Mark the current item skipped and advance.
+
+        Returns
+        -------
+        ReviewSession
+            New session with the current path recorded as skipped and the
+            index advanced. The original is unchanged.
+        """
+        item = self.current
+        if item is None:
+            return self
+        return dataclasses.replace(
+            self,
+            index=self.index + 1,
+            skipped=(*self.skipped, item.path),
+        )
+
+    def replace_current_project(self, summary: ProjectSummary) -> Self:
+        """Replace the current project item with a refreshed summary.
+
+        Parameters
+        ----------
+        summary : ProjectSummary
+            Refreshed summary for the project at the current position.
+
+        Returns
+        -------
+        ReviewSession
+            New session whose current item carries ``summary``. The original is
+            unchanged. A non-project or complete session is returned as is.
+        """
+        item = self.current
+        if item is None or item.kind is not ReviewItemKind.PROJECT:
+            return self
+        replacement = ReviewItem(kind=item.kind, path=item.path, project=summary)
+        items = list(self.items)
+        items[self.index] = replacement
+        return dataclasses.replace(self, items=tuple(items))
+
+
 @dataclasses.dataclass(slots=True, eq=False)
 class AppState:
     """Mutable state shared by the welcome and Inbox views.
@@ -68,6 +249,13 @@ class AppState:
         Inbox notes, newest first.
     failures : tuple[VaultFailure, ...]
         Notes the last scan could not parse.
+    active_section : WorkspaceSection
+        Sidebar destination currently shown.
+    browser_query : str
+        Title and identity filter typed into the browser search field.
+    review_session : ReviewSession | None
+        Guided review session in progress, or ``None`` when review is not
+        active.
     selected : Path | None
         Absolute path of the note shown in the preview.
     preview_body : str | None
@@ -119,6 +307,9 @@ class AppState:
     vault: Vault | None = None
     notes: tuple[VaultNote, ...] = ()
     failures: tuple[VaultFailure, ...] = ()
+    active_section: WorkspaceSection = WorkspaceSection.INBOX
+    browser_query: str = ""
+    review_session: ReviewSession | None = None
     selected: Path | None = None
     preview_body: str | None = None
     busy: bool = False
@@ -153,6 +344,231 @@ class AppState:
         """
         return None if self.vault is None else self.vault.root
 
+    @property
+    def browser_listing(self) -> BrowserListing | None:
+        """Return the current browser groups after applying the search query.
+
+        Returns
+        -------
+        BrowserListing | None
+            Grouped notes from the latest scan, filtered by
+            :attr:`browser_query`, or ``None`` when no vault is open.
+
+        Notes
+        -----
+        This property is pure in-memory work. It never reads a note body and
+        never changes the vault.
+        """
+        snapshot = self._snapshot
+        if snapshot is None:
+            return None
+        return afanes.core.search.browse_groups(snapshot).filtered(self.browser_query)
+
+    @property
+    def project_groups(self) -> tuple[ProjectGroup, ...]:
+        """Return project summaries grouped by presentation stage.
+
+        Returns
+        -------
+        tuple[ProjectGroup, ...]
+            Active, Waiting, Later, and Closed groups, or an empty tuple when
+            no vault is open.
+
+        Notes
+        -----
+        This property is pure in-memory work over the latest scan.
+        """
+        snapshot = self._snapshot
+        if snapshot is None:
+            return ()
+        return afanes.core.search.project_groups(snapshot)
+
+    @property
+    def review_pending_count(self) -> int:
+        """Return the number of items that need review attention.
+
+        Returns
+        -------
+        int
+            Pending inbox captures plus open projects without an open action.
+            Zero when no vault is open.
+        """
+        snapshot = self._snapshot
+        if snapshot is None:
+            return 0
+        return afanes.core.search.review_pending_count(snapshot)
+
+    async def set_section(self, section: WorkspaceSection) -> None:
+        """Select one workspace sidebar destination.
+
+        Parameters
+        ----------
+        section : WorkspaceSection
+            Destination to show.
+
+        Notes
+        -----
+        Switching sections performs no vault write and leaves the open page in
+        the page pane.
+        """
+        async with self._lock:
+            self.active_section = section
+            self.message = None
+
+    async def set_browser_query(self, query: str) -> None:
+        """Filter browser entries by display title or identity.
+
+        Parameters
+        ----------
+        query : str
+            Text typed into the search field. An empty value keeps every note.
+
+        Notes
+        -----
+        This command performs no file I/O and never reads a note body.
+        """
+        async with self._lock:
+            self.browser_query = query
+            self.message = None
+
+    async def start_review(self) -> bool:
+        """Start a guided review from the latest vault scan.
+
+        Returns
+        -------
+        bool
+            ``True`` when a session with at least one item started.
+
+        Notes
+        -----
+        The queue is a snapshot: pending inbox captures first, then open
+        projects without a next action, then healthy open projects. Work
+        created during the session waits for the next session. A zero queue
+        opens the Review destination without creating a session. Blocking
+        reads run in a worker thread.
+        """
+        async with self._lock:
+            snapshot = self._snapshot
+            if snapshot is None:
+                return False
+            queue = afanes.core.search.review_queue(snapshot)
+            self.review_session = ReviewSession(items=queue) if queue else None
+            self.active_section = WorkspaceSection.REVIEW
+            self.message = None
+            self._clear_processing()
+            if not queue:
+                return False
+            await self._enter_current_review_item()
+            return True
+
+    async def review_next(self) -> bool:
+        """Mark the current project reviewed and show the next item.
+
+        Returns
+        -------
+        bool
+            ``True`` when the session advanced. Inbox items cannot be advanced
+            with this command; they require a processing outcome or Skip.
+        """
+        async with self._lock:
+            session = self.review_session
+            if session is None or session.current is None or session.current.kind is not ReviewItemKind.PROJECT:
+                return False
+            self.review_session = session.record_reviewed()
+            self.message = None
+            await self._enter_current_review_item()
+            return True
+
+    async def review_skip(self) -> bool:
+        """Skip the current item without changing it.
+
+        Returns
+        -------
+        bool
+            ``True`` when an item was skipped and the session advanced.
+        """
+        async with self._lock:
+            session = self.review_session
+            if session is None or session.current is None:
+                return False
+            self.review_session = session.record_skipped()
+            self.message = None
+            await self._enter_current_review_item()
+            return True
+
+    async def create_review_action(self, title: str) -> Path | None:
+        """Create a next action for the current project in review.
+
+        Parameters
+        ----------
+        title : str
+            Action title typed into the review card. Whitespace-only input is
+            rejected without writing.
+
+        Returns
+        -------
+        Path | None
+            Absolute path of the created action, or ``None`` when nothing was
+            written.
+
+        Notes
+        -----
+        The project note is never changed. The refreshed project summary is
+        applied to the current session item so the card shows the new next
+        action. Blocking writes and scans run in a worker thread.
+        """
+        async with self._lock:
+            item = self._current_review_project()
+            vault = self.vault
+            if item is None or vault is None or not title.strip():
+                return None
+            project = item.project
+            if project is None:
+                return None
+            self.busy = True
+            self.message = None
+            try:
+                reference = NoteReference(scheme=ReferenceScheme.PROJECT, name=project.note.name)
+                try:
+                    path = await asyncio.to_thread(vault.create_project_action, title, reference)
+                except (AfanesError, OSError) as exc:
+                    logger.debug("Review action creation failed", exc_info=True)
+                    self.message = afanes.ui.strings.REVIEW_ACTION_FAILED.format(detail=str(exc))
+                    return None
+                await self._refresh_snapshot()
+                self._replace_review_project(item.path)
+                return path
+            finally:
+                self.busy = False
+
+    async def mark_review_project_done(self) -> bool:
+        """Mark the current review project ``done`` after confirmation.
+
+        Returns
+        -------
+        bool
+            ``True`` when the status changed and the session advanced.
+        """
+        return await self._set_review_project_status(Status.DONE)
+
+    async def defer_review_project(self) -> bool:
+        """Defer the current review project to ``later`` after confirmation.
+
+        Returns
+        -------
+        bool
+            ``True`` when the status changed and the session advanced.
+        """
+        return await self._set_review_project_status(Status.LATER)
+
+    async def finish_review(self) -> None:
+        """Close the review session and return to the browser."""
+        async with self._lock:
+            self.review_session = None
+            self.active_section = WorkspaceSection.INBOX
+            self._clear_processing()
+            self.message = None
+
     async def start(self) -> None:
         """Load saved settings and open the remembered vault.
 
@@ -184,6 +600,9 @@ class AppState:
                     return
                 self.vault = vault
                 self._clear_processing()
+                self.active_section = WorkspaceSection.INBOX
+                self.browser_query = ""
+                self.review_session = None
                 self.selected = None
                 self.preview_body = None
                 self.history = ()
@@ -230,6 +649,9 @@ class AppState:
                     return
                 self.vault = vault
                 self._clear_processing()
+                self.active_section = WorkspaceSection.INBOX
+                self.browser_query = ""
+                self.review_session = None
                 self.selected = None
                 self.preview_body = None
                 self.history = ()
@@ -1196,9 +1618,10 @@ class AppState:
 
         Notes
         -----
-        A successful apply leaves the wizard in a success state and refreshes
-        the Inbox. A failed apply keeps the plan so the user can retry. Blocking
-        writes and scans run in a worker thread.
+        A successful apply refreshes the scan. Outside a review it leaves the
+        wizard in a success state; during a review it records the item as
+        reviewed and opens the next queued item. A failed apply keeps the plan
+        so the user can retry. Blocking writes and scans run in a worker thread.
         """
         async with self._lock:
             vault = self.vault
@@ -1224,7 +1647,12 @@ class AppState:
                 self._clear_processing()
                 self.selected = None
                 self.preview_body = None
-                self.processing_result = target
+                session = self.review_session
+                if session is not None:
+                    self.review_session = session.record_reviewed()
+                    await self._enter_current_review_item()
+                else:
+                    self.processing_result = target
                 return target
             finally:
                 self.busy = False
@@ -1238,6 +1666,94 @@ class AppState:
         """Close the success state and return to the Inbox."""
         self._clear_processing()
         self.message = None
+
+    def _current_review_project(self) -> ReviewItem | None:
+        """Return the current project review item, or ``None``."""
+        session = self.review_session
+        if session is None:
+            return None
+        item = session.current
+        if item is None or item.kind is not ReviewItemKind.PROJECT or item.project is None:
+            return None
+        return item
+
+    async def _enter_current_review_item(self) -> None:
+        """Load the current review item, skipping captures that disappeared."""
+        while True:
+            session = self.review_session
+            if session is None:
+                return
+            item = session.current
+            self._clear_processing()
+            if item is None:
+                self.selected = None
+                self.preview_body = None
+                return
+            if item.kind is ReviewItemKind.PROJECT:
+                self.selected = None
+                self.preview_body = None
+                return
+            vault = self.vault
+            if vault is None:
+                return
+            try:
+                body = await asyncio.to_thread(vault.read_body, item.path)
+            except (AfanesError, OSError, UnicodeError) as exc:
+                logger.debug("Review capture could not be read", exc_info=True)
+                self.message = afanes.ui.strings.REVIEW_CAPTURE_READ_FAILED.format(detail=str(exc))
+                self.review_session = session.record_skipped()
+                continue
+            self.processing_note = item.path
+            self.processing_body = body
+            self.processing_plan = None
+            self.processing_result = None
+            self.selected = item.path
+            self.preview_body = body
+            return
+
+    async def _set_review_project_status(self, status: Status) -> bool:
+        """Apply one confirmed status change to the current review project."""
+        async with self._lock:
+            item = self._current_review_project()
+            vault = self.vault
+            if item is None or vault is None:
+                return False
+            self.busy = True
+            self.message = None
+            try:
+                try:
+                    await asyncio.to_thread(
+                        vault.set_status,
+                        item.path,
+                        status,
+                        snapshot=self._snapshot,
+                        confirm=True,
+                    )
+                except (AfanesError, OSError) as exc:
+                    logger.debug("Review project status change failed", exc_info=True)
+                    self.message = afanes.ui.strings.REVIEW_PROJECT_FAILED.format(detail=str(exc))
+                    return False
+                await self._refresh_snapshot()
+                session = self.review_session
+                if session is not None:
+                    self.review_session = session.record_reviewed()
+                await self._enter_current_review_item()
+                return True
+            finally:
+                self.busy = False
+
+    def _replace_review_project(self, path: Path) -> None:
+        """Replace the current review project with its refreshed summary."""
+        snapshot = self._snapshot
+        session = self.review_session
+        if snapshot is None or session is None:
+            return
+        summary = next(
+            (value for value in afanes.core.search.project_summaries(snapshot) if value.note.path == path),
+            None,
+        )
+        if summary is not None:
+            self.review_session = session.replace_current_project(summary)
 
     async def _mutate_labels(self, transform: Callable[[PageLabels], PageLabels]) -> bool:
         """Apply a label transformation that cannot change the scheme."""
@@ -1593,6 +2109,9 @@ class AppState:
         self.vault = None
         self.notes = ()
         self.failures = ()
+        self.active_section = WorkspaceSection.INBOX
+        self.browser_query = ""
+        self.review_session = None
         self.selected = None
         self.preview_body = None
         self.busy = False
@@ -1604,25 +2123,30 @@ class AppState:
         self._lock = asyncio.Lock()
 
     def note_title(self, path: Path) -> str:
-        """Return the display title for a note in the current Inbox list.
+        """Return the display title for a note in the latest scan.
 
         Parameters
         ----------
         path : Path
-            Absolute path of a note shown in the Inbox.
+            Absolute path of a note in the vault.
 
         Returns
         -------
         str
             Display title derived from the note's first level-1 heading, or its
             identity when the body has none. When ``path`` is no longer in the
-            current list, its filename stem is returned as a safe fallback.
+            latest scan, its filename stem is returned as a safe fallback.
 
         Notes
         -----
         This method is pure in-memory work over the last scan. It never reads
         the file and never parses Markdown in the view layer.
         """
+        snapshot = self._snapshot
+        if snapshot is not None:
+            note = next((note for note in snapshot.notes if note.path == path), None)
+            if note is not None:
+                return note.title
         note = next((note for note in self.notes if note.path == path), None)
         return path.stem if note is None else note.title
 
@@ -1696,6 +2220,9 @@ class AppState:
         self.vault = None
         self.notes = ()
         self.failures = ()
+        self.active_section = WorkspaceSection.INBOX
+        self.browser_query = ""
+        self.review_session = None
         self.selected = None
         self.preview_body = None
         self._snapshot = None

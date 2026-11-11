@@ -11,7 +11,7 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.inbox
-import afanes.ui.views.processing
+import afanes.ui.views.workspace
 
 
 async def main(page: ft.Page) -> None:
@@ -24,10 +24,12 @@ async def main(page: ft.Page) -> None:
 
     Notes
     -----
-    The shell chooses between the welcome state and the Inbox from the shared
-    application state, and rebuilds the page only when the vault changes. The
-    first development run may provision the Flet desktop client; application
-    code performs no network I/O.
+    The shell chooses between the welcome state and the workspace from the
+    shared application state, and rebuilds the page only when the vault
+    changes. Browser sections, the page pane, and focused flows update inside
+    the workspace without replacing it. The first development run may
+    provision the Flet desktop client; application code performs no network
+    I/O.
     """
     page.title = afanes.ui.strings.APP_TITLE
     page.theme_mode = ft.ThemeMode.SYSTEM
@@ -44,16 +46,8 @@ async def main(page: ft.Page) -> None:
         page.controls.clear()
         if state.vault_root is None:
             page.add(afanes.ui.views.inbox.build_welcome(choose_vault))
-        elif state.processing_note is not None or state.processing_result is not None:
-            page.add(
-                afanes.ui.views.processing.build_processing(
-                    page.update,
-                    cancel_processing,
-                    finish_processing,
-                )
-            )
         else:
-            page.add(afanes.ui.views.inbox.build_inbox(page.update, choose_vault, process_note))
+            page.add(afanes.ui.views.workspace.build_workspace(page.update, choose_vault))
         page.update()
 
     async def choose_vault() -> None:
@@ -65,18 +59,6 @@ async def main(page: ft.Page) -> None:
             await state.choose_vault(path)
         else:
             await state.change_vault(path)
-        await render()
-
-    async def process_note(path: Path) -> None:
-        await state.begin_processing(path)
-        await render()
-
-    async def cancel_processing() -> None:
-        state.cancel_processing()
-        await render()
-
-    async def finish_processing() -> None:
-        state.finish_processing()
         await render()
 
     await state.start()

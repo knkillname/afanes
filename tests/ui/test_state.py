@@ -22,6 +22,7 @@ from afanes.models.note import NoteType, Status
 
 OLD_NS = 1_700_000_000_000_000_000
 NEW_NS = 1_700_000_001_000_000_000
+TWO_PENDING = 2
 
 
 @pytest.fixture(autouse=True)
@@ -54,6 +55,28 @@ def _typed_note(note_type: str, body: str, *, category: str | None = None) -> st
         lines.append(f"category: {category}")
     lines.extend(["---", body])
     return "\n".join(lines)
+
+
+def _write_typed_note(
+    path: Path,
+    note_type: str,
+    *,
+    status: str | None = None,
+    project: str | None = None,
+    due_date: str | None = None,
+    body: str = "",
+) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["---", f"type: {note_type}"]
+    if status is not None:
+        lines.append(f"status: {status}")
+    if due_date is not None:
+        lines.append(f"due_date: {due_date}")
+    if project is not None:
+        lines.append(f'project: "{project}"')
+    lines.extend(["---", body])
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
 
 
 def _tree_state(root: Path) -> dict[str, bytes]:
@@ -1932,6 +1955,303 @@ class TestPageRecoveryLifecycle:
         assert (vault / "trash" / "Recovered page.md").exists()
         assert state.page is not None
         assert state.page.path == note.resolve()
+
+
+class TestReviewState:
+    def test_start_review_orders_inbox_then_stalled_then_healthy(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        capture = _write_note(vault / "inbox" / "Buy milk.md", _note_text("# Buy milk"))
+        _write_typed_note(vault / "projects" / "Stalled.md", "project", status="active")
+        _write_typed_note(vault / "projects" / "Healthy.md", "project", status="active")
+        _write_typed_note(
+            vault / "actions" / "Build.md",
+            "action",
+            status="active",
+            project="project:Healthy",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            return await state.start_review()
+
+        started = asyncio.run(scenario())
+
+        assert started is True
+        assert state.review_session is not None
+        assert [item.kind for item in state.review_session.items] == [
+            afanes.core.search.ReviewItemKind.INBOX,
+            afanes.core.search.ReviewItemKind.PROJECT,
+            afanes.core.search.ReviewItemKind.PROJECT,
+        ]
+        assert [item.path.stem for item in state.review_session.items] == ["Buy milk", "Stalled", "Healthy"]
+        assert state.processing_note == capture
+        assert state.active_section is afanes.ui.state.WorkspaceSection.REVIEW
+
+    def test_zero_pending_starts_no_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            return await state.start_review()
+
+        started = asyncio.run(scenario())
+
+        assert started is False
+        assert state.review_session is None
+        assert state.active_section is afanes.ui.state.WorkspaceSection.REVIEW
+        assert state.processing_note is None
+
+    def test_start_review_does_not_infer_an_outcome(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        capture = _write_note(vault / "inbox" / "Call Ada tomorrow.md", _note_text("# Call Ada tomorrow"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            await state.start_review()
+
+        asyncio.run(scenario())
+
+        assert capture.is_file()
+        assert not (vault / "actions").exists()
+        assert state.processing_plan is None
+        assert state.review_session is not None
+        assert state.review_session.current is not None
+
+    def test_processing_apply_advances_the_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "Buy milk.md", _note_text("# Buy milk"))
+        _write_typed_note(vault / "projects" / "Stalled.md", "project", status="active")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> Path | None:
+            await state.choose_vault(vault)
+            await state.start_review()
+            plan = await state.plan_processing(ProcessingOutcome.ACTION)
+            assert plan is not None
+            return await state.apply_processing()
+
+        target = asyncio.run(scenario())
+
+        assert target == vault / "actions" / "Buy milk.md"
+        assert state.review_session is not None
+        assert state.review_session.reviewed_count == 1
+        assert state.review_session.current is not None
+        assert state.review_session.current.kind is afanes.core.search.ReviewItemKind.PROJECT
+        assert state.processing_note is None
+        assert state.review_pending_count == 1
+
+    def test_skip_leaves_the_capture_and_advances(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        capture = _write_note(vault / "inbox" / "Buy milk.md", _note_text("# Buy milk"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            await state.start_review()
+            return await state.review_skip()
+
+        skipped = asyncio.run(scenario())
+
+        assert skipped is True
+        assert capture.is_file()
+        assert state.review_session is not None
+        assert state.review_session.skipped_count == 1
+        assert state.review_session.complete is True
+
+    def test_review_next_advances_a_project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        project = _write_typed_note(vault / "projects" / "Stalled.md", "project", status="active")
+        before = project.read_bytes()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            await state.start_review()
+            return await state.review_next()
+
+        advanced = asyncio.run(scenario())
+
+        assert advanced is True
+        assert project.read_bytes() == before
+        assert state.review_session is not None
+        assert state.review_session.complete is True
+        assert state.review_session.reviewed_count == 1
+
+    def test_review_next_does_not_skip_an_inbox_item(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "Buy milk.md", _note_text("# Buy milk"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            await state.start_review()
+            return await state.review_next()
+
+        advanced = asyncio.run(scenario())
+
+        assert advanced is False
+        assert state.review_session is not None
+        assert state.review_session.current is not None
+        assert state.review_session.current.kind is afanes.core.search.ReviewItemKind.INBOX
+
+    def test_mark_project_done_writes_the_status_and_advances(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        project = _write_typed_note(vault / "projects" / "Stalled.md", "project", status="active")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            await state.start_review()
+            return await state.mark_review_project_done()
+
+        changed = asyncio.run(scenario())
+
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+        assert changed is True
+        assert document.status is Status.DONE
+        assert state.review_session is not None
+        assert state.review_session.complete is True
+        assert state.review_pending_count == 0
+
+    def test_defer_project_sets_later_and_remains_pending(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        project = _write_typed_note(vault / "projects" / "Stalled.md", "project", status="active")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            await state.start_review()
+            return await state.defer_review_project()
+
+        changed = asyncio.run(scenario())
+
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+        assert changed is True
+        assert document.status is Status.LATER
+        assert state.review_pending_count == 1
+
+    def test_create_review_action_refreshes_the_project_card(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        project = _write_typed_note(vault / "projects" / "Launch.md", "project", status="active")
+        before = project.read_bytes()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> Path | None:
+            await state.choose_vault(vault)
+            await state.start_review()
+            return await state.create_review_action("Build the prototype")
+
+        path = asyncio.run(scenario())
+
+        assert path == vault / "actions" / "Build the prototype.md"
+        assert project.read_bytes() == before
+        assert path is not None
+        assert path.is_file()
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.raw["project"] == "project:Launch"
+        assert state.review_session is not None
+        current = state.review_session.current
+        assert current is not None
+        assert current.project is not None
+        assert current.project.next_action is not None
+        assert current.project.next_action.name == "Build the prototype"
+        assert state.review_session.reviewed_count == 0
+
+    def test_create_review_action_rejects_a_blank_title(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_typed_note(vault / "projects" / "Launch.md", "project", status="active")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> Path | None:
+            await state.choose_vault(vault)
+            await state.start_review()
+            return await state.create_review_action("   ")
+
+        path = asyncio.run(scenario())
+
+        assert path is None
+        assert not (vault / "actions").exists()
+        assert state.review_session is not None
+        current = state.review_session.current
+        assert current is not None
+        assert current.project is not None
+        assert current.project.next_action is None
+
+    def test_finish_review_returns_to_the_browser(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "Buy milk.md", _note_text("# Buy milk"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            await state.start_review()
+            await state.finish_review()
+
+        asyncio.run(scenario())
+
+        assert state.review_session is None
+        assert state.active_section is afanes.ui.state.WorkspaceSection.INBOX
+        assert state.processing_note is None
+
+    def test_new_work_is_not_appended_to_the_current_queue(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "Buy milk.md", _note_text("# Buy milk"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            await state.start_review()
+            await state.capture("Second thought")
+
+        asyncio.run(scenario())
+
+        assert state.review_session is not None
+        assert len(state.review_session.items) == 1
+        assert state.review_pending_count == TWO_PENDING
+
+    def test_reset_does_not_restore_a_review_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "Buy milk.md", _note_text("# Buy milk"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            await state.start_review()
+
+        asyncio.run(scenario())
+        state.reset()
+        asyncio.run(state.choose_vault(vault))
+
+        assert state.review_session is None
+        assert state.review_pending_count == 1
 
 
 class TestReset:

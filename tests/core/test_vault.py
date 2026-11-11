@@ -1,5 +1,6 @@
 """Tests for vault scanning, containment, atomic writes, and reference-safe edits."""
 
+import datetime
 import hashlib
 import os
 from pathlib import Path
@@ -11,6 +12,7 @@ import afanes.core.vault
 from afanes.core.errors import (
     ContentChangedError,
     EmptyCaptureError,
+    InvalidReferenceError,
     NameCollisionError,
     NoteParseError,
     VaultError,
@@ -36,6 +38,7 @@ def _write_note(
     *,
     category: str | None = None,
     status: str | None = None,
+    due_date: str | None = None,
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     if note_type == "person":
@@ -46,6 +49,8 @@ def _write_note(
         lines.append(f"category: {category}")
     if status is not None:
         lines.append(f"status: {status}")
+    if due_date is not None:
+        lines.append(f"due_date: {due_date}")
     if people:
         lines.append("people:")
         lines.extend(f'  - "{value}"' for value in people)
@@ -268,6 +273,40 @@ class TestScanVault:
 
         assert snapshot.notes == ()
         assert len(snapshot.failures) == ONE
+
+    def test_records_a_due_date(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Call.md", "action", due_date="2026-11-20")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert snapshot.notes[0].due_date == datetime.date(2026, 11, 20)
+
+    def test_absent_due_date_is_none(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Call.md", "action")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert snapshot.notes[0].due_date is None
+
+    def test_null_due_date_is_none(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Call.md", "action", due_date="null")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert snapshot.notes[0].due_date is None
+
+    def test_invalid_due_date_is_none_without_failing_the_scan(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Call.md", "action", due_date='"next Friday"')
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert [note.name for note in snapshot.notes] == ["Call"]
+        assert snapshot.notes[0].due_date is None
+        assert snapshot.failures == ()
 
     def test_reports_legacy_person_type(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -1737,3 +1776,166 @@ class TestTrash:
         afanes.core.vault.Vault(root).trash(note, confirm=True)
 
         assert (root / "trash" / "Ada 2.md").is_file()
+
+
+class TestCreateProjectAction:
+    def test_creates_a_linked_action(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "projects/Machine.md", "project", status="active")
+
+        path = afanes.core.vault.Vault(root).create_project_action(
+            "Build the prototype",
+            NoteReference(scheme=ReferenceScheme.PROJECT, name="Machine"),
+            due_date=datetime.date(2026, 11, 20),
+            people=("Ada",),
+        )
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert path == root / "actions" / "Build the prototype.md"
+        assert document.note_type is NoteType.ACTION
+        assert document.status is Status.ACTIVE
+        assert document.raw["project"] == "project:Machine"
+        assert document.raw["due_date"] == "2026-11-20"
+        assert document.raw["people"] == ["person:Ada"]
+        assert document.body == "# Build the prototype\n"
+
+    def test_rejects_a_blank_title(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "projects/Machine.md", "project", status="active")
+
+        with pytest.raises(VaultError):
+            afanes.core.vault.Vault(root).create_project_action(
+                "   ",
+                NoteReference(scheme=ReferenceScheme.PROJECT, name="Machine"),
+            )
+
+        assert not (root / "actions").exists()
+
+    def test_rejects_a_non_project_reference(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        with pytest.raises(InvalidReferenceError):
+            afanes.core.vault.Vault(root).create_project_action(
+                "Build",
+                NoteReference(scheme=ReferenceScheme.NOTE, name="Machine"),
+            )
+
+    def test_rejects_an_unresolved_project(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        with pytest.raises(VaultError):
+            afanes.core.vault.Vault(root).create_project_action(
+                "Build",
+                NoteReference(scheme=ReferenceScheme.PROJECT, name="Missing"),
+            )
+
+    def test_rejects_invalid_people_metadata(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "projects/Machine.md", "project", status="active")
+
+        with pytest.raises(VaultError):
+            afanes.core.vault.Vault(root).create_project_action(
+                "Build",
+                NoteReference(scheme=ReferenceScheme.PROJECT, name="Machine"),
+                people=(" ",),
+            )
+
+    def test_uses_a_unique_name_on_collision(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "projects/Machine.md", "project", status="active")
+        vault = afanes.core.vault.Vault(root)
+        reference = NoteReference(scheme=ReferenceScheme.PROJECT, name="Machine")
+
+        first = vault.create_project_action("Build", reference)
+        second = vault.create_project_action("Build", reference)
+
+        assert first.name == "Build.md"
+        assert second.name == "Build 2.md"
+        assert first.read_text(encoding="utf-8") == second.read_text(encoding="utf-8")
+
+    def test_collision_includes_other_notes_in_the_same_scheme(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "projects/Machine.md", "project", status="active")
+        _write_note(root / "reference/Build.md", "reference")
+
+        path = afanes.core.vault.Vault(root).create_project_action(
+            "Build",
+            NoteReference(scheme=ReferenceScheme.PROJECT, name="Machine"),
+        )
+
+        assert path == root / "actions" / "Build 2.md"
+
+    def test_rejects_a_destination_outside_the_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "projects/Machine.md", "project", status="active")
+        vault = afanes.core.vault.Vault(root)
+
+        def outside_directory(*_args: object, **_kwargs: object) -> Path:
+            return Path("../outside")
+
+        monkeypatch.setattr(
+            afanes.core.vault.Vault,
+            "directory_for",
+            outside_directory,
+        )
+
+        with pytest.raises(VaultPathError):
+            vault.create_project_action(
+                "Build",
+                NoteReference(scheme=ReferenceScheme.PROJECT, name="Machine"),
+            )
+
+
+class TestSetStatus:
+    def test_sets_a_project_status_without_touching_actions(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        project = _write_note(root / "projects/Machine.md", "project", status="active")
+        action = _write_note(root / "actions/Build.md", "action", status="active", project="project:Machine")
+        action_bytes = action.read_bytes()
+        vault = afanes.core.vault.Vault(root)
+
+        vault.set_status(project, Status.DONE, confirm=True)
+
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+        assert document.status is Status.DONE
+        assert action.read_bytes() == action_bytes
+
+    def test_requires_confirmation(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        project = _write_note(root / "projects/Machine.md", "project", status="active")
+
+        with pytest.raises(VaultError):
+            afanes.core.vault.Vault(root).set_status(project, Status.DONE)
+
+        assert "status: active" in project.read_text(encoding="utf-8")
+
+    def test_preserves_unknown_keys_and_newline_style(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        project = root / "projects" / "Machine.md"
+        project.parent.mkdir(parents=True)
+        project.write_bytes(b"---\r\ntype: project\r\nstatus: active\r\nx-custom: kept\r\n---\r\n# Machine\r\n")
+
+        afanes.core.vault.Vault(root).set_status(project, Status.LATER, confirm=True)
+
+        data = project.read_bytes()
+        assert b"x-custom: kept" in data
+        assert b"\r\n" in data
+        assert b"status: later" in data
+
+    def test_rejects_a_status_invalid_for_the_type(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "notes/Idea.md", "note")
+
+        with pytest.raises(NoteParseError):
+            afanes.core.vault.Vault(root).set_status(note, Status.ACTIVE, confirm=True)
+
+    def test_rejects_a_file_changed_after_the_snapshot(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        project = _write_note(root / "projects/Machine.md", "project", status="active")
+        snapshot = afanes.core.vault.Vault(root).scan()
+        project.write_text("---\ntype: project\nstatus: waiting\n---\n", encoding="utf-8")
+
+        with pytest.raises(ContentChangedError):
+            afanes.core.vault.Vault(root).set_status(project, Status.DONE, snapshot=snapshot, confirm=True)

@@ -1,0 +1,534 @@
+# SPDX-FileCopyrightText: 2026-present Mario Abarca <knkillname@gmail.com>
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Read-only browsing, project, and review queries over a vault snapshot.
+
+The functions in this module never read or write files. They derive browser
+groups, project summaries, and review queues from an already scanned
+:class:`afanes.core.vault.VaultSnapshot`, keeping classification rules out of
+the interface layer.
+"""
+
+import dataclasses
+import datetime
+from collections.abc import Iterable
+from enum import StrEnum
+from pathlib import Path
+from typing import Self
+
+import afanes.core.links
+import afanes.core.names
+from afanes.core.links import ResolutionOutcome
+from afanes.core.vault import VaultFailure, VaultNote, VaultSnapshot, is_inbox_path
+from afanes.models.link import ReferenceScheme
+from afanes.models.note import NoteType, ReferenceCategory, Status
+
+
+class BrowserSection(StrEnum):
+    """Fixed sections of the vault browser.
+
+    Attributes
+    ----------
+    INBOX : str
+        Captures stored under the vault's inbox directory.
+    PROJECTS : str
+        Notes of type ``project``.
+    ACTIONS : str
+        Notes of type ``action``.
+    PEOPLE : str
+        Reference notes with ``category: person``.
+    REFERENCES : str
+        Uncategorized reference notes.
+    NOTES : str
+        Free-form notes outside the inbox.
+    """
+
+    INBOX = "inbox"
+    PROJECTS = "projects"
+    ACTIONS = "actions"
+    PEOPLE = "people"
+    REFERENCES = "references"
+    NOTES = "notes"
+
+
+class ProjectStage(StrEnum):
+    """Presentation groups for project statuses.
+
+    Attributes
+    ----------
+    ACTIVE : str
+        Projects that are active or have no status.
+    WAITING : str
+        Projects explicitly waiting on something.
+    LATER : str
+        Projects deferred for later attention.
+    CLOSED : str
+        Completed, cancelled, or archived projects.
+    """
+
+    ACTIVE = "active"
+    WAITING = "waiting"
+    LATER = "later"
+    CLOSED = "closed"
+
+
+class ReviewItemKind(StrEnum):
+    """Kind of work queued for a review session.
+
+    Attributes
+    ----------
+    INBOX : str
+        A capture that still needs an explicit processing outcome.
+    PROJECT : str
+        An open project whose next step should be confirmed or created.
+    """
+
+    INBOX = "inbox"
+    PROJECT = "project"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class BrowserGroup:
+    """One section of the browser and its notes.
+
+    Attributes
+    ----------
+    section : BrowserSection
+        Section that owns the notes.
+    notes : tuple[VaultNote, ...]
+        Notes in presentation order. The inbox is newest first; other
+        sections are ordered by display title, identity, and path.
+    """
+
+    section: BrowserSection
+    notes: tuple[VaultNote, ...]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class BrowserListing:
+    """Every parsed note grouped for the browser, plus scan failures.
+
+    Attributes
+    ----------
+    groups : tuple[BrowserGroup, ...]
+        One group per browser section, always in section order.
+    failures : tuple[VaultFailure, ...]
+        Notes the scan could not parse, in scan order.
+    """
+
+    groups: tuple[BrowserGroup, ...]
+    failures: tuple[VaultFailure, ...]
+
+    def group(self, section: BrowserSection) -> BrowserGroup:
+        """Return one browser group.
+
+        Parameters
+        ----------
+        section : BrowserSection
+            Section to return. Every section is always present.
+
+        Returns
+        -------
+        BrowserGroup
+            Group for the requested section.
+        """
+        return next(group for group in self.groups if group.section is section)
+
+    def filtered(self, query: str) -> Self:
+        """Return a listing whose groups match a title or identity query.
+
+        Parameters
+        ----------
+        query : str
+            Free text typed into the browser search field. Matching ignores
+            case, Unicode form, and repeated whitespace. An empty query keeps
+            every note.
+
+        Returns
+        -------
+        BrowserListing
+            Listing with the same sections and failures. Search never reads a
+            note body, so body-only terms match nothing.
+        """
+        return BrowserListing(
+            groups=tuple(
+                BrowserGroup(section=group.section, notes=filter_notes(group.notes, query)) for group in self.groups
+            ),
+            failures=self.failures,
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ProjectSummary:
+    """One project and the actions attributed to it.
+
+    Attributes
+    ----------
+    note : VaultNote
+        Parsed project note.
+    open_actions : tuple[VaultNote, ...]
+        Actions attributed to the project that are open, ordered by the next
+        action policy.
+    next_action : VaultNote | None
+        First open action, or ``None`` when the project has no open action.
+    """
+
+    note: VaultNote
+    open_actions: tuple[VaultNote, ...]
+    next_action: VaultNote | None
+
+    @property
+    def open_count(self) -> int:
+        """Return the number of open actions.
+
+        Returns
+        -------
+        int
+            Length of :attr:`open_actions`.
+        """
+        return len(self.open_actions)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ProjectGroup:
+    """Projects sharing one presentation stage.
+
+    Attributes
+    ----------
+    stage : ProjectStage
+        Stage represented by this group.
+    projects : tuple[ProjectSummary, ...]
+        Projects in the stage, ordered by due date and title.
+    """
+
+    stage: ProjectStage
+    projects: tuple[ProjectSummary, ...]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ReviewItem:
+    """One snapshot entry in a guided review session.
+
+    Attributes
+    ----------
+    kind : ReviewItemKind
+        Whether the item is an inbox capture or a project.
+    path : Path
+        Absolute path of the capture or project note.
+    project : ProjectSummary | None
+        Project data for a project item; ``None`` for an inbox item.
+    """
+
+    kind: ReviewItemKind
+    path: Path
+    project: ProjectSummary | None = None
+
+
+def is_open_project(note: VaultNote) -> bool:
+    """Return whether a note is an open project.
+
+    Parameters
+    ----------
+    note : VaultNote
+        Note to classify. Non-project notes are never open projects.
+
+    Returns
+    -------
+    bool
+        ``True`` when the note is a project whose status is absent,
+        ``active``, ``waiting``, or ``later``.
+    """
+    if note.note_type is not NoteType.PROJECT:
+        return False
+    return note.status not in (Status.DONE, Status.CANCELLED, Status.ARCHIVED)
+
+
+def is_open_action(note: VaultNote) -> bool:
+    """Return whether a note is an open action.
+
+    Parameters
+    ----------
+    note : VaultNote
+        Note to classify. Non-action notes are never open actions.
+
+    Returns
+    -------
+    bool
+        ``True`` when the note is an action whose status is absent, ``active``,
+        or ``waiting``. A ``later`` action is deferred and not open.
+    """
+    if note.note_type is not NoteType.ACTION:
+        return False
+    return note.status in (None, Status.ACTIVE, Status.WAITING)
+
+
+def browse_groups(snapshot: VaultSnapshot) -> BrowserListing:
+    """Group every parsed note for the browser.
+
+    Parameters
+    ----------
+    snapshot : VaultSnapshot
+        Read-only scan result.
+
+    Returns
+    -------
+    BrowserListing
+        Six section groups in fixed order plus parse failures. A note appears
+        in exactly one group; captures under the inbox appear only under
+        ``Inbox``. Notes under ``trash/`` are already excluded by the scan.
+
+    Notes
+    -----
+    The function performs no file I/O and never changes a note.
+    """
+    groups: dict[BrowserSection, list[VaultNote]] = {section: [] for section in BrowserSection}
+    for note in snapshot.inbox_notes():
+        groups[BrowserSection.INBOX].append(note)
+    for note in snapshot.notes:
+        if is_inbox_path(note.relative_path):
+            continue
+        groups[_section_for(note)].append(note)
+    return BrowserListing(
+        groups=tuple(
+            BrowserGroup(
+                section=section,
+                notes=tuple(groups[section]) if section is BrowserSection.INBOX else _sorted_notes(groups[section]),
+            )
+            for section in BrowserSection
+        ),
+        failures=snapshot.failures,
+    )
+
+
+def filter_notes(notes: Iterable[VaultNote], query: str) -> tuple[VaultNote, ...]:
+    """Filter notes by display title or identity.
+
+    Parameters
+    ----------
+    notes : Iterable[VaultNote]
+        Notes to filter, in presentation order.
+    query : str
+        Free text typed by the user. Matching uses
+        :func:`afanes.core.names.normalize_name`, so case, Unicode form, and
+        repeated whitespace are ignored. An empty query keeps every note.
+
+    Returns
+    -------
+    tuple[VaultNote, ...]
+        Matching notes in the input order. The body is never inspected.
+    """
+    normalized_query = afanes.core.names.normalize_name(query)
+    if not normalized_query:
+        return tuple(notes)
+    return tuple(
+        note
+        for note in notes
+        if normalized_query in afanes.core.names.normalize_name(note.title)
+        or normalized_query in afanes.core.names.normalize_name(note.name)
+    )
+
+
+def project_summaries(snapshot: VaultSnapshot) -> tuple[ProjectSummary, ...]:
+    """Build one summary for every parsed project.
+
+    Parameters
+    ----------
+    snapshot : VaultSnapshot
+        Read-only scan result.
+
+    Returns
+    -------
+    ProjectSummary
+        Summaries in deterministic order: stage is not considered here, but
+        projects are ordered by due date, then display title, identity, and
+        path.
+
+    Notes
+    -----
+    An action belongs to a project only when its ``project`` frontmatter
+    reference resolves uniquely to that project. Body links, unresolved
+    references, and ambiguous references are ignored. Only actions that are
+    open contribute to :attr:`ProjectSummary.open_actions`.
+    """
+    projects = [note for note in snapshot.notes if note.note_type is NoteType.PROJECT]
+    actions_by_project: dict[Path, list[VaultNote]] = {project.path: [] for project in projects}
+    for note in snapshot.notes:
+        if note.note_type is not NoteType.ACTION or not is_open_action(note):
+            continue
+        for path in _attributed_projects(snapshot, note):
+            actions_by_project[path].append(note)
+
+    summaries = [_project_summary(project, tuple(actions_by_project[project.path])) for project in projects]
+    return tuple(sorted(summaries, key=_project_sort_key))
+
+
+def project_groups(snapshot: VaultSnapshot) -> tuple[ProjectGroup, ...]:
+    """Group project summaries by presentation stage.
+
+    Parameters
+    ----------
+    snapshot : VaultSnapshot
+        Read-only scan result.
+
+    Returns
+    -------
+    tuple[ProjectGroup, ...]
+        Active, Waiting, Later, and Closed groups in that order. Every group is
+        present even when empty. A project with no status is active.
+    """
+    summaries = project_summaries(snapshot)
+    return tuple(
+        ProjectGroup(
+            stage=stage,
+            projects=tuple(summary for summary in summaries if _project_stage(summary.note) is stage),
+        )
+        for stage in ProjectStage
+    )
+
+
+def review_queue(snapshot: VaultSnapshot) -> tuple[ReviewItem, ...]:
+    """Build the ordered queue for one review session.
+
+    Parameters
+    ----------
+    snapshot : VaultSnapshot
+        Read-only scan result captured when the session starts.
+
+    Returns
+    -------
+    tuple[ReviewItem, ...]
+        Pending inbox captures first, newest first; then open projects with no
+        open action; then healthy open projects for confirmation. Closed
+        projects are excluded.
+
+    Notes
+    -----
+    The result is a snapshot. Work created or changed after this call is not
+    appended to an existing queue; start a new session to include it.
+    """
+    inbox_items = tuple(ReviewItem(kind=ReviewItemKind.INBOX, path=note.path) for note in snapshot.inbox_notes())
+    open_projects = [
+        summary
+        for group in project_groups(snapshot)
+        if group.stage is not ProjectStage.CLOSED
+        for summary in group.projects
+    ]
+    stalled = tuple(
+        ReviewItem(kind=ReviewItemKind.PROJECT, path=summary.note.path, project=summary)
+        for summary in open_projects
+        if summary.next_action is None
+    )
+    healthy = tuple(
+        ReviewItem(kind=ReviewItemKind.PROJECT, path=summary.note.path, project=summary)
+        for summary in open_projects
+        if summary.next_action is not None
+    )
+    return (*inbox_items, *stalled, *healthy)
+
+
+def review_pending_count(snapshot: VaultSnapshot) -> int:
+    """Count the work that needs attention before a review.
+
+    Parameters
+    ----------
+    snapshot : VaultSnapshot
+        Read-only scan result.
+
+    Returns
+    -------
+    int
+        Number of pending inbox captures plus open projects with no open
+        action. Healthy open projects do not contribute to the count.
+
+    Notes
+    -----
+    The function performs no file I/O and never changes a note.
+    """
+    summaries = project_summaries(snapshot)
+    stalled = sum(1 for summary in summaries if is_open_project(summary.note) and summary.next_action is None)
+    return len(snapshot.inbox_notes()) + stalled
+
+
+def _section_for(note: VaultNote) -> BrowserSection:
+    """Return the browser section for a non-inbox note."""
+    if note.note_type is NoteType.PROJECT:
+        return BrowserSection.PROJECTS
+    if note.note_type is NoteType.ACTION:
+        return BrowserSection.ACTIONS
+    if note.note_type is NoteType.REFERENCE:
+        return BrowserSection.PEOPLE if note.category is ReferenceCategory.PERSON else BrowserSection.REFERENCES
+    return BrowserSection.NOTES
+
+
+def _sorted_notes(notes: Iterable[VaultNote]) -> tuple[VaultNote, ...]:
+    """Sort notes by display title, identity, and path."""
+    return tuple(
+        sorted(
+            notes,
+            key=lambda note: (
+                afanes.core.names.normalize_name(note.title),
+                afanes.core.names.normalize_name(note.name),
+                note.relative_path.as_posix(),
+            ),
+        )
+    )
+
+
+def _attributed_projects(snapshot: VaultSnapshot, action: VaultNote) -> tuple[Path, ...]:
+    """Return project paths that uniquely resolve from one action's reference."""
+    paths: list[Path] = []
+    for reference in action.frontmatter_references:
+        if reference.scheme is not ReferenceScheme.PROJECT:
+            continue
+        resolution = snapshot.catalog.resolve(reference)
+        if resolution.outcome is ResolutionOutcome.RESOLVED:
+            paths.append(resolution.targets[0])
+    return tuple(paths)
+
+
+def _project_summary(project: VaultNote, actions: tuple[VaultNote, ...]) -> ProjectSummary:
+    """Build one project summary and compute its next action."""
+    ordered = tuple(sorted(actions, key=_action_sort_key))
+    return ProjectSummary(
+        note=project,
+        open_actions=ordered,
+        next_action=ordered[0] if ordered else None,
+    )
+
+
+def _project_sort_key(summary: ProjectSummary) -> tuple[bool, datetime.date, str, str, str]:
+    """Order projects by due date, then display title, identity, and path."""
+    note = summary.note
+    due_date = note.due_date
+    return (
+        due_date is None,
+        due_date or datetime.date.max,
+        afanes.core.names.normalize_name(note.title),
+        afanes.core.names.normalize_name(note.name),
+        note.relative_path.as_posix(),
+    )
+
+
+def _action_sort_key(note: VaultNote) -> tuple[bool, datetime.date, int, str, str, str]:
+    """Order open actions for the next-action choice."""
+    due_date = note.due_date
+    status_rank = 0 if note.status in (None, Status.ACTIVE) else 1
+    return (
+        due_date is None,
+        due_date or datetime.date.max,
+        status_rank,
+        afanes.core.names.normalize_name(note.title),
+        afanes.core.names.normalize_name(note.name),
+        note.relative_path.as_posix(),
+    )
+
+
+def _project_stage(note: VaultNote) -> ProjectStage:
+    """Map a project status to its presentation stage."""
+    if note.status in (Status.DONE, Status.CANCELLED, Status.ARCHIVED):
+        return ProjectStage.CLOSED
+    if note.status is Status.WAITING:
+        return ProjectStage.WAITING
+    if note.status is Status.LATER:
+        return ProjectStage.LATER
+    return ProjectStage.ACTIVE

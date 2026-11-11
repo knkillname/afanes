@@ -9,9 +9,12 @@
 
 - [Development](#development)
 - [Vault format](#vault-format)
+- [Workspace browser](#workspace-browser)
 - [Inbox](#inbox)
+- [Projects](#projects)
 - [Pages and editing](#pages-and-editing)
 - [Processing](#processing)
+- [Review](#review)
 - [Changelog](#changelog)
 - [License](#license)
 
@@ -31,7 +34,8 @@ one-time development provisioning step; the application itself performs no netwo
 builds will bundle the client in a later change.
 
 On first launch, choose a vault folder. Afanes remembers it in the platform configuration
-directory and reopens it next time. The [Inbox](#inbox) then lists notes under `inbox/`.
+directory and reopens it next time. The [workspace browser](#workspace-browser) then lists every
+note in the vault and opens on the [Inbox](#inbox) group.
 
 ## Vault format
 
@@ -98,6 +102,30 @@ Use `person:` for reference notes with `category: person`, `project:` for projec
 `note:` for notes, actions, and uncategorized references. A note belongs to exactly one scheme.
 Names are matched case-insensitively, so `[Ada](<person:ada lovelace>)` resolves to the same note.
 
+## Workspace browser
+
+The workspace keeps a navigation browser beside the page pane. The browser groups every parsed
+note by type:
+
+- **Inbox** lists captures under `inbox/`, newest first.
+- **Projects** lists project notes grouped by status.
+- **Actions** lists action notes.
+- **People** lists reference notes with `category: person`.
+- **References** lists uncategorized reference notes.
+- **Notes** lists free-form notes outside the inbox.
+
+A note appears in exactly one group. Notes under `trash/` are absent. A note that cannot be parsed
+appears in **Unreadable notes**, where selecting it opens the complete file in raw rescue mode.
+Selecting any entry opens it in the page pane without changing the browser section.
+
+The search field filters the active section by display title or identity. Matching ignores case,
+Unicode form, and repeated whitespace. Search does not read note bodies; a term that appears only in
+a body does not match.
+
+The capture field stays at the top of the workspace. It behaves exactly like the Inbox composer:
+the first non-blank line becomes the filename and heading, and the note is written under `inbox/`
+with only `type: note`.
+
 ## Inbox
 
 Captures live in `inbox/`. Capturing a thought uses the first non-blank line as the filename and
@@ -117,16 +145,33 @@ type: note
 about the invoice
 ```
 
-The Inbox lists every note under `inbox/`, newest first, showing each note's display title with its
-vault-relative path as the secondary line. Select a note to open it in the page pane; read its body
-or choose Edit to change it. Process remains available for Inbox captures.
+The Inbox group lists every note under `inbox/`, newest first, showing each note's display title with
+its vault-relative path as the secondary line. Select a note to open it in the page pane; read its
+body or choose Edit to change it. Process remains available for Inbox captures.
+
+## Projects
+
+The Projects group lists every parsed project under **Active**, **Waiting**, **Later**, and
+**Closed**. A project without a status is active. `done`, `cancelled`, and `archived` projects are
+closed, and the Closed group starts collapsed.
+
+Each project row shows its status, optional due date, count of open actions, and next action. An
+action is open when it has no status or is `active` or `waiting`; `later`, `done`, `cancelled`, and
+`archived` actions are not open. A project's next action is computed, never stored: the open action
+with the earliest due date wins; when no open action has a due date, `active` ranks before
+`waiting`, then the display title breaks the tie.
+
+An action belongs to a project only when its `project` frontmatter reference resolves uniquely to
+that project. Links in the body do not count as steps, and an ambiguous or unresolved reference is
+not attributed to any project. Changing actions never changes a project's status automatically, and
+closing a project never changes its actions.
 
 ## Pages and editing
 
-Select a note in the Inbox to open it in the page pane. Read mode shows the display title and the
+Select a note in the browser to open it in the page pane. Read mode shows the display title and the
 rendered Markdown body; tapping an internal reference opens its page. External links, attachments,
 and unsafe destinations do nothing. Back returns through the pages you opened, whether they came
-from the Inbox list or a link.
+from the browser or a link.
 
 Following a reference that has no page opens a draft. The draft uses the reference scheme to choose
 its type and default folder:
@@ -156,8 +201,8 @@ version. If the file was moved or deleted, the page offers to recreate it or dis
 
 A note whose frontmatter cannot be parsed opens in raw rescue mode, where the complete file text is
 editable and labels are unavailable. Saving writes exactly what you typed; once the text parses, the
-normal editor returns. Unreadable notes are listed in the Inbox failure banner and can be opened from
-there.
+normal editor returns. Unreadable notes are listed in the browser's **Unreadable notes** section and
+can be opened from there.
 
 Rename and Move to trash are available in read mode. Both show their affected references before
 confirming. A rename updates the first heading only when it still matches the old identity; a custom
@@ -179,6 +224,36 @@ failed move leaves the note in the Inbox so the same plan can be retried.
 Project steps are action notes linked by the `project` key. Trash moves the note to `trash/`
 without rewriting any referring note; moving it back restores it and resolves its inbound
 references again.
+
+## Review
+
+The **Review** entry shows how many items need attention: pending Inbox captures plus open projects
+with no open action. Healthy open projects do not contribute to the badge. Selecting Review with
+zero pending items shows the zero state and starts no session.
+
+Starting a review snapshots a queue in this order:
+
+1. Pending Inbox captures.
+2. Open projects with no next action.
+3. Healthy open projects, for a quick confirmation.
+
+Closed projects are excluded. Notes created during a session appear in the browser immediately but
+wait for the next review session.
+
+An Inbox item opens the existing Processing Wizard. Confirming an outcome applies it and advances
+the session; cancelling leaves the capture in the Inbox. The review never chooses an outcome or
+metadata from the capture text.
+
+A project card shows the project title, status, optional due date, its next action, and any other
+open actions. Open project or the next action to work on either page. For a project with no open
+action, the card offers creating a next action, marking the project done, deferring it to `later`,
+or skipping. Creating an action requires a title and writes an action linked to the project; the
+project note itself is unchanged. Marking done and deferring both require confirmation. Skip leaves
+the project exactly as it was, so it remains in the next session's pending count.
+
+After the last item, the session reports how many items were reviewed and skipped and returns to the
+browser. The session is not persisted across restarts; the pending count is always recomputed from
+the vault.
 
 ## Changelog
 
