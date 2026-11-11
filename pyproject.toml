@@ -32,6 +32,9 @@ dependencies = [
 desktop = ["flet[desktop]>=1.0.4,<2"]
 web = ["flet[web]>=1.0.4,<2"]
 
+[project.scripts]
+afanes = "afanes.__main__:main"
+
 [project.urls]
 Documentation = "https://github.com/knkillname/afanes#readme"
 Issues = "https://github.com/knkillname/afanes/issues"

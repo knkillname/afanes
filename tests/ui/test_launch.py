@@ -1,7 +1,9 @@
 """Tests for the graphical entry point and its launch options."""
 
 import builtins
+import importlib
 import importlib.util
+import tomllib
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -13,6 +15,19 @@ import afanes.ui.strings
 
 USAGE_EXIT_CODE = 2
 TEST_PORT = 8765
+PROJECT_ROOT = Path(__file__).parents[2]
+
+
+class TestConsoleEntryPoint:
+    def test_console_script_targets_the_launch_function(self) -> None:
+        scripts = _project_scripts()
+
+        assert scripts["afanes"] == "afanes.__main__:main"
+
+    def test_console_script_target_resolves_to_a_callable(self) -> None:
+        target = _project_scripts()["afanes"]
+
+        assert callable(_resolve_target(target))
 
 
 class TestLaunchOptions:
@@ -161,6 +176,17 @@ class TestLaunchDispatch:
         assert excinfo.value.code == 1
         assert str(missing) in capsys.readouterr().err
         assert calls == []
+
+
+def _project_scripts() -> dict[str, str]:
+    document = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    scripts = document["project"]["scripts"]
+    return {name: str(target) for name, target in scripts.items()}
+
+
+def _resolve_target(target: str) -> object:
+    module_name, _, attribute = target.partition(":")
+    return getattr(importlib.import_module(module_name), attribute)
 
 
 def _block_runtime(monkeypatch: pytest.MonkeyPatch, blocked: str) -> None:

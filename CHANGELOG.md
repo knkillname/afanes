@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-11
+
+### Added
+
+- An installed `afanes` command launches the application, with the same `--web`, `--vault DIR`, and `--port N` options as `python -m afanes`; the module form remains available. This release implements the `add-console-launch-command` OpenSpec change.
+
 ## [0.4.0] - 2026-11-11
 
 ### Added

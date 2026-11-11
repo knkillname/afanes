@@ -25,8 +25,11 @@ Afanes is not yet distributed as a packaged desktop app. Run it from a source ch
 
 ```console
 hatch env create
-hatch run python -m afanes
+hatch run afanes
 ```
+
+`hatch run afanes` opens the desktop window. The module form, `hatch run python -m afanes`, is
+equivalent and remains available.
 
 `pip install afanes` installs the Python library and the Flet SDK, but no interface runtime. Install
 the runtime for the presentation you use:
@@ -36,6 +39,9 @@ pip install "afanes[desktop]"   # native window; the client is cached on first r
 pip install "afanes[web]"       # browser runtime; no native client is installed
 ```
 
+With a runtime installed, the `afanes` command starts the application; `python -m afanes` does the
+same.
+
 Installing a runtime through the package manager is the only supported path. Afanes never installs
 packages while starting. The first desktop run downloads and caches the Flet desktop client under
 `~/.flet/client/`; this is a one-time development provisioning step and the application itself
@@ -44,8 +50,8 @@ download. Packaged builds will bundle the desktop client in a later change.
 
 Afanes supports Flet 1.0.4 and later 1.x releases. `hatch test --all` runs the suite on every
 supported interpreter and against the oldest supported dependency versions. The development
-environment installs both interface runtimes, so `hatch run python -m afanes --web` works from a
-clean checkout.
+environment installs both interface runtimes, so `hatch run afanes --web` works from a clean
+checkout.
 
 ## Running in a browser
 
@@ -53,8 +59,10 @@ Machines that block the native Flet client can serve the same interface to a bro
 
 ```console
 pip install "afanes[web]"
-python -m afanes --web
+afanes --web
 ```
+
+The module form, `python -m afanes --web`, works the same.
 
 The desktop window stays the default; `--web` is the explicit opt-in and Afanes never switches
 presentation on its own. The server binds the loopback interface only and refuses other machines, so
