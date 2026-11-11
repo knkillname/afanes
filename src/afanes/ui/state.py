@@ -15,13 +15,10 @@ import logging
 import os
 from pathlib import Path
 
-import afanes.core.frontmatter
-import afanes.core.settings
-import afanes.core.vault
 import afanes.ui.strings
 from afanes.core.errors import AfanesError, ConfigurationError, EmptyCaptureError, VaultError
-from afanes.core.settings import Settings
-from afanes.core.vault import VaultFailure, VaultNote, VaultSnapshot
+from afanes.core.settings import Settings, SettingsStore
+from afanes.core.vault import Vault, VaultFailure, VaultNote, VaultSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +29,8 @@ class AppState:
 
     Attributes
     ----------
-    vault_root : Path | None
-        Resolved vault root, or ``None`` while the welcome state is shown.
+    vault : Vault | None
+        Active vault service, or ``None`` while the welcome state is shown.
     notes : tuple[VaultNote, ...]
         Inbox notes, newest first.
     failures : tuple[VaultFailure, ...]
@@ -54,7 +51,7 @@ class AppState:
     directly; they call the command methods.
     """
 
-    vault_root: Path | None = None
+    vault: Vault | None = None
     notes: tuple[VaultNote, ...] = ()
     failures: tuple[VaultFailure, ...] = ()
     selected: Path | None = None
@@ -62,6 +59,17 @@ class AppState:
     busy: bool = False
     message: str | None = None
     _lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock, repr=False)
+
+    @property
+    def vault_root(self) -> Path | None:
+        """Return the active vault root, or ``None`` in the welcome state.
+
+        Returns
+        -------
+        Path | None
+            Resolved root of :attr:`vault`, or ``None`` when no vault is open.
+        """
+        return None if self.vault is None else self.vault.root
 
     async def start(self) -> None:
         """Load saved settings and open the remembered vault.
@@ -76,7 +84,7 @@ class AppState:
             self.busy = True
             try:
                 try:
-                    settings = await asyncio.to_thread(afanes.core.settings.load_settings)
+                    settings = await asyncio.to_thread(SettingsStore.default().load)
                 except ConfigurationError:
                     logger.debug("Settings could not be read", exc_info=True)
                     self._show_welcome(afanes.ui.strings.SETTINGS_UNREADABLE)
@@ -85,12 +93,13 @@ class AppState:
                     self._show_welcome(None)
                     return
                 try:
-                    root, snapshot = await asyncio.to_thread(_open_vault, settings.vault)
+                    vault = await asyncio.to_thread(self._open_vault, settings.vault)
+                    snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Saved vault could not be opened", exc_info=True)
                     self._show_welcome(str(exc))
                     return
-                self.vault_root = root
+                self.vault = vault
                 self.selected = None
                 self.preview_body = None
                 self._apply_snapshot(snapshot)
@@ -116,21 +125,22 @@ class AppState:
             self.message = None
             try:
                 try:
-                    root, snapshot = await asyncio.to_thread(_open_vault, path)
+                    vault = await asyncio.to_thread(self._open_vault, path)
+                    snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Selected vault could not be opened", exc_info=True)
                     self.message = str(exc)
                     return
                 try:
                     await asyncio.to_thread(
-                        afanes.core.settings.save_settings,
-                        Settings(vault=root),
+                        SettingsStore.default().save,
+                        Settings(vault=vault.root),
                     )
                 except ConfigurationError as exc:
                     logger.debug("Vault selection could not be saved", exc_info=True)
                     self.message = afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail=str(exc))
                     return
-                self.vault_root = root
+                self.vault = vault
                 self.selected = None
                 self.preview_body = None
                 self._apply_snapshot(snapshot)
@@ -162,13 +172,13 @@ class AppState:
         runs in a worker thread.
         """
         async with self._lock:
-            vault_root = self.vault_root
-            if vault_root is None:
+            vault = self.vault
+            if vault is None:
                 return
             self.busy = True
             try:
                 try:
-                    snapshot = await asyncio.to_thread(afanes.core.vault.scan_vault, vault_root)
+                    snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Vault scan failed", exc_info=True)
                     self.message = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
@@ -178,7 +188,7 @@ class AppState:
                 if selected is None:
                     return
                 try:
-                    self.preview_body = await asyncio.to_thread(_read_body, selected)
+                    self.preview_body = await asyncio.to_thread(vault.read_body, selected)
                 except (AfanesError, OSError, UnicodeError) as exc:
                     logger.debug("Preview could not be refreshed", exc_info=True)
                     self.selected = None
@@ -212,14 +222,14 @@ class AppState:
             if not text.strip():
                 self.message = afanes.ui.strings.CAPTURE_EMPTY
                 return None
-            vault_root = self.vault_root
-            if vault_root is None:
+            vault = self.vault
+            if vault is None:
                 return None
             self.busy = True
             self.message = None
             try:
                 try:
-                    path = await asyncio.to_thread(afanes.core.vault.capture_note, vault_root, text)
+                    path = await asyncio.to_thread(vault.capture, text)
                 except EmptyCaptureError:
                     self.message = afanes.ui.strings.CAPTURE_EMPTY
                     return None
@@ -228,7 +238,7 @@ class AppState:
                     self.message = afanes.ui.strings.CAPTURE_FAILED.format(detail=str(exc))
                     return None
                 try:
-                    snapshot = await asyncio.to_thread(afanes.core.vault.scan_vault, vault_root)
+                    snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Inbox refresh after capture failed", exc_info=True)
                     self.message = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
@@ -253,10 +263,13 @@ class AppState:
         file I/O runs in a worker thread.
         """
         async with self._lock:
+            vault = self.vault
+            if vault is None:
+                return
             self.busy = True
             try:
                 try:
-                    body = await asyncio.to_thread(_read_body, path)
+                    body = await asyncio.to_thread(vault.read_body, path)
                 except (AfanesError, OSError, UnicodeError) as exc:
                     logger.debug("Note preview failed", exc_info=True)
                     self.selected = None
@@ -277,7 +290,7 @@ class AppState:
         Tests call this between cases and the application calls it on
         shutdown. A fresh command lock is created for the next event loop.
         """
-        self.vault_root = None
+        self.vault = None
         self.notes = ()
         self.failures = ()
         self.selected = None
@@ -286,9 +299,39 @@ class AppState:
         self.message = None
         self._lock = asyncio.Lock()
 
+    def _open_vault(self, path: Path) -> Vault:
+        """Open a vault and map filesystem failures to user-facing errors.
+
+        Parameters
+        ----------
+        path : Path
+            Directory chosen by the user.
+
+        Returns
+        -------
+        Vault
+            Validated vault service for the directory.
+
+        Raises
+        ------
+        VaultError
+            If the path is missing, is not a directory, cannot be read, or
+            cannot be resolved.
+        """
+        if not path.exists():
+            raise VaultError(afanes.ui.strings.VAULT_MISSING)
+        if not path.is_dir():
+            raise VaultError(afanes.ui.strings.VAULT_NOT_DIRECTORY)
+        if not os.access(path, os.R_OK):
+            raise VaultError(afanes.ui.strings.VAULT_UNREADABLE)
+        try:
+            return Vault(path)
+        except OSError as exc:
+            raise VaultError(afanes.ui.strings.VAULT_UNREADABLE) from exc
+
     def _show_welcome(self, message: str | None) -> None:
         """Clear the vault state and show the welcome screen."""
-        self.vault_root = None
+        self.vault = None
         self.notes = ()
         self.failures = ()
         self.selected = None
@@ -297,7 +340,7 @@ class AppState:
 
     def _apply_snapshot(self, snapshot: VaultSnapshot, focus: Path | None = None) -> None:
         """Replace the inbox list from a scan result."""
-        notes = list(afanes.core.vault.inbox_notes(snapshot))
+        notes = list(snapshot.inbox_notes())
         if focus is not None:
             for index, note in enumerate(notes):
                 if note.path == focus:
@@ -309,27 +352,6 @@ class AppState:
             self.selected = None
             self.preview_body = None
         self.message = None
-
-
-def _read_body(path: Path) -> str:
-    """Read a note and return its Markdown body without frontmatter."""
-    text = path.read_text(encoding="utf-8")
-    return afanes.core.frontmatter.NoteDocument.from_text(text).body
-
-
-def _open_vault(path: Path) -> tuple[Path, VaultSnapshot]:
-    """Resolve and scan a vault, raising a user-facing error on failure."""
-    if not path.exists():
-        raise VaultError(afanes.ui.strings.VAULT_MISSING)
-    if not path.is_dir():
-        raise VaultError(afanes.ui.strings.VAULT_NOT_DIRECTORY)
-    if not os.access(path, os.R_OK):
-        raise VaultError(afanes.ui.strings.VAULT_UNREADABLE)
-    try:
-        root = afanes.core.vault.resolve_vault_root(path)
-        return root, afanes.core.vault.scan_vault(root)
-    except OSError as exc:
-        raise VaultError(afanes.ui.strings.VAULT_UNREADABLE) from exc
 
 
 app_state = AppState()

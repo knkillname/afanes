@@ -287,39 +287,51 @@ def classify_destination(destination: str) -> DestinationKind:
     return DestinationKind.EXTERNAL
 
 
-def extract_references(markdown: str) -> list[NoteReference]:
-    """Extract every internal reference from Markdown body text.
-
-    Parameters
-    ----------
-    markdown : str
-        Note body without frontmatter.
-
-    Returns
-    -------
-    list[NoteReference]
-        References in document order, each carrying its link label when the
-        label is not empty.
-
-    Raises
-    ------
-    InvalidReferenceError
-        If an internal destination is malformed, for example ``note:`` with an
-        empty name.
+class ReferenceReader:
+    """Extract internal references from Markdown with one configured parser.
 
     Notes
     -----
-    Extraction uses a CommonMark parser, so references inside fenced code,
-    indented code, inline code, HTML comments, and images are ignored. Image
-    destinations never become references.
+    Reuse one reader for a batch of documents. The parser is not shared across
+    threads or scans; create a reader per batch.
     """
-    parser = MarkdownIt("commonmark")
-    references: list[NoteReference] = []
-    for token in parser.parse(markdown):
-        if token.type != "inline" or token.children is None:
-            continue
-        references.extend(_references_in_children(token.children))
-    return references
+
+    def __init__(self) -> None:
+        """Create a reader backed by a CommonMark parser."""
+        self._parser = MarkdownIt("commonmark")
+
+    def extract(self, markdown: str) -> list[NoteReference]:
+        """Extract every internal reference from Markdown body text.
+
+        Parameters
+        ----------
+        markdown : str
+            Note body without frontmatter.
+
+        Returns
+        -------
+        list[NoteReference]
+            References in document order, each carrying its link label when
+            the label is not empty.
+
+        Raises
+        ------
+        InvalidReferenceError
+            If an internal destination is malformed, for example ``note:``
+            with an empty name.
+
+        Notes
+        -----
+        Extraction uses a CommonMark parser, so references inside fenced code,
+        indented code, inline code, HTML comments, and images are ignored.
+        Image destinations never become references.
+        """
+        references: list[NoteReference] = []
+        for token in self._parser.parse(markdown):
+            if token.type != "inline" or token.children is None:
+                continue
+            references.extend(_references_in_children(token.children))
+        return references
 
 
 def reference_key(reference: NoteReference) -> tuple[ReferenceScheme, str]:
@@ -383,7 +395,7 @@ def rewrite_body_references(markdown: str, old: NoteReference, new: NoteReferenc
 
     rewritten = _apply_edits(markdown, edits)
     try:
-        remaining = extract_references(rewritten)
+        remaining = ReferenceReader().extract(rewritten)
     except InvalidReferenceError as exc:
         message = "Rewritten body is no longer valid Markdown"
         raise ReferenceRewriteError(message) from exc

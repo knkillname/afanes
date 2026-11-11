@@ -14,7 +14,7 @@ import afanes.ui.state
 import afanes.ui.strings
 from afanes.core.errors import ConfigurationError, VaultError
 from afanes.core.frontmatter import NoteDocument
-from afanes.core.settings import Settings
+from afanes.core.settings import Settings, SettingsStore
 
 OLD_NS = 1_700_000_000_000_000_000
 NEW_NS = 1_700_000_001_000_000_000
@@ -100,8 +100,8 @@ class TestStartup:
     def test_valid_settings_opens_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
-        first = afanes.core.vault.capture_note(vault, "First")
-        second = afanes.core.vault.capture_note(vault, "Second")
+        first = afanes.core.vault.Vault(vault).capture("First")
+        second = afanes.core.vault.Vault(vault).capture("Second")
         os.utime(first, ns=(OLD_NS, OLD_NS))
         os.utime(second, ns=(NEW_NS, NEW_NS))
         settings = tmp_path / "settings.json"
@@ -132,7 +132,7 @@ class TestStartup:
     def test_unreadable_notes_are_reported(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
-        afanes.core.vault.capture_note(vault, "Good")
+        afanes.core.vault.Vault(vault).capture("Good")
         bad = _write_note(vault / "inbox" / "Bad.md", "---\ntype: [unclosed\n---\n")
         settings = tmp_path / "settings.json"
         _write_settings(settings, vault)
@@ -150,7 +150,7 @@ class TestChooseVault:
     def test_choose_vault_saves_settings_and_lists_notes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
-        afanes.core.vault.capture_note(vault, "Buy milk")
+        afanes.core.vault.Vault(vault).capture("Buy milk")
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         state = afanes.ui.state.app_state
@@ -190,11 +190,11 @@ class TestChooseVault:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
-        def fail_save(_settings: Settings) -> None:
+        def fail_save(_store: SettingsStore, _settings: Settings) -> None:
             message = "simulated"
             raise ConfigurationError(message)
 
-        monkeypatch.setattr(afanes.core.settings, "save_settings", fail_save)
+        monkeypatch.setattr(afanes.ui.state.SettingsStore, "save", fail_save)
 
         asyncio.run(state.choose_vault(vault))
 
@@ -221,8 +221,8 @@ class TestChangeVault:
         second = tmp_path / "second"
         first.mkdir()
         second.mkdir()
-        afanes.core.vault.capture_note(first, "First note")
-        afanes.core.vault.capture_note(second, "Second note")
+        afanes.core.vault.Vault(first).capture("First note")
+        afanes.core.vault.Vault(second).capture("Second note")
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         state = afanes.ui.state.app_state
@@ -244,7 +244,7 @@ class TestChangeVault:
     ) -> None:
         first = tmp_path / "first"
         first.mkdir()
-        afanes.core.vault.capture_note(first, "First note")
+        afanes.core.vault.Vault(first).capture("First note")
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         state = afanes.ui.state.app_state
@@ -317,11 +317,11 @@ class TestCapture:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
-        def fail_capture(_root: Path, _text: str) -> Path:
+        def fail_capture(_vault: afanes.core.vault.Vault, _text: str) -> Path:
             message = "disk full"
             raise VaultError(message)
 
-        monkeypatch.setattr(afanes.core.vault, "capture_note", fail_capture)
+        monkeypatch.setattr(afanes.core.vault.Vault, "capture", fail_capture)
 
         async def scenario() -> Path | None:
             await state.choose_vault(vault)
@@ -463,7 +463,7 @@ class TestRefresh:
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            afanes.core.vault.capture_note(vault, "External note")
+            afanes.core.vault.Vault(vault).capture("External note")
             await state.refresh()
 
         asyncio.run(scenario())
@@ -541,14 +541,14 @@ class TestConcurrency:
         state = afanes.ui.state.app_state
         entered = threading.Event()
         release = threading.Event()
-        original = afanes.core.vault.capture_note
+        original = afanes.core.vault.Vault.capture
 
-        def blocking_capture(root: Path, text: str) -> Path:
+        def blocking_capture(vault: afanes.core.vault.Vault, text: str) -> Path:
             entered.set()
             release.wait(timeout=5)
-            return original(root, text)
+            return original(vault, text)
 
-        monkeypatch.setattr(afanes.core.vault, "capture_note", blocking_capture)
+        monkeypatch.setattr(afanes.core.vault.Vault, "capture", blocking_capture)
 
         async def scenario() -> None:
             await state.choose_vault(vault)

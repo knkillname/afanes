@@ -209,10 +209,11 @@ afanes/
 │       ├── core/
 │       │   ├── __init__.py
 │       │   ├── errors.py          # exception hierarchy
+│       │   ├── atomic.py          # shared atomic text writer
 │       │   ├── frontmatter.py     # parse / serialize Markdown + YAML
 │       │   ├── names.py           # name normalization and filename sanitization
 │       │   ├── links.py           # scheme reference extraction and resolution
-│       │   ├── vault.py           # vault discovery, path safety, atomic writes
+│       │   ├── vault.py           # vault discovery, path safety, note operations
 │       │   ├── indexer.py         # incremental SQLite index
 │       │   ├── search.py          # timeline, people, next-actions queries
 │       │   └── settings.py        # platform paths and app configuration
@@ -374,11 +375,44 @@ These principles are engineering constraints, not suggestions. Apply them at mod
 - **DRY.** Each rule has one authoritative implementation. Frontmatter validation, reference parsing, name normalization, path containment, and status transitions must not be duplicated across `core/`, `ui/`, and `cli/`. Apply the rule of three: abstract only after the third real duplication, and only when the abstraction is simpler than the duplication.
 - **KISS.** Choose the simplest design that satisfies the spec. Prefer the standard library, plain functions, and frozen dataclasses or small frozen classes over frameworks, metaclasses, dynamic dispatch, or speculative abstractions.
 - **Composition over inheritance.** Use dataclasses, functions, and small Protocols. Avoid deep class hierarchies and mixins.
-- **Cohesive objects over function bags.** When functions share state or must preserve an invariant together, model that unit as a small frozen class with focused methods. `NoteDocument` and `NameCatalog` are the reference examples: parsing, serialization, body replacement, and reference rewriting live with the note metadata they protect; catalog construction, candidate lookup, and resolution live with the name mapping they protect. Keep constructors validated through factories, keep the method surface small, and do not add Java-style getter/setter ceremony or anemic data bags. Pure stateless transformations remain module-level functions.
+- **Cohesive objects over function bags.** When functions share state or must preserve an invariant together, model that unit as a small frozen class with focused methods. `NoteDocument`, `NameCatalog`, `Settings`, and `Vault` are the reference examples: parsing, serialization, body replacement, and reference rewriting live with the note metadata they protect; catalog construction, candidate lookup, and resolution live with the name mapping they protect; schema validation lives with the settings value object and file I/O with its store; and vault operations live with the resolved root they protect. Keep constructors validated through factories, keep the method surface small, and do not add Java-style getter/setter ceremony or anemic data bags. Pure stateless transformations remain module-level functions. See **Object boundaries** below for the classification rules and review checklist.
 - **Public by default, private by purpose.** A leading underscore is only for implementation details. Domain rules, formats, limits, security sets, and other policy are public constants, functions, or value objects; callers and tests read them through the module. If a private behavior needs testing, promote it instead of reaching into internals.
 - **No dependency injection.** Do not add constructor injection, provider objects, service containers, or injected clocks, ID generators, or collaborators. Pass plain values as explicit parameters. A value object that carries its own immutable data is not dependency injection. Tests replace public module behavior with `monkeypatch` or `unittest.mock.patch`.
 - **Acyclic dependencies.** The import graph, including submodules and type-only imports, must be a directed acyclic graph. Do not hide cycles with function-local imports, `importlib`, or `__init__.py` re-exports. Fix the design.
 - **YAGNI.** Do not add extension points, configuration flags, or abstractions for hypothetical future needs. The spec defines the scope.
+
+#### Object boundaries
+
+Every new module, class, function, and method must fit one of four roles. State the role in the docstring when it is not obvious. If a unit fits two roles, split it.
+
+| Role | Owns | Must not own | Reference examples |
+| --- | --- | --- | --- |
+| Value object | Immutable data and the local invariants that protect it; a validating factory such as `from_text` or `from_payload` | File I/O, environment access, SQL, UI state | `Settings`, `VaultNote`, `NoteDocument`, `NameCatalog` |
+| Service object | One resource or cross-operation invariant; validates that resource at construction; exposes intent methods | Presentation, UI state, parsing rules owned by value objects | `Vault`, `SettingsStore` |
+| Pure function | A stateless transformation with no hidden state or resource handle | File I/O, cached parsers, mutable module state | `normalize_name`, `safe_filename`, `parse_reference` |
+| Controller / view | UI state and presentation; forwards intent to services | Markdown parsing, SQL, direct vault file I/O | `AppState`, `InboxView` |
+
+Rules:
+
+- Classify a new unit before writing it. If it mixes roles, split it rather than adding a comment that excuses the mix.
+- A function that repeats the same resource parameter across operations is a service waiting to be born. Move the resource into a service and call methods on it.
+- A data bag surrounded by free functions is not cohesive. Move behavior that protects the data onto the object, or make the object immutable and keep the transformation a pure function.
+- Do not wrap a stateless transformation in a class merely to satisfy an "OOP" label. `normalize_name` stays a function.
+- A service validates its resource at construction and raises a domain exception when the resource is missing or invalid. Do not defer invariant checks to every method.
+- Methods express intent (`vault.capture(text)`), not filesystem steps (`move_file(root, ...)`). Keep resource paths inside the object that owns them.
+- A low-level primitive with no owned resource may remain a module function even when it performs I/O; `write_text_atomic` in `core/atomic.py` is the reference example.
+- Tests exercise the public contract of the object or function. Do not test private helpers; promote the behavior if it needs a test.
+- Keep the dependency graph acyclic. A service may depend on value objects and pure primitives; a value object must not depend on a service or on file I/O.
+
+Review checklist for a change:
+
+- [ ] Does each new unit have one clear role from the table?
+- [ ] Is data plus its invariant owned by one object, or is a free function still reaching into the data?
+- [ ] Does a service validate its resource once at construction?
+- [ ] Is a stateless transformation still a function?
+- [ ] Are file I/O, environment access, and UI concerns outside value objects?
+- [ ] Are tests targeting public methods rather than private helpers?
+- [ ] Is the import graph still acyclic and within the layering rules in section 3.3?
 
 ### 4.4 Python style
 
@@ -545,11 +579,11 @@ def parse_note(path: pathlib.Path, vault_root: pathlib.Path) -> Note:
 
 ### 4.9 Local file I/O safety
 
-All vault writes must go through `core/vault.py`. UI and CLI code must never call `open(..., "w")` on a vault file directly.
+All vault writes must go through the `Vault` service in `core/vault.py`. UI and CLI code must never call `open(..., "w")` on a vault file directly. The low-level atomic primitive lives in `core/atomic.py`; `core/vault.py` and `core/settings.py` are its callers.
 
 1. **Resolve the vault root once.** Store it as an absolute, resolved `Path`.
 2. **Contain every path.** Resolve candidate paths and verify `candidate.is_relative_to(vault_root)`. Reject traversal and symlinks that escape the root.
-3. **Write atomically.** Create a temporary file in the same directory, write UTF-8 bytes, flush, `os.fsync`, then `os.replace`. Remove the temporary file on failure.
+3. **Write atomically.** Call `afanes.core.atomic.write_text_atomic`, which creates a temporary file in the same directory, writes UTF-8 bytes, flushes, `os.fsync`, then `os.replace`, and removes the temporary file on failure.
 4. **Preserve user content.** Modify only the frontmatter keys owned by the operation. Preserve the body, unknown keys, and existing newline style. New files use LF and UTF-8 without a BOM.
 5. **Detect external edits.** Before overwriting, compare a content hash or modification marker captured when the note was read. If the file changed, abort and ask the user.
 6. **Confirm destructive operations.** Rename, move, and delete require explicit user confirmation. Use a recoverable backup or trash mechanism where the platform supports it.

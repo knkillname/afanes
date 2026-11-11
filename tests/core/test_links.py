@@ -78,57 +78,66 @@ class TestClassifyDestination:
         assert afanes.core.links.classify_destination("//example.com") is DestinationKind.EXTERNAL
 
 
-class TestExtractReferences:
+class TestReferenceReader:
+    def test_reuses_one_reader_for_multiple_documents(self) -> None:
+        reader = afanes.core.links.ReferenceReader()
+
+        first = reader.extract("See [Ada](person:Ada).")
+        second = reader.extract("Use `[Ada](person:Ada)` and see [Grace](person:Grace).")
+
+        assert [reference.name for reference in first] == ["Ada"]
+        assert [reference.name for reference in second] == ["Grace"]
+
     def test_extracts_a_plain_link(self) -> None:
-        references = afanes.core.links.extract_references("See [Ada](person:Ada).")
+        references = afanes.core.links.ReferenceReader().extract("See [Ada](person:Ada).")
         assert references == [NoteReference(scheme=ReferenceScheme.PERSON, name="Ada", label="Ada")]
 
     def test_extracts_an_angle_bracketed_destination(self) -> None:
-        references = afanes.core.links.extract_references("[Ada](<person:Ada Lovelace>)")
+        references = afanes.core.links.ReferenceReader().extract("[Ada](<person:Ada Lovelace>)")
         assert references[0].name == "Ada Lovelace"
 
     def test_keeps_a_custom_label(self) -> None:
-        references = afanes.core.links.extract_references("[my colleague](person:Ada)")
+        references = afanes.core.links.ReferenceReader().extract("[my colleague](person:Ada)")
         assert references[0].label == "my colleague"
 
     def test_extracts_reference_style_links(self) -> None:
         body = "[Ada][ada]\n\n[ada]: <person:Ada Lovelace>\n"
-        references = afanes.core.links.extract_references(body)
+        references = afanes.core.links.ReferenceReader().extract(body)
         assert references == [NoteReference(scheme=ReferenceScheme.PERSON, name="Ada Lovelace", label="Ada")]
 
     def test_extracts_links_with_nested_label_brackets(self) -> None:
-        references = afanes.core.links.extract_references("[see [the person]](person:Ada)")
+        references = afanes.core.links.ReferenceReader().extract("[see [the person]](person:Ada)")
         assert references[0].label == "see [the person]"
 
     def test_ignores_an_escaped_opening_bracket(self) -> None:
-        assert afanes.core.links.extract_references(r"\[Ada](person:Ada)") == []
+        assert afanes.core.links.ReferenceReader().extract(r"\[Ada](person:Ada)") == []
 
     def test_ignores_a_reference_inside_fenced_code(self) -> None:
         body = "```markdown\n[Ada](person:Ada)\n```\n"
-        assert afanes.core.links.extract_references(body) == []
+        assert afanes.core.links.ReferenceReader().extract(body) == []
 
     def test_ignores_a_reference_inside_indented_code(self) -> None:
         body = "\n    [Ada](person:Ada)\n"
-        assert afanes.core.links.extract_references(body) == []
+        assert afanes.core.links.ReferenceReader().extract(body) == []
 
     def test_ignores_a_reference_inside_inline_code(self) -> None:
-        assert afanes.core.links.extract_references("Use `[Ada](person:Ada)` literally.") == []
+        assert afanes.core.links.ReferenceReader().extract("Use `[Ada](person:Ada)` literally.") == []
 
     def test_ignores_a_reference_inside_an_html_comment(self) -> None:
-        assert afanes.core.links.extract_references("<!-- [Ada](person:Ada) -->") == []
+        assert afanes.core.links.ReferenceReader().extract("<!-- [Ada](person:Ada) -->") == []
 
     def test_ignores_an_image_destination(self) -> None:
-        assert afanes.core.links.extract_references("![diagram](person:Ada)") == []
+        assert afanes.core.links.ReferenceReader().extract("![diagram](person:Ada)") == []
 
     def test_ignores_bracket_link_syntax(self) -> None:
-        assert afanes.core.links.extract_references("[[Ada Lovelace]]") == []
+        assert afanes.core.links.ReferenceReader().extract("[[Ada Lovelace]]") == []
 
     def test_does_not_extract_external_links(self) -> None:
-        assert afanes.core.links.extract_references("[docs](https://example.com)") == []
+        assert afanes.core.links.ReferenceReader().extract("[docs](https://example.com)") == []
 
     def test_rejects_a_malformed_internal_destination(self) -> None:
         with pytest.raises(InvalidReferenceError):
-            afanes.core.links.extract_references("[x](note:)")
+            afanes.core.links.ReferenceReader().extract("[x](note:)")
 
     @hypothesis.given(
         hypothesis.strategies.text(
@@ -138,7 +147,7 @@ class TestExtractReferences:
     )
     def test_a_fenced_code_block_hides_every_reference(self, text: str) -> None:
         body = f"~~~\n{text}\n~~~\n"
-        assert afanes.core.links.extract_references(body) == []
+        assert afanes.core.links.ReferenceReader().extract(body) == []
 
 
 class TestCatalog:
@@ -310,18 +319,18 @@ class TestRewriteBodyReferences:
         assert afanes.core.links.rewrite_body_references(body, self.old, self.new) == (body, 0)
 
     def test_raises_when_verification_cannot_parse(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        def broken(_markdown: str) -> list[NoteReference]:
+        def broken(_reader: afanes.core.links.ReferenceReader, _markdown: str) -> list[NoteReference]:
             message = "broken"
             raise InvalidReferenceError(message)
 
-        monkeypatch.setattr(afanes.core.links, "extract_references", broken)
+        monkeypatch.setattr(afanes.core.links.ReferenceReader, "extract", broken)
         with pytest.raises(ReferenceRewriteError):
             afanes.core.links.rewrite_body_references("[Ada Lovelace](<person:Ada Lovelace>)", self.old, self.new)
 
     def test_raises_when_the_old_reference_survives(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        def stale(_markdown: str) -> list[NoteReference]:
+        def stale(_reader: afanes.core.links.ReferenceReader, _markdown: str) -> list[NoteReference]:
             return [self.old]
 
-        monkeypatch.setattr(afanes.core.links, "extract_references", stale)
+        monkeypatch.setattr(afanes.core.links.ReferenceReader, "extract", stale)
         with pytest.raises(ReferenceRewriteError):
             afanes.core.links.rewrite_body_references("[Ada Lovelace](<person:Ada Lovelace>)", self.old, self.new)

@@ -121,7 +121,7 @@ class TestAppShell:
         vault.mkdir()
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
-        afanes.core.settings.save_settings(Settings(vault=vault), settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
         page = FakePage()
 
         asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))

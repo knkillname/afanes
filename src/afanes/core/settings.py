@@ -14,8 +14,9 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Self
 
-import afanes.core.vault
+import afanes.core.atomic
 from afanes.core.errors import ConfigurationError, VaultError
 
 # Public settings policy. Callers and tests share these values.
@@ -35,6 +36,57 @@ class Settings:
     """
 
     vault: Path
+
+    @classmethod
+    def from_payload(cls, payload: object, source: Path) -> Self:
+        """Build settings from a decoded JSON payload.
+
+        Parameters
+        ----------
+        payload : object
+            Decoded JSON value. It must be an object with a supported version
+            and an absolute vault path.
+        source : Path
+            Settings file the payload came from, used in error messages.
+
+        Returns
+        -------
+        Settings
+            Settings carrying the payload's vault path.
+
+        Raises
+        ------
+        ConfigurationError
+            If the payload is not an object, uses an unsupported version, or
+            does not contain an absolute vault path.
+        """
+        if not isinstance(payload, dict):
+            message = f"Settings must be a JSON object: {source}"
+            raise ConfigurationError(message)
+        version = payload.get("version")
+        if isinstance(version, bool) or not isinstance(version, int) or version != SETTINGS_VERSION:
+            message = f"Unsupported settings version in {source}"
+            raise ConfigurationError(message)
+        vault = payload.get("vault")
+        if not isinstance(vault, str) or not vault:
+            message = f"Settings do not contain a vault path: {source}"
+            raise ConfigurationError(message)
+        vault_path = Path(vault)
+        if not vault_path.is_absolute():
+            message = f"Settings vault path must be absolute: {source}"
+            raise ConfigurationError(message)
+        return cls(vault=vault_path)
+
+    def to_payload(self) -> dict[str, object]:
+        """Return the versioned JSON mapping for these settings.
+
+        Returns
+        -------
+        dict[str, object]
+            Mapping containing the settings version and the vault path as a
+            string.
+        """
+        return {"version": SETTINGS_VERSION, "vault": str(self.vault)}
 
 
 def config_directory() -> Path:
@@ -75,108 +127,98 @@ def settings_path() -> Path:
     return config_directory() / SETTINGS_FILENAME
 
 
-def load_settings(path: Path | None = None) -> Settings | None:
-    """Load application settings from disk.
+@dataclasses.dataclass(frozen=True, slots=True)
+class SettingsStore:
+    """Application settings file owned by one store instance.
 
-    Parameters
+    Attributes
     ----------
-    path : Path | None
-        Settings file to read. Defaults to :func:`settings_path`.
-
-    Returns
-    -------
-    Settings | None
-        Parsed settings, or ``None`` when the file does not exist.
-
-    Raises
-    ------
-    ConfigurationError
-        If the file cannot be read, is not valid JSON, is not a JSON object,
-        uses an unsupported version, or does not contain an absolute vault
-        path.
-
-    Notes
-    -----
-    This function performs blocking file I/O and never writes. A malformed
-    file is reported without being modified, so the caller can offer a
-    recovery path before replacing it.
+    path : Path
+        Settings file this store reads and writes.
     """
-    source = settings_path() if path is None else path
-    if not source.exists():
-        return None
-    try:
-        text = source.read_text(encoding="utf-8")
-    except OSError as exc:
-        message = f"Could not read settings: {source}"
-        raise ConfigurationError(message) from exc
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError as exc:
-        message = f"Settings are not valid JSON: {source}"
-        raise ConfigurationError(message) from exc
-    return _settings_from_payload(payload, source)
 
+    path: Path
 
-def save_settings(settings: Settings, path: Path | None = None) -> None:
-    """Write application settings atomically.
+    @classmethod
+    def default(cls) -> Self:
+        """Return a store for the platform's default settings file.
 
-    Parameters
-    ----------
-    settings : Settings
-        Preferences to persist. The vault path is resolved to an absolute
-        path before writing.
-    path : Path | None
-        Settings file to write. Defaults to :func:`settings_path`.
+        Returns
+        -------
+        SettingsStore
+            Store pointing at :func:`settings_path`.
+        """
+        return cls(path=settings_path())
 
-    Raises
-    ------
-    ConfigurationError
-        If the vault is not an existing directory, the configuration
-        directory cannot be created, or the atomic write fails.
+    def load(self) -> Settings | None:
+        """Load settings from this store's file.
 
-    Notes
-    -----
-    This function creates the configuration directory when missing and
-    performs blocking file I/O. A failed write leaves the previous settings
-    file intact.
-    """
-    destination = settings_path() if path is None else path
-    vault = settings.vault.expanduser().resolve()
-    if not vault.is_dir():
-        message = f"Vault is not a directory: {vault}"
-        raise ConfigurationError(message)
-    try:
-        destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    except OSError as exc:
-        message = f"Could not create the settings directory: {destination.parent}"
-        raise ConfigurationError(message) from exc
-    payload = json.dumps(
-        {"version": SETTINGS_VERSION, "vault": str(vault)},
-        ensure_ascii=False,
-        indent=2,
-    )
-    try:
-        afanes.core.vault.write_text_atomic(destination, f"{payload}\n")
-    except (OSError, VaultError) as exc:
-        message = f"Could not write settings: {destination}"
-        raise ConfigurationError(message) from exc
+        Returns
+        -------
+        Settings | None
+            Parsed settings, or ``None`` when the file does not exist.
 
+        Raises
+        ------
+        ConfigurationError
+            If the file cannot be read, is not valid JSON, is not a JSON
+            object, uses an unsupported version, or does not contain an
+            absolute vault path.
 
-def _settings_from_payload(payload: object, source: Path) -> Settings:
-    """Validate a decoded JSON payload and return settings."""
-    if not isinstance(payload, dict):
-        message = f"Settings must be a JSON object: {source}"
-        raise ConfigurationError(message)
-    version = payload.get("version")
-    if isinstance(version, bool) or not isinstance(version, int) or version != SETTINGS_VERSION:
-        message = f"Unsupported settings version in {source}"
-        raise ConfigurationError(message)
-    vault = payload.get("vault")
-    if not isinstance(vault, str) or not vault:
-        message = f"Settings do not contain a vault path: {source}"
-        raise ConfigurationError(message)
-    vault_path = Path(vault)
-    if not vault_path.is_absolute():
-        message = f"Settings vault path must be absolute: {source}"
-        raise ConfigurationError(message)
-    return Settings(vault=vault_path)
+        Notes
+        -----
+        This method performs blocking file I/O and never writes. A malformed
+        file is reported without being modified, so the caller can offer a
+        recovery path before replacing it.
+        """
+        if not self.path.exists():
+            return None
+        try:
+            text = self.path.read_text(encoding="utf-8")
+        except OSError as exc:
+            message = f"Could not read settings: {self.path}"
+            raise ConfigurationError(message) from exc
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            message = f"Settings are not valid JSON: {self.path}"
+            raise ConfigurationError(message) from exc
+        return Settings.from_payload(payload, self.path)
+
+    def save(self, settings: Settings) -> None:
+        """Write settings atomically to this store's file.
+
+        Parameters
+        ----------
+        settings : Settings
+            Preferences to persist. The vault path is resolved to an absolute
+            path before writing.
+
+        Raises
+        ------
+        ConfigurationError
+            If the vault is not an existing directory, the configuration
+            directory cannot be created, or the atomic write fails.
+
+        Notes
+        -----
+        This method creates the configuration directory when missing and
+        performs blocking file I/O. A failed write leaves the previous
+        settings file intact.
+        """
+        vault = settings.vault.expanduser().resolve()
+        if not vault.is_dir():
+            message = f"Vault is not a directory: {vault}"
+            raise ConfigurationError(message)
+        try:
+            self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        except OSError as exc:
+            message = f"Could not create the settings directory: {self.path.parent}"
+            raise ConfigurationError(message) from exc
+        resolved = dataclasses.replace(settings, vault=vault)
+        payload = json.dumps(resolved.to_payload(), ensure_ascii=False, indent=2)
+        try:
+            afanes.core.atomic.write_text_atomic(self.path, f"{payload}\n")
+        except (OSError, VaultError) as exc:
+            message = f"Could not write settings: {self.path}"
+            raise ConfigurationError(message) from exc

@@ -18,9 +18,8 @@ class TestReferenceLifecycle:
     def test_link_survives_a_move_and_follows_a_rename(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        ada = afanes.core.vault.create_note(root, "Ada Lovelace", NoteType.PERSON, directory=Path("people"))
-        note = afanes.core.vault.create_note(
-            root,
+        ada = afanes.core.vault.Vault(root).create("Ada Lovelace", NoteType.PERSON, directory=Path("people"))
+        note = afanes.core.vault.Vault(root).create(
             "Prepare report",
             NoteType.NOTE,
             directory=Path("inbox"),
@@ -28,24 +27,24 @@ class TestReferenceLifecycle:
         )
 
         reference = NoteReference(scheme=ReferenceScheme.PERSON, name="Ada Lovelace")
-        before = afanes.core.vault.scan_vault(root)
+        before = afanes.core.vault.Vault(root).scan()
         resolved = before.catalog.resolve(reference)
         assert resolved.outcome is ResolutionOutcome.RESOLVED
         assert resolved.targets == (ada,)
 
-        moved = afanes.core.vault.move_note(root, ada, Path("work"), confirm=True)
-        after_move = afanes.core.vault.scan_vault(root)
+        moved = afanes.core.vault.Vault(root).move(ada, Path("work"), confirm=True)
+        after_move = afanes.core.vault.Vault(root).scan()
         resolved_after_move = after_move.catalog.resolve(reference)
         assert resolved_after_move.outcome is ResolutionOutcome.RESOLVED
         assert resolved_after_move.targets == (moved,)
 
-        preview = afanes.core.vault.plan_rename(root, moved, "Ada King")
+        preview = afanes.core.vault.Vault(root).plan_rename(moved, "Ada King")
         assert preview.reference_count == ONE_REFERENCE
-        report = afanes.core.vault.apply_rename(root, preview, confirm=True)
+        report = afanes.core.vault.Vault(root).apply_rename(preview, confirm=True)
         assert report.failed == ()
         assert "[Ada King](<person:Ada King>)" in note.read_text(encoding="utf-8")
 
-        after_rename = afanes.core.vault.scan_vault(root)
+        after_rename = afanes.core.vault.Vault(root).scan()
         renamed = after_rename.catalog.resolve(NoteReference(scheme=ReferenceScheme.PERSON, name="Ada King"))
         assert renamed.outcome is ResolutionOutcome.RESOLVED
         assert renamed.targets[0].parent.name == "work"
@@ -56,13 +55,13 @@ class TestInboxCapture:
         root = tmp_path / "vault"
         root.mkdir()
 
-        first = afanes.core.vault.capture_note(root, "First thought\nwith detail")
-        second = afanes.core.vault.capture_note(root, "Second thought")
+        first = afanes.core.vault.Vault(root).capture("First thought\nwith detail")
+        second = afanes.core.vault.Vault(root).capture("Second thought")
         os.utime(first, ns=(FIRST_MODIFIED_NS, FIRST_MODIFIED_NS))
         os.utime(second, ns=(SECOND_MODIFIED_NS, SECOND_MODIFIED_NS))
 
-        snapshot = afanes.core.vault.scan_vault(root)
-        inbox = afanes.core.vault.inbox_notes(snapshot)
+        snapshot = afanes.core.vault.Vault(root).scan()
+        inbox = snapshot.inbox_notes()
         documents = [NoteDocument.from_text(note.path.read_text(encoding="utf-8")) for note in inbox]
 
         assert [note.name for note in inbox] == ["Second thought", "First thought"]

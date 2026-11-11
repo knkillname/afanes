@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-11
+
+### Changed
+
+- Core settings, vault, and reference APIs now use cohesive `SettingsStore`, `Vault`, and `ReferenceReader` objects. Vault files, settings JSON, and user-visible behavior are unchanged.
+- The shared atomic text writer now lives in `afanes.core.atomic`; vault and settings writes both use it.
+- `AGENTS.md` now defines object boundaries for value objects, service objects, pure functions, and controllers, with a review checklist.
+
+### Removed
+
+- The public free-function helpers `load_settings`, `save_settings`, `resolve_vault_root`, `contained_path`, `scan_vault`, `inbox_notes`, `create_note`, `capture_note`, `move_note`, `plan_rename`, `apply_rename`, `plan_deletion`, `delete_note`, and `extract_references`. Use the corresponding `SettingsStore`, `Vault`, `VaultSnapshot`, and `ReferenceReader` methods instead. This is a breaking Python API change; vault and settings formats are unaffected.
+
 ## [0.2.0] - 2026-11-10
 
 ### Added

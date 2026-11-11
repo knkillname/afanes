@@ -78,6 +78,21 @@ class TestImportBoundaries:
             assert module != "afanes"
             assert not module.startswith("afanes.")
 
+    def test_atomic_module_imports_only_the_standard_library_and_errors(self) -> None:
+        path = CORE_ROOT / "atomic.py"
+        assert path.is_file()
+        for module, level in _imports(path):
+            assert level == 0
+            if module == "afanes.core.errors":
+                continue
+            assert module != "afanes"
+            assert not module.startswith("afanes.")
+
+    def test_settings_does_not_import_the_vault_module(self) -> None:
+        path = CORE_ROOT / "settings.py"
+        assert path.is_file()
+        assert "afanes.core.vault" not in _first_party_imports(path)
+
     def test_models_do_not_import_the_names_module(self) -> None:
         assert all("afanes.core.names" not in _first_party_imports(path) for path in _python_files(MODEL_ROOT))
 
