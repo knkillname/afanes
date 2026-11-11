@@ -18,7 +18,7 @@
 
 ### 1.1 What Afanes is
 
-Afanes is a cross-platform desktop productivity engine and personal wiki. It captures unfiltered thoughts, clarifies them into action items or reference material, and organizes work through projects, due dates, people, and bidirectional `[[wikilinks]]`.
+Afanes is a cross-platform desktop productivity engine and personal wiki. It captures unfiltered thoughts, clarifies them into action items or reference material, and organizes work through projects, due dates, people, and bidirectional name-based references.
 
 The application is local-first. A user's vault is an ordinary directory of Markdown files that remains readable, editable, and portable without Afanes. The application is a lens over those files, not a replacement for them.
 
@@ -47,11 +47,11 @@ type: action
 status: active
 due_date: 2026-11-20
 people:
-  - "[[Ada Lovelace]]"
-project: "[[Release 1.0]]"
+  - "person:Ada Lovelace"
+project: "project:Release 1.0"
 ---
 
-Draft the migration checklist and link it to [[Release 1.0]].
+Draft the migration checklist and link it to [Release 1.0](<project:Release 1.0>).
 ```
 
 Required frontmatter contract:
@@ -61,15 +61,17 @@ Required frontmatter contract:
 | `type` | string enum | Initial values: `note`, `action`, `project`, `reference`, `person`. Extend only through an OpenSpec change. |
 | `status` | string enum | Initial values: `inbox`, `active`, `waiting`, `done`, `cancelled`, `archived`. Per-type validity is defined by `models/` and the relevant spec. |
 | `due_date` | ISO date or absent/null | `YYYY-MM-DD`, date-only, no timezone. A due date is a calendar date, not an instant. |
-| `people` | list of strings | Zero or more wikilink strings, for example `["[[Ada Lovelace]]"]`. |
+| `people` | list of strings | Zero or more `person:Name` references, for example `["person:Ada Lovelace"]`. |
+| `project` | string or absent/null | At most one `project:Name` reference, for example `"project:Release 1.0"`. |
 
 Rules for frontmatter:
 
 - Unknown keys are preserved when a note is rewritten. Never silently drop data.
 - Unknown enum values are not coerced. Surface a validation error and offer a raw edit path.
-- The body is Markdown. Wiki links use `[[Target]]` or `[[Target|Label]]`; resolution rules live in `core/links.py` and the relevant spec.
+- The body is standard Markdown. Internal references use `[Label](scheme:Name)` with the schemes `person`, `project`, and `note`; use angle brackets when the name contains spaces, for example `[Ada](<person:Ada Lovelace>)`. Resolution rules live in `core/links.py` and the relevant spec.
 - A malformed frontmatter block is a parse error, not an invitation to guess. Do not overwrite the file.
 - New files use stable key order and canonical YAML. Existing files only have keys modified that the current operation owns.
+- The filename stem is the note's name, display title, and identity. Directories classify only; moving a note never changes a reference. No `id` or `title` key participates in identity.
 - The format must remain human-editable. Do not introduce a hidden database-only field that is required to understand a note.
 
 ### 1.4 Core workflows
@@ -127,7 +129,8 @@ Rules for frontmatter:
 ### 2.4 Persistence and data engine
 
 - **Markdown + YAML frontmatter** is authoritative.
-- Use `python-frontmatter` with `PyYAML` in safe mode. Never use `yaml.load` or an unsafe loader.
+- Parse the frontmatter block with an explicit `---` fence parser and load it with `PyYAML` `safe_load`; serialize with `safe_dump`. Never use `yaml.load` or an unsafe loader.
+- Parse Markdown bodies with `markdown-it-py` so reference extraction follows CommonMark rather than a hand-rolled scanner.
 - **SQLite** via the standard-library `sqlite3` module is the derived graph index and search cache. No ORM.
 - The cache may be file-backed or in-memory. It must be fully rebuildable from the vault.
 - Use SQLite FTS5 for local full-text search when available. Detect FTS5 support at runtime and fall back to `LIKE` queries if it is unavailable.
@@ -164,7 +167,7 @@ Rules for frontmatter:
 | Python | runtime | 3.13+ only |
 | Hatch | development | 1.18+; sole workflow interface |
 | Flet | runtime | exact pin; public APIs |
-| python-frontmatter | runtime | exact pin; safe parsing |
+| markdown-it-py | runtime | exact pin; CommonMark parsing only |
 | PyYAML | runtime | exact pin; `safe_load` / `safe_dump` only |
 | SQLite / FTS5 | runtime | stdlib; optional FTS5 with fallback |
 | argparse | runtime | stdlib CLI |
@@ -202,18 +205,19 @@ afanes/
 │       │   ├── __init__.py
 │       │   ├── errors.py          # exception hierarchy
 │       │   ├── frontmatter.py     # parse / serialize Markdown + YAML
-│       │   ├── links.py           # [[wikilink]] extraction and resolution
+│       │   ├── names.py           # name normalization and filename sanitization
+│       │   ├── links.py           # scheme reference extraction and resolution
 │       │   ├── vault.py           # vault discovery, path safety, atomic writes
 │       │   ├── indexer.py         # incremental SQLite index
 │       │   ├── search.py          # timeline, people, next-actions queries
 │       │   └── settings.py        # platform paths and app configuration
 │       ├── models/
 │       │   ├── __init__.py
-│       │   ├── note.py            # Note, NoteType, Status
+│       │   ├── note.py            # NoteType
 │       │   ├── action.py          # ActionItem
 │       │   ├── project.py         # Project
 │       │   ├── person.py          # Person
-│       │   └── link.py            # WikiLink value object
+│       │   └── link.py            # NoteReference and ReferenceScheme
 │       ├── ui/
 │       │   ├── __init__.py
 │       │   ├── app.py             # Flet app shell and navigation
@@ -248,7 +252,7 @@ afanes/
 | Path | Owns | Must not contain |
 | --- | --- | --- |
 | `src/afanes/models/` | Domain types, enums, value objects, validation rules | File I/O, SQL, Flet imports, `core/` imports, `ui/` imports, `cli/` imports |
-| `src/afanes/core/` | Markdown/frontmatter parsing, wikilink resolution, vault I/O, SQLite indexing, search, platform paths | Flet imports, `ui/` imports, `cli/` imports, network calls |
+| `src/afanes/core/` | Markdown/frontmatter parsing, name normalization, scheme reference resolution, vault I/O, SQLite indexing, search, platform paths | Flet imports, `ui/` imports, `cli/` imports, network calls |
 | `src/afanes/ui/` | Flet app shell, views, components, `AppState`, theme, user-facing strings | Markdown parsing, SQL, direct file I/O, business rules |
 | `src/afanes/cli/` | argparse definitions, headless commands, output formatting | Flet imports, business rules, direct SQL |
 | `tests/` | Unit, property, integration, and architecture tests | Real user vaults, network access, committed secrets |
@@ -270,7 +274,7 @@ models  <-  core  <-  ui
 - `core/` must never import `ui/` or `cli/`.
 - `models/` must never import `core/`, `ui/`, or `cli/`.
 - No circular imports, including type-only imports and submodule cycles. Do not use `from __future__ import annotations` and do not use `typing.TYPE_CHECKING`. Import types at runtime and keep the graph acyclic. If a forward reference is unavoidable, quote it.
-- Import modules, not their members. The default is `import afanes.core.frontmatter` followed by `afanes.core.frontmatter.parse_note(...)`. Direct imports are allowed only for CamelCase types and classes, for example `from pathlib import Path` or `from afanes.models.note import Note`.
+- Import modules for functions and constants; import CamelCase types and classes directly from their defining module. For example, use `import afanes.core.frontmatter` and `afanes.core.frontmatter.parse_note(...)`, but `from pathlib import Path`, `from collections.abc import Sequence`, and `from afanes.models.note import NoteType`. Do not qualify a class through its module when a direct import is available. Module qualification is appropriate when the module namespace itself is the subject, such as an architecture or export test that inspects many symbols, and when the owning library mandates its import convention (for example, pytest fixtures use `pytest.MonkeyPatch` with `import pytest`).
 - Do not import functions, constants, enum members, or lowercase classes directly. Relative imports and `from afanes.core.frontmatter import parse_note` are forbidden.
 - Use the full dotted module path (`import afanes.core.frontmatter`). Do not use `from afanes.core import frontmatter`; the project standard is an explicit module import. Do not re-export implementation symbols from `__init__.py`.
 - Relative imports are rejected by the Hatch Ruff defaults. Architecture tests must reject the remaining forbidden import forms.
@@ -284,7 +288,7 @@ models  <-  core  <-  ui
 | Change | Location |
 | --- | --- |
 | New frontmatter field or parser rule | `models/`, `core/frontmatter.py`, relevant spec |
-| New wikilink syntax or resolution rule | `core/links.py`, `models/link.py`, relevant spec |
+| New reference syntax, scheme, or resolution rule | `core/links.py`, `core/names.py`, `models/link.py`, relevant spec |
 | New vault operation | `core/vault.py`, tests, spec |
 | New index table or query | `core/indexer.py`, `core/search.py`, schema migration, spec |
 | New screen | `ui/views/`, `ui/state.py`, `ui/strings.py`, tests |
@@ -357,15 +361,17 @@ The Zen of Python (PEP 20) is the tie-breaker for every design and style decisio
 
 These principles are engineering constraints, not suggestions. Apply them at module, class, and function scope.
 
-- **Single Responsibility (SRP).** A module, class, or function has one reason to change. `core/frontmatter.py` parses and serializes notes; it does not query the index or render UI. `ui/state.py` coordinates UI state; it does not parse Markdown.
+- **Single Responsibility (SRP).** A module, class, or function has one reason to change. `NoteDocument` parses and serializes notes; it does not query the index or render UI. `ui/state.py` coordinates UI state; it does not parse Markdown.
 - **Open/Closed (OCP).** Extend behavior by adding new functions, modules, or explicit dispatch tables; do not rewrite stable call sites for every variant. Do not build plugin systems or registries unless the spec requires them.
 - **Liskov Substitution (LSP).** Subtypes honor the contract of their base type. Prefer composition over inheritance. Do not use inheritance merely to share implementation details.
 - **Interface Segregation (ISP).** Define small, purpose-specific `Protocol` types. Do not create broad interfaces that force implementers to supply unrelated methods.
-- **Dependency Inversion (DIP).** High-level modules depend on stable module-level functions and narrow `Protocol` types, not on concrete implementation details. Achieve this through acyclic module boundaries. Do not use dependency injection, service locators, or containers.
-- **DRY.** Each rule has one authoritative implementation. Frontmatter validation, wikilink parsing, path containment, and status transitions must not be duplicated across `core/`, `ui/`, and `cli/`. Apply the rule of three: abstract only after the third real duplication, and only when the abstraction is simpler than the duplication.
-- **KISS.** Choose the simplest design that satisfies the spec. Prefer the standard library, plain functions, and frozen dataclasses over frameworks, metaclasses, dynamic dispatch, or speculative abstractions.
+- **Dependency Inversion (DIP).** High-level modules depend on stable public functions, small immutable value objects, and narrow `Protocol` types, not on private implementation helpers. Achieve this through acyclic module boundaries. Do not use dependency injection, service locators, or containers.
+- **DRY.** Each rule has one authoritative implementation. Frontmatter validation, reference parsing, name normalization, path containment, and status transitions must not be duplicated across `core/`, `ui/`, and `cli/`. Apply the rule of three: abstract only after the third real duplication, and only when the abstraction is simpler than the duplication.
+- **KISS.** Choose the simplest design that satisfies the spec. Prefer the standard library, plain functions, and frozen dataclasses or small frozen classes over frameworks, metaclasses, dynamic dispatch, or speculative abstractions.
 - **Composition over inheritance.** Use dataclasses, functions, and small Protocols. Avoid deep class hierarchies and mixins.
-- **No dependency injection.** Do not add constructor injection, provider objects, service containers, or injected clocks, ID generators, or collaborators. Pass plain values as explicit parameters. Tests replace module behavior with `monkeypatch` or `unittest.mock.patch`.
+- **Cohesive objects over function bags.** When functions share state or must preserve an invariant together, model that unit as a small frozen class with focused methods. `NoteDocument` and `NameCatalog` are the reference examples: parsing, serialization, body replacement, and reference rewriting live with the note metadata they protect; catalog construction, candidate lookup, and resolution live with the name mapping they protect. Keep constructors validated through factories, keep the method surface small, and do not add Java-style getter/setter ceremony or anemic data bags. Pure stateless transformations remain module-level functions.
+- **Public by default, private by purpose.** A leading underscore is only for implementation details. Domain rules, formats, limits, security sets, and other policy are public constants, functions, or value objects; callers and tests read them through the module. If a private behavior needs testing, promote it instead of reaching into internals.
+- **No dependency injection.** Do not add constructor injection, provider objects, service containers, or injected clocks, ID generators, or collaborators. Pass plain values as explicit parameters. A value object that carries its own immutable data is not dependency injection. Tests replace public module behavior with `monkeypatch` or `unittest.mock.patch`.
 - **Acyclic dependencies.** The import graph, including submodules and type-only imports, must be a directed acyclic graph. Do not hide cycles with function-local imports, `importlib`, or `__init__.py` re-exports. Fix the design.
 - **YAGNI.** Do not add extension points, configuration flags, or abstractions for hypothetical future needs. The spec defines the scope.
 
@@ -373,14 +379,14 @@ These principles are engineering constraints, not suggestions. Apply them at mod
 
 - Target Python 3.13. Do not use 3.14-only syntax or standard-library behavior.
 - **Do not use `from __future__ import annotations`.** The project standard is runtime-evaluable annotations. Use PEP 604 unions such as `str | None` and built-in generics such as `list[str]`. Quote forward references only when unavoidable, or restructure the code.
-- Import modules, not their members. The default is `import module` or `import package.module`; call functions and read constants through the module namespace. Direct imports are allowed only for CamelCase types and classes. Import order is enforced by Ruff's isort integration.
+- Follow the import rules in 3.3: import modules for functions and constants, and import CamelCase types and classes directly from their defining module. Import order is enforced by Ruff's isort integration.
 - Import matrix:
 
   | Allowed | Forbidden |
   | --- | --- |
   | `import functools` | `from functools import partial` |
   | `import dataclasses` | `from dataclasses import dataclass, field` |
-  | `import typing` | `from typing import cast` |
+  | `from typing import Self` | `from typing import cast` |
   | `import contextlib` | `from contextlib import suppress` |
   | `import pytest` | `from pytest import raises` |
   | `import hypothesis` | `from hypothesis import given` |
@@ -400,9 +406,10 @@ These principles are engineering constraints, not suggestions. Apply them at mod
   - Constants: `UPPER_CASE`.
   - Private helpers: leading underscore.
   - Avoid abbreviations except established domain terms such as `id` and `url`. Prefer `note_path` over `np`, `person` over `prsn`.
-- Use the `pathlib` module (`pathlib.Path`) for all filesystem paths. Never build paths with string concatenation or hardcoded `/` or `\`.
-- Use the `enum` module (`enum.StrEnum`) for closed vocabularies such as `NoteType` and `Status`.
-- Use the `dataclasses` module (`@dataclasses.dataclass(frozen=True, slots=True)`) for domain models. Validate in `__post_init__` or a dedicated factory.
+- Domain-policy constants are public `UPPER_CASE` names: forbidden filename characters, reserved device names, byte limits, fallback names, note suffixes, frontmatter fences, unsafe URL schemes, and similar rules callers and tests must share. Implementation details such as compiled regexes, parser token tables, and internal edit plans stay private. Tests read public constants through their module and never duplicate the policy.
+- Use `pathlib.Path` for all filesystem paths. Never build paths with string concatenation or hardcoded `/` or `\`.
+- Use `enum.StrEnum` for closed vocabularies such as `NoteType` and `Status`.
+- Use `@dataclasses.dataclass(frozen=True, slots=True)` for domain models and value objects. Keep local invariants in `__post_init__`; put parsing and cross-field validation in a `core/` factory that can raise domain exceptions.
 - Never use mutable default arguments. Use `dataclasses.field(default_factory=...)`.
 - Prefer pure functions. Keep I/O, clocks, environment access, and ID generation at the module boundary. Pass plain values such as paths, dates, and identifiers as explicit parameters. Do not use dependency injection: no constructor injection, service containers, provider frameworks, or injected collaborators. Tests replace module behavior with `monkeypatch` or `unittest.mock.patch`.
 - No mutable module-level state in `core/` or `models/`. The single `ui/state.py` `AppState` singleton is the only permitted exception; expose a reset hook for tests. Module-level constants are allowed but must be accessed through their module.
@@ -418,8 +425,8 @@ These principles are engineering constraints, not suggestions. Apply them at mod
 ### 4.5 Type checking
 
 - Annotate every function and method signature, including parameters, return types, and test functions.
-- Use `X | None`, `list[str]`, `dict[str, int]`, `tuple[str, ...]`, and abstract types from `collections.abc` (`Iterable`, `Mapping`, `Sequence`).
-- Do not use `Optional`, `List`, `Dict`, or `Tuple` from `typing`.
+- Use modern Python 3.13 typing: `X | None`, `list[str]`, `dict[str, int]`, `tuple[str, ...]`, abstract types from `collections.abc` (`Iterable`, `Mapping`, `Sequence`), and `Self` for methods that return the concrete class. Import `Iterable`, `Mapping`, and `Sequence` from `collections.abc`, and `Self` from `typing`; access any other typing member through the `typing` module.
+- Do not use `Optional`, `List`, `Dict`, `Tuple`, `Union`, quoted forward references, or `from __future__ import annotations`.
 - Avoid `Any` in public APIs. Use `object` at true boundaries and narrow it, or define a `Protocol` or generic type.
 - `# type: ignore[code]` is a last resort. It must include the specific error code and a justification comment. Prefer `typing.cast` with a comment explaining the invariant.
 - Do not use `typing.TYPE_CHECKING`. Import types at runtime, keep the import graph acyclic, and quote a forward reference only when unavoidable.
@@ -447,7 +454,7 @@ Strict NumPy-style docstrings are mandatory for every public API. Ruff enforces 
 
 **Formatting.**
 
-- Types in docstrings must match the runtime annotations exactly: `str | None`, `list[str]`, `datetime.date`, not `Optional[str]`, `List[str]`, or `date`.
+- Types in docstrings must match the runtime annotations exactly: `str | None`, `list[str]`, `datetime.date`, not `Optional[str]`, `List[str]`, or `date`. When the annotation is `Self`, name the concrete class in the docstring so the reader sees the actual type.
 - Use the canonical section order: summary, extended description, `Parameters`, `Returns` or `Yields`, `Raises`, `Attributes`, `See Also`, `Notes`, `References`, `Examples`.
 - Underline each section heading with at least three hyphens, matching the heading length.
 - Write parameter entries as `name : type` on one line, followed by an indented description. Write exception entries the same way.
@@ -500,15 +507,16 @@ def parse_note(path: pathlib.Path, vault_root: pathlib.Path) -> Note:
 
 - Domain models live in `models/` and are frozen, slotted dataclasses with enums and value objects.
 - Models do not import Flet, `core/`, `ui/`, or `cli/`.
-- Validate in `__post_init__` or a factory. Raise a domain exception from `core/errors.py`, never a bare `ValueError` at a public boundary unless the spec defines it.
+- Validate at the boundary that can raise domain errors. `models/` value objects stay standard-library-only and may enforce local invariants in `__post_init__`; parsing and cross-field validation that need domain exceptions happen in `core/` factories such as `NoteDocument.from_text` and `NameCatalog.from_entries`. Never use a bare `ValueError` at a public boundary unless the spec defines it.
 - Normalize at the parse boundary:
   - `due_date` becomes `datetime.date | None`.
-  - `people` becomes a tuple of `WikiLink` values.
+  - `people` becomes a tuple of `NoteReference` values with the `person` scheme.
+  - `project` becomes a `NoteReference` with the `project` scheme.
   - `type` and `status` become enums.
 - Preserve the raw frontmatter mapping on the model so unknown keys can be written back. Do not discard unknown data.
-- Identity is the vault-relative path unless the spec defines an explicit `id` field. Never rewrite paths or identities silently.
+- Identity is the filename stem: it is the note's name, display title, and identity. Directories are classification, never identity. No `id` or `title` key participates. Never rewrite paths or identities silently.
 - Due dates are calendar dates. Do not attach a timezone or convert them to instants.
-- People are stored as wikilink strings. Resolve them through the link index; do not duplicate denormalized names into note bodies.
+- People are stored as `person:Name` reference values. Resolve them through the name catalog; do not duplicate denormalized names into note bodies or auto-link bare words.
 - Models are immutable and safe to pass across threads. Return new instances instead of mutating shared state.
 
 ### 4.8 Errors and logging
@@ -594,6 +602,7 @@ All vault writes must go through `core/vault.py`. UI and CLI code must never cal
 
 - `hatch test` invokes pytest. Do not run pytest outside Hatch.
 - Group related tests in classes named `Test<Behavior>` and use plain test methods. Shared fixtures live in `tests/conftest.py`.
+- Never test production-private members: do not import, call, or monkeypatch a leading-underscore function, method, class, or module attribute. Test the public contract through a public entry point. If a private behavior is worth testing and has no public path, promote it to a public value object or function; do not reach into internals. Test-local helpers may be private because they are scaffolding, not the subject under test.
 - Mirror the source layout:
   - `tests/core/test_frontmatter.py`
   - `tests/core/test_links.py`
@@ -605,9 +614,9 @@ All vault writes must go through `core/vault.py`. UI and CLI code must never cal
 - Test names describe behavior and outcome, for example `test_parse_note_preserves_unknown_frontmatter_keys`.
 - Follow arrange-act-assert. One behavior per test. No logic or branching in tests.
 - Use `tmp_path` and fixture-created vaults. Never use the real vault, the user's home directory, or the network.
-- Use Hypothesis for parser round-trips, wikilink extraction, path containment, and frontmatter type handling. Add a deterministic regression test for every minimized failure.
+- Use Hypothesis for parser round-trips, reference extraction, name normalization, filename sanitization, path containment, and frontmatter type handling. Add a deterministic regression test for every minimized failure.
 - Do not use injected clock or ID objects. Tests replace time and identifier generation by patching the owning module with `monkeypatch` or `unittest.mock.patch`. Do not depend on the current date or random values unless the test controls them.
-- UI tests exercise `AppState` commands and view models by patching module-level collaborators with `monkeypatch` or `unittest.mock.patch`, and reset the `AppState` singleton between tests. Do not require a rendered Flutter window for ordinary unit tests.
+- UI tests exercise `AppState` commands and view models by patching public module-level collaborators with `monkeypatch` or `unittest.mock.patch`, and reset the `AppState` singleton between tests. Do not require a rendered Flutter window for ordinary unit tests.
 - Integration tests cover a full workflow: capture in the Inbox, run the Processing Wizard, write the note, reindex, and query the resulting views.
 - Add an architecture test that parses imports with `import ast` and fails on cycles or forbidden edges. Verify that `core/` never imports `ui/` or `cli/`, that `models/` imports only the standard library, and that submodule dependencies remain acyclic.
 - Cross-platform tests must avoid path-separator assumptions and cover reserved names and case-insensitive collisions.

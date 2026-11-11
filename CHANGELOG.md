@@ -7,15 +7,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-10
+
 ### Added
 
 - A changelog following Keep a Changelog 1.1.0.
+- Name-based note references in standard Markdown using `person:`, `project:`, and `note:` schemes, with resolved, unresolved, and ambiguous outcomes.
+- Filename-based note identity with per-scheme uniqueness, cross-platform sanitization, and reference-preserving directory moves and renames.
+- Read-only vault scanning and atomic note creation, move, rename, deletion, and inbound-reference reporting.
+- Runtime dependencies on `markdown-it-py` for CommonMark parsing and `PyYAML` for safe frontmatter handling.
 
 ### Changed
 
+- The canonical vault format now uses scheme references instead of bracket links; `AGENTS.md` and the README document the new format.
 - The operating manual now requires strict NumPy-style docstrings for every public API, including all parameters, return values, raised exceptions, and public attributes.
 - Archiving an OpenSpec change now bumps the version, updates the changelog and README, runs the quality gates, and creates a release commit.
 - OpenSpec project context now records the offline, neutral-vocabulary, docstring, and cross-platform constraints, and archive guidance carries the release steps.
+- The project license is now consistently AGPL-3.0-or-later across the LICENSE file, package metadata, README, and source headers.
+
+### Security
+
+- Active URL schemes such as `javascript:` are classified as unsafe and never resolve as internal references.
 
 ## [0.0.1] - 2026-11-10
 

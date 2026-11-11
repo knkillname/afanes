@@ -8,19 +8,24 @@ dynamic = ["version"]
 description = "Offline, Markdown-native productivity engine and personal wiki."
 readme = "README.md"
 requires-python = ">=3.13"
-license = "MIT"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
 keywords = ["markdown", "personal-wiki", "productivity", "offline", "flet"]
 authors = [
   { name = "Mario Abarca", email = "knkillname@gmail.com" },
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
 ]
-dependencies = []
+dependencies = [
+  "markdown-it-py==4.3.0",
+  "PyYAML==6.0.3",
+]
 
 [project.urls]
 Documentation = "https://github.com/knkillname/afanes#readme"
