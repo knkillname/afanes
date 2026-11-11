@@ -1,0 +1,106 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "afanes"
+dynamic = ["version"]
+description = "Offline, Markdown-native productivity engine and personal wiki."
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+keywords = ["markdown", "personal-wiki", "productivity", "offline", "flet"]
+authors = [
+  { name = "Mario Abarca", email = "knkillname@gmail.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: Implementation :: CPython",
+]
+dependencies = []
+
+[project.urls]
+Documentation = "https://github.com/knkillname/afanes#readme"
+Issues = "https://github.com/knkillname/afanes/issues"
+Source = "https://github.com/knkillname/afanes"
+
+# Single source of truth for development tool versions.
+# Keep the dev group aligned with Hatch's internal check and test environments.
+[dependency-groups]
+test = [
+  "hypothesis~=6.100",
+]
+dev = [
+  { include-group = "test" },
+  "coverage[toml]~=7.11",
+  "coverage-enable-subprocess==1.0",
+  "pyrefly==1.0.0",
+  "pytest~=9.0",
+  "pytest-mock~=3.12",
+  "pytest-randomly~=3.15",
+  "pytest-rerunfailures~=14.0",
+  "pytest-xdist[psutil]~=3.5",
+  "ruff==0.13.2",
+]
+
+[tool.hatch.version]
+path = "src/afanes/__about__.py"
+
+[tool.hatch.envs.default]
+path = ".venv"
+installer = "uv"
+dependency-groups = ["dev"]
+
+[tool.hatch.envs.hatch-test]
+dependency-groups = ["test"]
+
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.13", "3.14"]
+
+[tool.hatch.envs.hatch-check-types]
+dependency-groups = ["test"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+extend-select = ["ANN", "C90", "D", "S"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D100", "D101", "D102", "D103", "D104", "S101"]
+
+[tool.pyrefly]
+project-includes = ["src/afanes", "tests"]
+search-path = ["src"]
+python-version = "3.13"
+preset = "strict"
+disable-search-path-heuristics = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-config --strict-markers"
+
+[tool.coverage.run]
+source_pkgs = ["afanes"]
+branch = true
+parallel = true
+omit = [
+  "src/afanes/__about__.py",
+]
+
+[tool.coverage.paths]
+afanes = ["src/afanes", "*/afanes/src/afanes"]
+
+[tool.coverage.report]
+fail_under = 85
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+]
