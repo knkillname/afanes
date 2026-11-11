@@ -348,7 +348,7 @@ class InboxView:
             self.preview_body.visible = False
             self.preview_body.value = ""
         else:
-            self.preview_title.value = state.selected.stem
+            self.preview_title.value = state.note_title(state.selected)
             self.preview_body.value = state.preview_body or ""
             self.preview_body.visible = True
             self.preview_empty.visible = False
@@ -356,7 +356,7 @@ class InboxView:
     def _note_row(self, note: VaultNote) -> ft.Control:
         """Build one clickable note row."""
         return ft.ListTile(
-            title=note.name,
+            title=note.title,
             subtitle=note.relative_path.as_posix(),
             leading=ft.Icons.DESCRIPTION,
             selected=note.path == self._state.selected,

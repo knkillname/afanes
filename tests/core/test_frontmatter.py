@@ -305,6 +305,61 @@ class TestWithMetadata:
         assert updated.status is Status.ACTIVE
 
 
+class TestDisplayTitle:
+    def test_atx_heading_becomes_the_title(self) -> None:
+        document = NoteDocument.from_text("# Ada\n")
+
+        assert document.title == "Ada"
+
+    def test_setext_heading_becomes_the_title(self) -> None:
+        document = NoteDocument.from_text("Ada Lovelace\n===\n")
+
+        assert document.title == "Ada Lovelace"
+
+    def test_heading_after_introductory_text_becomes_the_title(self) -> None:
+        document = NoteDocument.from_text("An introduction.\n\n# Ada\n")
+
+        assert document.title == "Ada"
+
+    def test_first_heading_wins(self) -> None:
+        document = NoteDocument.from_text("# Ada\n\n# Grace\n")
+
+        assert document.title == "Ada"
+
+    def test_empty_first_heading_falls_back_and_does_not_search_later(self) -> None:
+        document = NoteDocument.from_text("#\n\n# Ada\n")
+
+        assert document.title is None
+
+    def test_inline_formatting_is_flattened_to_plain_text(self) -> None:
+        document = NoteDocument.from_text("# **Ada** *Lovelace* `Countess`\n")
+
+        assert document.title == "Ada Lovelace Countess"
+
+    def test_heading_inside_a_fenced_code_block_is_ignored(self) -> None:
+        document = NoteDocument.from_text("```\n# Ada\n```\n")
+
+        assert document.title is None
+
+    def test_missing_heading_returns_no_title(self) -> None:
+        document = NoteDocument.from_text("Just a body.\n")
+
+        assert document.title is None
+
+    def test_frontmatter_title_key_does_not_override_the_heading(self) -> None:
+        document = NoteDocument.from_text("---\ntitle: Stored\n---\n# Heading\n")
+
+        assert document.title == "Heading"
+
+    def test_with_body_recomputes_the_title(self) -> None:
+        document = NoteDocument.from_text("# Old\n")
+
+        replaced = document.with_body("# New\n")
+
+        assert replaced.title == "New"
+        assert document.title == "Old"
+
+
 class TestRewriteReferenceValues:
     def test_rewrites_matching_people_values_only(self) -> None:
         document = NoteDocument.from_text('---\ntype: note\npeople: ["person:Ada Lovelace", "person:Grace"]\n---\n')

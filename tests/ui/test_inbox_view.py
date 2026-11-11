@@ -33,6 +33,12 @@ async def _process(_path: Path) -> None:
     return None
 
 
+def _write_note(path: Path, body: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"---\ntype: note\n---\n{body}", encoding="utf-8")
+    return path
+
+
 class TestWelcomeView:
     def test_welcome_has_a_folder_action(self) -> None:
         control = afanes.ui.views.inbox.build_welcome(_change_vault)
@@ -95,7 +101,7 @@ class TestInboxView:
         assert isinstance(row, ft.ListTile)
         assert row.title == "Buy milk"
         assert view.preview_title.value == "Buy milk"
-        assert view.preview_body.value == "Buy milk"
+        assert view.preview_body.value == "# Buy milk"
         assert view.preview_body.visible is True
         assert view.preview_body.on_tap_link is not None
         assert view.process_button.disabled is False
@@ -103,6 +109,98 @@ class TestInboxView:
         selected = state.selected
         view.handle_link()
         assert state.selected == selected
+
+    def test_list_shows_the_heading_title_and_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "Ada.md", "# Ada, Countess of Lovelace\n")
+        monkeypatch.setattr(
+            afanes.core.settings,
+            "settings_path",
+            lambda: tmp_path / "settings.json",
+        )
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.choose_vault(vault))
+        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
+
+        row = view.list_view.controls[0]
+        assert isinstance(row, ft.ListTile)
+        assert row.title == "Ada, Countess of Lovelace"
+        assert row.subtitle == "inbox/Ada.md"
+
+    def test_list_falls_back_to_the_identity(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "Plain note.md", "No heading\n")
+        monkeypatch.setattr(
+            afanes.core.settings,
+            "settings_path",
+            lambda: tmp_path / "settings.json",
+        )
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.choose_vault(vault))
+        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
+
+        row = view.list_view.controls[0]
+        assert isinstance(row, ft.ListTile)
+        assert row.title == "Plain note"
+
+    def test_list_distinguishes_duplicate_titles_by_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "First.md", "# Buy milk\n")
+        _write_note(vault / "inbox" / "Second.md", "# Buy milk\n")
+        monkeypatch.setattr(
+            afanes.core.settings,
+            "settings_path",
+            lambda: tmp_path / "settings.json",
+        )
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.choose_vault(vault))
+        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
+
+        rows = [control for control in view.list_view.controls if isinstance(control, ft.ListTile)]
+        assert [row.title for row in rows] == ["Buy milk", "Buy milk"]
+        assert {row.subtitle for row in rows} == {"inbox/First.md", "inbox/Second.md"}
+
+    def test_preview_header_uses_the_heading_title(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        note = _write_note(vault / "inbox" / "Ada.md", "# Ada, Countess of Lovelace\n")
+        monkeypatch.setattr(
+            afanes.core.settings,
+            "settings_path",
+            lambda: tmp_path / "settings.json",
+        )
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            await state.select_note(note)
+
+        asyncio.run(scenario())
+        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
+
+        assert view.preview_title.value == "Ada, Countess of Lovelace"
+        assert view.preview_body.value == "# Ada, Countess of Lovelace\n"
+
+    def test_preview_header_falls_back_to_the_identity(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        note = _write_note(vault / "inbox" / "Plain note.md", "No heading\n")
+        monkeypatch.setattr(
+            afanes.core.settings,
+            "settings_path",
+            lambda: tmp_path / "settings.json",
+        )
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            await state.select_note(note)
+
+        asyncio.run(scenario())
+        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
+
+        assert view.preview_title.value == "Plain note"
 
     def test_process_button_calls_the_callback(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

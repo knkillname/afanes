@@ -33,8 +33,10 @@ directory and reopens it next time. The [Inbox](#inbox) then lists notes under `
 
 ## Vault format
 
-A vault is a directory of Markdown files. A note's filename stem is its name and title, and
-directories only classify; moving a note between folders never changes a reference.
+A vault is a directory of Markdown files. A note's filename stem is its identity and the name that
+references resolve against. Its display title is the first level-1 heading in the body, falling back
+to the filename stem when there is no heading. Directories only classify; moving a note between
+folders never changes a reference.
 
 Notes use one of four types:
 
@@ -53,6 +55,8 @@ people:
 project: "project:Turing Machine"
 ---
 
+# Ask Ada for the draft
+
 Ask [Ada Lovelace](<person:Ada Lovelace>) for the draft and file it under
 [Turing Machine](project:TuringMachine).
 ```
@@ -62,6 +66,8 @@ Ask [Ada Lovelace](<person:Ada Lovelace>) for the draft and file it under
 type: reference
 category: person
 ---
+
+# Ada Lovelace
 
 Ada's contact page.
 ```
@@ -93,11 +99,25 @@ Names are matched case-insensitively, so `[Ada](<person:ada lovelace>)` resolves
 ## Inbox
 
 Captures live in `inbox/`. Capturing a thought uses the first non-blank line as the filename and
-writes the complete text as the body, with only `type: note` in the frontmatter. No status,
-project, people, or due date is inferred; clarification is a separate step.
+writes that line as a level-1 heading at the start of the body. All other text is preserved, even
+when the filename had to sanitize characters that are unsafe on some platforms. The frontmatter
+contains only `type: note`. No status, project, people, or due date is inferred; clarification is a
+separate step.
 
-The Inbox lists every note under `inbox/`, newest first. Select a note to preview it read-only,
-then choose Process to open the wizard.
+Capturing `Call Ada` followed by `about the invoice` writes:
+
+```markdown
+---
+type: note
+---
+
+# Call Ada
+about the invoice
+```
+
+The Inbox lists every note under `inbox/`, newest first, showing each note's display title with its
+vault-relative path as the secondary line. Select a note to preview it read-only, then choose
+Process to open the wizard.
 
 ## Processing
 
@@ -106,9 +126,10 @@ actionable. If it is not, choose Trash, Later, or Reference. If it is, choose a 
 multi-step Project, then set a status, optional due date, people, and a project where applicable.
 
 The preview shows the destination and any person or project references that do not have a page
-yet. Those references are allowed and resolve automatically when the page appears. Confirming
-writes the classified frontmatter atomically and then moves the note out of `inbox/`. A failed
-move leaves the note in the Inbox so the same plan can be retried.
+yet. People and project fields suggest existing pages by display title or identity and store the
+page identity. Those references are allowed and resolve automatically when the page appears.
+Confirming writes the classified frontmatter atomically and then moves the note out of `inbox/`. A
+failed move leaves the note in the Inbox so the same plan can be retried.
 
 Project steps are action notes linked by the `project` key. Trash moves the note to `trash/`
 without rewriting any referring note; moving it back restores it and resolves its inbound

@@ -286,6 +286,34 @@ class TestScanVault:
         snapshot = afanes.core.vault.Vault(root).scan()
         assert snapshot.notes[0].content_hash == hashlib.sha256(path.read_bytes()).hexdigest()
 
+    def test_records_the_heading_title(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Ada.md", body="# Ada, Countess of Lovelace")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert snapshot.notes[0].name == "Ada"
+        assert snapshot.notes[0].title == "Ada, Countess of Lovelace"
+
+    def test_title_falls_back_to_the_identity(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Ada.md", body="No heading")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert snapshot.notes[0].title == "Ada"
+
+    def test_an_invalid_note_with_a_heading_is_still_reported(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        bad = root / "Ada.md"
+        bad.parent.mkdir(parents=True)
+        bad.write_text("---\ntype: [unclosed\n---\n# Ada\n", encoding="utf-8")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert snapshot.notes == ()
+        assert [failure.path.as_posix() for failure in snapshot.failures] == ["Ada.md"]
+
     def test_extracts_body_and_frontmatter_references(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write_note(
@@ -408,6 +436,78 @@ class TestInboxNotes:
         snapshot = afanes.core.vault.Vault(root).scan()
 
         assert snapshot.inbox_notes() == ()
+
+
+class TestAssignmentCandidates:
+    def test_matches_an_identity(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "reference/people/Ada.md", "person", body="# Countess\n")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        candidates = snapshot.assignment_candidates(ReferenceScheme.PERSON, "ada")
+        assert [note.name for note in candidates] == ["Ada"]
+
+    def test_matches_a_title(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "reference/people/Ada.md", "person", body="# Ada, Countess of Lovelace\n")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        candidates = snapshot.assignment_candidates(ReferenceScheme.PERSON, "countess")
+        assert [note.name for note in candidates] == ["Ada"]
+
+    def test_matching_ignores_case_and_repeated_whitespace(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "reference/people/Ada.md", "person", body="# Ada, Countess of Lovelace\n")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        candidates = snapshot.assignment_candidates(ReferenceScheme.PERSON, "ada,   countess")
+        assert [note.name for note in candidates] == ["Ada"]
+
+    def test_duplicate_titles_are_distinguished_by_identity(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "reference/people/Ada.md", "person", body="# Ada, Countess of Lovelace\n")
+        _write_note(root / "reference/people/Ada King.md", "person", body="# Ada, Countess of Lovelace\n")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        candidates = snapshot.assignment_candidates(ReferenceScheme.PERSON, "countess")
+        assert [note.name for note in candidates] == ["Ada", "Ada King"]
+
+    def test_filters_by_scheme(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "reference/people/Ada.md", "person", body="# Ada\n")
+        _write_note(root / "projects/Ada.md", "project", body="# Ada\n")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        people = snapshot.assignment_candidates(ReferenceScheme.PERSON, "ada")
+        projects = snapshot.assignment_candidates(ReferenceScheme.PROJECT, "ada")
+        assert [note.name for note in people] == ["Ada"]
+        assert [note.name for note in projects] == ["Ada"]
+        assert people[0].note_type is NoteType.REFERENCE
+        assert projects[0].note_type is NoteType.PROJECT
+
+    def test_empty_query_returns_every_note_in_the_scheme(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "reference/people/Grace.md", "person", body="# Grace Hopper\n")
+        _write_note(root / "reference/people/Ada.md", "person", body="# Ada Lovelace\n")
+        _write_note(root / "projects/Launch.md", "project", body="# Launch\n")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        candidates = snapshot.assignment_candidates(ReferenceScheme.PERSON, "")
+        assert [note.name for note in candidates] == ["Ada", "Grace"]
+
+    def test_no_match_returns_nothing(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "reference/people/Ada.md", "person")
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert snapshot.assignment_candidates(ReferenceScheme.PERSON, "missing") == ()
 
 
 class TestCreateNote:
@@ -566,7 +666,7 @@ class TestCaptureNote:
         assert [entry.name for entry in root.iterdir()] == ["inbox"]
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
         assert document.raw == {"type": "note"}
-        assert document.body == "Buy milk"
+        assert document.body == "# Buy milk"
 
     def test_reuses_an_existing_inbox_case_variant(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -585,7 +685,32 @@ class TestCaptureNote:
         path = afanes.core.vault.Vault(root).capture(text)
 
         assert path.name == "Call Ada.md"
-        assert NoteDocument.from_text(path.read_text(encoding="utf-8")).body == text
+        assert NoteDocument.from_text(path.read_text(encoding="utf-8")).body == "\n\n# Call Ada\nabout the invoice\n"
+
+    def test_leaves_an_existing_heading_alone(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        text = "# Call Ada\nabout the invoice\n"
+
+        path = afanes.core.vault.Vault(root).capture(text)
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+
+        assert document.body == text
+        assert document.title == "Call Ada"
+
+    def test_templates_a_sanitized_first_line_without_changing_it(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.Vault(root).capture("Q1: Planning?")
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert path.name == "Q1 Planning.md"
+        assert document.body == "# Q1: Planning?"
+        assert snapshot.notes[0].title == "Q1: Planning?"
 
     def test_rejects_whitespace_only_text(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

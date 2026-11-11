@@ -17,6 +17,7 @@ from afanes.core.errors import ConfigurationError, VaultError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import ProcessingOutcome
 from afanes.core.settings import Settings, SettingsStore
+from afanes.models.link import ReferenceScheme
 
 OLD_NS = 1_700_000_000_000_000_000
 NEW_NS = 1_700_000_001_000_000_000
@@ -68,7 +69,7 @@ class TestProcessingState:
 
         assert opened is True
         assert state.processing_note == capture
-        assert state.processing_body == "Buy milk"
+        assert state.processing_body == "# Buy milk"
         assert state.selected == capture
 
     def test_begin_processing_rejects_a_missing_capture(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -244,6 +245,47 @@ class TestProcessingState:
 
         assert state.processing_result is None
         assert state.processing_note is None
+
+
+class TestAssignmentCandidates:
+    def test_returns_candidates_from_the_last_scan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(
+            vault / "reference/people/Ada.md",
+            "---\ntype: reference\ncategory: person\n---\n# Ada, Countess of Lovelace\n",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.choose_vault(vault))
+        candidates = state.assignment_candidates(ReferenceScheme.PERSON, "countess")
+
+        assert [note.name for note in candidates] == ["Ada"]
+        assert candidates[0].title == "Ada, Countess of Lovelace"
+
+    def test_returns_nothing_without_a_vault(self) -> None:
+        state = afanes.ui.state.app_state
+
+        assert state.assignment_candidates(ReferenceScheme.PERSON, "ada") == ()
+
+    def test_candidates_follow_a_refresh(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[afanes.core.vault.VaultNote, ...]:
+            await state.choose_vault(vault)
+            _write_note(
+                vault / "projects/Launch.md",
+                "---\ntype: project\nstatus: active\n---\n# Launch the product\n",
+            )
+            await state.refresh()
+            return state.assignment_candidates(ReferenceScheme.PROJECT, "product")
+
+        candidates = asyncio.run(scenario())
+
+        assert [note.name for note in candidates] == ["Launch"]
 
 
 class TestStartup:
@@ -610,7 +652,7 @@ class TestPreview:
         asyncio.run(scenario())
 
         assert state.selected == state.notes[0].path
-        assert state.preview_body == "First line\nsecond line"
+        assert state.preview_body == "# First line\nsecond line"
         assert "type: note" not in (state.preview_body or "")
 
     def test_preview_performs_no_write(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

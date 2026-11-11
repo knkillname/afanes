@@ -56,7 +56,11 @@ class VaultNote:
         Vault-relative path used for diagnostics.
     name : str
         Filename stem, preserving display case. This is the note's identity and
-        title.
+        reference name.
+    title : str
+        Display title derived from the first level-1 heading, falling back to
+        :attr:`name` when the body has no level-1 heading. It is display-only
+        and does not participate in identity or reference resolution.
     note_type : NoteType
         Declared type from frontmatter.
     category : ReferenceCategory | None
@@ -78,6 +82,7 @@ class VaultNote:
     path: Path
     relative_path: Path
     name: str
+    title: str
     note_type: NoteType
     category: ReferenceCategory | None
     status: Status | None
@@ -161,6 +166,52 @@ class VaultSnapshot:
             sorted(
                 notes,
                 key=lambda note: (-note.modified_ns, note.name.casefold(), note.relative_path.as_posix()),
+            )
+        )
+
+    def assignment_candidates(self, scheme: ReferenceScheme, query: str) -> tuple[VaultNote, ...]:
+        """Return notes whose identity or display title contains a query.
+
+        Parameters
+        ----------
+        scheme : ReferenceScheme
+            Namespace to search, normally ``person`` or ``project``.
+        query : str
+            Free text typed by the user. Matching ignores case, Unicode form,
+            and repeated whitespace. An empty query matches every note in the
+            scheme.
+
+        Returns
+        -------
+        tuple[VaultNote, ...]
+            Matching notes ordered by display title, then identity, then
+            vault-relative path. Empty when nothing matches.
+
+        Notes
+        -----
+        This method performs no file I/O and no rescan. Identity and display
+        title are normalized with :func:`afanes.core.names.normalize_name`, so
+        matching follows the same rule as reference resolution. Display titles
+        are only matched; they never become reference targets.
+        """
+        normalized_query = afanes.core.names.normalize_name(query)
+        matches = [
+            note
+            for note in self.notes
+            if afanes.core.links.scheme_for_note(note.note_type, note.category) is scheme
+            and (
+                normalized_query in afanes.core.names.normalize_name(note.name)
+                or normalized_query in afanes.core.names.normalize_name(note.title)
+            )
+        ]
+        return tuple(
+            sorted(
+                matches,
+                key=lambda note: (
+                    afanes.core.names.normalize_name(note.title),
+                    afanes.core.names.normalize_name(note.name),
+                    note.relative_path.as_posix(),
+                ),
             )
         )
 
@@ -656,12 +707,13 @@ class Vault:
         body: str = "",
         status: Status | None = None,
     ) -> Path:
-        """Create a note whose sanitized filename stem becomes its title.
+        """Create a note whose sanitized filename stem becomes its identity.
 
         Parameters
         ----------
         title : str
-            Display title to sanitize into a filename.
+            Name to sanitize into the identity filename. The new note's display
+            title is derived separately from its body.
         note_type : NoteType
             Declared type for the new note.
         category : ReferenceCategory | None
@@ -741,7 +793,7 @@ class Vault:
         ----------
         text : str
             Captured thought. The first non-blank line becomes the filename
-            stem and the complete text becomes the Markdown body.
+            stem and receives a level-1 heading marker in the body.
 
         Returns
         -------
@@ -759,18 +811,26 @@ class Vault:
 
         Notes
         -----
-        The note declares only ``type: note``; no status, project, people, due
-        date, or references are inferred. The inbox directory is created on
-        demand. This method performs blocking file I/O.
+        The complete text becomes the Markdown body. ``# `` is inserted at the
+        start of the first non-blank line unless its first non-whitespace
+        character is already ``#``. All other text, including leading blank
+        lines, is preserved. The note declares only ``type: note``; no status,
+        project, people, due date, or references are inferred. The inbox
+        directory is created on demand. This method performs blocking file I/O.
         """
-        first_line = next((line for line in text.splitlines() if line.strip()), None)
-        if first_line is None:
+        lines = text.splitlines(keepends=True)
+        first_index = next((index for index, line in enumerate(lines) if line.strip()), None)
+        if first_index is None:
             message = "A captured thought must contain text"
             raise EmptyCaptureError(message)
+        first_line = lines[first_index]
+        body_lines = list(lines)
+        if not first_line.lstrip().startswith("#"):
+            body_lines[first_index] = f"# {first_line}"
         return self.create(
             first_line,
             NoteType.NOTE,
-            body=text,
+            body="".join(body_lines),
             status=None,
         )
 
@@ -846,7 +906,8 @@ class Vault:
         note_path : Path
             Existing note path, relative or absolute.
         new_title : str
-            Requested title. It is sanitized before comparison and use.
+            Requested name for the note's identity. It is sanitized before
+            comparison and use.
         snapshot : VaultSnapshot | None
             Pre-built scan to avoid rescanning, or ``None`` to scan the vault.
 
@@ -1207,6 +1268,7 @@ def _read_note(
         path=path,
         relative_path=relative_path,
         name=path.stem,
+        title=document.title or path.stem,
         note_type=document.note_type,
         category=document.category,
         status=document.status,

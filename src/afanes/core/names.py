@@ -73,7 +73,7 @@ def safe_filename(title: str) -> str:
     Parameters
     ----------
     title : str
-        Display title supplied by the user or derived from note content.
+        Name supplied by the user or derived from note content.
 
     Returns
     -------
@@ -82,8 +82,9 @@ def safe_filename(title: str) -> str:
 
     Notes
     -----
-    The returned stem is the note's title and identity, so it is intentionally
-    display-preserving rather than slugified. Collision handling belongs to
+    The returned stem is the note's identity and reference name, so it is
+    intentionally display-preserving rather than slugified. A note's display
+    title is derived separately from its body. Collision handling belongs to
     :func:`unique_name`.
     """
     name = unicodedata.normalize("NFC", title)

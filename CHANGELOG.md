@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-11
+
+### Added
+
+- Page display titles derived from the first level-1 heading in a note body, falling back to the filename identity when no heading exists.
+- Inbox entries and previews show display titles, with the vault-relative path as the secondary line.
+- People and project assignment fields suggest existing pages by display title or identity and store the page identity.
+
+### Changed
+
+- Captures write the first non-blank line as a level-1 heading, preserving the original wording when the filename is sanitized.
+- The filename stem is the note identity and reference name; it no longer doubles as the display title. No `title:` frontmatter key is introduced.
+
 ## [0.3.0] - 2026-11-11
 
 ### Added

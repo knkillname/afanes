@@ -106,7 +106,9 @@ class TestProcessingLifecycle:
         assert target == root / "actions" / "Call Ada.md"
         assert snapshot.inbox_notes() == ()
         assert [note.path for note in snapshot.notes] == [target]
-        assert NoteDocument.from_text(target.read_text(encoding="utf-8")).body == "Call Ada"
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert document.body == "# Call Ada"
+        assert document.title == "Call Ada"
 
     def test_capture_to_reference(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -121,6 +123,7 @@ class TestProcessingLifecycle:
         assert target == root / "reference" / "Reading list.md"
         assert document.note_type is NoteType.REFERENCE
         assert document.status is None
+        assert document.title == "Reading list"
         assert vault.scan().inbox_notes() == ()
 
     def test_capture_to_later(self, tmp_path: Path) -> None:
@@ -191,10 +194,14 @@ class TestInboxCapture:
         documents = [NoteDocument.from_text(note.path.read_text(encoding="utf-8")) for note in inbox]
 
         assert [note.name for note in inbox] == ["Second thought", "First thought"]
+        assert [note.title for note in inbox] == ["Second thought", "First thought"]
         assert [note.relative_path.as_posix() for note in inbox] == [
             "inbox/Second thought.md",
             "inbox/First thought.md",
         ]
-        assert [document.body for document in documents] == ["Second thought", "First thought\nwith detail"]
+        assert [document.body for document in documents] == [
+            "# Second thought",
+            "# First thought\nwith detail",
+        ]
         assert [document.raw for document in documents] == [{"type": "note"}, {"type": "note"}]
         assert all(note.path.parent.name == "inbox" for note in inbox)

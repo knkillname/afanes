@@ -12,6 +12,8 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.processing import ProcessingOutcome, ProcessingPlan
+from afanes.core.vault import VaultNote
+from afanes.models.link import ReferenceScheme
 from afanes.models.note import Status
 
 
@@ -75,6 +77,7 @@ class ProcessingView:
         self._on_finish = on_finish
         self._working = False
         self._plan_hidden = self._state.processing_plan is None
+        self._suppress_suggestions = False
 
         self.progress = ft.ProgressRing(
             width=16,
@@ -171,6 +174,8 @@ class ProcessingView:
             width=420,
             visible=False,
         )
+        self.people_suggestions = ft.Column(controls=[], spacing=0, visible=False)
+        self.project_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.preview_button = ft.FilledButton(
             content=afanes.ui.strings.PROCESSING_PREVIEW_ACTION,
             icon=ft.Icons.VISIBILITY,
@@ -197,7 +202,9 @@ class ProcessingView:
                     spacing=afanes.ui.theme.ITEM_GAP,
                     wrap=True,
                 ),
+                self.project_suggestions,
                 self.people,
+                self.people_suggestions,
                 self.form_error,
                 self.preview_button,
             ],
@@ -384,6 +391,9 @@ class ProcessingView:
         self.due_date.disabled = working
         self.people.disabled = working
         self.project.disabled = working
+        for control in (*self.people_suggestions.controls, *self.project_suggestions.controls):
+            if isinstance(control, ft.ListTile):
+                control.disabled = working
         self.preview_button.disabled = working
         self.cancel_button.disabled = working
         self.confirm_button.disabled = working
@@ -394,7 +404,7 @@ class ProcessingView:
     def _refresh_dynamic(self) -> None:
         """Refresh visibility, plan details, and banners from application state."""
         state = self._state
-        self.capture_title.value = state.processing_note.stem if state.processing_note is not None else ""
+        self.capture_title.value = state.note_title(state.processing_note) if state.processing_note is not None else ""
         self.capture_body.value = state.processing_body or ""
 
         outcome = self._selected_outcome()
@@ -403,6 +413,7 @@ class ProcessingView:
         self.due_date.visible = actionable
         self.project.visible = outcome is ProcessingOutcome.ACTION
         self.people.visible = outcome is not None and outcome is not ProcessingOutcome.TRASH
+        self._refresh_suggestions()
 
         success = state.processing_result is not None
         self.form.visible = not success
@@ -467,6 +478,91 @@ class ProcessingView:
             )
         self.plan_warnings.controls = warnings
         self.plan_warnings.visible = bool(warnings)
+
+    def _refresh_suggestions(self) -> None:
+        """Refresh assignment suggestions from the retained vault snapshot."""
+        if self._suppress_suggestions:
+            self._clear_suggestions(self.people_suggestions)
+            self._clear_suggestions(self.project_suggestions)
+            return
+        self._render_suggestions(
+            self.people_suggestions,
+            ReferenceScheme.PERSON,
+            self._active_people_token(),
+            visible=self.people.visible,
+            apply=self._apply_people_suggestion,
+        )
+        self._render_suggestions(
+            self.project_suggestions,
+            ReferenceScheme.PROJECT,
+            (self.project.value or "").strip(),
+            visible=self.project.visible,
+            apply=self._apply_project_suggestion,
+        )
+
+    def _render_suggestions(
+        self,
+        column: ft.Column,
+        scheme: ReferenceScheme,
+        query: str,
+        *,
+        visible: bool,
+        apply: Callable[[str], None],
+    ) -> None:
+        """Fill one suggestion list from the active field text."""
+        if not visible or not query:
+            self._clear_suggestions(column)
+            return
+        candidates = self._state.assignment_candidates(scheme, query)
+        column.controls = [self._suggestion_tile(note, apply) for note in candidates]
+        column.visible = bool(column.controls)
+
+    @staticmethod
+    def _clear_suggestions(column: ft.Column) -> None:
+        """Empty one suggestion list and hide it."""
+        column.controls = []
+        column.visible = False
+
+    def _suggestion_tile(self, note: VaultNote, apply: Callable[[str], None]) -> ft.Control:
+        """Build one selectable assignment suggestion."""
+        subtitle = note.name if note.name != note.title else None
+        return ft.ListTile(
+            title=note.title,
+            subtitle=subtitle,
+            dense=True,
+            on_click=self._suggestion_handler(note.name, apply),
+        )
+
+    def _suggestion_handler(
+        self,
+        identity: str,
+        apply: Callable[[str], None],
+    ) -> Callable[[], Awaitable[None]]:
+        """Bind a no-argument async selection handler to one page identity."""
+
+        async def handle() -> None:
+            self._suppress_suggestions = True
+            try:
+                apply(identity)
+                self._invalidate_plan()
+            finally:
+                self._suppress_suggestions = False
+
+        return handle
+
+    def _active_people_token(self) -> str:
+        """Return the token after the last comma in the people field."""
+        return (self.people.value or "").rsplit(",", 1)[-1].strip()
+
+    def _apply_people_suggestion(self, identity: str) -> None:
+        """Replace the active people token with a page identity."""
+        value = self.people.value or ""
+        head, separator, _ = value.rpartition(",")
+        self.people.value = f"{head.rstrip()}, {identity}" if separator else identity
+
+    def _apply_project_suggestion(self, identity: str) -> None:
+        """Replace the project field with a page identity."""
+        self.project.value = identity
 
 
 def _banner(message: str) -> ft.Control:

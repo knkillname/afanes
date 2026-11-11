@@ -278,6 +278,44 @@ class TestPlanProcessing:
 
         assert [reference.name for reference in plan.unresolved_references] == ["Grace", "Missing"]
 
+    def test_assigning_a_page_identity_resolves_it(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.Vault(root)
+        vault.create(
+            "Ada",
+            NoteType.REFERENCE,
+            category=ReferenceCategory.PERSON,
+            body="# Ada, Countess of Lovelace\n",
+        )
+        capture = _capture(root)
+
+        plan = vault.plan_processing(capture, ProcessingOutcome.ACTION, people=("Ada",))
+
+        assert plan.people == (NoteReference(scheme=ReferenceScheme.PERSON, name="Ada"),)
+        assert plan.unresolved_references == ()
+
+    def test_assigning_a_display_title_keeps_it_unresolved(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.Vault(root)
+        vault.create(
+            "Ada",
+            NoteType.REFERENCE,
+            category=ReferenceCategory.PERSON,
+            body="# Ada, Countess of Lovelace\n",
+        )
+        capture = _capture(root)
+
+        plan = vault.plan_processing(
+            capture,
+            ProcessingOutcome.ACTION,
+            people=("Ada, Countess of Lovelace",),
+        )
+
+        assert plan.people == (NoteReference(scheme=ReferenceScheme.PERSON, name="Ada, Countess of Lovelace"),)
+        assert plan.unresolved_references == plan.people
+
     def test_plans_a_reference(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
@@ -534,7 +572,7 @@ class TestApplyProcessing:
         assert document.note_type is NoteType.REFERENCE
         assert document.category is None
         assert document.status is None
-        assert document.body == "Call Ada"
+        assert document.body == "# Call Ada"
 
     def test_applies_a_later_reference(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

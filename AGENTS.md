@@ -51,6 +51,8 @@ people:
 project: "project:Release 1.0"
 ---
 
+# Release migration checklist
+
 Draft the migration checklist and link it to [Release 1.0](<project:Release 1.0>).
 ```
 
@@ -74,15 +76,15 @@ Rules for frontmatter:
 - The body is standard Markdown. Internal references use `[Label](scheme:Name)` with the schemes `person`, `project`, and `note`; use angle brackets when the name contains spaces, for example `[Ada](<person:Ada Lovelace>)`. Resolution rules live in `core/links.py` and the relevant spec.
 - A malformed frontmatter block is a parse error, not an invitation to guess. Do not overwrite the file.
 - New files use stable key order and canonical YAML. Existing files only have keys modified that the current operation owns.
-- The filename stem is the note's name, display title, and identity. Directories classify only; moving a note never changes a reference. No `id` or `title` key participates in identity.
+- The filename stem is the note's identity and reference name. The display title is the first level-1 Markdown heading in the body, falling back to the stem when there is none; it is derived and never stored. Directories classify only; moving a note never changes a reference. No `id` or `title` key participates in identity.
 - The format must remain human-editable. Do not introduce a hidden database-only field that is required to understand a note.
 
 ### 1.4 Core workflows
 
 | Workflow | Required behavior | Primary code |
 | --- | --- | --- |
-| Inbox | Rapid capture of a raw thought as a Markdown file under `inbox/`. The first non-blank line becomes the filename and the full text becomes the body. No status or other classification is assigned at capture time; the Inbox lists the folder newest first. | `ui/views/inbox.py`, `core/vault.py` |
-| Processing Wizard | Step-by-step clarification into one of Trash, Later, Reference, Action, or Project, with status, due date, people, and project assignment where applicable. Every step is explicit, previewed, and confirmed before writing. | `ui/views/processing.py`, `core/processing.py`, `core/vault.py` |
+| Inbox | Rapid capture of a raw thought as a Markdown file under `inbox/`. The first non-blank line becomes the filename and is written as a level-1 heading at the start of the body; all other text is preserved. No status or other classification is assigned at capture time; the Inbox lists the folder newest first and shows each note by display title with its vault-relative path as the secondary line. | `ui/views/inbox.py`, `core/vault.py` |
+| Processing Wizard | Step-by-step clarification into one of Trash, Later, Reference, Action, or Project, with status, due date, people, and project assignment where applicable. People and project inputs suggest existing pages by display title or identity and store identities. Every step is explicit, previewed, and confirmed before writing. | `ui/views/processing.py`, `core/processing.py`, `core/vault.py` |
 | Clarification Pipeline | The plan/apply state machine and validation used by the Processing Wizard. Must be testable without Flet. | `core/processing.py`, `core/vault.py`, `models/` |
 | Timeline | Dynamic view ordered by `due_date`, including overdue and undated buckets. | `ui/views/timeline.py`, `core/search.py` |
 | People / Contacts | Network view over reference notes with `category: person` and their bidirectional links to actions, projects, and references. | `ui/views/people.py`, `core/links.py` |
@@ -557,7 +559,7 @@ def parse_note(path: pathlib.Path, vault_root: pathlib.Path) -> Note:
   - `project` becomes a `NoteReference` with the `project` scheme.
   - `type`, `category`, and `status` become enums.
 - Preserve the raw frontmatter mapping on the model so unknown keys can be written back. Do not discard unknown data.
-- Identity is the filename stem: it is the note's name, display title, and identity. Directories are classification, never identity. No `id` or `title` key participates. Never rewrite paths or identities silently.
+- Identity is the filename stem: it is the note's name, identity, and reference target. The display title is derived from the first level-1 heading in the body, falling back to the stem when there is none; it is not stored and does not participate in identity. Directories are classification, never identity. No `id` or `title` key participates. Never rewrite paths or identities silently.
 - Due dates are calendar dates. Do not attach a timezone or convert them to instants.
 - People are stored as `person:Name` reference values. Resolve them through the name catalog; do not duplicate denormalized names into note bodies or auto-link bare words.
 - Models are immutable and safe to pass across threads. Return new instances instead of mutating shared state.

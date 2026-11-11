@@ -21,6 +21,7 @@ from afanes.core.errors import AfanesError, ConfigurationError, EmptyCaptureErro
 from afanes.core.processing import ProcessingOutcome, ProcessingPlan
 from afanes.core.settings import Settings, SettingsStore
 from afanes.core.vault import Vault, VaultFailure, VaultNote, VaultSnapshot
+from afanes.models.link import ReferenceScheme
 from afanes.models.note import Status
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,7 @@ class AppState:
     processing_body: str | None = None
     processing_plan: ProcessingPlan | None = None
     processing_result: Path | None = None
+    _snapshot: VaultSnapshot | None = dataclasses.field(default=None, repr=False)
     _lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock, repr=False)
 
     @property
@@ -475,8 +477,60 @@ class AppState:
         self.preview_body = None
         self.busy = False
         self.message = None
+        self._snapshot = None
         self._clear_processing()
         self._lock = asyncio.Lock()
+
+    def note_title(self, path: Path) -> str:
+        """Return the display title for a note in the current Inbox list.
+
+        Parameters
+        ----------
+        path : Path
+            Absolute path of a note shown in the Inbox.
+
+        Returns
+        -------
+        str
+            Display title derived from the note's first level-1 heading, or its
+            identity when the body has none. When ``path`` is no longer in the
+            current list, its filename stem is returned as a safe fallback.
+
+        Notes
+        -----
+        This method is pure in-memory work over the last scan. It never reads
+        the file and never parses Markdown in the view layer.
+        """
+        note = next((note for note in self.notes if note.path == path), None)
+        return path.stem if note is None else note.title
+
+    def assignment_candidates(self, scheme: ReferenceScheme, query: str) -> tuple[VaultNote, ...]:
+        """Return assignment suggestions from the last vault scan.
+
+        Parameters
+        ----------
+        scheme : ReferenceScheme
+            Namespace to search, normally ``person`` or ``project``.
+        query : str
+            Free text typed by the user. An empty query matches every note in
+            the scheme.
+
+        Returns
+        -------
+        tuple[VaultNote, ...]
+            Matching notes ordered by display title, then identity, or an empty
+            tuple when no vault is open.
+
+        Notes
+        -----
+        This is pure in-memory work over the retained snapshot. It performs no
+        file I/O and never rescans the vault, so it is safe to call from a
+        keystroke handler.
+        """
+        snapshot = self._snapshot
+        if snapshot is None:
+            return ()
+        return snapshot.assignment_candidates(scheme, query)
 
     def _clear_processing(self) -> None:
         """Clear the Processing Wizard session fields."""
@@ -522,11 +576,13 @@ class AppState:
         self.failures = ()
         self.selected = None
         self.preview_body = None
+        self._snapshot = None
         self._clear_processing()
         self.message = message
 
     def _apply_snapshot(self, snapshot: VaultSnapshot, focus: Path | None = None) -> None:
         """Replace the inbox list from a scan result."""
+        self._snapshot = snapshot
         notes = list(snapshot.inbox_notes())
         if focus is not None:
             for index, note in enumerate(notes):

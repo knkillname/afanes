@@ -13,6 +13,8 @@ import dataclasses
 from typing import Self
 
 import yaml
+from markdown_it import MarkdownIt
+from markdown_it.token import Token
 from yaml import YAMLError
 
 import afanes.core.links
@@ -157,6 +159,28 @@ class NoteDocument:
             New document instance; the original is unchanged.
         """
         return dataclasses.replace(self, body=body)
+
+    @property
+    def title(self) -> str | None:
+        """Return the display title derived from the first level-1 heading.
+
+        Returns
+        -------
+        str | None
+            Trimmed plain text of the first level-1 heading in :attr:`body`, or
+            ``None`` when the body has no level-1 heading or its first level-1
+            heading has blank text.
+
+        Notes
+        -----
+        The title is derived from the body on every access and is never stored
+        in frontmatter. Setext headings count, and inline formatting is
+        flattened to text. A heading inside a fenced or indented code block is
+        ignored. A blank first heading does not fall through to a later
+        heading. The value is display-only; it does not participate in
+        identity, uniqueness, or reference resolution.
+        """
+        return _body_title(self.body)
 
     def with_metadata(self, raw: dict[str, object]) -> Self:
         """Return a copy with replaced frontmatter, revalidated.
@@ -417,3 +441,63 @@ class NoteDocument:
     def _frontmatter_value(reference: NoteReference) -> str:
         """Render a reference as a frontmatter value without angle brackets."""
         return f"{reference.scheme.value}:{reference.name}"
+
+
+def _body_title(body: str) -> str | None:
+    """Return the plain text of the first level-1 heading in a body.
+
+    Parameters
+    ----------
+    body : str
+        Markdown body without frontmatter.
+
+    Returns
+    -------
+    str | None
+        Trimmed heading text, or ``None`` when the first level-1 heading is
+        absent or blank.
+
+    Notes
+    -----
+    Extraction uses the CommonMark parser, so headings inside code blocks are
+    not considered. Inline markup is flattened to text and a multi-line setext
+    heading is joined with single spaces.
+    """
+    tokens = MarkdownIt("commonmark").parse(body)
+    for index, token in enumerate(tokens):
+        if token.type != "heading_open" or token.tag != "h1":
+            continue
+        inline = tokens[index + 1] if index + 1 < len(tokens) else None
+        text = _inline_text(inline) if inline is not None and inline.type == "inline" else ""
+        return text.strip() or None
+    return None
+
+
+def _inline_text(token: Token) -> str:
+    """Flatten one inline token's children to plain text.
+
+    Parameters
+    ----------
+    token : Token
+        Inline token holding the heading's children.
+
+    Returns
+    -------
+    str
+        Concatenated text of text, code, and image children, with line breaks
+        rendered as single spaces.
+
+    Notes
+    -----
+    Formatting markers and raw inline HTML are omitted because the result is a
+    display title, not a Markdown fragment.
+    """
+    if token.children is None:
+        return token.content
+    parts: list[str] = []
+    for child in token.children:
+        if child.type in {"text", "code_inline", "image"}:
+            parts.append(child.content)
+        elif child.type in {"softbreak", "hardbreak"}:
+            parts.append(" ")
+    return "".join(parts)
