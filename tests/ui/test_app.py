@@ -158,9 +158,9 @@ class TestAppShell:
 
         async def scenario() -> None:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
-            await state.select_note(state.notes[0].path)
+            await state.open_page(state.notes[0].path)
             process_button = _find_by_key(page.controls[0], "process-note")
-            assert isinstance(process_button, ft.FilledButton)
+            assert isinstance(process_button, ft.TextButton)
             process_handler = typing.cast("Handler", process_button.on_click)
             await process_handler()
 

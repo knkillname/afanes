@@ -11,6 +11,7 @@ import afanes.core.settings
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.views.inbox
+from afanes.core.editing import DraftMode
 from afanes.core.vault import VaultFailure
 
 TWO_BANNERS = 2
@@ -69,10 +70,10 @@ class TestInboxView:
         assert view.capture_button.content == afanes.ui.strings.CAPTURE_ACTION
         assert len(view.list_view.controls) == 1
         assert isinstance(view.list_view.controls[0], ft.Container)
-        assert view.preview_empty.visible is True
-        assert view.preview_body.visible is False
+        assert view.page_view.empty_text.visible is True
+        assert view.page_view.read_body.visible is False
         assert view.banners.visible is False
-        assert view.process_button.disabled is True
+        assert view.page_view.process_button.visible is False
 
     def test_build_returns_the_root_control(self) -> None:
         control = afanes.ui.views.inbox.build_inbox(_noop, _change_vault, _process)
@@ -92,7 +93,7 @@ class TestInboxView:
         async def scenario() -> None:
             await state.choose_vault(vault)
             await state.capture("Buy milk")
-            await state.select_note(state.notes[0].path)
+            await state.open_page(state.notes[0].path)
 
         asyncio.run(scenario())
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
@@ -100,15 +101,11 @@ class TestInboxView:
         row = view.list_view.controls[0]
         assert isinstance(row, ft.ListTile)
         assert row.title == "Buy milk"
-        assert view.preview_title.value == "Buy milk"
-        assert view.preview_body.value == "# Buy milk"
-        assert view.preview_body.visible is True
-        assert view.preview_body.on_tap_link is not None
-        assert view.process_button.disabled is False
-
-        selected = state.selected
-        view.handle_link()
-        assert state.selected == selected
+        assert view.page_view.title.value == "Buy milk"
+        assert view.page_view.read_body.value == "# Buy milk"
+        assert view.page_view.read_body.visible is True
+        assert view.page_view.read_body.on_tap_link is not None
+        assert view.page_view.process_button.visible is True
 
     def test_list_shows_the_heading_title_and_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -175,13 +172,13 @@ class TestInboxView:
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            await state.select_note(note)
+            await state.open_page(note)
 
         asyncio.run(scenario())
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
 
-        assert view.preview_title.value == "Ada, Countess of Lovelace"
-        assert view.preview_body.value == "# Ada, Countess of Lovelace\n"
+        assert view.page_view.title.value == "Ada, Countess of Lovelace"
+        assert view.page_view.read_body.value == "# Ada, Countess of Lovelace\n"
 
     def test_preview_header_falls_back_to_the_identity(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -195,12 +192,12 @@ class TestInboxView:
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            await state.select_note(note)
+            await state.open_page(note)
 
         asyncio.run(scenario())
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
 
-        assert view.preview_title.value == "Plain note"
+        assert view.page_view.title.value == "Plain note"
 
     def test_process_button_calls_the_callback(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -219,16 +216,17 @@ class TestInboxView:
         async def scenario() -> None:
             await state.choose_vault(vault)
             await state.capture("Buy milk")
-            await state.select_note(state.notes[0].path)
+            await state.open_page(state.notes[0].path)
 
         asyncio.run(scenario())
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, process)
 
-        assert view.process_button.on_click is not None
-        handler = typing.cast("typing.Any", view.process_button.on_click)
+        assert view.page_view.process_button.on_click is not None
+        handler = typing.cast("typing.Any", view.page_view.process_button.on_click)
         asyncio.run(handler())
 
-        assert calls == [state.selected]
+        assert state.page is not None
+        assert calls == [state.page.path]
 
     def test_shows_message_and_scan_banners(self) -> None:
         state = afanes.ui.state.app_state
@@ -239,3 +237,34 @@ class TestInboxView:
 
         assert view.banners.visible is True
         assert len(view.banners.controls) == TWO_BANNERS
+
+    def test_failure_path_opens_raw_rescue(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        broken = vault / "reference" / "Broken.md"
+        broken.parent.mkdir(parents=True)
+        broken.write_text("---\ntype: refrence\n---\nBody\n", encoding="utf-8")
+        monkeypatch.setattr(
+            afanes.core.settings,
+            "settings_path",
+            lambda: tmp_path / "settings.json",
+        )
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+
+        asyncio.run(scenario())
+        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
+        failure_banner = view.banners.controls[0]
+        assert isinstance(failure_banner, ft.Container)
+        content = failure_banner.content
+        assert isinstance(content, ft.Column)
+        button = content.controls[1]
+        assert isinstance(button, ft.TextButton)
+        handler = typing.cast("typing.Any", button.on_click)
+        asyncio.run(handler())
+
+        assert state.page is not None
+        assert state.page.mode is DraftMode.RAW
+        assert view.page_view.raw_panel.visible is True

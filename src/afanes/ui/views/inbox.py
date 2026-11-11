@@ -17,7 +17,8 @@ import flet as ft
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
-from afanes.core.vault import VaultNote
+import afanes.ui.views.page
+from afanes.core.vault import VaultFailure, VaultNote
 
 
 def build_welcome(on_choose: Callable[[], Awaitable[None]]) -> ft.Control:
@@ -69,7 +70,7 @@ def build_welcome(on_choose: Callable[[], Awaitable[None]]) -> ft.Control:
 
 
 class InboxView:
-    """Composer, newest-first note list, and read-only preview.
+    """Composer, newest-first note list, and page pane.
 
     Parameters
     ----------
@@ -161,52 +162,7 @@ class InboxView:
             bgcolor=afanes.ui.theme.SURFACE_CONTAINER_COLOR,
             border_radius=afanes.ui.theme.CARD_RADIUS,
         )
-        self.preview_title = ft.Text(
-            afanes.ui.strings.PREVIEW_TITLE,
-            theme_style=ft.TextThemeStyle.TITLE_MEDIUM,
-        )
-        self.preview_empty = ft.Text(
-            afanes.ui.strings.PREVIEW_EMPTY,
-            color=afanes.ui.theme.MUTED_TEXT_COLOR,
-        )
-        self.preview_body = ft.Markdown(
-            value="",
-            selectable=True,
-            auto_follow_links=False,
-            on_tap_link=self.handle_link,
-        )
-        self.preview_body.visible = False
-        self.process_button = ft.FilledButton(
-            content=afanes.ui.strings.PROCESS_ACTION,
-            icon=ft.Icons.PLAY_ARROW,
-            on_click=self._process_selected,
-            disabled=True,
-            key="process-note",
-        )
-        self.preview_header = ft.Row(
-            controls=[
-                self.preview_title,
-                ft.Container(expand=True),
-                self.process_button,
-            ],
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-        self.preview_content = ft.Column(
-            controls=[self.preview_empty, self.preview_body],
-            scroll=ft.ScrollMode.AUTO,
-            expand=True,
-            spacing=afanes.ui.theme.ITEM_GAP,
-        )
-        self.preview_panel = ft.Container(
-            content=ft.Column(
-                controls=[self.preview_header, ft.Divider(), self.preview_content],
-                expand=True,
-            ),
-            expand=True,
-            padding=afanes.ui.theme.ITEM_GAP,
-            bgcolor=afanes.ui.theme.SURFACE_CONTAINER_COLOR,
-            border_radius=afanes.ui.theme.CARD_RADIUS,
-        )
+        self.page_view = afanes.ui.views.page.PageView(update, on_process)
 
         header = ft.Row(
             controls=[
@@ -240,7 +196,7 @@ class InboxView:
             vertical_alignment=ft.CrossAxisAlignment.END,
         )
         body = ft.Row(
-            controls=[self.list_panel, self.preview_panel],
+            controls=[self.list_panel, self.page_view.build()],
             expand=True,
             spacing=afanes.ui.theme.SECTION_GAP,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
@@ -261,10 +217,6 @@ class InboxView:
             Composed Inbox layout.
         """
         return self.root
-
-    def handle_link(self) -> None:
-        """Swallow a link tap without navigating or launching an external program."""
-        return None
 
     async def _capture(self) -> None:
         """Capture the composer text and update the view."""
@@ -290,10 +242,10 @@ class InboxView:
         self._update()
 
     async def _select(self, path: Path) -> None:
-        """Load a note into the preview and update the view."""
+        """Open a note in the page pane and update the view."""
         self._set_working(working=True)
         try:
-            await self._state.select_note(path)
+            await self._state.open_page(path)
         finally:
             self._set_working(working=False)
         self._refresh_dynamic()
@@ -307,25 +259,18 @@ class InboxView:
         finally:
             self._set_working(working=False)
 
-    async def _process_selected(self) -> None:
-        """Open the Processing Wizard for the selected capture."""
-        path = self._state.selected
-        if path is None:
-            return
-        await self._on_process(path)
-
     def _set_working(self, *, working: bool) -> None:
         """Disable controls and show progress while a command runs."""
         self.progress.visible = working
         self.capture_button.disabled = working
         self.refresh_button.disabled = working
         self.change_button.disabled = working
-        self.process_button.disabled = working or self._state.selected is None
         self.composer.read_only = working
+        self.page_view.refresh()
         self._update()
 
     def _refresh_dynamic(self) -> None:
-        """Refresh the list, banners, count, and preview from application state."""
+        """Refresh the list, banners, count, and page pane from application state."""
         state = self._state
         self.count_text.value = afanes.ui.strings.note_count(len(state.notes))
         self.vault_text.value = str(state.vault_root) if state.vault_root is not None else ""
@@ -337,29 +282,61 @@ class InboxView:
         if state.message is not None:
             banners.append(_banner(state.message))
         if state.failures:
-            paths = ", ".join(failure.path.as_posix() for failure in state.failures)
-            banners.append(_banner(afanes.ui.strings.scan_warning(len(state.failures), paths)))
+            banners.append(self._failure_banner(state.failures))
         self.banners.controls = banners
         self.banners.visible = bool(banners)
-        self.process_button.disabled = state.selected is None
-        if state.selected is None:
-            self.preview_title.value = afanes.ui.strings.PREVIEW_TITLE
-            self.preview_empty.visible = True
-            self.preview_body.visible = False
-            self.preview_body.value = ""
-        else:
-            self.preview_title.value = state.note_title(state.selected)
-            self.preview_body.value = state.preview_body or ""
-            self.preview_body.visible = True
-            self.preview_empty.visible = False
+        self.page_view.refresh()
+
+    def _failure_banner(self, failures: tuple[VaultFailure, ...]) -> ft.Control:
+        """Build a warning banner whose paths open raw rescue mode."""
+        controls: list[ft.Control] = [
+            ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=afanes.ui.theme.ERROR_TEXT_COLOR, size=18),
+                    ft.Text(
+                        afanes.ui.strings.scan_warning_title(len(failures)),
+                        color=afanes.ui.theme.ERROR_TEXT_COLOR,
+                        selectable=True,
+                        expand=True,
+                    ),
+                ],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+            )
+        ]
+        controls.extend(
+            ft.TextButton(
+                content=failure.path.as_posix(),
+                on_click=self._open_failure_handler(failure.path),
+            )
+            for failure in failures
+        )
+        return ft.Container(
+            bgcolor=afanes.ui.theme.ERROR_CONTAINER_COLOR,
+            padding=afanes.ui.theme.BANNER_PADDING,
+            border_radius=afanes.ui.theme.CARD_RADIUS,
+            content=ft.Column(controls=controls, spacing=0),
+        )
+
+    def _open_failure_handler(self, path: Path) -> Callable[[], Awaitable[None]]:
+        """Bind a no-argument async handler that opens one unreadable note."""
+
+        async def handle() -> None:
+            await self._state.open_failure(path)
+            self._refresh_dynamic()
+            self._update()
+
+        return handle
 
     def _note_row(self, note: VaultNote) -> ft.Control:
         """Build one clickable note row."""
+        page = self._state.page
+        selected = page is not None and page.path == note.path
         return ft.ListTile(
             title=note.title,
             subtitle=note.relative_path.as_posix(),
             leading=ft.Icons.DESCRIPTION,
-            selected=note.path == self._state.selected,
+            selected=selected,
             on_click=self._select_handler(note.path),
         )
 

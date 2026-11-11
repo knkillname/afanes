@@ -7,6 +7,7 @@ import dataclasses
 import datetime
 import hashlib
 from collections.abc import Iterable, Mapping
+from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
 
@@ -16,7 +17,9 @@ import afanes.core.names
 import afanes.models.note
 from afanes.core.errors import (
     AfanesError,
+    ContentChangedError,
     EmptyCaptureError,
+    InvalidReferenceError,
     NameCollisionError,
     NoteParseError,
     ProcessingError,
@@ -120,6 +123,98 @@ class VaultFailure:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class PageContent:
+    """One note read for viewing or editing.
+
+    Attributes
+    ----------
+    path : Path
+        Absolute path to the note file.
+    relative_path : Path
+        Vault-relative path used for display and diagnostics.
+    text : str
+        Complete file text, including any frontmatter block.
+    content_hash : str
+        SHA-256 digest of the file bytes, captured when the note was read.
+    document : NoteDocument | None
+        Parsed document, or ``None`` when the note could not be parsed.
+    failure : str | None
+        Parse failure message, or ``None`` when :attr:`document` is present.
+
+    Notes
+    -----
+    The raw text is retained even when parsing fails so a page can open in raw
+    rescue mode without losing the file's current content.
+    """
+
+    path: Path
+    relative_path: Path
+    text: str
+    content_hash: str
+    document: NoteDocument | None
+    failure: str | None
+
+
+class LinkOutcome(StrEnum):
+    """Outcome of routing an internal reference to a page.
+
+    Attributes
+    ----------
+    RESOLVED : str
+        Exactly one parsed note matches the reference.
+    AMBIGUOUS : str
+        Several parsed notes match the reference.
+    BROKEN : str
+        No parsed note matches, but one or more unparseable files share the
+        reference name.
+    MISSING : str
+        No parsed note and no unparseable file matches the reference.
+    """
+
+    RESOLVED = "resolved"
+    AMBIGUOUS = "ambiguous"
+    BROKEN = "broken"
+    MISSING = "missing"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class LinkTarget:
+    """One routed internal reference and the page paths it reaches.
+
+    Attributes
+    ----------
+    reference : NoteReference
+        Reference that was routed.
+    outcome : LinkOutcome
+        Whether the reference resolved, was ambiguous, pointed at an
+        unparseable file, or matched nothing.
+    paths : tuple[Path, ...]
+        Absolute paths for a resolved, ambiguous, or broken outcome. Empty for
+        a missing outcome. Ambiguous and broken outcomes keep every candidate.
+    """
+
+    reference: NoteReference
+    outcome: LinkOutcome
+    paths: tuple[Path, ...] = ()
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ReferenceSite:
+    """References in one note that point at a target note.
+
+    Attributes
+    ----------
+    path : Path
+        Absolute path to the referring note.
+    reference_count : int
+        Number of references in that note that resolve to the target.
+    """
+
+    path: Path
+    reference_count: int
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class VaultSnapshot:
     """Read-only result of scanning a vault.
 
@@ -215,21 +310,88 @@ class VaultSnapshot:
             )
         )
 
+    def link_target(self, reference: NoteReference) -> LinkTarget:
+        """Route one internal reference to its page without reading the vault.
+
+        Parameters
+        ----------
+        reference : NoteReference
+            Internal reference to route. External destinations are classified
+            before this method is called and are never passed here.
+
+        Returns
+        -------
+        LinkTarget
+            Resolved, ambiguous, broken, or missing outcome with every matching
+            absolute path.
+
+        Notes
+        -----
+        A broken outcome is reported when the catalog has no match but one or
+        more unparseable files share the normalized reference name. Their
+        vault-relative failure paths are resolved against :attr:`root` so the
+        caller can open the file in raw rescue mode. This method performs no
+        file I/O and never chooses among ambiguous candidates.
+        """
+        resolution = self.catalog.resolve(reference)
+        if resolution.outcome is ResolutionOutcome.RESOLVED:
+            return LinkTarget(reference=reference, outcome=LinkOutcome.RESOLVED, paths=resolution.targets)
+        if resolution.outcome is ResolutionOutcome.AMBIGUOUS:
+            return LinkTarget(reference=reference, outcome=LinkOutcome.AMBIGUOUS, paths=resolution.targets)
+
+        normalized = afanes.core.names.normalize_name(reference.name)
+        broken = tuple(
+            self.root / failure.path
+            for failure in self.failures
+            if afanes.core.names.normalize_name(failure.path.stem) == normalized
+        )
+        if broken:
+            return LinkTarget(reference=reference, outcome=LinkOutcome.BROKEN, paths=broken)
+        return LinkTarget(reference=reference, outcome=LinkOutcome.MISSING)
+
+    def referrers(self, note_path: Path) -> tuple[ReferenceSite, ...]:
+        """Return notes whose references resolve to one target note.
+
+        Parameters
+        ----------
+        note_path : Path
+            Target note path, relative or absolute.
+
+        Returns
+        -------
+        tuple[ReferenceSite, ...]
+            Referring notes with per-note reference counts, in scan order.
+            Empty when no reference resolves to the target.
+
+        Notes
+        -----
+        Only unique resolution counts; an ambiguous reference is not attributed
+        to any candidate. The result is computed from the snapshot and performs
+        no file I/O.
+        """
+        return _affected_sites(self, note_path)
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ReferenceSite:
-    """References in one note that point at a target note.
+class ReferenceRepairPreview:
+    """References that would be rewritten from one name to another.
 
     Attributes
     ----------
-    path : Path
-        Absolute path to the referring note.
-    reference_count : int
-        Number of references in that note that resolve to the target.
+    old : NoteReference
+        Reference name currently written in the vault.
+    new : NoteReference
+        Replacement reference name in the same scheme.
+    sites : tuple[ReferenceSite, ...]
+        Referring notes and their per-note reference counts, in scan order.
+    content_hashes : dict[Path, str]
+        Content hash captured at planning time for every referring note.
     """
 
-    path: Path
-    reference_count: int
+    old: NoteReference
+    new: NoteReference
+    sites: tuple[ReferenceSite, ...]
+    content_hashes: dict[Path, str]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -248,13 +410,17 @@ class RenamePreview:
         Current filename stem.
     new_name : str
         Sanitized replacement stem.
+    heading_update : bool
+        Whether the first level-1 heading currently matches the old identity
+        and should be updated to the new one.
     affected : tuple[ReferenceSite, ...]
         Referring notes and counts, in scan order.
     reference_count : int
         Total number of references that would be rewritten.
     content_hashes : dict[Path, str]
         Content hash captured at planning time for every affected note,
-        including the renamed note when it refers to itself.
+        including the renamed note when it refers to itself or needs a heading
+        update.
     """
 
     note_path: Path
@@ -262,6 +428,7 @@ class RenamePreview:
     scheme: ReferenceScheme
     old_name: str
     new_name: str
+    heading_update: bool
     affected: tuple[ReferenceSite, ...]
     reference_count: int
     content_hashes: dict[Path, str]
@@ -281,6 +448,28 @@ class RewriteFailure:
 
     path: Path
     message: str
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class RewriteReport:
+    """Outcome of applying a reference repair.
+
+    Attributes
+    ----------
+    updated : tuple[Path, ...]
+        Notes whose references were rewritten.
+    skipped : tuple[Path, ...]
+        Notes skipped because their content changed after planning.
+    unchanged : tuple[Path, ...]
+        Notes that no longer contained the old reference.
+    failed : tuple[RewriteFailure, ...]
+        Notes that could not be rewritten, with reasons.
+    """
+
+    updated: tuple[Path, ...]
+    skipped: tuple[Path, ...]
+    unchanged: tuple[Path, ...]
+    failed: tuple[RewriteFailure, ...]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -697,6 +886,132 @@ class Vault:
         text = source.read_text(encoding="utf-8")
         return NoteDocument.from_text(text).body
 
+    def read_page(self, note_path: Path) -> PageContent:
+        """Read one note for viewing or editing without writing anything.
+
+        Parameters
+        ----------
+        note_path : Path
+            Relative or absolute path to a note inside this vault.
+
+        Returns
+        -------
+        PageContent
+            Raw text, content hash, parsed document, and any parse failure.
+
+        Raises
+        ------
+        VaultPathError
+            If the path escapes the vault root, does not exist, or is a
+            directory.
+        OSError
+            If the file cannot be read.
+        UnicodeError
+            If the file is not valid UTF-8.
+
+        Notes
+        -----
+        A note with malformed frontmatter is returned with ``document`` set to
+        ``None`` and a diagnostic in ``failure``. The raw text is preserved so
+        the page can offer raw rescue mode. This method performs blocking file
+        I/O and never writes.
+        """
+        source = self.contained(note_path)
+        try:
+            data = source.read_bytes()
+        except FileNotFoundError as exc:
+            message = f"Note does not exist: {note_path}"
+            raise VaultPathError(message) from exc
+        except IsADirectoryError as exc:
+            message = f"Not a note file: {note_path}"
+            raise VaultPathError(message) from exc
+
+        text = data.decode("utf-8")
+        content_hash = hashlib.sha256(data).hexdigest()
+        relative_path = source.relative_to(self.root)
+        try:
+            document = NoteDocument.from_text(text)
+        except (NoteParseError, InvalidReferenceError) as exc:
+            return PageContent(
+                path=source,
+                relative_path=relative_path,
+                text=text,
+                content_hash=content_hash,
+                document=None,
+                failure=str(exc),
+            )
+        if document.note_type is None:
+            message = "Note has no type"
+            return PageContent(
+                path=source,
+                relative_path=relative_path,
+                text=text,
+                content_hash=content_hash,
+                document=None,
+                failure=message,
+            )
+        return PageContent(
+            path=source,
+            relative_path=relative_path,
+            text=text,
+            content_hash=content_hash,
+            document=document,
+            failure=None,
+        )
+
+    def write_page(self, note_path: Path, text: str, expected_hash: str) -> str:
+        """Write a note after confirming that its content is unchanged.
+
+        Parameters
+        ----------
+        note_path : Path
+            Relative or absolute path to an existing note inside this vault.
+        text : str
+            Complete file text to write. The caller owns the newline style; the
+            text is written as provided.
+        expected_hash : str
+            SHA-256 digest of the content read before editing.
+
+        Returns
+        -------
+        str
+            SHA-256 digest of the written bytes, for the next comparison.
+
+        Raises
+        ------
+        VaultPathError
+            If the path escapes the vault, does not exist, or is a directory.
+        ContentChangedError
+            If the file's current content differs from ``expected_hash``.
+        VaultError
+            If the destination directory is missing or the atomic write fails.
+        OSError
+            If the file cannot be read.
+
+        Notes
+        -----
+        The current file is read and hashed immediately before the atomic
+        replace. A concurrent write between the check and the replace is not
+        detected; this is accepted for the local single-writer application.
+        Nothing is written when the hash does not match.
+        """
+        source = self.contained(note_path)
+        try:
+            data = source.read_bytes()
+        except FileNotFoundError as exc:
+            message = f"Note does not exist: {note_path}"
+            raise VaultPathError(message) from exc
+        except IsADirectoryError as exc:
+            message = f"Not a note file: {note_path}"
+            raise VaultPathError(message) from exc
+
+        if hashlib.sha256(data).hexdigest() != expected_hash:
+            message = f"Note changed on disk: {note_path}"
+            raise ContentChangedError(message)
+
+        afanes.core.atomic.write_text_atomic(source, text)
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
     def create(
         self,
         title: str,
@@ -766,25 +1081,143 @@ class Vault:
         taken.update(entry.name for entry in target_directory.iterdir())
         name = afanes.core.names.unique_name(afanes.core.names.safe_filename(title), taken)
 
-        normalized_body = body.replace("\r\n", "\n").replace("\r", "\n").removeprefix("\ufeff")
-        raw: dict[str, object] = {"type": note_type.value}
-        if category is not None:
-            raw["category"] = category.value
-        if status is not None:
-            raw["status"] = status.value
-        document = NoteDocument(
-            raw=raw,
-            body=normalized_body,
-            newline="\n",
-            has_frontmatter=True,
-            note_type=note_type,
-            references=(),
-            category=category,
-            status=status,
-        )
+        document = _new_note_document(note_type, category, status, body)
         path = target_directory / f"{name}{NOTE_SUFFIX}"
         afanes.core.atomic.write_text_atomic(path, document.to_text())
         return path
+
+    def create_page(
+        self,
+        reference_name: str,
+        note_type: NoteType,
+        category: ReferenceCategory | None = None,
+        *,
+        body: str = "",
+        text: str | None = None,
+    ) -> Path:
+        """Create a note under its exact name, without adding a suffix.
+
+        Parameters
+        ----------
+        reference_name : str
+            Name from the reference that requested the page. It is sanitized
+            into the identity filename.
+        note_type : NoteType
+            Declared type for the new note.
+        category : ReferenceCategory | None
+            Reference category. Only valid when ``note_type`` is
+            :attr:`NoteType.REFERENCE`; ``None`` creates an uncategorized
+            reference.
+        body : str
+            Initial Markdown body used when ``text`` is ``None``.
+        text : str | None
+            Complete note text to write exactly. When supplied, it takes
+            precedence over ``body`` and must declare the requested type and
+            category.
+
+        Returns
+        -------
+        Path
+            Absolute path to the created note.
+
+        Raises
+        ------
+        NoteParseError
+            If a category is supplied for a non-reference note, ``text`` does
+            not parse, or ``text`` declares a different type or category.
+        NameCollisionError
+            If the exact name already belongs to a note in the same scheme or
+            the target filename exists, including a case-insensitive sibling.
+        VaultPathError
+            If the target directory escapes the vault.
+        VaultError
+            If the target path is not a directory or the write fails.
+
+        Notes
+        -----
+        Unlike :meth:`create`, this method never changes the requested name. It
+        is used for pages created from unresolved links, where a suffix would
+        leave the link unresolved. Collision checks run before the destination
+        directory is created and before any file is written.
+        """
+        if category is not None and note_type is not NoteType.REFERENCE:
+            message = "Only reference notes can declare a category"
+            raise NoteParseError(message)
+
+        content: str
+        if text is None:
+            content = _new_note_document(note_type, category, None, body).to_text()
+        else:
+            parsed = NoteDocument.from_text(text)
+            if parsed.note_type is not note_type or parsed.category is not category:
+                message = "Note text does not match the requested type and category"
+                raise NoteParseError(message)
+            content = text
+
+        target_directory = self.contained(self.directory_for(note_type, category))
+        if target_directory.exists() and not target_directory.is_dir():
+            message = f"Note directory is not a directory: {target_directory}"
+            raise VaultError(message)
+
+        name = afanes.core.names.safe_filename(reference_name)
+        scheme = afanes.core.links.scheme_for_note(note_type, category)
+        snapshot = self.scan()
+        if snapshot.catalog.candidates(scheme, name):
+            message = f"A {scheme.value} note named {name!r} already exists"
+            raise NameCollisionError(message)
+
+        target = target_directory / f"{name}{NOTE_SUFFIX}"
+        folded_name = target.name.casefold()
+        if target_directory.is_dir() and any(
+            child.name.casefold() == folded_name for child in target_directory.iterdir()
+        ):
+            message = f"Destination already exists: {target}"
+            raise NameCollisionError(message)
+
+        target_directory.mkdir(parents=True, exist_ok=True)
+        afanes.core.atomic.write_text_atomic(target, content)
+        return target
+
+    def recreate_page(self, note_path: Path, text: str) -> str:
+        """Recreate a note that disappeared after it was read for editing.
+
+        Parameters
+        ----------
+        note_path : Path
+            Original relative or absolute path of the missing note.
+        text : str
+            Complete text to write. It is written as provided and is not
+            parsed, so a raw rescue draft can be recreated as typed.
+
+        Returns
+        -------
+        str
+            SHA-256 digest of the written bytes.
+
+        Raises
+        ------
+        VaultPathError
+            If the path escapes the vault.
+        ContentChangedError
+            If a file already exists at the path.
+        VaultError
+            If the destination directory is missing or the write fails.
+
+        Notes
+        -----
+        This is an explicit recovery action, not a normal save: the caller has
+        confirmed that the draft should replace the missing file. It never
+        overwrites an existing file.
+        """
+        source = self.contained(note_path)
+        if source.exists():
+            message = f"Note already exists: {note_path}"
+            raise ContentChangedError(message)
+        if not source.parent.is_dir():
+            message = f"Destination directory does not exist: {source.parent}"
+            raise VaultError(message)
+        afanes.core.atomic.write_text_atomic(source, text)
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def capture(self, text: str) -> Path:
         """Capture raw text as an unclassified note in this vault's inbox.
@@ -948,12 +1381,26 @@ class Vault:
 
         affected = () if same_name else _affected_sites(vault, source)
         hashes = {site.path: _hash_for_note(vault, site.path) for site in affected}
+
+        heading_update = False
+        if not same_name:
+            try:
+                data = source.read_bytes()
+                document = NoteDocument.from_text(data.decode("utf-8"))
+            except (OSError, UnicodeDecodeError, AfanesError) as exc:
+                message = f"Could not inspect the note before renaming: {source}"
+                raise VaultError(message) from exc
+            heading_update = document.title == note.name
+            if heading_update:
+                hashes[source] = hashlib.sha256(data).hexdigest()
+
         return RenamePreview(
             note_path=source,
             target_path=target,
             scheme=scheme,
             old_name=note.name,
             new_name=new_name,
+            heading_update=heading_update,
             affected=affected,
             reference_count=sum(site.reference_count for site in affected),
             content_hashes=hashes,
@@ -1014,7 +1461,83 @@ class Vault:
         unchanged: list[Path] = []
         failed: list[RewriteFailure] = []
 
+        if preview.heading_update:
+            heading_updated, heading_skipped, heading_unchanged, heading_failed = self._apply_heading_update(
+                preview, source, target, old_reference, new_reference
+            )
+            updated.extend(heading_updated)
+            skipped.extend(heading_skipped)
+            unchanged.extend(heading_unchanged)
+            failed.extend(heading_failed)
+
+        site_updated, site_skipped, site_unchanged, site_failed = self._apply_reference_sites(
+            preview,
+            source,
+            target,
+            old_reference,
+            new_reference,
+            skip_source=preview.heading_update,
+        )
+        updated.extend(site_updated)
+        skipped.extend(site_skipped)
+        unchanged.extend(site_unchanged)
+        failed.extend(site_failed)
+
+        return RenameReport(
+            renamed=renamed,
+            updated=tuple(updated),
+            skipped=tuple(skipped),
+            unchanged=tuple(unchanged),
+            failed=tuple(failed),
+        )
+
+    def _apply_heading_update(
+        self,
+        preview: RenamePreview,
+        source: Path,
+        target: Path,
+        old_reference: NoteReference,
+        new_reference: NoteReference,
+    ) -> tuple[tuple[Path, ...], tuple[Path, ...], tuple[Path, ...], tuple[RewriteFailure, ...]]:
+        """Apply the heading update and classify the outcome."""
+        try:
+            data = target.read_bytes()
+        except OSError as exc:
+            return ((), (), (), (RewriteFailure(path=target, message=str(exc)),))
+        if hashlib.sha256(data).hexdigest() != preview.content_hashes.get(source):
+            return ((), (target,), (), ())
+        try:
+            changed = _rewrite_renamed_note(
+                target,
+                data,
+                old_reference,
+                new_reference,
+                preview.new_name,
+            )
+        except (OSError, UnicodeDecodeError, AfanesError) as exc:
+            return ((), (), (), (RewriteFailure(path=target, message=str(exc)),))
+        if changed:
+            return ((target,), (), (), ())
+        return ((), (), (target,), ())
+
+    def _apply_reference_sites(
+        self,
+        preview: RenamePreview,
+        source: Path,
+        target: Path,
+        old_reference: NoteReference,
+        new_reference: NoteReference,
+        *,
+        skip_source: bool,
+    ) -> tuple[list[Path], list[Path], list[Path], list[RewriteFailure]]:
+        """Rewrite the preview's referring notes, optionally skipping the renamed note."""
+        updated: list[Path] = []
+        skipped: list[Path] = []
+        unchanged: list[Path] = []
+        failed: list[RewriteFailure] = []
         for site in preview.affected:
+            if skip_source and _same_path(site.path, source):
+                continue
             read_path = target if _same_path(site.path, source) else site.path
             try:
                 data = read_path.read_bytes()
@@ -1034,9 +1557,119 @@ class Vault:
                 updated.append(read_path)
             else:
                 unchanged.append(read_path)
+        return updated, skipped, unchanged, failed
 
-        return RenameReport(
-            renamed=renamed,
+    def plan_reference_repair(
+        self,
+        old: NoteReference,
+        new: NoteReference,
+        *,
+        snapshot: VaultSnapshot | None = None,
+    ) -> ReferenceRepairPreview:
+        """Plan a rewrite of one reference name to another without writing.
+
+        Parameters
+        ----------
+        old : NoteReference
+            Reference name currently written in the vault.
+        new : NoteReference
+            Replacement reference name. It must use the same scheme as ``old``.
+        snapshot : VaultSnapshot | None
+            Pre-built scan to avoid rescanning, or ``None`` to scan the vault.
+
+        Returns
+        -------
+        ReferenceRepairPreview
+            Referring notes, per-note counts, and content hashes captured at
+            planning time. Empty when no note contains the old reference.
+
+        Raises
+        ------
+        VaultError
+            If the two references use different schemes.
+
+        Notes
+        -----
+        Matching compares reference keys (scheme and normalized name) rather
+        than resolution. It therefore finds references to a name that has no
+        page yet, which is exactly the unsafe-link repair case. This method
+        performs blocking file I/O when it scans, and never writes.
+        """
+        if old.scheme is not new.scheme:
+            message = "Reference repair must stay within one scheme"
+            raise VaultError(message)
+
+        vault = snapshot or self.scan()
+        old_key = afanes.core.links.reference_key(old)
+        sites: list[ReferenceSite] = []
+        hashes: dict[Path, str] = {}
+        for note in vault.notes:
+            count = sum(1 for reference in note.references if afanes.core.links.reference_key(reference) == old_key)
+            if count:
+                sites.append(ReferenceSite(path=note.path, reference_count=count))
+                hashes[note.path] = note.content_hash
+        return ReferenceRepairPreview(old=old, new=new, sites=tuple(sites), content_hashes=hashes)
+
+    def apply_reference_repair(
+        self,
+        preview: ReferenceRepairPreview,
+        *,
+        confirm: bool = False,
+    ) -> RewriteReport:
+        """Apply a reference repair after confirmation.
+
+        Parameters
+        ----------
+        preview : ReferenceRepairPreview
+            Plan produced by :meth:`plan_reference_repair`.
+        confirm : bool
+            Explicit confirmation gate. The operation raises unless this is
+            ``True``.
+
+        Returns
+        -------
+        RewriteReport
+            Updated, skipped, unchanged, and failed notes.
+
+        Raises
+        ------
+        VaultError
+            If confirmation is missing.
+
+        Notes
+        -----
+        Each referring note is rewritten atomically only when its content still
+        matches the hash captured at planning time. A changed note is skipped
+        and reported. Re-applying the same preview is safe: notes already
+        rewritten by an earlier run are skipped by the hash guard.
+        """
+        if not confirm:
+            message = "Reference repairs require explicit confirmation"
+            raise VaultError(message)
+
+        updated: list[Path] = []
+        skipped: list[Path] = []
+        unchanged: list[Path] = []
+        failed: list[RewriteFailure] = []
+        for site in preview.sites:
+            try:
+                data = site.path.read_bytes()
+            except OSError as exc:
+                failed.append(RewriteFailure(path=site.path, message=str(exc)))
+                continue
+            if hashlib.sha256(data).hexdigest() != preview.content_hashes.get(site.path):
+                skipped.append(site.path)
+                continue
+            try:
+                changed = _rewrite_note(site.path, data, preview.old, preview.new)
+            except (OSError, UnicodeDecodeError, AfanesError) as exc:
+                failed.append(RewriteFailure(path=site.path, message=str(exc)))
+                continue
+            if changed:
+                updated.append(site.path)
+            else:
+                unchanged.append(site.path)
+        return RewriteReport(
             updated=tuple(updated),
             skipped=tuple(skipped),
             unchanged=tuple(unchanged),
@@ -1328,6 +1961,31 @@ def _project_reference(name: str) -> NoteReference:
     return NoteReference(scheme=ReferenceScheme.PROJECT, name=trimmed)
 
 
+def _new_note_document(
+    note_type: NoteType,
+    category: ReferenceCategory | None,
+    status: Status | None,
+    body: str,
+) -> NoteDocument:
+    """Build the canonical document for a newly created note."""
+    normalized_body = body.replace("\r\n", "\n").replace("\r", "\n").removeprefix("\ufeff")
+    raw: dict[str, object] = {"type": note_type.value}
+    if category is not None:
+        raw["category"] = category.value
+    if status is not None:
+        raw["status"] = status.value
+    return NoteDocument(
+        raw=raw,
+        body=normalized_body,
+        newline="\n",
+        has_frontmatter=True,
+        note_type=note_type,
+        references=(),
+        category=category,
+        status=status,
+    )
+
+
 def _processed_text(plan: ProcessingPlan, document: NoteDocument) -> str:
     """Return the classified Markdown text for a non-trash plan."""
     if plan.outcome is ProcessingOutcome.TRASH:
@@ -1428,6 +2086,28 @@ def _rewrite_note(
 
     final = rewritten.with_body(body)
     text = final.to_text()
+    reader = afanes.core.links.ReferenceReader()
+    _verify_rewrite(text, old, reader)
+    afanes.core.atomic.write_text_atomic(path, text)
+    return True
+
+
+def _rewrite_renamed_note(
+    path: Path,
+    data: bytes,
+    old: NoteReference,
+    new: NoteReference,
+    new_title: str,
+) -> bool:
+    """Rewrite a renamed note's heading and references atomically."""
+    current = data.decode("utf-8")
+    document = NoteDocument.from_text(current)
+    body, _ = afanes.core.links.rewrite_body_references(document.body, old, new)
+    rewritten, _ = document.rewrite_references(old, new)
+    final = rewritten.with_body(body).with_heading(new_title)
+    text = final.to_text()
+    if text == current:
+        return False
     reader = afanes.core.links.ReferenceReader()
     _verify_rewrite(text, old, reader)
     afanes.core.atomic.write_text_atomic(path, text)

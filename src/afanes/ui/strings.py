@@ -88,6 +88,99 @@ VAULT_UNREADABLE = "The saved vault folder cannot be read. Choose a vault to con
 SCAN_WARNING_ONE = "1 note could not be read: {paths}"
 SCAN_WARNING_MANY = "{count} notes could not be read: {paths}"
 
+PAGE_BACK = "Back"
+PAGE_EDIT = "Edit"
+PAGE_DONE = "Done"
+PAGE_RENAME = "Rename"
+PAGE_TRASH = "Move to trash"
+PAGE_EMPTY = "Select a note to open it."
+PAGE_IDENTITY_LABEL = "Identity"
+PAGE_PATH_LABEL = "Path"
+PAGE_BODY_LABEL = "Body (Markdown)"
+PAGE_TYPE_LABEL = "Type"
+PAGE_CATEGORY_LABEL = "Category"
+PAGE_STATUS_LABEL = "Status"
+PAGE_DUE_DATE_LABEL = "Due date (YYYY-MM-DD)"
+PAGE_PEOPLE_LABEL = "People"
+PAGE_PROJECT_LABEL = "Project"
+PAGE_RAW_WARNING = "This page's metadata cannot be read. Edit the text directly; labels return once it parses."
+PAGE_RAW_SAVE = "Save text"
+PAGE_SAVING = "Saving"
+PAGE_SAVED = "Saved"
+PAGE_UNSAVED = "Unsaved changes"
+PAGE_OPEN_FAILED = "Could not open this page: {detail}"
+PAGE_SAVE_FAILED = "Could not save this page: {detail}"
+PAGE_CONFLICT_CHANGED = "This page changed on disk. Reload it or overwrite it with your version."
+PAGE_CONFLICT_MISSING = "This page no longer exists at its path. Recreate it or discard the draft."
+PAGE_CONFLICT_LEAVE = "Resolve the disk conflict before leaving this page."
+PAGE_PENDING_DIALOG = "Confirm or cancel the open page action before leaving this page."
+PAGE_CONFLICT_TITLE = "This page changed on disk"
+PAGE_CONFLICT_RELOAD = "Reload from disk"
+PAGE_CONFLICT_OVERWRITE = "Overwrite with my version"
+PAGE_CONFLICT_RECREATE = "Recreate page"
+PAGE_CONFLICT_DISCARD = "Discard draft"
+PAGE_AMBIGUOUS_TITLE = "Choose a page"
+PAGE_AMBIGUOUS_BODY = "More than one page matches this reference."
+PAGE_REPAIR_PENDING = "Choose how to handle the old link names before leaving this page."
+PAGE_REPAIR_TITLE = "Repair link names"
+PAGE_REPAIR_BODY = 'The name "{old}" cannot be a filename. The page was created as "{new}".'
+PAGE_REPAIR_COUNT = "{detail} still use the old name."
+PAGE_REPAIR_REWRITE = "Rewrite links"
+PAGE_REPAIR_KEEP = "Keep old links"
+PAGE_REPAIR_CANCEL = "Cancel creation"
+PAGE_REPAIR_FAILED = "Some links could not be repaired: {detail}"
+PAGE_TYPE_CHANGE_TITLE = "Change page type?"
+PAGE_TYPE_CHANGE_BODY = "{detail} will become unresolved."
+PAGE_TYPE_CHANGE_CONFIRM = "Change type"
+PAGE_RENAME_TITLE = "Rename page"
+PAGE_RENAME_LABEL = "New name"
+PAGE_RENAME_PREVIEW = "{detail} will be updated."
+PAGE_RENAME_CONFIRM = "Rename"
+PAGE_RENAME_FAILED = "Could not rename this page: {detail}"
+PAGE_TRASH_TITLE = "Move to trash?"
+PAGE_TRASH_BODY = "The page will move to {path}. {detail} will become unresolved."
+PAGE_TRASH_CONFIRM = "Move to trash"
+PAGE_TRASH_FAILED = "Could not move this page to trash: {detail}"
+PAGE_CANCEL = "Cancel"
+PAGE_RAW_UPGRADED = "The page now parses; labels are available."
+PAGE_TYPE_CHANGE_LEAVE = "Confirm or cancel the type change before leaving this page."
+PAGE_NONE = "None"
+PAGE_NEW = "New page"
+
+PAGE_TYPE_LABELS = MappingProxyType(
+    {
+        "note": "Note",
+        "action": "Action",
+        "project": "Project",
+        "reference": "Reference",
+    }
+)
+PAGE_CATEGORY_LABELS = MappingProxyType(
+    {
+        "person": "Person",
+    }
+)
+
+
+def reference_count(count: int, notes: int) -> str:
+    """Return a short reference-count phrase for a page dialog.
+
+    Parameters
+    ----------
+    count : int
+        Number of references affected.
+    notes : int
+        Number of notes containing those references.
+
+    Returns
+    -------
+    str
+        Phrase such as ``2 references in 1 note``.
+    """
+    reference_label = "reference" if count == 1 else "references"
+    note_label = "note" if notes == 1 else "notes"
+    return f"{count} {reference_label} in {notes} {note_label}"
+
 
 def note_count(count: int) -> str:
     """Return the note-count label for the Inbox heading.
@@ -103,6 +196,22 @@ def note_count(count: int) -> str:
         Singular or plural count label.
     """
     return NOTE_COUNT_ONE if count == 1 else NOTE_COUNT_MANY.format(count=count)
+
+
+def scan_warning_title(count: int) -> str:
+    """Return the unreadable-note banner heading.
+
+    Parameters
+    ----------
+    count : int
+        Number of notes that could not be parsed.
+
+    Returns
+    -------
+    str
+        Singular or plural heading for the failure list.
+    """
+    return "1 note could not be read." if count == 1 else f"{count} notes could not be read."
 
 
 def scan_warning(count: int, paths: str) -> str:

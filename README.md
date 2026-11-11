@@ -10,6 +10,8 @@
 - [Development](#development)
 - [Vault format](#vault-format)
 - [Inbox](#inbox)
+- [Pages and editing](#pages-and-editing)
+- [Processing](#processing)
 - [Changelog](#changelog)
 - [License](#license)
 
@@ -116,8 +118,51 @@ about the invoice
 ```
 
 The Inbox lists every note under `inbox/`, newest first, showing each note's display title with its
-vault-relative path as the secondary line. Select a note to preview it read-only, then choose
-Process to open the wizard.
+vault-relative path as the secondary line. Select a note to open it in the page pane; read its body
+or choose Edit to change it. Process remains available for Inbox captures.
+
+## Pages and editing
+
+Select a note in the Inbox to open it in the page pane. Read mode shows the display title and the
+rendered Markdown body; tapping an internal reference opens its page. External links, attachments,
+and unsafe destinations do nothing. Back returns through the pages you opened, whether they came
+from the Inbox list or a link.
+
+Following a reference that has no page opens a draft. The draft uses the reference scheme to choose
+its type and default folder:
+
+| Reference | Type | Default folder |
+| --- | --- | --- |
+| `note:Quarterly budget` | uncategorized reference | `reference/` |
+| `person:Ada` | reference with `category: person` | `reference/people/` |
+| `project:Release 1.0` | project | `projects/` |
+
+The draft starts with the reference name as its level-1 heading and is written only after you type
+body text or change a label. The filename is the sanitized reference name, used exactly; a collision
+stops the first save instead of adding a suffix. If the original name was unsafe as a filename, the
+first save offers to rewrite the references that still use it. If the safe name already belongs to a
+page in the same scheme, that page opens instead of creating a duplicate.
+
+Choose Edit to change the raw Markdown body and the labels: type, category, status, due date, people,
+and project. The body includes its level-1 heading, which is the display title. Category is offered
+only for references, and status choices follow the selected type. People and project fields suggest
+existing pages by display title or identity. Changing the type or category previews the inbound
+references that would become unresolved before applying the change.
+
+A dirty draft is written roughly every 30 seconds and when you choose Done, press Back, or open
+another page. Before every write, Afanes compares the file with the version it read; if another
+program changed it, the save stops and the page offers to reload the file or overwrite it with your
+version. If the file was moved or deleted, the page offers to recreate it or discard the draft.
+
+A note whose frontmatter cannot be parsed opens in raw rescue mode, where the complete file text is
+editable and labels are unavailable. Saving writes exactly what you typed; once the text parses, the
+normal editor returns. Unreadable notes are listed in the Inbox failure banner and can be opened from
+there.
+
+Rename and Move to trash are available in read mode. Both show their affected references before
+confirming. A rename updates the first heading only when it still matches the old identity; a custom
+heading is preserved. Trashed pages move under `trash/`, and their inbound references become
+unresolved until a page with that name appears again.
 
 ## Processing
 

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-11
+
+### Added
+
+- A page pane beside the Inbox with read and edit modes, live internal links, a shared Back history, and raw rescue for unreadable notes.
+- Page creation from unresolved links, deriving type and folder from the `note:`, `person:`, or `project:` scheme and writing only after the first content.
+- Raw Markdown body editing plus type, category, status, due date, people, and project labels, with page suggestions and inline validation.
+- Autosave every 30 seconds and on Done, Back, or navigation, with external-edit detection and reload, overwrite, recreate, or discard recovery.
+- Previewed type and category changes that list the inbound references which would become unresolved.
+- Previewed rename and trash actions from the page; a rename updates a matching level-1 heading with the identity.
+- A safe-identity repair prompt for unsafe reference names, with vault-wide reference rewriting.
+
+### Changed
+
+- Selecting an Inbox note opens the page pane; internal links navigate while external, attachment, and unsafe destinations remain inert.
+- The Inbox failure banner lists unreadable notes as actions that open raw rescue mode.
+
 ## [0.3.1] - 2026-11-11
 
 ### Added

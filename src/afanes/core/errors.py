@@ -38,6 +38,10 @@ class VaultPathError(VaultError):
     """Raised when a path escapes the vault root or is not a regular note."""
 
 
+class ContentChangedError(VaultError):
+    """Raised when a note changed on disk after it was read for editing."""
+
+
 class NoteParseError(AfanesError):
     """Raised when a note's frontmatter or metadata cannot be parsed."""
 

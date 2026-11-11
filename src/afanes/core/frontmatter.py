@@ -160,6 +160,53 @@ class NoteDocument:
         """
         return dataclasses.replace(self, body=body)
 
+    def with_heading(self, text: str) -> Self:
+        """Return a copy with its first level-1 heading replaced.
+
+        Parameters
+        ----------
+        text : str
+            New heading text. Surrounding whitespace is trimmed and the heading
+            is written in ATX form.
+
+        Returns
+        -------
+        NoteDocument
+            New document with the first level-1 heading replaced. Content
+            before and after the heading is preserved.
+
+        Raises
+        ------
+        NoteParseError
+            If the body has no level-1 heading.
+
+        Notes
+        -----
+        Heading detection uses the CommonMark parser, so a line inside a code
+        block is not a heading. A setext heading is replaced with an ATX
+        heading at the same line position, and the document's newline style is
+        preserved.
+        """
+        tokens = MarkdownIt("commonmark").parse(self.body)
+        for token in tokens:
+            if token.type != "heading_open" or token.tag != "h1":
+                continue
+            line_map = token.map
+            if line_map is None:
+                break
+            start, end = line_map
+            lines = self.body.splitlines(keepends=True)
+            if start < 0 or end > len(lines) or start >= end:
+                break
+            trailing = lines[end - 1].endswith(("\n", "\r"))
+            replacement = f"# {text.strip()}"
+            if trailing:
+                replacement += self.newline
+            lines[start:end] = [replacement]
+            return self.with_body("".join(lines))
+        message = "Note has no level-1 heading"
+        raise NoteParseError(message)
+
     @property
     def title(self) -> str | None:
         """Return the display title derived from the first level-1 heading.

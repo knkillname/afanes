@@ -360,6 +360,57 @@ class TestDisplayTitle:
         assert document.title == "Old"
 
 
+class TestWithHeading:
+    def test_replaces_an_atx_heading(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n\n# Ada\nBody.\n")
+
+        updated = document.with_heading("Ada King")
+
+        assert updated.body == "\n# Ada King\nBody.\n"
+        assert updated.note_type is NoteType.NOTE
+
+    def test_replaces_a_setext_heading_with_an_atx_heading(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n\nAda\n===\n\nBody.\n")
+
+        updated = document.with_heading("Ada King")
+
+        assert updated.body == "\n# Ada King\n\nBody.\n"
+
+    def test_replaces_a_heading_after_introductory_text_in_place(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n\nIntro.\n\n# Ada\n\nBody.\n")
+
+        updated = document.with_heading("Ada King")
+
+        assert updated.body == "\nIntro.\n\n# Ada King\n\nBody.\n"
+
+    def test_raises_when_no_heading_exists(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n\nBody.\n")
+
+        with pytest.raises(NoteParseError):
+            document.with_heading("Ada King")
+
+    def test_ignores_a_heading_inside_a_code_block(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n\n```\n# Ada\n```\n")
+
+        with pytest.raises(NoteParseError):
+            document.with_heading("Ada King")
+
+    def test_preserves_crlf_newlines(self) -> None:
+        document = NoteDocument.from_text("---\r\ntype: note\r\n---\r\n\r\n# Ada\r\nBody.\r\n")
+
+        updated = document.with_heading("Ada King")
+
+        assert "\r\n# Ada King\r\n" in updated.body
+        assert "\n" not in updated.to_text().replace("\r\n", "")
+
+    def test_preserves_unknown_keys(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\ncustom: keep\n---\n\n# Ada\n")
+
+        updated = document.with_heading("Ada King")
+
+        assert updated.raw["custom"] == "keep"
+
+
 class TestRewriteReferenceValues:
     def test_rewrites_matching_people_values_only(self) -> None:
         document = NoteDocument.from_text('---\ntype: note\npeople: ["person:Ada Lovelace", "person:Grace"]\n---\n')

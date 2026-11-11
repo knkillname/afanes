@@ -1,9 +1,14 @@
 """End-to-end test for creation, linking, moving, and renaming notes."""
 
+import asyncio
 import os
 from pathlib import Path
 
+import pytest
+
+import afanes.core.settings
 import afanes.core.vault
+import afanes.ui.state
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import ResolutionOutcome
 from afanes.core.processing import ProcessingOutcome
@@ -205,3 +210,61 @@ class TestInboxCapture:
         ]
         assert [document.raw for document in documents] == [{"type": "note"}, {"type": "note"}]
         assert all(note.path.parent.name == "inbox" for note in inbox)
+
+
+class TestPageEditingLifecycle:
+    def test_capture_link_follow_create_and_edit(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.Vault(root)
+        ada = vault.create("Ada", NoteType.REFERENCE, category=ReferenceCategory.PERSON)
+        capture = vault.create(
+            "Planning",
+            NoteType.NOTE,
+            body="[Ada](<person:Ada>) and [Budget](<note:Budget>)\n",
+        )
+        monkeypatch.setattr(
+            afanes.core.settings,
+            "settings_path",
+            lambda: tmp_path / "settings.json",
+        )
+        state = afanes.ui.state.app_state
+        state.reset()
+
+        async def scenario() -> None:
+            await state.choose_vault(root)
+            await state.open_page(capture)
+            await state.follow_link("person:Ada")
+            assert state.page is not None
+            assert state.page.path == ada.resolve()
+            await state.back()
+            assert state.page is not None
+            assert state.page.path == capture.resolve()
+            await state.follow_link("note:Budget")
+            await state.set_page_body("# Budget\n\nDraft the budget.\n")
+            await state.set_page_type(NoteType.ACTION)
+            await state.set_page_status(Status.ACTIVE)
+            await state.set_page_due_date("2026-12-01")
+            await state.set_page_people(("Ada",))
+            await state.set_page_project("Release 1.0")
+            assert await state.autosave() is True
+            assert await state.done_editing() is True
+
+        try:
+            asyncio.run(scenario())
+        finally:
+            state.reset()
+
+        budget = root / "actions" / "Budget.md"
+        document = NoteDocument.from_text(budget.read_text(encoding="utf-8"))
+        assert document.note_type is NoteType.ACTION
+        assert document.status is Status.ACTIVE
+        assert document.raw["due_date"] == "2026-12-01"
+        assert document.raw["people"] == ["person:Ada"]
+        assert document.raw["project"] == "project:Release 1.0"
+        assert document.body == "# Budget\n\nDraft the budget.\n"
+
+        snapshot = afanes.core.vault.Vault(root).scan()
+        assert snapshot.catalog.resolve(NoteReference(ReferenceScheme.NOTE, "Budget")).targets == (budget,)
+        assert snapshot.catalog.resolve(NoteReference(ReferenceScheme.PERSON, "Ada")).targets == (ada,)
+        assert [note.path for note in snapshot.inbox_notes()] == [capture]
