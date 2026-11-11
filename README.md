@@ -8,6 +8,7 @@
 ## Table of Contents
 
 - [Development](#development)
+- [Running in a browser](#running-in-a-browser)
 - [Vault format](#vault-format)
 - [Workspace browser](#workspace-browser)
 - [Inbox](#inbox)
@@ -42,7 +43,38 @@ performs no network I/O. The `web` runtime ships its browser client inside its w
 download. Packaged builds will bundle the desktop client in a later change.
 
 Afanes supports Flet 1.0.4 and later 1.x releases. `hatch test --all` runs the suite on every
-supported interpreter and against the oldest supported dependency versions.
+supported interpreter and against the oldest supported dependency versions. The development
+environment installs both interface runtimes, so `hatch run python -m afanes --web` works from a
+clean checkout.
+
+## Running in a browser
+
+Machines that block the native Flet client can serve the same interface to a browser instead:
+
+```console
+pip install "afanes[web]"
+python -m afanes --web
+```
+
+The desktop window stays the default; `--web` is the explicit opt-in and Afanes never switches
+presentation on its own. The server binds the loopback interface only and refuses other machines, so
+Afanes remains a single-user local application. Every interface asset comes from the local
+installation, so a session works with no network access after installation.
+
+Options:
+
+- `--vault DIR` opens that folder for this run without replacing the remembered vault.
+- `--port N` chooses the listening port. The default asks the operating system for a free one.
+
+A browser cannot return a folder path from a file dialog, so a browser session asks for an absolute
+path instead of opening a picker, and the Change vault action asks the same way. One browser session
+can drive the workspace at a time: a second tab shows a notice until the first one closes. If the
+desktop client cannot start, Afanes reports the failure and exits rather than switching
+presentations silently.
+
+If a browser tab shows a spinner with "Working…", the tab has lost its Python session, usually
+because the server process exited. Start the server again and reload the tab. Closing a tab releases
+its session, so Afanes can be reopened in a new one.
 
 On first launch, choose a vault folder. Afanes remembers it in the platform configuration
 directory and reopens it next time. The [workspace browser](#workspace-browser) then lists every

@@ -138,6 +138,9 @@ The default vault layout is `inbox/` for captures, `trash/` for recoverable disc
 - Do not mix incompatible Flet API generations in the same codebase.
 - The UI must be lightweight and 100% cross-platform on macOS, Linux, and Windows.
 - The UI follows the single-`AppState` controller pattern described in 4.11.
+- The desktop window is the default presentation. The browser presentation is an explicit opt-in mode; the application must never switch presentation on its own, and a failed desktop launch must name `--web` as the alternative.
+- A browser session binds the loopback interface only, serves every interface asset from the local installation, and allows one active session; see 4.11.
+- Never install or download a runtime package while starting. Check for the package and report the install command instead.
 
 ### 2.4 Persistence and data engine
 
@@ -632,6 +635,9 @@ All vault writes must go through the `Vault` service in `core/vault.py`. UI and 
 - Cancel timers, background tasks, and subscriptions when a view is disposed. Close any resources the view owns.
 - Persist only UI preferences such as window size and last view. Never persist vault data in UI state.
 - No background network calls. If a user explicitly opens an external link, require a spec and a clear user action.
+- The interface has two presentations: a native desktop window and a loopback-only browser session. The shell reads `page.web` once; views must not branch on presentation.
+- A browser session binds `127.0.0.1` only, serves every client asset from the local installation, and permits one active `AppState` session. A second session shows a notice and must not scan or write the vault.
+- Never install a runtime package or fetch a client while starting. Report the missing package and the install command instead.
 - Flet upgrades require an OpenSpec change and a manual verification pass on macOS, Linux, and Windows.
 
 ### 4.12 Async, threading, and concurrency

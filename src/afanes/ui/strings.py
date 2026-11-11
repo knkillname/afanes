@@ -11,10 +11,37 @@ from types import MappingProxyType
 
 APP_TITLE = "Afanes"
 
+LAUNCH_DESCRIPTION = "Open Afanes, an offline Markdown vault."
+LAUNCH_WEB_HELP = "Serve the interface in a browser instead of a desktop window."
+LAUNCH_VAULT_HELP = "Open DIR for this run without replacing the remembered vault."
+LAUNCH_PORT_HELP = "Port for the browser presentation. 0 chooses a free port."
+LAUNCH_PORT_NOT_NUMBER = "port must be a whole number"
+LAUNCH_PORT_OUT_OF_RANGE = "port must be between 0 and {limit}"
+LAUNCH_MISSING_SDK = (
+    'Afanes needs the Flet SDK, which is not installed. Install it with "pip install afanes[desktop]" '
+    'or "pip install afanes[web]".'
+)
+LAUNCH_MISSING_DESKTOP = (
+    'The desktop runtime is not installed. Install it with "pip install afanes[desktop]", '
+    "or run with --web for the browser presentation."
+)
+LAUNCH_MISSING_WEB = 'The web runtime is not installed. Install it with "pip install afanes[web]".'
+LAUNCH_DESKTOP_FAILED = "The desktop window could not start: {detail}\nRun with --web for the browser presentation."
+LAUNCH_VAULT_INVALID = "Cannot open {path}: {detail}"
+
 WELCOME_TITLE = "Welcome to Afanes"
 WELCOME_BODY = "Afanes works on a folder of Markdown files called a vault. Choose an existing folder to get started."
 WELCOME_CHOOSE = "Choose vault"
 WELCOME_NOTE = "You can change the vault later."
+WELCOME_PATH_LABEL = "Vault folder path"
+WELCOME_PATH_HINT = "Absolute path to a folder of Markdown files."
+WELCOME_OPEN = "Open"
+CANCEL_ACTION = "Cancel"
+SESSION_ACTIVE_TITLE = "Afanes is open in another window"
+SESSION_ACTIVE_BODY = "Only one window can use the vault at a time. Close the other window, then try again."
+SESSION_RETRY = "Try again"
+CHANGE_VAULT_DIALOG_TITLE = "Change vault"
+CHANGE_VAULT_DIALOG_BODY = "Enter the folder path for the vault to open."
 
 INBOX_TITLE = "Inbox"
 REVIEW_TITLE = "Review"
@@ -145,9 +172,10 @@ VAULT_SELECTION_FAILED = "Could not save the vault selection: {detail}"
 REFRESH_FAILED = "Could not refresh the inbox: {detail}"
 PREVIEW_FAILED = "Could not read this note: {detail}"
 SETTINGS_UNREADABLE = "Saved preferences could not be read. Choose a vault to continue."
-VAULT_MISSING = "The saved vault folder no longer exists. Choose a vault to continue."
-VAULT_NOT_DIRECTORY = "The saved vault path is not a folder. Choose a vault to continue."
-VAULT_UNREADABLE = "The saved vault folder cannot be read. Choose a vault to continue."
+VAULT_MISSING = "That folder does not exist. Choose a vault to continue."
+VAULT_NOT_DIRECTORY = "That path is not a folder. Choose a vault to continue."
+VAULT_UNREADABLE = "That folder cannot be read. Choose a vault to continue."
+VAULT_PATH_REQUIRED = "Enter the folder path for the vault."
 SCAN_WARNING_ONE = "1 note could not be read: {paths}"
 SCAN_WARNING_MANY = "{count} notes could not be read: {paths}"
 

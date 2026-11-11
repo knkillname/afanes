@@ -67,6 +67,45 @@ PAGE_HISTORY_LIMIT = 50
 AUTOSAVE_SECONDS = 30
 
 
+def open_vault(path: Path) -> Vault:
+    """Open and validate a vault directory for the interface.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Candidate vault directory. A relative path is resolved by
+        :class:`afanes.core.vault.Vault`.
+
+    Returns
+    -------
+    Vault
+        Validated vault service for the directory.
+
+    Raises
+    ------
+    VaultError
+        If the path is missing, is not a directory, cannot be read, or cannot
+        be resolved.
+
+    Notes
+    -----
+    This is the single validation path shared by the folder picker, the typed
+    path field, and the command-line vault option. It performs blocking
+    filesystem checks; call it from a worker thread when a command is
+    responding to a UI event.
+    """
+    if not path.exists():
+        raise VaultError(afanes.ui.strings.VAULT_MISSING)
+    if not path.is_dir():
+        raise VaultError(afanes.ui.strings.VAULT_NOT_DIRECTORY)
+    if not os.access(path, os.R_OK):
+        raise VaultError(afanes.ui.strings.VAULT_UNREADABLE)
+    try:
+        return Vault(path)
+    except OSError as exc:
+        raise VaultError(afanes.ui.strings.VAULT_UNREADABLE) from exc
+
+
 class WorkspaceSection(StrEnum):
     """Top-level destinations in the workspace sidebar.
 
@@ -296,6 +335,9 @@ class AppState:
         Trash preview waiting for confirmation.
     saving : bool
         Whether a page write is in progress.
+    session_active : bool
+        Whether a presentation session currently drives the workspace. A
+        second browser session is refused while this is ``True``.
 
     Notes
     -----
@@ -329,6 +371,7 @@ class AppState:
     rename_preview: RenamePreview | None = None
     trash_preview: TrashPreview | None = None
     saving: bool = False
+    session_active: bool = False
     _snapshot: VaultSnapshot | None = dataclasses.field(default=None, repr=False)
     _autosave_task: asyncio.Task[None] | None = dataclasses.field(default=None, repr=False)
     _lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock, repr=False)
@@ -592,7 +635,7 @@ class AppState:
                     self._show_welcome(None)
                     return
                 try:
-                    vault = await asyncio.to_thread(self._open_vault, settings.vault)
+                    vault = await asyncio.to_thread(open_vault, settings.vault)
                     snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Saved vault could not be opened", exc_info=True)
@@ -626,18 +669,65 @@ class AppState:
         file I/O runs in a worker thread.
         """
         async with self._lock:
-            if not await self._commit_current():
-                return
-            self.busy = True
-            self.message = None
+            await self._open_vault_state(path, remember=True)
+
+    async def open_vault_path(self, text: str) -> None:
+        """Open a vault from a path typed by the user.
+
+        Parameters
+        ----------
+        text : str
+            Path typed into the welcome state or the change-vault dialog.
+            Leading and trailing whitespace is ignored. Blank input is
+            rejected before any filesystem access.
+
+        Notes
+        -----
+        Delegates to :meth:`choose_vault`, so resolution, validation, and
+        settings persistence are shared with the folder picker. A rejected
+        path leaves the controller in its previous state and sets
+        :attr:`message`.
+        """
+        trimmed = text.strip()
+        if not trimmed:
+            self.message = afanes.ui.strings.VAULT_PATH_REQUIRED
+            return
+        await self.choose_vault(Path(trimmed))
+
+    async def open_vault_for_run(self, path: Path) -> None:
+        """Open a vault for this run without replacing remembered settings.
+
+        Parameters
+        ----------
+        path : Path
+            Vault directory supplied when the process started.
+
+        Notes
+        -----
+        The vault is validated, scanned, and shown exactly as
+        :meth:`choose_vault` would, but the settings file is not written, so
+        the remembered vault survives the run. Blocking file I/O runs in a
+        worker thread.
+        """
+        self._start_autosave()
+        async with self._lock:
+            await self._open_vault_state(path, remember=False)
+
+    async def _open_vault_state(self, path: Path, *, remember: bool) -> None:
+        """Open a vault while the command lock is held."""
+        if not await self._commit_current():
+            return
+        self.busy = True
+        self.message = None
+        try:
             try:
-                try:
-                    vault = await asyncio.to_thread(self._open_vault, path)
-                    snapshot = await asyncio.to_thread(vault.scan)
-                except (VaultError, OSError) as exc:
-                    logger.debug("Selected vault could not be opened", exc_info=True)
-                    self.message = str(exc)
-                    return
+                vault = await asyncio.to_thread(open_vault, path)
+                snapshot = await asyncio.to_thread(vault.scan)
+            except (VaultError, OSError) as exc:
+                logger.debug("Selected vault could not be opened", exc_info=True)
+                self.message = str(exc)
+                return
+            if remember:
                 try:
                     await asyncio.to_thread(
                         SettingsStore.default().save,
@@ -647,18 +737,18 @@ class AppState:
                     logger.debug("Vault selection could not be saved", exc_info=True)
                     self.message = afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail=str(exc))
                     return
-                self.vault = vault
-                self._clear_processing()
-                self.active_section = WorkspaceSection.INBOX
-                self.browser_query = ""
-                self.review_session = None
-                self.selected = None
-                self.preview_body = None
-                self.history = ()
-                self._clear_page()
-                self._apply_snapshot(snapshot)
-            finally:
-                self.busy = False
+            self.vault = vault
+            self._clear_processing()
+            self.active_section = WorkspaceSection.INBOX
+            self.browser_query = ""
+            self.review_session = None
+            self.selected = None
+            self.preview_body = None
+            self.history = ()
+            self._clear_page()
+            self._apply_snapshot(snapshot)
+        finally:
+            self.busy = False
 
     async def change_vault(self, path: Path) -> None:
         """Switch to a different vault without restarting the application.
@@ -674,6 +764,35 @@ class AppState:
         modified.
         """
         await self.choose_vault(path)
+
+    def begin_session(self) -> bool:
+        """Claim the single active workspace session.
+
+        Returns
+        -------
+        bool
+            ``True`` when this caller became the active session, ``False``
+            when another session already holds it.
+
+        Notes
+        -----
+        The marker is process-wide, matching the single controller and single
+        vault. A refused caller must not scan or write the vault.
+        """
+        if self.session_active:
+            return False
+        self.session_active = True
+        return True
+
+    def release_session(self) -> None:
+        """Release the active workspace session.
+
+        Notes
+        -----
+        The interface shell calls this when its page disconnects. Releasing an
+        unclaimed session is a no-op.
+        """
+        self.session_active = False
 
     async def refresh(self) -> None:
         """Re-read the vault and update the Inbox.
@@ -2116,6 +2235,7 @@ class AppState:
         self.preview_body = None
         self.busy = False
         self.message = None
+        self.session_active = False
         self.history = ()
         self._snapshot = None
         self._clear_processing()
@@ -2184,36 +2304,6 @@ class AppState:
         self.processing_body = None
         self.processing_plan = None
         self.processing_result = None
-
-    def _open_vault(self, path: Path) -> Vault:
-        """Open a vault and map filesystem failures to user-facing errors.
-
-        Parameters
-        ----------
-        path : Path
-            Directory chosen by the user.
-
-        Returns
-        -------
-        Vault
-            Validated vault service for the directory.
-
-        Raises
-        ------
-        VaultError
-            If the path is missing, is not a directory, cannot be read, or
-            cannot be resolved.
-        """
-        if not path.exists():
-            raise VaultError(afanes.ui.strings.VAULT_MISSING)
-        if not path.is_dir():
-            raise VaultError(afanes.ui.strings.VAULT_NOT_DIRECTORY)
-        if not os.access(path, os.R_OK):
-            raise VaultError(afanes.ui.strings.VAULT_UNREADABLE)
-        try:
-            return Vault(path)
-        except OSError as exc:
-            raise VaultError(afanes.ui.strings.VAULT_UNREADABLE) from exc
 
     def _show_welcome(self, message: str | None) -> None:
         """Clear the vault state and show the welcome screen."""

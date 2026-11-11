@@ -2288,3 +2288,118 @@ class TestReset:
         asyncio.run(state.choose_vault(vault))
 
         assert state.vault_root == vault.resolve()
+
+
+class TestOpenVaultPath:
+    def test_typed_path_opens_and_saves_settings(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        afanes.core.vault.Vault(vault).capture("Buy milk")
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.open_vault_path(f"  {vault}  "))
+
+        assert state.vault_root == vault.resolve()
+        assert [note.name for note in state.notes] == ["Buy milk"]
+        assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(vault.resolve())
+
+    def test_blank_path_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.open_vault_path("   "))
+
+        assert state.vault_root is None
+        assert state.message == afanes.ui.strings.VAULT_PATH_REQUIRED
+        assert not settings.exists()
+
+    def test_missing_path_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.open_vault_path(str(tmp_path / "missing")))
+
+        assert state.vault_root is None
+        assert state.message == afanes.ui.strings.VAULT_MISSING
+
+    def test_file_path_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        target = tmp_path / "note.md"
+        target.write_text("not a directory", encoding="utf-8")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.open_vault_path(str(target)))
+
+        assert state.vault_root is None
+        assert state.message == afanes.ui.strings.VAULT_NOT_DIRECTORY
+
+    def test_unreadable_path_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+
+        def deny_access(*_args: object, **_kwargs: object) -> bool:
+            return False
+
+        monkeypatch.setattr(afanes.ui.state.os, "access", deny_access)
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.open_vault_path(str(vault)))
+
+        assert state.vault_root is None
+        assert state.message == afanes.ui.strings.VAULT_UNREADABLE
+
+
+class TestOpenVaultForRun:
+    def test_supplied_vault_leaves_settings_unchanged(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        remembered = tmp_path / "remembered"
+        remembered.mkdir()
+        supplied = tmp_path / "supplied"
+        supplied.mkdir()
+        afanes.core.vault.Vault(supplied).capture("Buy milk")
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=remembered))
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.open_vault_for_run(supplied))
+
+        assert state.vault_root == supplied.resolve()
+        assert [note.name for note in state.notes] == ["Buy milk"]
+        assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(remembered.resolve())
+
+    def test_supplied_vault_failure_reports_a_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.open_vault_for_run(tmp_path / "missing"))
+
+        assert state.vault_root is None
+        assert state.message == afanes.ui.strings.VAULT_MISSING
+
+
+class TestSessionGuard:
+    def test_second_begin_is_refused(self) -> None:
+        state = afanes.ui.state.app_state
+
+        assert state.begin_session() is True
+        assert state.begin_session() is False
+
+    def test_release_allows_a_later_session(self) -> None:
+        state = afanes.ui.state.app_state
+
+        state.begin_session()
+        state.release_session()
+
+        assert state.begin_session() is True
+
+    def test_reset_clears_the_session(self) -> None:
+        state = afanes.ui.state.app_state
+        state.begin_session()
+
+        state.reset()
+
+        assert state.session_active is False

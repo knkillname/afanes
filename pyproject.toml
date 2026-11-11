@@ -48,6 +48,7 @@ dev = [
   "coverage[toml]~=7.11",
   "coverage-enable-subprocess==1.0",
   "flet[desktop]>=1.0.4,<2",
+  "flet[web]>=1.0.4,<2",
   "pyrefly==1.0.0",
   "pytest~=9.0",
   "pytest-mock~=3.12",

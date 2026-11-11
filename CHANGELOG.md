@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-11
+
+### Added
+
+- A browser presentation: `python -m afanes --web` serves the workspace from a loopback-only local server, so Afanes runs on machines that block the native Flet client. `--vault DIR` opens a folder for a single run, and `--port N` chooses the listening port.
+
+### Changed
+
+- A browser session asks for an absolute vault path on the welcome screen and in the Change vault action, because browsers cannot return a directory path from a file dialog, and allows one active session at a time.
+- A missing runtime is reported with the install command instead of being installed at startup, and a failed desktop launch names `--web` rather than switching presentation silently.
+- This release implements the `web-runtime` OpenSpec change.
+
 ## [0.3.4] - 2026-11-11
 
 ### Added

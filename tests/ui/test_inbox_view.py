@@ -34,6 +34,10 @@ async def _process(_path: Path) -> None:
     return None
 
 
+async def _open_path(_text: str) -> None:
+    return None
+
+
 def _write_note(path: Path, body: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"---\ntype: note\n---\n{body}", encoding="utf-8")
@@ -60,6 +64,24 @@ class TestWelcomeView:
 
         assert isinstance(content, ft.Column)
         assert any(isinstance(item, ft.Container) for item in content.controls)
+
+
+class TestBrowserWelcomeView:
+    def test_browser_welcome_has_a_path_field(self) -> None:
+        control = afanes.ui.views.inbox.build_welcome(on_open_path=_open_path)
+        assert isinstance(control, ft.Container)
+        content = control.content
+        assert isinstance(content, ft.Column)
+
+        fields = [item for item in content.controls if isinstance(item, ft.TextField)]
+        buttons = [item for item in content.controls if isinstance(item, ft.FilledButton)]
+        assert len(fields) == 1
+        assert len(buttons) == 1
+        assert buttons[0].content == afanes.ui.strings.WELCOME_OPEN
+
+    def test_welcome_requires_a_selection_command(self) -> None:
+        with pytest.raises(ValueError, match="selection command"):
+            afanes.ui.views.inbox.build_welcome()
 
 
 class TestInboxView:

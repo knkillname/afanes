@@ -21,19 +21,36 @@ import afanes.ui.views.page
 from afanes.core.vault import VaultFailure, VaultNote
 
 
-def build_welcome(on_choose: Callable[[], Awaitable[None]]) -> ft.Control:
+def build_welcome(
+    on_choose: Callable[[], Awaitable[None]] | None = None,
+    on_open_path: Callable[[str], Awaitable[None]] | None = None,
+) -> ft.Control:
     """Build the first-run welcome state.
 
     Parameters
     ----------
-    on_choose : Callable[[], Awaitable[None]]
-        Command that opens the folder picker and selects a vault.
+    on_choose : Callable[[], Awaitable[None]] | None
+        Command that opens the native folder picker and selects a vault.
+        Supplied by the desktop presentation.
+    on_open_path : Callable[[str], Awaitable[None]] | None
+        Command that opens the vault named by a typed path. Supplied by the
+        browser presentation, which has no native directory dialog.
 
     Returns
     -------
     ft.Control
-        Centered welcome layout with a folder action and any startup message.
+        Centered welcome layout with the selection action for this
+        presentation and any startup message.
+
+    Raises
+    ------
+    ValueError
+        If neither selection command is supplied. Each presentation must offer
+        exactly one way to choose a vault.
     """
+    if on_choose is None and on_open_path is None:
+        message = "The welcome state needs one vault selection command."
+        raise ValueError(message)
     controls: list[ft.Control] = [
         ft.Text(
             afanes.ui.strings.WELCOME_TITLE,
@@ -41,19 +58,26 @@ def build_welcome(on_choose: Callable[[], Awaitable[None]]) -> ft.Control:
             text_align=ft.TextAlign.CENTER,
         ),
         ft.Text(afanes.ui.strings.WELCOME_BODY, text_align=ft.TextAlign.CENTER),
-        ft.FilledButton(
-            content=afanes.ui.strings.WELCOME_CHOOSE,
-            icon=ft.Icons.FOLDER_OPEN,
-            on_click=on_choose,
-            autofocus=True,
-        ),
+    ]
+    if on_choose is not None:
+        controls.append(
+            ft.FilledButton(
+                content=afanes.ui.strings.WELCOME_CHOOSE,
+                icon=ft.Icons.FOLDER_OPEN,
+                on_click=on_choose,
+                autofocus=True,
+            ),
+        )
+    if on_open_path is not None:
+        controls.extend(_vault_path_entry(on_open_path))
+    controls.append(
         ft.Text(
             afanes.ui.strings.WELCOME_NOTE,
             size=12,
             color=afanes.ui.theme.MUTED_TEXT_COLOR,
             text_align=ft.TextAlign.CENTER,
         ),
-    ]
+    )
     message = afanes.ui.state.app_state.message
     if message is not None:
         controls.append(_banner(message))
@@ -62,6 +86,67 @@ def build_welcome(on_choose: Callable[[], Awaitable[None]]) -> ft.Control:
         alignment=ft.Alignment.CENTER,
         content=ft.Column(
             controls=controls,
+            spacing=afanes.ui.theme.SECTION_GAP,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            width=520,
+        ),
+    )
+
+
+def _vault_path_entry(on_open_path: Callable[[str], Awaitable[None]]) -> list[ft.Control]:
+    """Build the typed-path selection controls for a browser session."""
+    field = ft.TextField(
+        label=afanes.ui.strings.WELCOME_PATH_LABEL,
+        hint_text=afanes.ui.strings.WELCOME_PATH_HINT,
+        width=420,
+        autofocus=True,
+        key="welcome-path",
+    )
+
+    async def open_typed_path() -> None:
+        await on_open_path(field.value or "")
+
+    field.on_submit = open_typed_path
+    button = ft.FilledButton(
+        content=afanes.ui.strings.WELCOME_OPEN,
+        icon=ft.Icons.FOLDER_OPEN,
+        on_click=open_typed_path,
+        key="welcome-open",
+    )
+    return [field, button]
+
+
+def build_session_notice(on_retry: Callable[[], Awaitable[None]]) -> ft.Control:
+    """Build the state shown when another session already owns the workspace.
+
+    Parameters
+    ----------
+    on_retry : Callable[[], Awaitable[None]]
+        Command that tries to claim the session again.
+
+    Returns
+    -------
+    ft.Control
+        Centered notice with a single retry action.
+    """
+    return ft.Container(
+        expand=True,
+        alignment=ft.Alignment.CENTER,
+        content=ft.Column(
+            controls=[
+                ft.Text(
+                    afanes.ui.strings.SESSION_ACTIVE_TITLE,
+                    theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM,
+                    text_align=ft.TextAlign.CENTER,
+                ),
+                ft.Text(afanes.ui.strings.SESSION_ACTIVE_BODY, text_align=ft.TextAlign.CENTER),
+                ft.FilledButton(
+                    content=afanes.ui.strings.SESSION_RETRY,
+                    on_click=on_retry,
+                    autofocus=True,
+                    key="session-retry",
+                ),
+            ],
             spacing=afanes.ui.theme.SECTION_GAP,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             width=520,
