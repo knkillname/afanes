@@ -120,16 +120,19 @@ The default vault layout is `inbox/` for captures, `trash/` for recoverable disc
 - Use `hatch shell` or `hatch run` to access these tools directly for diagnosis (`hatch run pytest`, `hatch run ruff`, `hatch run pyrefly`). The authoritative gates remain `hatch check` and `hatch test`.
 - `hatch check` and `hatch test` run in Hatch's isolated internal environments (`hatch-check-*`, `hatch-test.*`), not in `.venv`; they are gate environments, not editor environments. Hatch supplies their core tool versions, while `hatch-test.*` and `hatch-check-types` add the `test` dependency group for test-only packages.
 - When Hatch is upgraded, compare `hatch env show -i --json` with the `dev` group pins and update them together so local and gate environments stay aligned.
-- Runtime dependencies are pinned to exact versions in `pyproject.toml` for reproducible desktop builds. Development and test tools may use bounded ranges.
+- Runtime dependencies use compatible-release ranges in `pyproject.toml`, with a lower bound that a `hatch-test` matrix environment exercises and an upper bound below the next major version. A lower bound that no test environment runs is not a supported version.
+- Every release records the resolved versions of the ranged runtime dependencies in its changelog entry. The repository holds no lock file and no constraints file, so the release record replaces them.
+- Express optional runtime components through the owning package's extras, for example `flet[desktop]` and `flet[web]`, so the resolver keeps the component and its host package on the same version. Never re-pin such a component to a patch version in this project.
+- Development and test tools may use bounded ranges or exact pins; they never reach a runtime install.
 - Every new dependency requires an OpenSpec change that states the need, alternatives considered, license, offline behavior, and cross-platform impact.
 - Forbidden dependencies: cloud SDKs, hosted databases, analytics, telemetry, crash-reporting services, auto-update services, and anything that performs hidden network I/O.
 
 ### 2.3 Graphical user interface
 
 - **Flet** (Python powered by the Flutter engine) is the GUI toolkit.
-- Pin the current stable Flet release exactly in `pyproject.toml`. Upgrade it only through an OpenSpec change.
+- Depend on Flet through a compatible-release range that stops below the next major. Widen or move the supported window only through an OpenSpec change.
 - Target Flet 1.x. A Flet 1.x runtime downloads its desktop client on first use unless a packaged build or a pre-provisioned cache supplies it.
-- Pin `flet-desktop` exactly in the development group so source runs have a client. Shipped desktop builds must bundle the client through `flet build`; a bare Python install is not a runnable offline desktop app.
+- Depend on `flet[desktop]` through the same range in the development group so source runs have a client, and let Flet's extra keep the client version locked to the SDK. Shipped desktop builds must bundle the client through `flet build`; a bare Python install is not a runnable offline desktop app.
 - Treat the first development run as environment provisioning, never as product behavior. Application code must not trigger the client download from a shipped build.
 - Use public Flet APIs only. Do not depend on private modules, internal widget trees, or undocumented behavior.
 - Do not mix incompatible Flet API generations in the same codebase.
@@ -176,10 +179,10 @@ The default vault layout is `inbox/` for captures, `trash/` for recoverable disc
 | --- | --- | --- |
 | Python | runtime | 3.13+ only |
 | Hatch | development | 1.18+; sole workflow interface |
-| Flet | runtime | exact pin; library and public APIs only |
-| flet-desktop | development | exact pin; provisions the desktop client for source runs; packaged builds bundle it |
-| markdown-it-py | runtime | exact pin; CommonMark parsing only |
-| PyYAML | runtime | exact pin; `safe_load` / `safe_dump` only |
+| Flet | runtime | compatible-release range; library and public APIs only |
+| Flet runtime clients | optional runtime | `flet[desktop]` in the development group and `flet[web]` as an extra; install only the presentation in use |
+| markdown-it-py | runtime | compatible-release range; CommonMark parsing only |
+| PyYAML | runtime | compatible-release range; `safe_load` / `safe_dump` only |
 | SQLite / FTS5 | runtime | stdlib; optional FTS5 with fallback |
 | argparse | runtime | stdlib CLI |
 | Hypothesis | test only | property-based tests |

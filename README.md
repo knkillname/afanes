@@ -27,11 +27,22 @@ hatch env create
 hatch run python -m afanes
 ```
 
-`pip install afanes` installs the Python library only, not a runnable desktop app.
+`pip install afanes` installs the Python library and the Flet SDK, but no interface runtime. Install
+the runtime for the presentation you use:
 
-The first run downloads and caches the Flet desktop client under `~/.flet/client/`. This is a
-one-time development provisioning step; the application itself performs no network I/O. Packaged
-builds will bundle the client in a later change.
+```console
+pip install "afanes[desktop]"   # native window; the client is cached on first run
+pip install "afanes[web]"       # browser runtime; no native client is installed
+```
+
+Installing a runtime through the package manager is the only supported path. Afanes never installs
+packages while starting. The first desktop run downloads and caches the Flet desktop client under
+`~/.flet/client/`; this is a one-time development provisioning step and the application itself
+performs no network I/O. The `web` runtime ships its browser client inside its wheel, so it needs no
+download. Packaged builds will bundle the desktop client in a later change.
+
+Afanes supports Flet 1.0.4 and later 1.x releases. `hatch test --all` runs the suite on every
+supported interpreter and against the oldest supported dependency versions.
 
 On first launch, choose a vault folder. Afanes remembers it in the platform configuration
 directory and reopens it next time. The [workspace browser](#workspace-browser) then lists every

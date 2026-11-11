@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-11-11
+
+### Added
+
+- Optional runtime installs: `afanes[desktop]` for the native window and `afanes[web]` for the browser runtime, so an environment can install only the runtime it needs and omit the native client.
+
+### Changed
+
+- Runtime dependencies now use compatible-release ranges instead of exact pins. Afanes supports Flet 1.0.4 and later 1.x releases, and installs resolve on artifact mirrors that do not carry the newest release.
+- This release was built and tested against Flet 1.1.2, markdown-it-py 4.3.0, and PyYAML 6.0.3. The oldest supported versions are tested in the same run.
+
 ## [0.3.3] - 2026-11-11
 
 ### Added

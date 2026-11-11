@@ -23,10 +23,14 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
 ]
 dependencies = [
-  "flet==1.1.2",
-  "markdown-it-py==4.3.0",
-  "PyYAML==6.0.3",
+  "flet>=1.0.4,<2",
+  "markdown-it-py>=4.0,<5",
+  "PyYAML>=6.0.3,<7",
 ]
+
+[project.optional-dependencies]
+desktop = ["flet[desktop]>=1.0.4,<2"]
+web = ["flet[web]>=1.0.4,<2"]
 
 [project.urls]
 Documentation = "https://github.com/knkillname/afanes#readme"
@@ -43,7 +47,7 @@ dev = [
   { include-group = "test" },
   "coverage[toml]~=7.11",
   "coverage-enable-subprocess==1.0",
-  "flet-desktop==1.1.2",
+  "flet[desktop]>=1.0.4,<2",
   "pyrefly==1.0.0",
   "pytest~=9.0",
   "pytest-mock~=3.12",
@@ -66,6 +70,17 @@ dependency-groups = ["test"]
 
 [[tool.hatch.envs.hatch-test.matrix]]
 python = ["3.13", "3.14"]
+
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.13"]
+deps = ["floor"]
+
+[tool.hatch.envs.hatch-test.overrides]
+matrix.deps.extra-dependencies = [
+  { value = "flet[desktop]==1.0.4", if = ["floor"] },
+  { value = "markdown-it-py==4.0.0", if = ["floor"] },
+  { value = "PyYAML==6.0.3", if = ["floor"] },
+]
 
 [tool.hatch.envs.hatch-check-types]
 dependency-groups = ["test"]
