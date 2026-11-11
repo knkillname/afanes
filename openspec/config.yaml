@@ -1,32 +1,25 @@
 schema: spec-driven
 
-# Project context (optional)
-# Add only constraints that should guide OpenSpec artifacts and workflows.
-# Include constraints an agent cannot infer by reading the code.
-# Keep general project documentation and discoverable codebase facts out.
-# Example:
-#   context: |
-#     Designs and tasks must cover Windows, macOS, and Linux
-#     Write all artifacts in Spanish
+# Durable constraints that guide OpenSpec artifacts and workflows.
+# Engineering detail lives in AGENTS.md; this file records only what an agent
+# cannot infer from the code.
+context: |
+  Afanes is offline-only: no runtime network access, accounts, telemetry, or
+  cloud storage. Durable user data lives in the Markdown vault; the SQLite index
+  is a disposable cache.
+  Code, UI copy, specs, and commits use neutral, original vocabulary; see
+  AGENTS.md section 4.2 for the prohibited terms.
+  Public Python APIs require strict NumPy-style docstrings that document every
+  parameter, return value, raised exception, and public attribute.
+  Every change must preserve macOS, Linux, and Windows parity.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always state what is out of scope
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
-
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+# Advisory guidance read by /opsx-archive through `openspec instructions archive`.
+operations:
+  archive:
+    guidance:
+      - "After the archive succeeds, run the post-archive release workflow in AGENTS.md section 5.8 before reporting completion."
+      - "Choose the semver bump from the archived change, then run hatch version patch, hatch version minor, or hatch version major. Never edit src/afanes/__about__.py by hand."
+      - "Update CHANGELOG.md following Keep a Changelog: move Unreleased entries under the new version and date, add a fresh Unreleased section, and update comparison links."
+      - "Review README.md and update it when the change affects installation, usage, features, platforms, configuration, or documented behavior. Record when no update is required."
+      - "Run hatch check, hatch test --cover, openspec validate --all --strict, openspec doctor, and the vocabulary compliance check before committing."
+      - "Create one release commit titled chore(release): vX.Y.Z with the archived change name in the body. Do not tag, push, or publish unless the maintainer asks."

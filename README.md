@@ -8,6 +8,7 @@
 ## Table of Contents
 
 - [Installation](#installation)
+- [Changelog](#changelog)
 - [License](#license)
 
 ## Installation
@@ -15,6 +16,10 @@
 ```console
 pip install afanes
 ```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the release history.
 
 ## License
 

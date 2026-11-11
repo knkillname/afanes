@@ -4,7 +4,7 @@
 
 **Status:** Initial operating manual. Changes to this file require an OpenSpec change or explicit maintainer direction.
 
-**Read order:** `AGENTS.md` -> `README.md` -> `pyproject.toml` -> relevant `openspec/specs/` -> active change artifacts -> code and tests.
+**Read order:** `AGENTS.md` -> `README.md` -> `CHANGELOG.md` -> `pyproject.toml` -> relevant `openspec/specs/` -> active change artifacts -> code and tests.
 
 **Precedence:** explicit user instruction within the constraints below > OpenSpec behavior specs > this file > local code patterns. If two sources conflict, stop and ask. Do not silently choose one.
 
@@ -152,7 +152,7 @@ Rules for frontmatter:
   - Module imports only; the first-party package is `afanes`. Relative imports and direct function/constant imports are forbidden; direct imports are limited to CamelCase types and classes.
   - Additional rule families: `D` (docstrings), `ANN` (annotations), `C90` (complexity), `S` (security).
 - **Pyrefly** is the only type checker, configured with `preset = "strict"` for `src/` and `tests/`.
-- **NumPy-style docstrings** are mandatory for public APIs.
+- **NumPy-style docstrings** are mandatory for every public API; see 4.6 for the strict contract.
 - **Coverage** must be at least 85% overall. Parser, link, vault, and indexer modules should target 90% or higher.
 - **Hypothesis** is required for property-based tests of parsing, link extraction, and path containment.
 - Do not add a second linter, formatter, type checker, test runner, or coverage tool. Do not use `hatch fmt`; it is deprecated in favor of `hatch check`.
@@ -183,6 +183,7 @@ Create directories only when a change needs them. This is the intended shape, no
 afanes/
 ├── AGENTS.md
 ├── README.md
+├── CHANGELOG.md
 ├── LICENSE
 ├── pyproject.toml
 ├── openspec/
@@ -427,15 +428,38 @@ These principles are engineering constraints, not suggestions. Apply them at mod
 
 ### 4.6 Docstrings
 
-- Public modules, classes, functions, and methods require NumPy-style docstrings. Private helpers may omit a docstring only when their purpose is self-evident.
-- Structure:
-  1. One-line imperative summary.
-  2. Blank line.
-  3. Extended description when needed.
-  4. NumPy sections such as `Parameters`, `Returns`, `Raises`, `Notes`, and `Examples`.
-- Document side effects, path-safety requirements, thread or async constraints, and whether a function performs I/O.
+Strict NumPy-style docstrings are mandatory for every public API. Ruff enforces the `D` rule family with `convention = "numpy"` and the `ANN` annotation rules; reviewers enforce the section content that Ruff cannot check. A missing or incomplete docstring is a blocking review finding, not a style preference.
+
+**Scope.** Every public module, package, class, exception, enum, `Protocol`, function, method, property, `classmethod`, `staticmethod`, and public dunder method requires a docstring. This includes `__init__`, `__call__`, `__enter__`, `__exit__`, `__iter__`, `__next__`, and `__len__` when they form part of the object's contract. Public dataclasses and enums document their fields and members in an `Attributes` section. Private helpers require a docstring whenever their behavior is not obvious from the name and signature.
+
+**Required content.**
+
+- A one-line imperative summary that ends with a period.
+- A blank line after the summary, before the extended description or the first section.
+- An extended description when the summary cannot convey the contract.
+- `Parameters` documenting every public parameter, including positional-only, keyword-only, `*args`, and `**kwargs`. Omit `self` and `cls`. State accepted range, units, invariants, ownership, and defaults when they are not obvious from the annotation.
+- `Returns` for every callable that returns a value. State the meaning and shape of the result. Omit `Returns` only for `-> None`; describe the side effect in `Notes` instead.
+- `Yields` for generators, with the same detail as `Returns`.
+- `Raises` for every exception a caller may reasonably handle. List domain exceptions from `core/errors.py`, never internal `AssertionError` invariants.
+- `Attributes` for public dataclass fields, enum members, and class attributes.
+- `Notes` for I/O, blocking behavior, thread or async constraints, path-safety requirements, ordering guarantees, and side effects.
+- `See Also`, `References`, and `Examples` when they add real value.
+
+**Formatting.**
+
+- Types in docstrings must match the runtime annotations exactly: `str | None`, `list[str]`, `datetime.date`, not `Optional[str]`, `List[str]`, or `date`.
+- Use the canonical section order: summary, extended description, `Parameters`, `Returns` or `Yields`, `Raises`, `Attributes`, `See Also`, `Notes`, `References`, `Examples`.
+- Underline each section heading with at least three hyphens, matching the heading length.
+- Write parameter entries as `name : type` on one line, followed by an indented description. Write exception entries the same way.
+- Put one blank line between sections and indent descriptions by four spaces.
+- Do not use Google style, reStructuredText field lists, or Sphinx-only directives.
+- Do not restate the signature. Document meaning, constraints, and failure modes.
+- Do not use `# noqa: D...` to silence a docstring rule. Fix the docstring.
 - Do not include prohibited vocabulary in docstrings or examples.
-- Example:
+
+Test functions are not public API and remain exempt through the per-file ignores in `pyproject.toml`. Do not weaken those ignores to avoid documenting production code.
+
+Example:
 
 ```python
 import pathlib
@@ -610,6 +634,8 @@ A change is complete only when all of the following are true:
 - [ ] Relevant specs and documentation are updated.
 - [ ] The diff is minimal and contains no unrelated formatting churn.
 
+Archiving adds one more gate: the post-archive release workflow in 5.8 must complete before the work is reported as done.
+
 ---
 
 ## 5. OpenSpec & Task Execution Workflow
@@ -650,6 +676,7 @@ Code and tests do not override a spec. If the implementation and the spec disagr
 | Apply | Implement tasks only | `/opsx-apply <change-name>` | Code, tests, checked tasks |
 | Validate | Verify behavior and quality | `hatch check`, `hatch test --cover`, `openspec validate --all --strict`, `openspec doctor` | Passing checks |
 | Archive | Merge the change into main specs | `/opsx-archive <change-name>` or `openspec archive "<change-name>"` | Updated main specs, archived change |
+| Release | Bump version, update changelog and README, commit | `hatch version <part>` (see 5.8) | New version, `CHANGELOG.md`, release commit |
 
 The planning boundary is strict: a propose workflow stops after presenting artifacts. Do not start implementation in the same response, even if the original request asked for it.
 
@@ -718,6 +745,7 @@ Create it when the change affects architecture, data format, indexing, concurren
 - Archive only after the user approves and the work is complete.
 - `openspec archive` updates the main specs. Review the resulting diff; do not manually copy deltas into `openspec/specs/`.
 - Use `--skip-specs` only for infrastructure, tooling, or documentation changes that genuinely have no behavior delta.
+- After a successful archive, run the post-archive release workflow in 5.8 before reporting completion. `--skip-specs` does not skip the release.
 - Keep the change name in the commit or pull request for traceability.
 
 ### 5.7 OpenSpec configuration
@@ -725,7 +753,34 @@ Create it when the change affects architecture, data format, indexing, concurren
 - `openspec/config.yaml` holds durable constraints that must guide artifact generation. Keep it concise and do not duplicate this entire file.
 - Use the `context` field for constraints an agent cannot infer from the code, such as offline-only behavior, cross-platform requirements, or vocabulary rules.
 - Use per-artifact `rules` only when a rule applies to a specific artifact type.
+- Use `operations.archive.guidance` for advisory post-archive steps that must survive regeneration of the OpenSpec skills and commands.
 - Changing OpenSpec configuration is itself a change. Update it through the normal workflow.
+
+### 5.8 Post-archive release
+
+Every successful archive, including `--skip-specs` infrastructure changes, ends with a release commit. Do not report an archive as complete until this workflow finishes.
+
+1. **Choose the bump.** Derive it from the archived change, not from the size of the diff.
+   - **MAJOR** for an incompatible change to a public Python API, the vault or frontmatter contract, a CLI command or flag, or a spec-defined behavior that requires user migration.
+   - **MINOR** for backward-compatible new behavior: a new capability, view, command, option, frontmatter field, or user-visible workflow.
+   - **PATCH** for backward-compatible fixes, documentation, refactors, performance work, tests, and tooling or process changes with no behavior delta.
+   - Pre-1.0 releases follow the same rules. Do not treat `0.x` as permission to break users silently.
+2. **Bump the version.** Run `hatch version patch`, `hatch version minor`, or `hatch version major`. Use `hatch version "<exact>"` only when the maintainer specifies the version, and `hatch version release` only to graduate a prerelease. An explicit downgrade requires `--force` and maintainer approval. Never edit `src/afanes/__about__.py` by hand. Confirm the new version with `hatch version`.
+3. **Update `CHANGELOG.md`.** Follow Keep a Changelog 1.1.0 and Semantic Versioning.
+   - Add a concise entry for the archived change to `Unreleased` when one is not already present.
+   - Move every `Unreleased` entry into a new `## [X.Y.Z] - YYYY-MM-DD` section dated with the archive date.
+   - Leave a fresh, empty `## [Unreleased]` section at the top.
+   - Use only `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Omit empty sections.
+   - Write user-facing, observable outcomes. Do not paste task lists, commit messages, or internal file inventories.
+   - Name the archived OpenSpec change in the entry when it helps traceability.
+   - Update the comparison links so `[Unreleased]` compares the new version to `HEAD` and the new version links to its release tag. If release tags are not used, omit the links instead of linking to nonexistent tags.
+   - Never rewrite an entry for a version that was already released or tagged. Ship a new patch release instead.
+4. **Review `README.md`.** Update it when the change affects installation, quick start, features, supported platforms, configuration, CLI usage, or any statement that is now stale. If nothing needs to change, record `README: no change required` in the archive summary.
+5. **Run the gates.** Run `hatch check`, `hatch test --cover`, `openspec validate --all --strict`, `openspec doctor`, and the compliance check in 6.6. Do not commit while any gate fails.
+6. **Commit.** Create one commit for the archive and its release artifacts: `chore(release): vX.Y.Z`. The body must contain `Archived OpenSpec change: <change-name>`. Include the archived change directory, synced main specs, `src/afanes/__about__.py`, `CHANGELOG.md`, and `README.md` when it changed. Do not tag, push, or publish unless the maintainer asks.
+7. **Report.** State the previous and new versions, the bump rationale, the changelog section, whether `README.md` changed, and the commit hash.
+
+If the archive succeeds but the release workflow fails, leave the archive and version changes in the working tree, report the failure, and do not create a partial or misleading release commit. Multiple archives on the same day each get their own bump and release commit.
 
 ---
 
@@ -824,7 +879,7 @@ OpenCode slash commands:
 /opsx-archive <change-name>
 ```
 
-Use `openspec archive` only after the change is complete and approved. It updates the main specs.
+Use `openspec archive` only after the change is complete and approved. It updates the main specs. A successful archive always triggers the release workflow in 5.8.
 
 ### 6.6 Compliance check
 
@@ -846,10 +901,15 @@ rg -n -i 'gtd|getting_things_done|getting-things-done|inbox_zero' \
 
 ```bash
 hatch build
-hatch version
+hatch version                 # print the current version
+hatch version patch           # 0.0.1 -> 0.0.2
+hatch version minor           # 0.0.1 -> 0.1.0
+hatch version major           # 0.0.1 -> 1.0.0
+hatch version "<exact>"       # maintainer-specified version
+hatch version release         # graduate a prerelease
 ```
 
-`hatch publish` is maintainer-only. Do not publish without a passing quality gate and an approved change.
+Version bumps happen only through the post-archive release workflow in 5.8. Never edit `src/afanes/__about__.py` by hand. `hatch publish` is maintainer-only. Do not publish without a passing quality gate and an approved change.
 
 ---
 
