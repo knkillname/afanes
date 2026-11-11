@@ -9,8 +9,10 @@ import flet as ft
 import pytest
 
 import afanes.core.settings
+import afanes.core.vault
 import afanes.ui.app
 import afanes.ui.state
+import afanes.ui.strings
 from afanes.core.settings import Settings
 
 Handler = Callable[[], Awaitable[None]]
@@ -64,6 +66,19 @@ def _welcome_button(control: ft.Control) -> ft.FilledButton:
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
     monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: path)
+
+
+def _find_by_key(control: ft.Control, key: str) -> ft.Control | None:
+    if getattr(control, "key", None) == key:
+        return control
+    for child in getattr(control, "controls", []) or []:
+        found = _find_by_key(child, key)
+        if found is not None:
+            return found
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        return _find_by_key(content, key)
+    return None
 
 
 class TestAppShell:
@@ -128,3 +143,37 @@ class TestAppShell:
 
         assert afanes.ui.state.app_state.vault_root == vault.resolve()
         assert isinstance(page.controls[0], ft.Column)
+
+    def test_process_action_opens_the_wizard_and_cancel_returns(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
+        afanes.core.vault.Vault(vault).capture("Buy milk")
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await state.select_note(state.notes[0].path)
+            process_button = _find_by_key(page.controls[0], "process-note")
+            assert isinstance(process_button, ft.FilledButton)
+            process_handler = typing.cast("Handler", process_button.on_click)
+            await process_handler()
+
+            assert state.processing_note is not None
+            assert _find_by_key(page.controls[0], "processing-view") is not None
+
+            cancel_button = _find_by_key(page.controls[0], "processing-cancel")
+            assert isinstance(cancel_button, ft.TextButton)
+            cancel_handler = typing.cast("Handler", cancel_button.on_click)
+            await cancel_handler()
+
+        asyncio.run(scenario())
+
+        assert state.processing_note is None
+        assert _find_by_key(page.controls[0], "processing-view") is None
+        assert _find_by_key(page.controls[0], "process-note") is not None

@@ -58,8 +58,9 @@ Frontmatter contract:
 
 | Key | Type | Rules |
 | --- | --- | --- |
-| `type` | string enum | Required. Initial values: `note`, `action`, `project`, `reference`, `person`. Extend only through an OpenSpec change. |
-| `status` | string enum or absent | Optional until processing begins. Initial values: `inbox`, `active`, `waiting`, `done`, `cancelled`, `archived`. Per-type validity is defined by `models/` and the relevant spec. A captured note has no `status` key. |
+| `type` | string enum | Required. Initial values: `note`, `action`, `project`, `reference`. Extend only through an OpenSpec change. |
+| `category` | string enum or absent | Optional on `reference` notes only. Initial value: `person`. A categorized reference belongs to its category scheme; an uncategorized reference belongs to the `note` scheme. |
+| `status` | string enum or absent | Optional. Actions and projects: `active`, `waiting`, `done`, `cancelled`, `archived`, `later`. References: `later`, `archived`, or absent. Captures: absent. `inbox` is not a status. Per-type validity is defined by `models/` and the relevant spec. |
 | `due_date` | ISO date or absent/null | `YYYY-MM-DD`, date-only, no timezone. A due date is a calendar date, not an instant. |
 | `people` | list of strings | Zero or more `person:Name` references, for example `["person:Ada Lovelace"]`. |
 | `project` | string or absent/null | At most one `project:Name` reference, for example `"project:Release 1.0"`. |
@@ -68,7 +69,8 @@ Rules for frontmatter:
 
 - Unknown keys are preserved when a note is rewritten. Never silently drop data.
 - Unknown enum values are not coerced. Surface a validation error and offer a raw edit path.
-- A note without `status` is captured but not yet processed. The Inbox is the `inbox/` directory; capture adds no status, project, people, or due date.
+- A captured note has no `status`. The Inbox is the `inbox/` directory; capture adds no status, category, project, people, or due date.
+- A person page is a `reference` note with `category: person`; `person` is not a note type. The `person` scheme resolves only to those notes. The `note` scheme resolves to `note`, `action`, and an uncategorized `reference`. A note belongs to exactly one scheme.
 - The body is standard Markdown. Internal references use `[Label](scheme:Name)` with the schemes `person`, `project`, and `note`; use angle brackets when the name contains spaces, for example `[Ada](<person:Ada Lovelace>)`. Resolution rules live in `core/links.py` and the relevant spec.
 - A malformed frontmatter block is a parse error, not an invitation to guess. Do not overwrite the file.
 - New files use stable key order and canonical YAML. Existing files only have keys modified that the current operation owns.
@@ -80,11 +82,13 @@ Rules for frontmatter:
 | Workflow | Required behavior | Primary code |
 | --- | --- | --- |
 | Inbox | Rapid capture of a raw thought as a Markdown file under `inbox/`. The first non-blank line becomes the filename and the full text becomes the body. No status or other classification is assigned at capture time; the Inbox lists the folder newest first. | `ui/views/inbox.py`, `core/vault.py` |
-| Processing Wizard | Step-by-step clarification: actionable vs reference, project vs single action item, due date, and people assignment. Every step is explicit and reversible where possible. | `ui/views/processing.py`, `core/frontmatter.py` |
-| Clarification Pipeline | The underlying state machine and validation used by the Processing Wizard. Must be testable without Flet. | `core/`, `models/` |
+| Processing Wizard | Step-by-step clarification into one of Trash, Later, Reference, Action, or Project, with status, due date, people, and project assignment where applicable. Every step is explicit, previewed, and confirmed before writing. | `ui/views/processing.py`, `core/processing.py`, `core/vault.py` |
+| Clarification Pipeline | The plan/apply state machine and validation used by the Processing Wizard. Must be testable without Flet. | `core/processing.py`, `core/vault.py`, `models/` |
 | Timeline | Dynamic view ordered by `due_date`, including overdue and undated buckets. | `ui/views/timeline.py`, `core/search.py` |
-| People / Contacts | Network view over person pages and their bidirectional links to actions, projects, and references. | `ui/views/people.py`, `core/links.py` |
+| People / Contacts | Network view over reference notes with `category: person` and their bidirectional links to actions, projects, and references. | `ui/views/people.py`, `core/links.py` |
 | Next Actions | Matrix view over open action items. Exact axes and filters are defined by the spec, not improvised in the UI. | `ui/views/next_actions.py`, `core/search.py` |
+
+The default vault layout is `inbox/` for captures, `trash/` for recoverable discards, `reference/` for non-actionable notes with category folders such as `reference/people/`, `projects/` for outcomes, and `actions/` for single steps. These are default destinations, not required structure. Notes under `trash/` are excluded from scans, identity, and reference resolution.
 
 ### 1.5 What Afanes is not
 
@@ -214,15 +218,15 @@ afanes/
 │       │   ├── names.py           # name normalization and filename sanitization
 │       │   ├── links.py           # scheme reference extraction and resolution
 │       │   ├── vault.py           # vault discovery, path safety, note operations
+│       │   ├── processing.py      # processing plan, outcomes, and apply
 │       │   ├── indexer.py         # incremental SQLite index
 │       │   ├── search.py          # timeline, people, next-actions queries
 │       │   └── settings.py        # platform paths and app configuration
 │       ├── models/
 │       │   ├── __init__.py
-│       │   ├── note.py            # NoteType
+│       │   ├── note.py            # NoteType, ReferenceCategory, Status
 │       │   ├── action.py          # ActionItem
 │       │   ├── project.py         # Project
-│       │   ├── person.py          # Person
 │       │   └── link.py            # NoteReference and ReferenceScheme
 │       ├── ui/
 │       │   ├── __init__.py
@@ -551,7 +555,7 @@ def parse_note(path: pathlib.Path, vault_root: pathlib.Path) -> Note:
   - `due_date` becomes `datetime.date | None`.
   - `people` becomes a tuple of `NoteReference` values with the `person` scheme.
   - `project` becomes a `NoteReference` with the `project` scheme.
-  - `type` and `status` become enums.
+  - `type`, `category`, and `status` become enums.
 - Preserve the raw frontmatter mapping on the model so unknown keys can be written back. Do not discard unknown data.
 - Identity is the filename stem: it is the note's name, display title, and identity. Directories are classification, never identity. No `id` or `title` key participates. Never rewrite paths or identities silently.
 - Due dates are calendar dates. Do not attach a timezone or convert them to instants.
@@ -586,10 +590,10 @@ All vault writes must go through the `Vault` service in `core/vault.py`. UI and 
 3. **Write atomically.** Call `afanes.core.atomic.write_text_atomic`, which creates a temporary file in the same directory, writes UTF-8 bytes, flushes, `os.fsync`, then `os.replace`, and removes the temporary file on failure.
 4. **Preserve user content.** Modify only the frontmatter keys owned by the operation. Preserve the body, unknown keys, and existing newline style. New files use LF and UTF-8 without a BOM.
 5. **Detect external edits.** Before overwriting, compare a content hash or modification marker captured when the note was read. If the file changed, abort and ask the user.
-6. **Confirm destructive operations.** Rename, move, and delete require explicit user confirmation. Use a recoverable backup or trash mechanism where the platform supports it.
+6. **Confirm destructive operations.** Rename, move, trash, and any permanent deletion require explicit user confirmation. Trashing moves the note to the vault-local `trash/` folder; permanent deletion is not part of the current workflow.
 7. **Serialize writes per vault.** Do not run concurrent writers. Use an application-level lock or a single-writer queue.
 8. **Reject unsafe filenames.** Sanitize for cross-platform use, reject reserved Windows names (`CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`, `LPT1`-`LPT9`), trailing dots or spaces, and invalid characters. Detect case-insensitive collisions.
-9. **No recursive deletes.** Never follow symlinks during deletion. Never delete outside the vault.
+9. **No recursive deletes.** Never follow symlinks during trash or deletion. Never move or delete outside the vault. `trash/` is excluded from scans, identity, and reference resolution.
 10. **Read-only startup.** Application startup and index refresh must not write to the vault.
 11. **Watch for external changes.** Debounce file-watcher events, coalesce bursts, and ignore the application's own atomic writes.
 12. **Use tests, not the real vault.** All I/O tests use `tmp_path` or a fixture-created vault. Never touch a user's actual notes.

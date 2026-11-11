@@ -17,7 +17,7 @@ from markdown_it.token import Token
 import afanes.core.names
 from afanes.core.errors import InvalidReferenceError, ReferenceRewriteError
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType
+from afanes.models.note import NoteType, ReferenceCategory
 
 _SCHEME_PATTERN = re.compile(r"^(?P<scheme>[A-Za-z][A-Za-z0-9+.\-]*):(?P<name>.*)$", re.DOTALL)
 _LINK_DESTINATION_PATTERN = re.compile(r"\]\(\s*(?P<destination><[^>\n]*>|[^)\s]+)")
@@ -92,24 +92,32 @@ class ReferenceResolution:
     targets: tuple[Path, ...] = ()
 
 
-def scheme_for_note_type(note_type: NoteType) -> ReferenceScheme:
-    """Map a note type to the scheme that addresses it.
+def scheme_for_note(note_type: NoteType, category: ReferenceCategory | None = None) -> ReferenceScheme:
+    """Map a note type and optional category to the scheme that addresses it.
 
     Parameters
     ----------
     note_type : NoteType
         Type declared by the target note.
+    category : ReferenceCategory | None
+        Reference category when the note is a reference. ``None`` means an
+        uncategorized reference or a non-reference note.
 
     Returns
     -------
     ReferenceScheme
-        ``person`` for person notes, ``project`` for project notes, and
-        ``note`` for the document family.
+        ``person`` for a reference with category ``person``, ``project`` for a
+        project note, and ``note`` for the document family.
+
+    Notes
+    -----
+    A note belongs to exactly one scheme. A categorized reference is not also
+    addressable through the ``note`` scheme.
     """
-    if note_type is NoteType.PERSON:
-        return ReferenceScheme.PERSON
     if note_type is NoteType.PROJECT:
         return ReferenceScheme.PROJECT
+    if note_type is NoteType.REFERENCE and category is ReferenceCategory.PERSON:
+        return ReferenceScheme.PERSON
     return ReferenceScheme.NOTE
 
 
@@ -122,8 +130,9 @@ class NameCatalog:
     Build catalogs with :meth:`from_entries` rather than constructing the
     internal mapping by hand. A name may map to several paths when the vault
     contains duplicates; the catalog keeps every candidate so resolution can
-    report ambiguity instead of choosing one. All note types in the document
-    family share the ``note`` namespace.
+    report ambiguity instead of choosing one. ``note``, ``action``, and
+    uncategorized references share the ``note`` namespace; a categorized
+    reference belongs only to its category scheme.
     """
 
     _entries: dict[tuple[ReferenceScheme, str], tuple[Path, ...]]
@@ -131,25 +140,27 @@ class NameCatalog:
     @classmethod
     def from_entries(
         cls,
-        entries: Iterable[tuple[Path, NoteType]],
+        entries: Iterable[tuple[Path, NoteType, ReferenceCategory | None]],
     ) -> Self:
-        """Build a catalog from note paths and declared types.
+        """Build a catalog from note paths, types, and categories.
 
         Parameters
         ----------
-        entries : Iterable[tuple[Path, NoteType]]
-            Note path and declared type for every note in the vault.
+        entries : Iterable[tuple[Path, NoteType, ReferenceCategory | None]]
+            Note path, declared type, and optional reference category for
+            every note in the vault.
 
         Returns
         -------
         NameCatalog
             Catalog with normalized names, sorted candidate tuples, and
             deterministic iteration order. Names containing path syntax are
-            ignored so they can never resolve.
+            ignored so they can never resolve. Each note is indexed under
+            exactly one scheme.
         """
         grouped: dict[tuple[ReferenceScheme, str], list[Path]] = {}
-        for path, note_type in entries:
-            scheme = scheme_for_note_type(note_type)
+        for path, note_type, category in entries:
+            scheme = scheme_for_note(note_type, category)
             name = afanes.core.names.normalize_name(path.stem)
             if _has_path_syntax(name):
                 continue

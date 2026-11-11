@@ -77,12 +77,15 @@ class InboxView:
         Requests a repaint of the page. Tests pass a no-op or a counter.
     on_change_vault : Callable[[], Awaitable[None]]
         Command that opens the folder picker and switches the vault.
+    on_process : Callable[[Path], Awaitable[None]]
+        Command that opens the Processing Wizard for a selected capture.
     """
 
     def __init__(
         self,
         update: Callable[[], None],
         on_change_vault: Callable[[], Awaitable[None]],
+        on_process: Callable[[Path], Awaitable[None]],
     ) -> None:
         """Build the Inbox controls against the shared application state.
 
@@ -92,10 +95,13 @@ class InboxView:
             Requests a repaint of the page.
         on_change_vault : Callable[[], Awaitable[None]]
             Command that opens the folder picker and switches the vault.
+        on_process : Callable[[Path], Awaitable[None]]
+            Command that opens the Processing Wizard for a selected capture.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
         self._on_change_vault = on_change_vault
+        self._on_process = on_process
 
         self.progress = ft.ProgressRing(
             width=16,
@@ -170,6 +176,21 @@ class InboxView:
             on_tap_link=self.handle_link,
         )
         self.preview_body.visible = False
+        self.process_button = ft.FilledButton(
+            content=afanes.ui.strings.PROCESS_ACTION,
+            icon=ft.Icons.PLAY_ARROW,
+            on_click=self._process_selected,
+            disabled=True,
+            key="process-note",
+        )
+        self.preview_header = ft.Row(
+            controls=[
+                self.preview_title,
+                ft.Container(expand=True),
+                self.process_button,
+            ],
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
         self.preview_content = ft.Column(
             controls=[self.preview_empty, self.preview_body],
             scroll=ft.ScrollMode.AUTO,
@@ -178,7 +199,7 @@ class InboxView:
         )
         self.preview_panel = ft.Container(
             content=ft.Column(
-                controls=[self.preview_title, ft.Divider(), self.preview_content],
+                controls=[self.preview_header, ft.Divider(), self.preview_content],
                 expand=True,
             ),
             expand=True,
@@ -286,12 +307,20 @@ class InboxView:
         finally:
             self._set_working(working=False)
 
+    async def _process_selected(self) -> None:
+        """Open the Processing Wizard for the selected capture."""
+        path = self._state.selected
+        if path is None:
+            return
+        await self._on_process(path)
+
     def _set_working(self, *, working: bool) -> None:
         """Disable controls and show progress while a command runs."""
         self.progress.visible = working
         self.capture_button.disabled = working
         self.refresh_button.disabled = working
         self.change_button.disabled = working
+        self.process_button.disabled = working or self._state.selected is None
         self.composer.read_only = working
         self._update()
 
@@ -312,6 +341,7 @@ class InboxView:
             banners.append(_banner(afanes.ui.strings.scan_warning(len(state.failures), paths)))
         self.banners.controls = banners
         self.banners.visible = bool(banners)
+        self.process_button.disabled = state.selected is None
         if state.selected is None:
             self.preview_title.value = afanes.ui.strings.PREVIEW_TITLE
             self.preview_empty.visible = True
@@ -364,6 +394,7 @@ class InboxView:
 def build_inbox(
     update: Callable[[], None],
     on_change_vault: Callable[[], Awaitable[None]],
+    on_process: Callable[[Path], Awaitable[None]],
 ) -> ft.Control:
     """Build the Inbox view.
 
@@ -373,13 +404,15 @@ def build_inbox(
         Requests a repaint of the page.
     on_change_vault : Callable[[], Awaitable[None]]
         Command that opens the folder picker and switches the vault.
+    on_process : Callable[[Path], Awaitable[None]]
+        Command that opens the Processing Wizard for a selected capture.
 
     Returns
     -------
     ft.Control
         Composed Inbox layout.
     """
-    return InboxView(update, on_change_vault).build()
+    return InboxView(update, on_change_vault, on_process).build()
 
 
 def _banner(message: str) -> ft.Control:

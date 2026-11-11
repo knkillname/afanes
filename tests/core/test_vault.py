@@ -8,12 +8,12 @@ import pytest
 
 import afanes.core.atomic
 import afanes.core.vault
-from afanes.core.errors import EmptyCaptureError, NameCollisionError, VaultError, VaultPathError
+from afanes.core.errors import EmptyCaptureError, NameCollisionError, NoteParseError, VaultError, VaultPathError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import ResolutionOutcome
 from afanes.core.vault import ReferenceSite
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType
+from afanes.models.note import NoteType, ReferenceCategory, Status
 
 ONE = 1
 TWO = 2
@@ -26,9 +26,19 @@ def _write_note(
     body: str = "",
     people: tuple[str, ...] = (),
     project: str | None = None,
+    *,
+    category: str | None = None,
+    status: str | None = None,
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["---", f"type: {note_type}", "status: inbox"]
+    if note_type == "person":
+        note_type = "reference"
+        category = "person"
+    lines = ["---", f"type: {note_type}"]
+    if category is not None:
+        lines.append(f"category: {category}")
+    if status is not None:
+        lines.append(f"status: {status}")
     if people:
         lines.append("people:")
         lines.extend(f'  - "{value}"' for value in people)
@@ -96,6 +106,68 @@ class TestVaultService:
             vault.contained(link)
 
 
+class TestDirectoryFor:
+    def test_note_uses_inbox(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        assert afanes.core.vault.Vault(root).directory_for(NoteType.NOTE) == root / "inbox"
+
+    def test_action_uses_actions(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        assert afanes.core.vault.Vault(root).directory_for(NoteType.ACTION) == root / "actions"
+
+    def test_project_uses_projects(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        assert afanes.core.vault.Vault(root).directory_for(NoteType.PROJECT) == root / "projects"
+
+    def test_uncategorized_reference_uses_reference(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        assert afanes.core.vault.Vault(root).directory_for(NoteType.REFERENCE) == root / "reference"
+
+    def test_person_reference_uses_people(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        directory = afanes.core.vault.Vault(root).directory_for(NoteType.REFERENCE, ReferenceCategory.PERSON)
+
+        assert directory == root / "reference" / "people"
+
+    def test_reuses_an_existing_case_variant(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        (root / "Inbox").mkdir(parents=True)
+        (root / "reference" / "People").mkdir(parents=True)
+
+        vault = afanes.core.vault.Vault(root)
+        assert vault.directory_for(NoteType.NOTE) == root / "Inbox"
+        assert vault.directory_for(NoteType.REFERENCE, ReferenceCategory.PERSON) == root / "reference" / "People"
+
+    def test_does_not_create_directories(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.Vault(root)
+
+        vault.directory_for(NoteType.NOTE)
+        vault.directory_for(NoteType.ACTION)
+        vault.directory_for(NoteType.PROJECT)
+        vault.directory_for(NoteType.REFERENCE, ReferenceCategory.PERSON)
+
+        assert list(root.iterdir()) == []
+
+    def test_rejects_a_category_on_an_action(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        with pytest.raises(VaultError):
+            afanes.core.vault.Vault(root).directory_for(NoteType.ACTION, ReferenceCategory.PERSON)
+
+
 class TestScanVault:
     def test_finds_nested_notes_in_deterministic_order(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -110,6 +182,34 @@ class TestScanVault:
         _write_note(root / "Visible.md")
         snapshot = afanes.core.vault.Vault(root).scan()
         assert [note.name for note in snapshot.notes] == ["Visible"]
+
+    def test_skips_the_trash_directory(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "trash/Ada.md")
+        _write_note(root / "Trash/Bob.md")
+        _write_note(root / "Active.md")
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert [note.name for note in snapshot.notes] == ["Active"]
+
+    def test_trashed_names_can_be_reused(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "trash/Ada.md", "person")
+        active = _write_note(root / "reference/people/Ada.md", "person")
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        resolution = snapshot.catalog.resolve(NoteReference(scheme=ReferenceScheme.PERSON, name="Ada"))
+        assert resolution.outcome is ResolutionOutcome.RESOLVED
+        assert resolution.targets == (active,)
+
+    def test_reference_to_a_trashed_note_is_unresolved(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "trash/Ada.md", "person")
+        _write_note(root / "inbox/Note.md", body="[Ada](person:Ada)")
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        resolution = snapshot.catalog.resolve(NoteReference(scheme=ReferenceScheme.PERSON, name="Ada"))
+        assert resolution.outcome is ResolutionOutcome.UNRESOLVED
 
     def test_skips_a_symlink_that_escapes_the_vault(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -137,8 +237,46 @@ class TestScanVault:
         root = tmp_path / "vault"
         path = root / "NoType.md"
         path.parent.mkdir(parents=True)
-        path.write_text("---\nstatus: inbox\n---\n", encoding="utf-8")
+        path.write_text("---\nid: legacy\n---\n", encoding="utf-8")
         snapshot = afanes.core.vault.Vault(root).scan()
+        assert snapshot.notes == ()
+        assert len(snapshot.failures) == ONE
+
+    def test_records_category_and_status(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "people/Ada.md", "reference", category="person", status="later")
+        _write_note(root / "projects/Launch.md", "project", status="active")
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        by_name = {note.name: note for note in snapshot.notes}
+        assert by_name["Ada"].category is ReferenceCategory.PERSON
+        assert by_name["Ada"].status is Status.LATER
+        assert by_name["Launch"].category is None
+        assert by_name["Launch"].status is Status.ACTIVE
+
+    def test_reports_an_invalid_status(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Bad.md", "action", status="inbox")
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert snapshot.notes == ()
+        assert len(snapshot.failures) == ONE
+
+    def test_reports_legacy_person_type(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        path = root / "Ada.md"
+        path.parent.mkdir(parents=True)
+        path.write_text("---\ntype: person\n---\n", encoding="utf-8")
+        snapshot = afanes.core.vault.Vault(root).scan()
+
+        assert snapshot.notes == ()
+        assert len(snapshot.failures) == ONE
+
+    def test_reports_category_on_a_non_reference(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Bad.md", "action", category="person")
+        snapshot = afanes.core.vault.Vault(root).scan()
+
         assert snapshot.notes == ()
         assert len(snapshot.failures) == ONE
 
@@ -280,24 +418,70 @@ class TestCreateNote:
         assert path.name == "Q1 Planning.md"
         assert NoteDocument.from_text(path.read_text(encoding="utf-8")).note_type is NoteType.NOTE
 
+    def test_defaults_to_inbox_for_a_note(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.Vault(root).create("Ada", NoteType.NOTE)
+
+        assert path == root / "inbox" / "Ada.md"
+
+    def test_defaults_to_actions_for_an_action(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.Vault(root).create("Ada", NoteType.ACTION, status=Status.ACTIVE)
+
+        assert path == root / "actions" / "Ada.md"
+
+    def test_defaults_to_projects_for_a_project(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.Vault(root).create("Ada", NoteType.PROJECT, status=Status.ACTIVE)
+
+        assert path == root / "projects" / "Ada.md"
+
+    def test_defaults_to_reference_for_an_uncategorized_reference(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.Vault(root).create("Ada", NoteType.REFERENCE)
+
+        assert path == root / "reference" / "Ada.md"
+
+    def test_defaults_to_people_for_a_person_reference(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.Vault(root).create(
+            "Ada",
+            NoteType.REFERENCE,
+            category=ReferenceCategory.PERSON,
+        )
+
+        assert path == root / "reference" / "people" / "Ada.md"
+
     def test_suffixes_a_collision_within_the_scheme(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        afanes.core.vault.Vault(root).create("Ada", NoteType.PERSON)
-        second = afanes.core.vault.Vault(root).create("Ada", NoteType.PERSON)
+        afanes.core.vault.Vault(root).create("Ada", NoteType.REFERENCE, category=ReferenceCategory.PERSON)
+        second = afanes.core.vault.Vault(root).create("Ada", NoteType.REFERENCE, category=ReferenceCategory.PERSON)
         assert second.name == "Ada 2.md"
 
     def test_suffixes_a_collision_with_an_existing_file(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
-        (root / "Ada.txt").write_text("occupied", encoding="utf-8")
-        path = afanes.core.vault.Vault(root).create("Ada", NoteType.PERSON)
+        (root / "reference" / "people").mkdir(parents=True)
+        (root / "reference" / "people" / "Ada.txt").write_text("occupied", encoding="utf-8")
+        path = afanes.core.vault.Vault(root).create("Ada", NoteType.REFERENCE, category=ReferenceCategory.PERSON)
         assert path.name == "Ada 2.md"
 
     def test_allows_cross_scheme_reuse_in_different_directories(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        person = afanes.core.vault.Vault(root).create("Ada", NoteType.PERSON, directory=Path("people"))
+        person = afanes.core.vault.Vault(root).create(
+            "Ada", NoteType.REFERENCE, category=ReferenceCategory.PERSON, directory=Path("people")
+        )
         project = afanes.core.vault.Vault(root).create("Ada", NoteType.PROJECT, directory=Path("work"))
         assert person.name == "Ada.md"
         assert project.name == "Ada.md"
@@ -311,22 +495,29 @@ class TestCreateNote:
     def test_creates_a_missing_classification_directory(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        path = afanes.core.vault.Vault(root).create("Ada", NoteType.PERSON, directory=Path("people"))
+        path = afanes.core.vault.Vault(root).create(
+            "Ada", NoteType.REFERENCE, category=ReferenceCategory.PERSON, directory=Path("people")
+        )
         assert path.parent.is_dir()
 
     def test_rejects_a_directory_that_escapes_the_vault(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
         with pytest.raises(VaultPathError):
-            afanes.core.vault.Vault(root).create("Ada", NoteType.PERSON, directory=Path("../outside"))
+            afanes.core.vault.Vault(root).create(
+                "Ada", NoteType.REFERENCE, category=ReferenceCategory.PERSON, directory=Path("../outside")
+            )
 
     def test_new_note_is_valid_markdown(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        path = afanes.core.vault.Vault(root).create("Ada", NoteType.PERSON, body="Hello\n")
+        path = afanes.core.vault.Vault(root).create(
+            "Ada", NoteType.REFERENCE, category=ReferenceCategory.PERSON, body="Hello\n"
+        )
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
-        assert document.note_type is NoteType.PERSON
-        assert document.raw["status"] == "inbox"
+        assert document.note_type is NoteType.REFERENCE
+        assert document.category is ReferenceCategory.PERSON
+        assert "status" not in document.raw
         assert document.body == "Hello\n"
 
     def test_new_note_normalizes_line_endings_and_removes_a_bom(self, tmp_path: Path) -> None:
@@ -338,12 +529,30 @@ class TestCreateNote:
         assert not data.startswith(b"\xef\xbb\xbf")
         assert data.endswith(b"one\ntwo\n")
 
-    def test_status_none_omits_the_key(self, tmp_path: Path) -> None:
+    def test_default_omits_the_status_key(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        path = afanes.core.vault.Vault(root).create("Ada", NoteType.NOTE, status=None)
+        path = afanes.core.vault.Vault(root).create("Ada", NoteType.NOTE)
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
         assert document.raw == {"type": "note"}
+
+    def test_explicit_status_is_written(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        path = afanes.core.vault.Vault(root).create("Ada", NoteType.ACTION, status=Status.ACTIVE)
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.status is Status.ACTIVE
+
+    def test_rejects_a_category_on_a_non_reference(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        with pytest.raises(NoteParseError):
+            afanes.core.vault.Vault(root).create(
+                "Ada",
+                NoteType.ACTION,
+                category=ReferenceCategory.PERSON,
+            )
 
 
 class TestCaptureNote:
@@ -354,9 +563,19 @@ class TestCaptureNote:
         path = afanes.core.vault.Vault(root).capture("Buy milk")
 
         assert path == root / "inbox" / "Buy milk.md"
+        assert [entry.name for entry in root.iterdir()] == ["inbox"]
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
         assert document.raw == {"type": "note"}
         assert document.body == "Buy milk"
+
+    def test_reuses_an_existing_inbox_case_variant(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        (root / "Inbox").mkdir(parents=True)
+
+        path = afanes.core.vault.Vault(root).capture("Buy milk")
+
+        assert path == root / "Inbox" / "Buy milk.md"
+        assert not (root / "inbox").exists()
 
     def test_uses_the_first_non_blank_line_as_the_name(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -690,42 +909,73 @@ class TestApplyRename:
             afanes.core.vault.Vault(root).apply_rename(preview, confirm=True)
 
 
-class TestDeletion:
-    def test_reports_inbound_references(self, tmp_path: Path) -> None:
+class TestTrash:
+    def test_reports_inbound_references_and_destination(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         note = _write_note(root / "people/Ada.md", "person")
         _write_note(root / "inbox/One.md", body="[Ada](<person:Ada>)")
         _write_note(root / "inbox/Two.md", people=("person:Ada",))
-        preview = afanes.core.vault.Vault(root).plan_deletion(note)
+
+        preview = afanes.core.vault.Vault(root).plan_trash(note)
+
         assert preview.reference_count == TWO
         assert len(preview.affected_notes) == TWO
+        assert preview.trash_path == root / "trash" / "Ada.md"
+        assert not (root / "trash").exists()
 
     def test_requires_confirmation(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         note = _write_note(root / "people/Ada.md", "person")
+
         with pytest.raises(VaultError):
-            afanes.core.vault.Vault(root).delete(note)
+            afanes.core.vault.Vault(root).trash(note)
+
         assert note.exists()
 
-    def test_deletes_without_modifying_referring_notes(self, tmp_path: Path) -> None:
+    def test_moves_to_trash_without_modifying_referring_notes(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         note = _write_note(root / "people/Ada.md", "person")
         referring = _write_note(root / "inbox/Note.md", body="[Ada](<person:Ada>)")
-        before = referring.read_bytes()
-        count = afanes.core.vault.Vault(root).delete(note, confirm=True)
+        note_bytes = note.read_bytes()
+        referring_bytes = referring.read_bytes()
+
+        count = afanes.core.vault.Vault(root).trash(note, confirm=True)
+
+        trashed = root / "trash" / "Ada.md"
         assert count == ONE
         assert not note.exists()
-        assert referring.read_bytes() == before
+        assert trashed.read_bytes() == note_bytes
+        assert referring.read_bytes() == referring_bytes
 
-    def test_references_become_unresolved_after_deletion(self, tmp_path: Path) -> None:
+    def test_references_become_unresolved_after_trashing(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         note = _write_note(root / "people/Ada.md", "person")
-        afanes.core.vault.Vault(root).delete(note, confirm=True)
+        afanes.core.vault.Vault(root).trash(note, confirm=True)
         snapshot = afanes.core.vault.Vault(root).scan()
         result = snapshot.catalog.resolve(NoteReference(scheme=ReferenceScheme.PERSON, name="Ada"))
         assert result.outcome is ResolutionOutcome.UNRESOLVED
 
-    def test_deleting_an_unreferenced_note_reports_zero(self, tmp_path: Path) -> None:
+    def test_trashing_an_unreferenced_note_reports_zero(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         note = _write_note(root / "people/Ada.md", "person")
-        assert afanes.core.vault.Vault(root).delete(note, confirm=True) == 0
+        assert afanes.core.vault.Vault(root).trash(note, confirm=True) == 0
+
+    def test_reuses_an_existing_trash_case_variant(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        (root / "Trash").mkdir(parents=True)
+        note = _write_note(root / "people/Ada.md", "person")
+
+        afanes.core.vault.Vault(root).trash(note, confirm=True)
+
+        assert (root / "Trash" / "Ada.md").is_file()
+        assert not (root / "trash").exists()
+
+    def test_uses_a_unique_name_inside_trash(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        (root / "trash").mkdir(parents=True)
+        (root / "trash" / "Ada.md").write_text("older", encoding="utf-8")
+        note = _write_note(root / "people/Ada.md", "person")
+
+        afanes.core.vault.Vault(root).trash(note, confirm=True)
+
+        assert (root / "trash" / "Ada 2.md").is_file()

@@ -78,6 +78,17 @@ class TestImportBoundaries:
             assert module != "afanes"
             assert not module.startswith("afanes.")
 
+    def test_note_vocabulary_module_is_a_standard_library_leaf(self) -> None:
+        path = MODEL_ROOT / "note.py"
+        assert path.is_file()
+        for module, level in _imports(path):
+            assert level == 0
+            assert module != "afanes"
+            assert not module.startswith("afanes.")
+
+    def test_no_module_imports_a_person_model(self) -> None:
+        assert all("afanes.models.person" not in _first_party_imports(path) for path in _python_files(SOURCE_ROOT))
+
     def test_atomic_module_imports_only_the_standard_library_and_errors(self) -> None:
         path = CORE_ROOT / "atomic.py"
         assert path.is_file()

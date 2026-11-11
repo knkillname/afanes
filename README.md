@@ -34,8 +34,15 @@ directory and reopens it next time. The [Inbox](#inbox) then lists notes under `
 ## Vault format
 
 A vault is a directory of Markdown files. A note's filename stem is its name and title, and
-directories only classify; moving a note between folders never changes a reference. Internal
-references are standard Markdown links with a typed scheme:
+directories only classify; moving a note between folders never changes a reference.
+
+Notes use one of four types:
+
+- `note` is an unprocessed capture or a free-form document.
+- `action` is one actionable step.
+- `project` is an outcome made of action steps.
+- `reference` is non-actionable knowledge. A reference may declare a `category`; for example,
+  `category: person` marks a person page. People are reference notes, not a separate type.
 
 ```markdown
 ---
@@ -50,8 +57,38 @@ Ask [Ada Lovelace](<person:Ada Lovelace>) for the draft and file it under
 [Turing Machine](project:TuringMachine).
 ```
 
-Use `note:` for notes, actions, and references. Names are matched case-insensitively, so
-`[Ada](<person:ada lovelace>)` resolves to the same note.
+```markdown
+---
+type: reference
+category: person
+---
+
+Ada's contact page.
+```
+
+The default vault layout is:
+
+```text
+vault/
+  inbox/          captures
+  trash/          recoverable discards
+  reference/      non-actionable notes
+    people/       reference notes with category: person
+  projects/       project notes
+  actions/        action notes
+```
+
+These folders are conveniences, not requirements. Existing notes anywhere in the vault still
+resolve. Folders are created only when a write needs them. Notes under `trash/` are excluded from
+scans, name uniqueness, and reference resolution; moving a note back restores it.
+
+Actions and projects may use `active`, `waiting`, `done`, `cancelled`, `archived`, or `later`.
+References may omit status or use `later` or `archived`. A capture has no status; `status: inbox`
+is not valid because the folder is the queue.
+
+Use `person:` for reference notes with `category: person`, `project:` for project notes, and
+`note:` for notes, actions, and uncategorized references. A note belongs to exactly one scheme.
+Names are matched case-insensitively, so `[Ada](<person:ada lovelace>)` resolves to the same note.
 
 ## Inbox
 
@@ -59,7 +96,23 @@ Captures live in `inbox/`. Capturing a thought uses the first non-blank line as 
 writes the complete text as the body, with only `type: note` in the frontmatter. No status,
 project, people, or due date is inferred; clarification is a separate step.
 
-The Inbox lists every note under `inbox/`, newest first, and opens notes read-only.
+The Inbox lists every note under `inbox/`, newest first. Select a note to preview it read-only,
+then choose Process to open the wizard.
+
+## Processing
+
+Select a capture in the Inbox and choose Process. The wizard asks whether the thought is
+actionable. If it is not, choose Trash, Later, or Reference. If it is, choose a single Action or a
+multi-step Project, then set a status, optional due date, people, and a project where applicable.
+
+The preview shows the destination and any person or project references that do not have a page
+yet. Those references are allowed and resolve automatically when the page appears. Confirming
+writes the classified frontmatter atomically and then moves the note out of `inbox/`. A failed
+move leaves the note in the Inbox so the same plan can be retried.
+
+Project steps are action notes linked by the `project` key. Trash moves the note to `trash/`
+without rewriting any referring note; moving it back restores it and resolves its inbound
+references again.
 
 ## Changelog
 

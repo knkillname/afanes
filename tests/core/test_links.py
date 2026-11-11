@@ -11,7 +11,7 @@ import afanes.core.links
 from afanes.core.errors import InvalidReferenceError, ReferenceRewriteError
 from afanes.core.links import DestinationKind, NameCatalog, ResolutionOutcome
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType
+from afanes.models.note import NoteType, ReferenceCategory
 
 TWO_REWRITES = 2
 
@@ -150,24 +150,68 @@ class TestReferenceReader:
         assert afanes.core.links.ReferenceReader().extract(body) == []
 
 
+class TestSchemeForNote:
+    def test_person_category_maps_to_person(self) -> None:
+        assert afanes.core.links.scheme_for_note(NoteType.REFERENCE, ReferenceCategory.PERSON) is ReferenceScheme.PERSON
+
+    def test_uncategorized_reference_maps_to_note(self) -> None:
+        assert afanes.core.links.scheme_for_note(NoteType.REFERENCE, None) is ReferenceScheme.NOTE
+
+    def test_project_maps_to_project(self) -> None:
+        assert afanes.core.links.scheme_for_note(NoteType.PROJECT, None) is ReferenceScheme.PROJECT
+
+    def test_action_maps_to_note(self) -> None:
+        assert afanes.core.links.scheme_for_note(NoteType.ACTION, None) is ReferenceScheme.NOTE
+
+    def test_note_maps_to_note(self) -> None:
+        assert afanes.core.links.scheme_for_note(NoteType.NOTE, None) is ReferenceScheme.NOTE
+
+
 class TestCatalog:
     def test_maps_each_type_to_its_scheme(self) -> None:
         catalog = NameCatalog.from_entries(
             [
-                (Path("people/Ada.md"), NoteType.PERSON),
-                (Path("work/Turing.md"), NoteType.PROJECT),
-                (Path("inbox/Call.md"), NoteType.ACTION),
+                (Path("people/Ada.md"), NoteType.REFERENCE, ReferenceCategory.PERSON),
+                (Path("work/Turing.md"), NoteType.PROJECT, None),
+                (Path("inbox/Call.md"), NoteType.ACTION, None),
             ]
         )
         assert catalog.candidates(ReferenceScheme.PERSON, "ada") == (Path("people/Ada.md"),)
         assert catalog.candidates(ReferenceScheme.PROJECT, "turing") == (Path("work/Turing.md"),)
         assert catalog.candidates(ReferenceScheme.NOTE, "call") == (Path("inbox/Call.md"),)
 
+    def test_uncategorized_reference_stays_in_note_scheme(self) -> None:
+        target = Path("reference/Ada.md")
+        catalog = NameCatalog.from_entries([(target, NoteType.REFERENCE, None)])
+
+        assert catalog.candidates(ReferenceScheme.NOTE, "ada") == (target,)
+        assert catalog.candidates(ReferenceScheme.PERSON, "ada") == ()
+
+    def test_person_category_is_not_in_note_scheme(self) -> None:
+        target = Path("reference/people/Ada.md")
+        catalog = NameCatalog.from_entries([(target, NoteType.REFERENCE, ReferenceCategory.PERSON)])
+
+        assert catalog.candidates(ReferenceScheme.PERSON, "ada") == (target,)
+        assert catalog.candidates(ReferenceScheme.NOTE, "ada") == ()
+
+    def test_person_and_uncategorized_reference_can_share_a_name(self) -> None:
+        person = Path("reference/people/Ada.md")
+        reference = Path("reference/Ada.md")
+        catalog = NameCatalog.from_entries(
+            [
+                (person, NoteType.REFERENCE, ReferenceCategory.PERSON),
+                (reference, NoteType.REFERENCE, None),
+            ]
+        )
+
+        assert catalog.candidates(ReferenceScheme.PERSON, "ada") == (person,)
+        assert catalog.candidates(ReferenceScheme.NOTE, "ada") == (reference,)
+
     def test_allows_cross_scheme_name_reuse(self) -> None:
         catalog = NameCatalog.from_entries(
             [
-                (Path("people/Ada.md"), NoteType.PERSON),
-                (Path("work/Ada.md"), NoteType.PROJECT),
+                (Path("people/Ada.md"), NoteType.REFERENCE, ReferenceCategory.PERSON),
+                (Path("work/Ada.md"), NoteType.PROJECT, None),
             ]
         )
         assert catalog.candidates(ReferenceScheme.PERSON, "ada") == (Path("people/Ada.md"),)
@@ -176,24 +220,36 @@ class TestCatalog:
     def test_keeps_duplicate_names_as_multiple_candidates(self) -> None:
         first = Path("a/Ada.md")
         second = Path("b/Ada.md")
-        catalog = NameCatalog.from_entries([(first, NoteType.PERSON), (second, NoteType.PERSON)])
+        catalog = NameCatalog.from_entries(
+            [
+                (first, NoteType.REFERENCE, ReferenceCategory.PERSON),
+                (second, NoteType.REFERENCE, ReferenceCategory.PERSON),
+            ]
+        )
         assert catalog.candidates(ReferenceScheme.PERSON, "ada") == (first, second)
 
     def test_normalizes_case_and_unicode(self) -> None:
-        catalog = NameCatalog.from_entries([(Path("people/Jose\u0301.md"), NoteType.PERSON)])
+        catalog = NameCatalog.from_entries(
+            [(Path("people/Jose\u0301.md"), NoteType.REFERENCE, ReferenceCategory.PERSON)]
+        )
         assert catalog.candidates(ReferenceScheme.PERSON, "jos\u00e9") == (Path("people/Jose\u0301.md"),)
 
     def test_candidates_are_sorted_deterministically(self) -> None:
         first = Path("z/Ada.md")
         second = Path("a/Ada.md")
-        catalog = NameCatalog.from_entries([(first, NoteType.PERSON), (second, NoteType.PERSON)])
+        catalog = NameCatalog.from_entries(
+            [
+                (first, NoteType.REFERENCE, ReferenceCategory.PERSON),
+                (second, NoteType.REFERENCE, ReferenceCategory.PERSON),
+            ]
+        )
         assert catalog.candidates(ReferenceScheme.PERSON, "ada") == (second, first)
 
 
 class TestResolution:
     def test_resolves_a_unique_match(self) -> None:
         target = Path("people/Ada.md")
-        catalog = NameCatalog.from_entries([(target, NoteType.PERSON)])
+        catalog = NameCatalog.from_entries([(target, NoteType.REFERENCE, ReferenceCategory.PERSON)])
         result = catalog.resolve(NoteReference(scheme=ReferenceScheme.PERSON, name="ada"))
         assert result.outcome is ResolutionOutcome.RESOLVED
         assert result.targets == (target,)
@@ -207,26 +263,33 @@ class TestResolution:
     def test_reports_all_candidates_for_an_ambiguous_name(self) -> None:
         first = Path("a/Ada.md")
         second = Path("b/Ada.md")
-        catalog = NameCatalog.from_entries([(first, NoteType.PERSON), (second, NoteType.PERSON)])
+        catalog = NameCatalog.from_entries(
+            [
+                (first, NoteType.REFERENCE, ReferenceCategory.PERSON),
+                (second, NoteType.REFERENCE, ReferenceCategory.PERSON),
+            ]
+        )
         result = catalog.resolve(NoteReference(scheme=ReferenceScheme.PERSON, name="Ada"))
         assert result.outcome is ResolutionOutcome.AMBIGUOUS
         assert result.targets == (first, second)
 
     def test_namespaces_never_resolve_across_schemes(self) -> None:
-        catalog = NameCatalog.from_entries([(Path("work/Ada.md"), NoteType.PROJECT)])
+        catalog = NameCatalog.from_entries([(Path("work/Ada.md"), NoteType.PROJECT, None)])
         result = catalog.resolve(NoteReference(scheme=ReferenceScheme.PERSON, name="Ada"))
         assert result.outcome is ResolutionOutcome.UNRESOLVED
 
     def test_heals_when_a_matching_note_is_added(self) -> None:
         reference = NoteReference(scheme=ReferenceScheme.PERSON, name="Ada")
         before = NameCatalog.from_entries([]).resolve(reference)
-        after = NameCatalog.from_entries([(Path("people/Ada.md"), NoteType.PERSON)]).resolve(reference)
+        after = NameCatalog.from_entries(
+            [(Path("people/Ada.md"), NoteType.REFERENCE, ReferenceCategory.PERSON)]
+        ).resolve(reference)
         assert before.outcome is ResolutionOutcome.UNRESOLVED
         assert after.outcome is ResolutionOutcome.RESOLVED
 
     def test_dangles_when_a_matching_note_is_removed(self) -> None:
         reference = NoteReference(scheme=ReferenceScheme.PERSON, name="Ada")
-        catalog = NameCatalog.from_entries([(Path("people/Ada.md"), NoteType.PERSON)])
+        catalog = NameCatalog.from_entries([(Path("people/Ada.md"), NoteType.REFERENCE, ReferenceCategory.PERSON)])
         before = catalog.resolve(reference)
         after = NameCatalog.from_entries([]).resolve(reference)
         assert before.outcome is ResolutionOutcome.RESOLVED
@@ -234,7 +297,7 @@ class TestResolution:
 
     @pytest.mark.parametrize("name", ["../Ada", "people/Ada", "people\\Ada", "..", "..md"])
     def test_traversal_looking_names_match_nothing(self, name: str) -> None:
-        catalog = NameCatalog.from_entries([(Path("people/Ada.md"), NoteType.PERSON)])
+        catalog = NameCatalog.from_entries([(Path("people/Ada.md"), NoteType.REFERENCE, ReferenceCategory.PERSON)])
         result = catalog.resolve(NoteReference(scheme=ReferenceScheme.PERSON, name=name))
         assert result.outcome is ResolutionOutcome.UNRESOLVED
 
@@ -244,7 +307,7 @@ class TestResolution:
             raise AssertionError(message)
 
         monkeypatch.setattr(builtins, "open", fail)
-        catalog = NameCatalog.from_entries([(Path("people/Ada.md"), NoteType.PERSON)])
+        catalog = NameCatalog.from_entries([(Path("people/Ada.md"), NoteType.REFERENCE, ReferenceCategory.PERSON)])
         result = catalog.resolve(NoteReference(scheme=ReferenceScheme.PERSON, name="Ada"))
         assert result.outcome is ResolutionOutcome.RESOLVED
 

@@ -42,6 +42,10 @@ class NoteParseError(AfanesError):
     """Raised when a note's frontmatter or metadata cannot be parsed."""
 
 
+class ProcessingError(VaultError):
+    """Raised when a processing plan is invalid or cannot be applied."""
+
+
 class EmptyCaptureError(AfanesError):
     """Raised when a capture contains no non-blank text."""
 

@@ -7,6 +7,8 @@ Views and state read text from this module so the interface stays consistent
 and can be localized later. No UI copy belongs inline in a view.
 """
 
+from types import MappingProxyType
+
 APP_TITLE = "Afanes"
 
 WELCOME_TITLE = "Welcome to Afanes"
@@ -15,6 +17,32 @@ WELCOME_CHOOSE = "Choose vault"
 WELCOME_NOTE = "You can change the vault later."
 
 INBOX_TITLE = "Inbox"
+PROCESS_ACTION = "Process"
+PROCESSING_TITLE = "Process capture"
+PROCESSING_CAPTURE = "Capture"
+PROCESSING_OUTCOME_LABEL = "Outcome"
+PROCESSING_STATUS_LABEL = "Status"
+PROCESSING_DUE_DATE_LABEL = "Due date (YYYY-MM-DD)"
+PROCESSING_PEOPLE_LABEL = "People (comma-separated)"
+PROCESSING_PROJECT_LABEL = "Project"
+PROCESSING_PREVIEW_ACTION = "Preview"
+PROCESSING_CONFIRM_ACTION = "Confirm"
+PROCESSING_CANCEL_ACTION = "Cancel"
+PROCESSING_DONE_ACTION = "Done"
+PROCESSING_DESTINATION = "Destination: {path}"
+PROCESSING_PLAN_TITLE = "Ready to apply"
+PROCESSING_SUCCESS_TITLE = "Capture processed"
+PROCESSING_SUCCESS_BODY = "The note was moved to {path}."
+PROCESSING_UNRESOLVED = "Unresolved references: {names}"
+PROCESSING_SCHEME_WARNING = "{count} inbound references will become unresolved because the note changes scheme."
+PROCESSING_REFERENCE_WARNING = "{count} inbound references point to this capture and will become unresolved."
+PROCESSING_EMPTY_OUTCOME = "Choose an outcome before previewing."
+PROCESSING_INVALID_DATE = "Enter a due date as YYYY-MM-DD or leave it empty."
+PROCESSING_READ_FAILED = "Could not read this capture: {detail}"
+PROCESSING_PLAN_FAILED = "Could not prepare the processing preview: {detail}"
+PROCESSING_FAILED = "Could not process the capture: {detail}"
+PROCESSING_REFRESH_FAILED = "The capture was processed, but the Inbox could not be refreshed: {detail}"
+PROCESSING_MISSING = "This capture is no longer in the Inbox."
 NOTE_COUNT_ONE = "1 note"
 NOTE_COUNT_MANY = "{count} notes"
 COMPOSER_LABEL = "Capture a thought"
@@ -27,6 +55,26 @@ EMPTY_BODY = "Write a thought above. The first line becomes the title."
 PREVIEW_TITLE = "Preview"
 PREVIEW_EMPTY = "Select a note to read it."
 WORKING = "Working"
+
+PROCESSING_OUTCOME_LABELS = MappingProxyType(
+    {
+        "trash": "Trash",
+        "later": "Later",
+        "reference": "Reference",
+        "action": "Action",
+        "project": "Project",
+    }
+)
+PROCESSING_STATUS_LABELS = MappingProxyType(
+    {
+        "active": "Active",
+        "waiting": "Waiting",
+        "done": "Done",
+        "cancelled": "Cancelled",
+        "archived": "Archived",
+        "later": "Later",
+    }
+)
 
 CAPTURE_EMPTY = "Write a thought before capturing."
 CAPTURE_FAILED = "Could not capture the thought: {detail}"

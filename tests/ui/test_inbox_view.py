@@ -1,6 +1,7 @@
 """Tests for the welcome and Inbox views without a rendered window."""
 
 import asyncio
+import typing
 from pathlib import Path
 
 import flet as ft
@@ -28,6 +29,10 @@ async def _change_vault() -> None:
     return None
 
 
+async def _process(_path: Path) -> None:
+    return None
+
+
 class TestWelcomeView:
     def test_welcome_has_a_folder_action(self) -> None:
         control = afanes.ui.views.inbox.build_welcome(_change_vault)
@@ -52,7 +57,7 @@ class TestWelcomeView:
 
 class TestInboxView:
     def test_shows_the_composer_and_empty_state(self) -> None:
-        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault)
+        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
 
         assert view.composer.label == afanes.ui.strings.COMPOSER_LABEL
         assert view.capture_button.content == afanes.ui.strings.CAPTURE_ACTION
@@ -61,9 +66,10 @@ class TestInboxView:
         assert view.preview_empty.visible is True
         assert view.preview_body.visible is False
         assert view.banners.visible is False
+        assert view.process_button.disabled is True
 
     def test_build_returns_the_root_control(self) -> None:
-        control = afanes.ui.views.inbox.build_inbox(_noop, _change_vault)
+        control = afanes.ui.views.inbox.build_inbox(_noop, _change_vault, _process)
 
         assert isinstance(control, ft.Column)
 
@@ -83,7 +89,7 @@ class TestInboxView:
             await state.select_note(state.notes[0].path)
 
         asyncio.run(scenario())
-        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault)
+        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
 
         row = view.list_view.controls[0]
         assert isinstance(row, ft.ListTile)
@@ -92,17 +98,46 @@ class TestInboxView:
         assert view.preview_body.value == "Buy milk"
         assert view.preview_body.visible is True
         assert view.preview_body.on_tap_link is not None
+        assert view.process_button.disabled is False
 
         selected = state.selected
         view.handle_link()
         assert state.selected == selected
+
+    def test_process_button_calls_the_callback(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        monkeypatch.setattr(
+            afanes.core.settings,
+            "settings_path",
+            lambda: tmp_path / "settings.json",
+        )
+        state = afanes.ui.state.app_state
+        calls: list[Path] = []
+
+        async def process(path: Path) -> None:
+            calls.append(path)
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            await state.capture("Buy milk")
+            await state.select_note(state.notes[0].path)
+
+        asyncio.run(scenario())
+        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, process)
+
+        assert view.process_button.on_click is not None
+        handler = typing.cast("typing.Any", view.process_button.on_click)
+        asyncio.run(handler())
+
+        assert calls == [state.selected]
 
     def test_shows_message_and_scan_banners(self) -> None:
         state = afanes.ui.state.app_state
         state.message = "boom"
         state.failures = (VaultFailure(path=Path("inbox/Bad.md"), message="bad"),)
 
-        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault)
+        view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
 
         assert view.banners.visible is True
         assert len(view.banners.controls) == TWO_BANNERS

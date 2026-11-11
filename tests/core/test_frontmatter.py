@@ -2,14 +2,15 @@
 
 import pytest
 
+import afanes.models.note
 from afanes.core.errors import InvalidReferenceError, NoteParseError
 from afanes.core.frontmatter import NoteDocument
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType
+from afanes.models.note import NoteType, ReferenceCategory, Status
 
 CUSTOM_VALUE = 42
 SAMPLE = """---
-type: note
+type: action
 status: active
 people:
   - "person:Ada"
@@ -25,7 +26,8 @@ Body text.
 class TestParseDocument:
     def test_parses_metadata_body_and_references(self) -> None:
         document = NoteDocument.from_text(SAMPLE)
-        assert document.note_type is NoteType.NOTE
+        assert document.note_type is NoteType.ACTION
+        assert document.status is afanes.models.note.Status.ACTIVE
         assert document.has_frontmatter is True
         assert document.body == "\nBody text.\n"
         assert document.raw["status"] == "active"
@@ -69,8 +71,12 @@ class TestParseDocument:
         assert document.note_type is NoteType.ACTION
 
     def test_missing_type_is_reported_as_absent(self) -> None:
-        document = NoteDocument.from_text("---\nstatus: inbox\n---\n")
+        document = NoteDocument.from_text("---\nid: legacy\n---\n")
         assert document.note_type is None
+
+    def test_person_is_no_longer_a_note_type(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\ntype: person\n---\n")
 
     def test_malformed_yaml_is_rejected(self) -> None:
         with pytest.raises(NoteParseError):
@@ -99,6 +105,108 @@ class TestParseDocument:
     def test_non_string_key_is_rejected(self) -> None:
         with pytest.raises(NoteParseError):
             NoteDocument.from_text("---\n1: note\n---\n")
+
+
+class TestCategory:
+    def test_reference_accepts_a_person_category(self) -> None:
+        document = NoteDocument.from_text("---\ntype: reference\ncategory: person\n---\n")
+
+        assert document.category is ReferenceCategory.PERSON
+        assert document.raw["category"] == "person"
+
+    def test_uncategorized_reference_is_valid(self) -> None:
+        document = NoteDocument.from_text("---\ntype: reference\n---\n")
+
+        assert document.category is None
+
+    def test_category_is_normalized_to_lowercase(self) -> None:
+        document = NoteDocument.from_text("---\ntype: reference\ncategory: Person\n---\n")
+
+        assert document.category is ReferenceCategory.PERSON
+        assert "category: person" in document.to_text()
+
+    def test_unknown_category_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\ntype: reference\ncategory: place\n---\n")
+
+    def test_empty_category_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\ntype: reference\ncategory: ''\n---\n")
+
+    def test_null_category_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\ntype: reference\ncategory: null\n---\n")
+
+    def test_category_on_an_action_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\ntype: action\ncategory: person\n---\n")
+
+    def test_category_on_a_note_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\ntype: note\ncategory: person\n---\n")
+
+    def test_category_without_a_type_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\ncategory: person\n---\n")
+
+    def test_category_survives_a_round_trip(self) -> None:
+        document = NoteDocument.from_text("---\ntype: reference\ncategory: person\n---\n")
+
+        reparsed = NoteDocument.from_text(document.to_text())
+
+        assert reparsed.category is ReferenceCategory.PERSON
+
+
+class TestStatus:
+    @pytest.mark.parametrize("status", ["active", "waiting", "done", "cancelled", "archived", "later"])
+    def test_actions_accept_workflow_statuses(self, status: str) -> None:
+        document = NoteDocument.from_text(f"---\ntype: action\nstatus: {status}\n---\n")
+
+        assert document.status is Status(status)
+
+    @pytest.mark.parametrize("status", ["active", "waiting", "done", "cancelled", "archived", "later"])
+    def test_projects_accept_workflow_statuses(self, status: str) -> None:
+        document = NoteDocument.from_text(f"---\ntype: project\nstatus: {status}\n---\n")
+
+        assert document.status is Status(status)
+
+    @pytest.mark.parametrize("status", ["later", "archived"])
+    def test_references_accept_deferred_or_archived(self, status: str) -> None:
+        document = NoteDocument.from_text(f"---\ntype: reference\nstatus: {status}\n---\n")
+
+        assert document.status is Status(status)
+
+    def test_notes_reject_a_status(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\ntype: note\nstatus: active\n---\n")
+
+    def test_inbox_is_not_a_status(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\ntype: action\nstatus: inbox\n---\n")
+
+    def test_waiting_reference_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\ntype: reference\nstatus: waiting\n---\n")
+
+    def test_status_without_a_type_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\nstatus: active\n---\n")
+
+    def test_non_string_status_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\ntype: action\nstatus: 3\n---\n")
+
+    def test_null_status_is_treated_as_absent(self) -> None:
+        document = NoteDocument.from_text("---\ntype: action\nstatus: null\n---\n")
+
+        assert document.status is None
+
+    def test_status_survives_a_round_trip(self) -> None:
+        document = NoteDocument.from_text("---\ntype: action\nstatus: waiting\n---\n")
+
+        reparsed = NoteDocument.from_text(document.to_text())
+
+        assert reparsed.status is Status.WAITING
 
 
 class TestFrontmatterReferences:
@@ -167,6 +275,34 @@ class TestSerializeDocument:
         source = "---\r\ntype: note\r\n---\r\nBody\r\n"
         document = NoteDocument.from_text(source)
         assert document.to_text() == source
+
+
+class TestWithMetadata:
+    def test_replaces_metadata_and_preserves_the_body(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\ncustom: 42\n---\nBody\n")
+        updated = document.with_metadata({"type": "action", "status": "waiting", "custom": 42})
+
+        assert updated.note_type is NoteType.ACTION
+        assert updated.status is Status.WAITING
+        assert updated.raw["custom"] == CUSTOM_VALUE
+        assert updated.body == document.body
+        assert "type: action" in updated.to_text()
+        assert "status: waiting" in updated.to_text()
+
+    def test_revalidates_the_replacement(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n")
+
+        with pytest.raises(NoteParseError):
+            document.with_metadata({"type": "action", "status": "inbox"})
+
+    def test_does_not_retain_the_caller_mapping(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n")
+        raw: dict[str, object] = {"type": "action", "status": "active"}
+
+        updated = document.with_metadata(raw)
+        raw["status"] = "done"
+
+        assert updated.status is Status.ACTIVE
 
 
 class TestRewriteReferenceValues:

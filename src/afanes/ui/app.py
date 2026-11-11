@@ -11,6 +11,7 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.inbox
+import afanes.ui.views.processing
 
 
 async def main(page: ft.Page) -> None:
@@ -43,8 +44,16 @@ async def main(page: ft.Page) -> None:
         page.controls.clear()
         if state.vault_root is None:
             page.add(afanes.ui.views.inbox.build_welcome(choose_vault))
+        elif state.processing_note is not None or state.processing_result is not None:
+            page.add(
+                afanes.ui.views.processing.build_processing(
+                    page.update,
+                    cancel_processing,
+                    finish_processing,
+                )
+            )
         else:
-            page.add(afanes.ui.views.inbox.build_inbox(page.update, choose_vault))
+            page.add(afanes.ui.views.inbox.build_inbox(page.update, choose_vault, process_note))
         page.update()
 
     async def choose_vault() -> None:
@@ -56,6 +65,18 @@ async def main(page: ft.Page) -> None:
             await state.choose_vault(path)
         else:
             await state.change_vault(path)
+        await render()
+
+    async def process_note(path: Path) -> None:
+        await state.begin_processing(path)
+        await render()
+
+    async def cancel_processing() -> None:
+        state.cancel_processing()
+        await render()
+
+    async def finish_processing() -> None:
+        state.finish_processing()
         await render()
 
     await state.start()

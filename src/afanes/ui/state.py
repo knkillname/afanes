@@ -11,14 +11,17 @@ keeps a capture from overlapping a scan or a vault change.
 
 import asyncio
 import dataclasses
+import datetime
 import logging
 import os
 from pathlib import Path
 
 import afanes.ui.strings
 from afanes.core.errors import AfanesError, ConfigurationError, EmptyCaptureError, VaultError
+from afanes.core.processing import ProcessingOutcome, ProcessingPlan
 from afanes.core.settings import Settings, SettingsStore
 from afanes.core.vault import Vault, VaultFailure, VaultNote, VaultSnapshot
+from afanes.models.note import Status
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +46,14 @@ class AppState:
         Whether a blocking command is in progress.
     message : str | None
         Banner text for the current error or warning.
+    processing_note : Path | None
+        Capture currently open in the Processing Wizard.
+    processing_body : str | None
+        Markdown body of the processing capture.
+    processing_plan : ProcessingPlan | None
+        Validated plan waiting for confirmation.
+    processing_result : Path | None
+        Destination of the last successful processing apply.
 
     Notes
     -----
@@ -58,6 +69,10 @@ class AppState:
     preview_body: str | None = None
     busy: bool = False
     message: str | None = None
+    processing_note: Path | None = None
+    processing_body: str | None = None
+    processing_plan: ProcessingPlan | None = None
+    processing_result: Path | None = None
     _lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock, repr=False)
 
     @property
@@ -100,6 +115,7 @@ class AppState:
                     self._show_welcome(str(exc))
                     return
                 self.vault = vault
+                self._clear_processing()
                 self.selected = None
                 self.preview_body = None
                 self._apply_snapshot(snapshot)
@@ -141,6 +157,7 @@ class AppState:
                     self.message = afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail=str(exc))
                     return
                 self.vault = vault
+                self._clear_processing()
                 self.selected = None
                 self.preview_body = None
                 self._apply_snapshot(snapshot)
@@ -282,6 +299,167 @@ class AppState:
             finally:
                 self.busy = False
 
+    async def begin_processing(self, path: Path) -> bool:
+        """Open the Processing Wizard for an Inbox capture.
+
+        Parameters
+        ----------
+        path : Path
+            Absolute path of a note currently listed in the Inbox.
+
+        Returns
+        -------
+        bool
+            ``True`` when the capture body was read and the wizard can open.
+
+        Notes
+        -----
+        A capture that disappeared or cannot be read leaves the controller in
+        the Inbox with an actionable message. Blocking file I/O runs in a
+        worker thread.
+        """
+        async with self._lock:
+            vault = self.vault
+            if vault is None:
+                return False
+            if all(note.path != path for note in self.notes):
+                self.message = afanes.ui.strings.PROCESSING_MISSING
+                return False
+            self.busy = True
+            self.message = None
+            try:
+                try:
+                    body = await asyncio.to_thread(vault.read_body, path)
+                except (AfanesError, OSError, UnicodeError) as exc:
+                    logger.debug("Capture could not be read for processing", exc_info=True)
+                    self.message = afanes.ui.strings.PROCESSING_READ_FAILED.format(detail=str(exc))
+                    return False
+                self.processing_note = path
+                self.processing_body = body
+                self.processing_plan = None
+                self.processing_result = None
+                self.selected = path
+                self.preview_body = body
+                return True
+            finally:
+                self.busy = False
+
+    async def plan_processing(
+        self,
+        outcome: ProcessingOutcome,
+        *,
+        status: Status | None = None,
+        due_date: datetime.date | None = None,
+        people: tuple[str, ...] = (),
+        project: str | None = None,
+    ) -> ProcessingPlan | None:
+        """Build a processing preview for the open capture.
+
+        Parameters
+        ----------
+        outcome : ProcessingOutcome
+            Selected clarification outcome.
+        status : Status | None
+            Requested target status, when the outcome accepts one.
+        due_date : datetime.date | None
+            Optional calendar due date for an action or project.
+        people : tuple[str, ...]
+            Person names assigned to the target.
+        project : str | None
+            Project name assigned to an action.
+
+        Returns
+        -------
+        ProcessingPlan | None
+            The validated plan, or ``None`` when planning failed.
+
+        Notes
+        -----
+        Planning never writes. The plan is retained in
+        :attr:`processing_plan` for the preview and confirmation step. Blocking
+        file I/O runs in a worker thread.
+        """
+        async with self._lock:
+            vault = self.vault
+            note = self.processing_note
+            if vault is None or note is None:
+                return None
+            self.busy = True
+            self.message = None
+            try:
+                try:
+                    plan = await asyncio.to_thread(
+                        vault.plan_processing,
+                        note,
+                        outcome,
+                        status=status,
+                        due_date=due_date,
+                        people=people,
+                        project=project,
+                    )
+                except (AfanesError, OSError) as exc:
+                    logger.debug("Processing plan failed", exc_info=True)
+                    self.processing_plan = None
+                    self.message = afanes.ui.strings.PROCESSING_PLAN_FAILED.format(detail=str(exc))
+                    return None
+                self.processing_plan = plan
+                return plan
+            finally:
+                self.busy = False
+
+    async def apply_processing(self) -> Path | None:
+        """Apply the current processing plan after confirmation.
+
+        Returns
+        -------
+        Path | None
+            Destination path on success, or ``None`` when the apply failed.
+
+        Notes
+        -----
+        A successful apply leaves the wizard in a success state and refreshes
+        the Inbox. A failed apply keeps the plan so the user can retry. Blocking
+        writes and scans run in a worker thread.
+        """
+        async with self._lock:
+            vault = self.vault
+            plan = self.processing_plan
+            if vault is None or plan is None:
+                return None
+            self.busy = True
+            self.message = None
+            try:
+                try:
+                    target = await asyncio.to_thread(vault.apply_processing, plan, confirm=True)
+                except (AfanesError, OSError) as exc:
+                    logger.debug("Processing apply failed", exc_info=True)
+                    self.message = afanes.ui.strings.PROCESSING_FAILED.format(detail=str(exc))
+                    return None
+                try:
+                    snapshot = await asyncio.to_thread(vault.scan)
+                except (VaultError, OSError) as exc:
+                    logger.debug("Inbox refresh after processing failed", exc_info=True)
+                    self.message = afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail=str(exc))
+                else:
+                    self._apply_snapshot(snapshot)
+                self._clear_processing()
+                self.selected = None
+                self.preview_body = None
+                self.processing_result = target
+                return target
+            finally:
+                self.busy = False
+
+    def cancel_processing(self) -> None:
+        """Close the wizard and discard its unsaved plan."""
+        self._clear_processing()
+        self.message = None
+
+    def finish_processing(self) -> None:
+        """Close the success state and return to the Inbox."""
+        self._clear_processing()
+        self.message = None
+
     def reset(self) -> None:
         """Return the controller to its initial state.
 
@@ -297,7 +475,15 @@ class AppState:
         self.preview_body = None
         self.busy = False
         self.message = None
+        self._clear_processing()
         self._lock = asyncio.Lock()
+
+    def _clear_processing(self) -> None:
+        """Clear the Processing Wizard session fields."""
+        self.processing_note = None
+        self.processing_body = None
+        self.processing_plan = None
+        self.processing_result = None
 
     def _open_vault(self, path: Path) -> Vault:
         """Open a vault and map filesystem failures to user-facing errors.
@@ -336,6 +522,7 @@ class AppState:
         self.failures = ()
         self.selected = None
         self.preview_body = None
+        self._clear_processing()
         self.message = message
 
     def _apply_snapshot(self, snapshot: VaultSnapshot, focus: Path | None = None) -> None:

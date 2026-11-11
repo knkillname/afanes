@@ -1,6 +1,7 @@
 """Tests for the single application state controller."""
 
 import asyncio
+import datetime
 import json
 import os
 import threading
@@ -14,6 +15,7 @@ import afanes.ui.state
 import afanes.ui.strings
 from afanes.core.errors import ConfigurationError, VaultError
 from afanes.core.frontmatter import NoteDocument
+from afanes.core.processing import ProcessingOutcome
 from afanes.core.settings import Settings, SettingsStore
 
 OLD_NS = 1_700_000_000_000_000_000
@@ -46,6 +48,202 @@ def _note_text(body: str) -> str:
 
 def _tree_state(root: Path) -> dict[str, bytes]:
     return {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+
+
+class TestProcessingState:
+    def test_begin_processing_loads_the_capture(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[bool, Path]:
+            await state.choose_vault(vault)
+            capture = await state.capture("Buy milk")
+            assert capture is not None
+            opened = await state.begin_processing(capture)
+            return opened, capture
+
+        opened, capture = asyncio.run(scenario())
+
+        assert opened is True
+        assert state.processing_note == capture
+        assert state.processing_body == "Buy milk"
+        assert state.selected == capture
+
+    def test_begin_processing_rejects_a_missing_capture(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            return await state.begin_processing(vault / "inbox" / "Missing.md")
+
+        opened = asyncio.run(scenario())
+
+        assert opened is False
+        assert state.message == afanes.ui.strings.PROCESSING_MISSING
+
+    def test_begin_processing_performs_no_writes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> dict[str, bytes]:
+            await state.choose_vault(vault)
+            capture = await state.capture("Buy milk")
+            assert capture is not None
+            before = _tree_state(vault)
+            await state.begin_processing(capture)
+            return before
+
+        before = asyncio.run(scenario())
+
+        assert _tree_state(vault) == before
+
+    def test_plan_processing_builds_a_plan_without_writing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            capture = await state.capture("Buy milk")
+            assert capture is not None
+            await state.begin_processing(capture)
+            plan = await state.plan_processing(ProcessingOutcome.ACTION)
+            assert plan is not None
+            assert state.processing_plan is plan
+
+        asyncio.run(scenario())
+
+        assert not (vault / "actions" / "Buy milk.md").exists()
+
+    def test_plan_processing_failure_sets_a_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            capture = await state.capture("Buy milk")
+            assert capture is not None
+            await state.begin_processing(capture)
+            plan = await state.plan_processing(
+                ProcessingOutcome.REFERENCE,
+                due_date=datetime.date(2026, 11, 20),
+            )
+            assert plan is None
+
+        asyncio.run(scenario())
+
+        assert state.processing_plan is None
+        assert state.message is not None
+        assert state.message.startswith("Could not prepare")
+
+    def test_apply_processing_moves_the_capture(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> Path:
+            await state.choose_vault(vault)
+            capture = await state.capture("Buy milk")
+            assert capture is not None
+            await state.begin_processing(capture)
+            await state.plan_processing(ProcessingOutcome.ACTION)
+            target = await state.apply_processing()
+            assert target is not None
+            return target
+
+        target = asyncio.run(scenario())
+
+        assert target == vault / "actions" / "Buy milk.md"
+        assert target.exists()
+        assert state.processing_result == target
+        assert state.processing_note is None
+        assert state.processing_plan is None
+        assert state.notes == ()
+
+    def test_apply_processing_failure_keeps_the_plan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        capture_path: Path | None = None
+
+        async def scenario() -> None:
+            nonlocal capture_path
+            await state.choose_vault(vault)
+            capture_path = await state.capture("Buy milk")
+            assert capture_path is not None
+            await state.begin_processing(capture_path)
+            await state.plan_processing(ProcessingOutcome.ACTION)
+
+        asyncio.run(scenario())
+
+        def fail_apply(_vault: object, _plan: object, **_kwargs: object) -> Path:
+            message = "write failed"
+            raise VaultError(message)
+
+        monkeypatch.setattr(afanes.core.vault.Vault, "apply_processing", fail_apply)
+        result = asyncio.run(state.apply_processing())
+
+        assert result is None
+        assert state.processing_plan is not None
+        assert state.message is not None
+        assert capture_path is not None
+        assert capture_path.exists()
+
+    def test_cancel_processing_clears_the_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            capture = await state.capture("Buy milk")
+            assert capture is not None
+            await state.begin_processing(capture)
+            await state.plan_processing(ProcessingOutcome.ACTION)
+            state.cancel_processing()
+
+        asyncio.run(scenario())
+
+        assert state.processing_note is None
+        assert state.processing_body is None
+        assert state.processing_plan is None
+        assert state.processing_result is None
+        assert state.message is None
+
+    def test_finish_processing_clears_the_success_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            capture = await state.capture("Buy milk")
+            assert capture is not None
+            await state.begin_processing(capture)
+            await state.plan_processing(ProcessingOutcome.ACTION)
+            await state.apply_processing()
+            state.finish_processing()
+
+        asyncio.run(scenario())
+
+        assert state.processing_result is None
+        assert state.processing_note is None
 
 
 class TestStartup:

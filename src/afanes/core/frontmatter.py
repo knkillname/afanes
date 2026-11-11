@@ -16,9 +16,10 @@ import yaml
 from yaml import YAMLError
 
 import afanes.core.links
+import afanes.models.note
 from afanes.core.errors import InvalidReferenceError, NoteParseError
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType
+from afanes.models.note import NoteType, ReferenceCategory, Status
 
 # Public canonical frontmatter delimiter.
 FRONTMATTER_FENCE = "---"
@@ -42,6 +43,11 @@ class NoteDocument:
         Declared type, or ``None`` when the note has no ``type`` key.
     references : tuple[NoteReference, ...]
         References declared by the ``people`` and ``project`` values.
+    category : ReferenceCategory | None
+        Reference category, or ``None`` for an uncategorized reference or a
+        non-reference note.
+    status : Status | None
+        Validated workflow status, or ``None`` when the key is absent.
 
     Notes
     -----
@@ -56,6 +62,8 @@ class NoteDocument:
     has_frontmatter: bool
     note_type: NoteType | None
     references: tuple[NoteReference, ...]
+    category: ReferenceCategory | None = None
+    status: Status | None = None
 
     @classmethod
     def from_text(cls, text: str) -> Self:
@@ -77,8 +85,9 @@ class NoteDocument:
         ------
         NoteParseError
             If the opening fence is never closed, the YAML is malformed or is
-            not a mapping, a key is not a string, or the declared type is
-            unknown.
+            not a mapping, a key is not a string, the declared type is unknown,
+            the category is invalid or misplaced, or the status is unknown or
+            not valid for the declared type.
         InvalidReferenceError
             If ``people`` or ``project`` is not made of valid scheme
             references.
@@ -90,13 +99,18 @@ class NoteDocument:
         """
         raw, body, has_frontmatter = cls._split_frontmatter(text)
         newline = "\r\n" if "\r\n" in text else "\n"
+        note_type = cls._declared_note_type(raw)
+        category = cls._declared_category(raw, note_type)
+        status = cls._declared_status(raw, note_type)
         return cls(
             raw=raw,
             body=body,
             newline=newline,
             has_frontmatter=has_frontmatter,
-            note_type=cls._declared_note_type(raw),
+            note_type=note_type,
             references=cls._references_from_raw(raw),
+            category=category,
+            status=status,
         )
 
     def to_text(self) -> str:
@@ -143,6 +157,49 @@ class NoteDocument:
             New document instance; the original is unchanged.
         """
         return dataclasses.replace(self, body=body)
+
+    def with_metadata(self, raw: dict[str, object]) -> Self:
+        """Return a copy with replaced frontmatter, revalidated.
+
+        Parameters
+        ----------
+        raw : dict[str, object]
+            New frontmatter mapping. The mapping is copied before validation;
+            the caller's dictionary is not retained.
+
+        Returns
+        -------
+        NoteDocument
+            New document with the replacement metadata and the original body,
+            newline style, and frontmatter presence.
+
+        Raises
+        ------
+        NoteParseError
+            If the replacement metadata has an unknown type, an invalid
+            category or status, or malformed values.
+        InvalidReferenceError
+            If ``people`` or ``project`` is not made of valid scheme
+            references.
+
+        Notes
+        -----
+        Unknown keys are preserved. Category and status values are normalized
+        to their canonical lowercase forms.
+        """
+        new_raw = dict(raw)
+        note_type = self._declared_note_type(new_raw)
+        category = self._declared_category(new_raw, note_type)
+        status = self._declared_status(new_raw, note_type)
+        references = self._references_from_raw(new_raw)
+        return dataclasses.replace(
+            self,
+            raw=new_raw,
+            note_type=note_type,
+            category=category,
+            status=status,
+            references=references,
+        )
 
     def rewrite_references(self, old: NoteReference, new: NoteReference) -> tuple[Self, int]:
         """Rewrite matching frontmatter reference values.
@@ -262,6 +319,57 @@ class NoteDocument:
         except ValueError as exc:
             message = f"Unknown note type: {value!r}"
             raise NoteParseError(message) from exc
+
+    @staticmethod
+    def _declared_category(
+        raw: dict[str, object],
+        note_type: NoteType | None,
+    ) -> ReferenceCategory | None:
+        """Return the validated reference category, or ``None`` when absent."""
+        if "category" not in raw:
+            return None
+        value = raw["category"]
+        if not isinstance(value, str) or not value.strip():
+            message = "Frontmatter category must be a non-empty string"
+            raise NoteParseError(message)
+        if note_type is not NoteType.REFERENCE:
+            message = "Frontmatter category is only valid on reference notes"
+            raise NoteParseError(message)
+        try:
+            category = ReferenceCategory(value.strip().casefold())
+        except ValueError as exc:
+            message = f"Unknown reference category: {value!r}"
+            raise NoteParseError(message) from exc
+        raw["category"] = category.value
+        return category
+
+    @staticmethod
+    def _declared_status(
+        raw: dict[str, object],
+        note_type: NoteType | None,
+    ) -> Status | None:
+        """Return the validated workflow status, or ``None`` when absent."""
+        if "status" not in raw:
+            return None
+        value = raw["status"]
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            message = "Frontmatter status must be a string"
+            raise NoteParseError(message)
+        try:
+            status = Status(value)
+        except ValueError as exc:
+            message = f"Unknown note status: {value!r}"
+            raise NoteParseError(message) from exc
+        if note_type is None:
+            message = "Frontmatter status requires a note type"
+            raise NoteParseError(message)
+        if status not in afanes.models.note.allowed_statuses(note_type):
+            message = f"Status {value!r} is not valid for {note_type.value} notes"
+            raise NoteParseError(message)
+        raw["status"] = status.value
+        return status
 
     @staticmethod
     def _references_from_raw(raw: dict[str, object]) -> tuple[NoteReference, ...]:

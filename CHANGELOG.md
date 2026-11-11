@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-11
+
+### Added
+
+- A processing model that clarifies an inbox capture into Trash, Later, Reference, Action, or Project, with preview, confirmation, metadata, and atomic apply.
+- A default vault layout: `inbox/`, `trash/`, `reference/` with category folders, `projects/`, and `actions/`.
+- Recoverable trash under `trash/`; trashed notes are excluded from scans and reference resolution.
+- Reference categories: people are `type: reference` notes with `category: person`, with a path for future categories such as places.
+- A Processing Wizard in the desktop interface and a Process action in the Inbox.
+- Main specifications for the `processing`, `vault-layout`, and `reference-categories` capabilities.
+
+### Changed
+
+- `NoteType` now contains `note`, `action`, `project`, and `reference`; `person` is no longer a standalone type.
+- `person:` references resolve to reference notes with `category: person`; `note:` covers notes, actions, and uncategorized references. One note belongs to one scheme.
+- Status vocabulary is `active`, `waiting`, `done`, `cancelled`, `archived`, and `later`; `inbox` is no longer a status.
+- Default creation destinations follow the new vault layout, with case-insensitive folder reuse and lazy creation.
+- Vault deletion is replaced by recoverable `Vault.plan_trash` and `Vault.trash` operations.
+
+### Removed
+
+- The public `Vault.plan_deletion` and `Vault.delete` methods. Use `Vault.plan_trash` and `Vault.trash` instead.
+- `NoteType.PERSON`; convert legacy notes to `type: reference` with `category: person`.
+- `status: inbox`; captures have no status and the folder is the queue.
+
 ## [0.2.1] - 2026-11-11
 
 ### Changed
