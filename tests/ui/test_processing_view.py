@@ -199,6 +199,42 @@ class TestProcessingView:
         ]
         assert view.template.value == "empty"
 
+    def test_template_options_refresh_when_the_catalog_changes(self) -> None:
+        state = _open_capture()
+        state.processing.cards = (_card(),)
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        state.processing.cards = (_card(title="Place", category="place", path="place.md"),)
+        view.outcome.value = ProcessingOutcome.REFERENCE.value
+
+        _select_outcome(view)
+
+        assert [option.key for option in view.template.options] == ["card:place.md", "empty"]
+
+    def test_refresh_keeps_a_valid_template_selection(self) -> None:
+        state = _open_capture()
+        state.processing.cards = (_card(),)
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.template.value = "card:person.md"
+        state.processing.cards = (_card(), _card(title="Place", category="place", path="place.md"))
+        view.outcome.value = ProcessingOutcome.REFERENCE.value
+
+        _select_outcome(view)
+
+        assert view.template.value == "card:person.md"
+
+    def test_refresh_resets_a_removed_template_to_empty(self) -> None:
+        state = _open_capture()
+        state.processing.cards = (_card(),)
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.template.value = "card:person.md"
+        state.processing.cards = ()
+        view.outcome.value = ProcessingOutcome.REFERENCE.value
+
+        _select_outcome(view)
+
+        assert view.template.value == "empty"
+        assert [option.key for option in view.template.options] == ["empty"]
+
     def test_selecting_a_card_shows_its_description(self) -> None:
         state = _open_capture()
         state.processing.cards = (_card(description="A contact."),)
