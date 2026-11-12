@@ -96,23 +96,49 @@ class ProcessingState:
             self.status.clear_message()
             try:
                 try:
-                    body = await asyncio.to_thread(vault.read_body, path)
+                    await self.load(path)
                 except (AfanesError, OSError, UnicodeError) as exc:
                     logger.debug("Capture could not be read for processing", exc_info=True)
                     self.status.show_message(afanes.ui.strings.PROCESSING_READ_FAILED.format(detail=str(exc)))
                     return False
-                listing = await asyncio.to_thread(self._load_cards, vault)
-                self.note = path
-                self.body = body
-                self.plan = None
-                self.result = None
-                self.cards = listing.cards
-                self.card_issues = listing.issues
-                self.session.selected = path
-                self.session.preview_body = body
                 return True
             finally:
                 self.status.set_busy(busy=False)
+
+    async def load(self, path: Path) -> None:
+        """Load a capture and its template cards into the wizard.
+
+        Parameters
+        ----------
+        path : Path
+            Absolute path of the capture to read.
+
+        Raises
+        ------
+        VaultError
+            When no vault is open.
+        AfanesError, OSError, UnicodeError
+            Propagated from reading the capture body or template cards.
+
+        Notes
+        -----
+        Callers own the command lock, busy flag, and user-facing error
+        messages. Blocking reads run in worker threads. The wizard fields are
+        updated only after both reads succeed.
+        """
+        vault = self.session.vault
+        if vault is None:
+            raise VaultError(afanes.ui.strings.VAULT_MISSING)
+        body = await asyncio.to_thread(vault.read_body, path)
+        listing = await asyncio.to_thread(self._load_cards, vault)
+        self.note = path
+        self.body = body
+        self.plan = None
+        self.result = None
+        self.cards = listing.cards
+        self.card_issues = listing.issues
+        self.session.selected = path
+        self.session.preview_body = body
 
     async def build_plan(
         self,
