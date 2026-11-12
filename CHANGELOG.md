@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- A Sphinx documentation site under `docs/` with MyST Markdown, the Furo theme, getting-started, guide, reference, contributor, and API pages, four screenshots, a docs-style test, and local `hatch run docs:build` / `hatch run docs:serve` commands. The API reference covers all public `models/` and `core/` modules. This implements the `add-documentation-site` OpenSpec change.
+- A per-change documentation review rule in `AGENTS.md` and the OpenSpec archive guidance: every change updates the affected docs page or records why no user-facing documentation changed.
+
+### Changed
+
+- `README.md` is now a landing page; the user manual, vault format, build guide, and contributor material moved into `docs/`. Documentation headings in `README.md` and `docs/` use a curated emoji palette, with `tl;dr`, Tip, Warning, and Remember admonitions.
+- Development dependencies gain Sphinx 9.2.0, MyST-Parser 5.2.0, Furo 2025.12.19, sphinx-design 0.8.0, sphinx-copybutton 0.5.2, and sphinx-autobuild 2025.8.25. They are dev-only; the runtime dependency set is unchanged.
+
 ## [0.5.2] - 2026-11-12
 
 ### Added

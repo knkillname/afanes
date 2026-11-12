@@ -423,9 +423,9 @@ class TestWorkspaceLiveness:
 
 
 class TestDocumentedExamples:
-    def test_readme_project_example_parses(self) -> None:
-        readme = Path(__file__).resolve().parents[2] / "README.md"
-        text = readme.read_text(encoding="utf-8")
+    def test_project_example_parses(self) -> None:
+        page = Path(__file__).resolve().parents[2] / "docs" / "reference" / "vault-format.md"
+        text = page.read_text(encoding="utf-8")
         marker = "---\ntype: project\nstatus: active\ndue_date: 2026-11-30\n---\n"
         start = text.index(marker)
         end = text.index("```", start)
@@ -442,6 +442,36 @@ class TestDocumentedExamples:
         assert steps[1].owners == ("Ada Lovelace",)
         assert steps[2].checked is True
         assert steps[2].actual == datetime.date(2026, 11, 15)
+
+    def test_capture_example_parses(self) -> None:
+        page = Path(__file__).resolve().parents[2] / "docs" / "getting-started" / "capture-clarify-review.md"
+        text = page.read_text(encoding="utf-8")
+        marker = "---\ntype: note\n---\n"
+        start = text.index(marker)
+        end = text.index("```", start)
+        document = NoteDocument.from_text(text[start:end])
+
+        assert document.note_type is NoteType.NOTE
+        assert document.title == "Call Ada"
+        assert document.status is None
+        assert "about the invoice" in document.body
+
+    def test_step_metadata_example_parses(self) -> None:
+        page = Path(__file__).resolve().parents[2] / "docs" / "guide" / "projects-and-steps.md"
+        text = page.read_text(encoding="utf-8")
+        marker = "- [ ] Call the plumber"
+        start = text.index(marker)
+        end = text.index("\n", start)
+        steps = StepDocument(text[start:end]).steps
+
+        assert len(steps) == 1
+        step = steps[0]
+        assert step.text == "Call the plumber"
+        assert step.checked is False
+        assert step.owners == ("Ada",)
+        assert step.plan == datetime.date(2026, 11, 20)
+        assert step.actual == datetime.date(2026, 11, 14)
+        assert step.tags == ("phone",)
 
 
 class TestStepAwareProjectPageIntegration:

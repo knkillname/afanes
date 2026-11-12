@@ -4,7 +4,7 @@
 
 **Status:** Operating manual. Change this file only through an OpenSpec change or explicit maintainer direction.
 
-**Read order:** `AGENTS.md` -> `README.md` -> `CHANGELOG.md` -> `pyproject.toml` -> `openspec/specs/` -> active change in `openspec/changes/` -> code and tests.
+**Read order:** `AGENTS.md` -> `README.md` -> `docs/develop/documentation.md` -> `CHANGELOG.md` -> `pyproject.toml` -> `openspec/specs/` -> active change in `openspec/changes/` -> code and tests.
 
 **Precedence:** explicit user instruction > OpenSpec behavior specs > this file > local code patterns. If sources conflict, stop and ask.
 
@@ -18,7 +18,7 @@
 - Flow: capture -> clarify -> browse -> review. Three note types: `note` (Inbox capture), `reference` (optional free-form `category`), `project` (body holds Markdown task-list steps). Filename stem is identity; the first H1 is the display title.
 - Default layout: `inbox/`, `trash/`, `reference/<category>/`, `projects/`. Folders are conventions, not requirements. `trash/` is excluded from scans and reference resolution.
 - Current state: there is no SQLite index. Each vault is scanned into an in-memory `VaultSnapshot`; `core/search.py` derives browser, project, and review views from it. Do not add `indexer`, `afanes index`, or `afanes doctor` without an approved change.
-- Behavior details belong to `openspec/specs/*/spec.md` and `README.md`; do not duplicate or re-derive them here.
+- Behavior details belong to `openspec/specs/*/spec.md` (normative) and `docs/` (user-facing narrative); `README.md` is the landing page. Do not duplicate or re-derive them here.
 - UI: Flet 1.x. The desktop window is the default; `--web` is explicit, loopback-only, and single-session. The first development desktop run may fetch the Flet client once as provisioning; packaged builds bundle it.
 
 ## 2. Environment and commands
@@ -31,6 +31,8 @@ hatch run afanes                    # desktop
 hatch run afanes --web              # loopback browser
 hatch check                         # Ruff lint + format check + Pyrefly strict
 hatch check --fix                   # lint/format fixes only; types need manual fixes
+hatch run docs:build                # Sphinx documentation; warnings are errors
+hatch run docs:serve                # local documentation preview
 hatch test --cover                  # coverage; fail_under = 85
 hatch test tests/core/vault/test_service.py::TestVaultOpen::test_opens_an_existing_directory
 hatch test -k "frontmatter and not slow"
@@ -42,6 +44,7 @@ hatch run python scripts/scan_benchmark.py --notes 1000 5000 10000 --repeat 5
 - Interpreter: `.venv/bin/python` (Windows: `.venv\Scripts\python.exe`).
 - Version: `hatch version`. Bump only through 5.3; never edit `src/afanes/__about__.py`.
 - Build: `hatch run flet build <linux|macos|windows> --build-version "$(hatch version)"`. Build only on the host OS; artifacts land in `build/<platform>/`. `src/main.py` is the packaged launcher.
+- Documentation: `docs/` is the user-facing manual; build it with `hatch run docs:build` and preview it with `hatch run docs:serve`. The `docs` Hatch environment installs Sphinx only for documentation work.
 - OpenSpec: `openspec list --json`, `openspec status --change "<name>" --json`, `openspec instructions apply --change "<name>" --json`, `openspec validate --all --strict`, `openspec doctor`, `openspec archive "<name>"`. Slash commands: `/opsx-propose`, `/opsx-apply`, `/opsx-archive`, and siblings.
 - `rg` is not installed here. Use `grep -r` (see 6.1).
 
@@ -50,7 +53,8 @@ hatch run python scripts/scan_benchmark.py --notes 1000 5000 10000 --repeat 5
 - Runtime dependencies use compatible ranges in `pyproject.toml` (lower bound tested by the floor matrix, upper bound below the next major). There is no lock or constraints file.
 - A new dependency requires an OpenSpec change covering the need, alternatives, license, offline behavior, and cross-platform impact. Never add cloud, telemetry, or auto-update packages.
 - Flet components come through `flet[desktop]` / `flet[web]` extras; never re-pin a component to a patch version.
-- Ruff, Pyrefly, pytest, and coverage are the only tools. Do not add a second linter, formatter, type checker, test runner, or coverage tool. `hatch fmt` is deprecated; use `hatch check`.
+- Ruff, Pyrefly, pytest, and coverage are the only code-quality tools. Do not add a second linter, formatter, type checker, test runner, or coverage tool. `hatch fmt` is deprecated; use `hatch check`.
+- Sphinx builds the documentation; it is not a second linter, formatter, test runner, or coverage tool. Documentation dependencies live in the `docs` dependency group.
 
 ## 3. Architecture
 
@@ -157,6 +161,8 @@ Strict NumPy-style docstrings are mandatory for every public module, class, enum
 
 - [ ] The approved change's tasks are all checked and the behavior is implemented.
 - [ ] New behavior has tests; bug fixes have regression tests.
+- [ ] Documentation is updated for the affected behavior, or the change records why no user-facing documentation changed.
+- [ ] `hatch run docs:build` passes when `docs/` or the documented examples change.
 - [ ] `hatch check` passes.
 - [ ] `hatch test --cover` passes at 85% or higher.
 - [ ] `openspec validate --all --strict` and `openspec doctor` pass.
@@ -174,7 +180,7 @@ No implementation without an approved OpenSpec change. Implementation includes s
 
 1. Name the change explicitly; run `openspec status --change "<name>" --json`.
 2. Run `openspec instructions apply --change "<name>" --json` and read every returned context file.
-3. Work one task at a time; keep the diff scoped.
+3. Work one task at a time; keep the diff scoped. Check `docs/` for the behavior the task changes and update the page, or record why the change has no user-facing documentation effect.
 4. Run the narrowest relevant tests, then check the task checkbox at its exact path and line.
 5. Commit each task or coherent unit as soon as it is green. The subject names the behavior (`feat(processing): add append-step outcome`), not the version. Checkbox edits travel with their commit.
 6. Never accumulate implementation work for a later release commit; a history of only `chore(release)` is a blocking review finding.
@@ -190,10 +196,10 @@ Every successful archive, including `--skip-specs`, ends with a release step.
 
 1. **Bump only when the archive completes a coherent milestone.** `1.0.0` is reserved for the first usable MVP (open a vault, capture, clarify, browse, review without hand-editing files); the checklist, platform evidence, and version path live in `RELEASE.md`. Incompatible changes to unreleased APIs are MINOR or PATCH, never MAJOR. If no milestone completes, keep the entry under `Unreleased` and skip the bump. Never edit `src/afanes/__about__.py`; use `hatch version patch|minor|major`.
 2. **CHANGELOG.md** (Keep a Changelog 1.1.0, SemVer): move `Unreleased` entries under `## [X.Y.Z] - YYYY-MM-DD`, leave a fresh empty `Unreleased`, use only Added/Changed/Deprecated/Removed/Fixed/Security, write observable outcomes, name the change, record resolved runtime dependency versions, and list moved or removed public APIs with replacements. Update comparison links only when release tags exist; never rewrite a released entry.
-3. **README.md**: update it for installation, quick start, features, platforms, configuration, CLI, or stale behavior. Record `README: no change required` when nothing changed.
+3. **README.md and docs/**: update the landing page for installation, quick start, features, platforms, configuration, CLI, or stale behavior, and update the affected docs pages. Record `README: no change required` and `Docs: no change required` when neither changed.
 4. **Gates**: `hatch check`, `hatch test --cover`, `openspec validate --all --strict`, `openspec doctor`, and the 6.1 compliance check.
 5. **Commit** the archive move, synced specs, and release artifacts together. The subject names the delivered behavior; the body contains `Archived OpenSpec change: <name>` and, when bumped, `Release: vX.Y.Z`. Do not tag, push, or publish unless asked.
-6. **Report** the previous/new version, bump rationale, changelog section, README status, and commit hash.
+6. **Report** the previous/new version, bump rationale, changelog section, README status, docs status, and commit hash.
 
 If the archive succeeds but the release step fails, leave the work in the tree, report the failure, and do not create a partial release commit.
 

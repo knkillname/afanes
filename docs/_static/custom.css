@@ -1,0 +1,13 @@
+/* Project-specific documentation styles.
+ *
+ * The default Furo theme and the built-in Sphinx admonitions carry the visual
+ * design. This file is intentionally small so the site stays close to the
+ * theme and remains easy to maintain.
+ */
+
+img.screenshot {
+  border: 1px solid var(--color-foreground-border, #d0d7de);
+  border-radius: 6px;
+  margin: 1rem 0;
+}
+
