@@ -54,6 +54,22 @@ If a reference name was unsafe as a filename, the first save offers to rewrite t
 use it. If the safe name already belongs to a page in the same scheme, that page opens instead of
 creating a duplicate.
 
+## ↩️ Connections use the same resolution
+
+The **Connections** section of a page is the inbound direction of the same name rules. A note appears
+under **Linked from** only when its body reference resolves to exactly one page. A missing or ambiguous
+reference is attributed to no page, and notes under `trash/` never contribute.
+
+Step owners and a project's `asked_by` value resolve in the `note:` namespace, so any note with a
+matching name can own steps or request work; the note does not need a person category. An `asked_by`
+value that matches no note stays plain text on the project and appears in no Connections section. A
+project appears under **Requested projects** once, and an owner can own several steps in the same
+project.
+
+Connections are derived from the scan and are not stored. Nothing in the vault records a backlink,
+and reading or toggling the section writes no file. See [Pages and editing](../guide/pages-and-editing.md)
+for the section itself.
+
 ## 🗂️ Categories are labels, not namespaces
 
 A category groups references in the browser and chooses a default folder under `reference/`. It never

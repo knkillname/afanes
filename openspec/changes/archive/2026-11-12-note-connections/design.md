@@ -138,3 +138,21 @@ controls with the display title as their only label; project headings are muted 
 
 None. The vault format is unchanged, no data is rewritten, and the first page opened after upgrade builds the index
 from the existing scan. Rolling back removes the section and the cache; no user data is affected.
+
+## Measured cost
+
+`scripts/scan_benchmark.py` gained a `connections` phase that builds the index for one snapshot and queries the first
+note, matching the first page opened after a scan. Measured with
+`hatch run python scripts/scan_benchmark.py --notes 1000 5000 10000 --repeat 5` on Linux (Python 3.14.8, tmpfs, 12
+CPUs, commit `922724e74ccb`):
+
+| Notes | Scan median | Connections median |
+| --- | --- | --- |
+| 1,000 | 1,543.47 ms | 10.90 ms |
+| 5,000 | 7,725.54 ms | 55.45 ms |
+| 10,000 | 15,022.50 ms | 112.29 ms |
+
+The index build is linear and stays below 1% of the cold scan at every size (0.75% at 10,000 notes). The scan itself is
+unchanged by this change apart from copying one parsed string per note; the 10,000-note median of 15.0 seconds sits at
+the documented 15-second pass line on this machine, whose cold scan is slower than the 12.0-second reference baseline
+recorded in the changelog.

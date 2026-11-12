@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- **Connections.** Read mode lists the notes that link to the open page, the open steps owned by a person, and the
+  projects they requested. Each completed view is opt-in, the section is read-only, and it is hidden when empty.
+  This implements the `note-connections` OpenSpec change.
+
 ### Fixed
 
 - The workspace sidebar recovers from a stale presentation freeze marker, so switching browser sections no longer

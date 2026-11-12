@@ -20,6 +20,26 @@ opened, whether they came from the browser or a link.
 A project renders as one step-aware body. Prose stays Markdown, and task lists become interactive step
 rows. See [Projects and steps](projects-and-steps.md) for the step actions.
 
+## 🔗 Connections
+
+Read mode ends with a **Connections** section when the page has at least one connection. The section
+is derived from the current vault scan and is never written to a note.
+
+- **Linked from** lists the notes whose body references resolve to this page, once per note and by
+  display title.
+- **Owned steps** lists the open steps of open projects that name this page as an owner. Steps are
+  grouped by project and keep their order in the project body.
+- **Requested projects** lists the open projects whose `asked_by` value resolves to this page.
+
+Completed owned steps stay behind **Show completed steps**, and finished requested projects stay
+behind **Show finished projects**. The two toggles are independent and both start hidden; opening
+another page hides them again. Selecting a linked note opens it, while selecting an owned step or a
+project heading opens the project at the top.
+
+Only a name that resolves to exactly one note creates a connection. Missing and ambiguous names
+contribute nothing, and notes under `trash/` never contribute. Edit mode and raw rescue mode hide the
+section. See [Names and links](../reference/names-and-links.md) for the resolution rules.
+
 ## ✏️ Editing labels
 
 Choose **Edit** to change the raw Markdown body and the labels:
