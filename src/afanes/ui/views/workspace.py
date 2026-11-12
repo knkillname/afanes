@@ -10,6 +10,7 @@ the Processing Wizard, or a guided review.
 """
 
 import asyncio
+import dataclasses
 import datetime
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -434,6 +435,7 @@ class WorkspaceView:
 
     def _set_working(self, *, working: bool) -> None:
         """Disable controls and show progress while a command runs."""
+        self._own_controls()
         self.progress.visible = working
         self.capture_button.disabled = working
         self.refresh_button.disabled = working
@@ -445,6 +447,49 @@ class WorkspaceView:
         self._set_section_tiles_disabled(disabled=working)
         self._update()
 
+    def _own_controls(self) -> None:
+        """Clear stale toolkit freeze markers from this workspace's controls.
+
+        Notes
+        -----
+        Flet 1.1.x can mark an imperative control as immutable while reconciling
+        a keyed update. Every control under :attr:`root` belongs to this view, so
+        a marker on one of them is stale and makes the next assignment raise.
+        The walk reads control metadata only and never reads or writes the vault.
+        """
+        self._clear_frozen(self.root, set())
+
+    def _clear_frozen(self, control: ft.Control, visited: set[int]) -> None:
+        """Clear freeze markers on one control and its descendants."""
+        if id(control) in visited:
+            return
+        visited.add(id(control))
+        if hasattr(control, "_frozen"):
+            object.__delattr__(control, "_frozen")
+        for child in self._control_children(control):
+            self._clear_frozen(child, visited)
+
+    @staticmethod
+    def _control_children(control: ft.Control) -> list[ft.Control]:
+        """Return the direct controls held by one control's fields."""
+        if not dataclasses.is_dataclass(control):
+            return []
+        children: list[ft.Control] = []
+        for field in dataclasses.fields(control):
+            children.extend(WorkspaceView._controls_in(getattr(control, field.name, None)))
+        return children
+
+    @staticmethod
+    def _controls_in(value: object) -> list[ft.Control]:
+        """Return the controls held directly in one field value."""
+        if isinstance(value, ft.Control):
+            return [value]
+        if isinstance(value, (list, tuple)):
+            return [item for item in value if isinstance(item, ft.Control)]
+        if isinstance(value, dict):
+            return [item for item in value.values() if isinstance(item, ft.Control)]
+        return []
+
     def _set_section_tiles_disabled(self, *, disabled: bool) -> None:
         """Enable or disable the section entries during a command."""
         for tile in self.section_tiles.values():
@@ -453,6 +498,7 @@ class WorkspaceView:
 
     def _refresh_dynamic(self) -> None:
         """Refresh counts, browser entries, banners, and the main area."""
+        self._own_controls()
         state = self._state
         self.vault_text.value = str(state.session.vault_root) if state.session.vault_root is not None else ""
         listing = state.browser.listing()

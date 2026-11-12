@@ -94,6 +94,10 @@ def _handler(control: ft.Control) -> Handler:
     return typing.cast("Handler", control.__getattribute__("on_click"))
 
 
+def _freeze(control: ft.Control) -> None:
+    object.__setattr__(control, "_frozen", True)
+
+
 def _change_handler(control: ft.Control) -> Handler:
     return typing.cast("Handler", control.__getattribute__("on_change"))
 
@@ -309,6 +313,59 @@ class TestWorkspaceShell:
         assert afanes.ui.state.app_state.pages.page is not None
         assert afanes.ui.state.app_state.pages.page.mode is DraftMode.RAW
         assert view.page_view.raw_panel.visible is True
+
+
+class TestFrozenControlRecovery:
+    def test_section_switch_recovers_a_frozen_entry(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        projects = afanes.ui.state.browser.WorkspaceSection.PROJECTS
+        tile = view.section_tiles[projects]
+        tile.selected = True
+        _freeze(tile)
+
+        asyncio.run(_handler(tile)())
+
+        assert not hasattr(tile, "_frozen")
+        assert tile.selected is True
+        assert afanes.ui.state.app_state.browser.active_section is projects
+
+    def test_refresh_recovers_a_frozen_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        projects = afanes.ui.state.browser.WorkspaceSection.PROJECTS
+        tile = view.section_tiles[projects]
+        tile.selected = True
+        _freeze(tile)
+
+        view.refresh()
+
+        assert not hasattr(tile, "_frozen")
+        assert tile.selected is False
+
+    def test_refresh_recovers_a_frozen_count(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "One.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+        count = view.section_counts[afanes.ui.state.browser.WorkspaceSection.INBOX]
+        count.value = "stale"
+        _freeze(count)
+
+        view.refresh()
+
+        assert not hasattr(count, "_frozen")
+        assert count.value == "1"
+
+    def test_refresh_leaves_outside_controls_frozen(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        outside = ft.ListTile(title="Outside")
+        _freeze(outside)
+
+        view.refresh()
+
+        assert hasattr(outside, "_frozen")
 
 
 class TestCaptureBar:

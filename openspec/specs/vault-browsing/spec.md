@@ -219,6 +219,32 @@ A refresh triggered by an external change SHALL be read-only. It MUST NOT write 
 - **WHEN** no vault is open, or the vault was closed
 - **THEN** no scan runs in the background
 
+### Requirement: The workspace stays interactive across refreshes
+
+After any workspace refresh — a section switch, search, explicit refresh, page command, processing or review update, or
+background scan — every sidebar entry, count, search field, action, and the main area SHALL remain usable. A refresh
+MUST NOT raise a control-lifecycle error or leave the workspace partially updated.
+
+#### Scenario: A section switch follows startup
+
+- **WHEN** the workspace has rendered and the reader selects another browser section
+- **THEN** the active entry and its accent edge update and no error is shown
+
+#### Scenario: A section switch follows a background scan
+
+- **WHEN** a background refresh has applied a changed scan
+- **THEN** selecting another section still updates the sidebar
+
+#### Scenario: An immutable section entry is recovered
+
+- **WHEN** the presentation toolkit has marked a sidebar entry as immutable
+- **THEN** the next refresh restores the entry's usability and the reader can switch sections
+
+#### Scenario: Refreshing controls writes nothing
+
+- **WHEN** the workspace refreshes its controls
+- **THEN** no note file is created, changed, moved, or removed
+
 ### Requirement: Unparseable notes remain reachable
 
 The browser SHALL list notes that the scan could not parse in a separate failures section. Selecting one SHALL open it in raw rescue mode.

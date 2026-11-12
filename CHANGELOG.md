@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The workspace sidebar recovers from a stale presentation freeze marker, so switching browser sections no longer
+  raises `Frozen controls cannot be updated`. This implements the `fix-frozen-sidebar-controls` OpenSpec change.
+
 ## [0.6.0] - 2026-11-12
 
 ### Added
