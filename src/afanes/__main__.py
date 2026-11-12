@@ -124,6 +124,34 @@ class Launcher:
         return afanes.cli.main.main(argv)
 
     @staticmethod
+    def launch_packaged() -> None:
+        """Start the desktop interface from a packaged build.
+
+        Notes
+        -----
+        A packaged build bundles the interface client, so this path skips the
+        runtime package check that protects a source run. It starts the same
+        page entry point as :func:`main` and accepts no command-line arguments.
+        """
+        logging.basicConfig(level=logging.INFO)
+        try:
+            # Imported here so a broken artifact reports one actionable message
+            # instead of an import traceback, matching the source entry point.
+            import flet as ft  # noqa: PLC0415
+
+            import afanes.ui.app  # noqa: PLC0415
+        except ModuleNotFoundError:
+            Launcher.fail(_SDK_MISSING_MESSAGE)
+
+        async def entry(page: ft.Page) -> None:
+            await afanes.ui.app.main(page)
+
+        try:
+            ft.run(entry)
+        except (OSError, SystemExit) as exc:
+            Launcher.fail(afanes.ui.strings.LAUNCH_DESKTOP_FAILED.format(detail=exc))
+
+    @staticmethod
     def fail(message: str) -> NoReturn:
         """Write an actionable message to standard error and exit.
 

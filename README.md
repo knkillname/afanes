@@ -8,6 +8,7 @@
 ## Table of Contents
 
 - [Development](#development)
+- [Build a desktop app](#build-a-desktop-app)
 - [Command line](#command-line)
 - [Running in a browser](#running-in-a-browser)
 - [Vault format](#vault-format)
@@ -22,7 +23,8 @@
 
 ## Development
 
-Afanes is not yet distributed as a packaged desktop app. Run it from a source checkout:
+Afanes runs from a source checkout. A packaged desktop build is documented below and is the delivery
+path for distribution:
 
 ```console
 hatch env create
@@ -47,12 +49,53 @@ Installing a runtime through the package manager is the only supported path. Afa
 packages while starting. The first desktop run downloads and caches the Flet desktop client under
 `~/.flet/client/`; this is a one-time development provisioning step and the application itself
 performs no network I/O. The `web` runtime ships its browser client inside its wheel, so it needs no
-download. Packaged builds will bundle the desktop client in a later change.
+download. A packaged build bundles the desktop client; see [Build a desktop app](#build-a-desktop-app).
 
 Afanes supports Flet 1.0.4 and later 1.x releases. `hatch test --all` runs the suite on every
 supported interpreter and against the oldest supported dependency versions. The development
 environment installs both interface runtimes, so `hatch run afanes --web` works from a clean
 checkout.
+
+## Build a desktop app
+
+`flet build` produces a packaged desktop artifact that bundles the interface client, so the
+application starts with no network access. Install the Flutter SDK first; `flet build` stops and names
+the toolchain it needs when one is missing. The native build tools are also required: Xcode command
+line tools on macOS, Visual Studio Build Tools on Windows, and `clang`, CMake, Ninja, and the GTK 3
+development libraries on Linux. Each artifact is built on its own operating system; there is no
+cross-platform desktop build.
+
+```console
+hatch run flet build linux --build-version "$(hatch version)"
+hatch run flet build macos --build-version "$(hatch version)"
+hatch run flet build windows --build-version "$(hatch version)"
+```
+
+Run only the command for the machine you are on. `--build-version` records the project version from
+`hatch version` in the artifact metadata, so the build never carries a second version number. The
+artifact is written under `build/<platform>/`:
+
+- `build/linux/`
+- `build/macos/`
+- `build/windows/`
+
+The launcher is `src/main.py`, and `[tool.flet.app]` in `pyproject.toml` points the build at the `src`
+directory. Build-time dependency resolution is the only network activity; the packaged application
+makes no request at startup.
+
+Artifacts are unsigned local builds. Code signing, notarization, auto-update, and a release pipeline
+are not part of this project yet.
+
+### Check the offline start
+
+Launch the artifact with networking unavailable, open a vault, and capture a note. The window must
+open without downloading a client, and the note written by the packaged app must be identical to the
+one a source run writes. Confirm the artifact metadata reports the same version as `hatch version`.
+
+Packaged artifacts are checked on the platform that produces them. Linux is verified locally: the
+artifact built, started with no remote connection, and wrote the same note as a source run. The
+automated suite also covers the workspace refresh behavior. The macOS and Windows artifact,
+offline-start, capture, and refresh checks are performed by the maintainer on those machines.
 
 ## Command line
 

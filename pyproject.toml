@@ -64,6 +64,10 @@ dev = [
 [tool.hatch.version]
 path = "src/afanes/__about__.py"
 
+[tool.flet.app]
+path = "src"
+module = "main"
+
 [tool.hatch.envs.default]
 path = ".venv"
 installer = "uv"
