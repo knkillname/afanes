@@ -136,28 +136,6 @@ Creating a vault SHALL seed `inbox/`, `trash/`, `reference/`, and `projects/` in
 - **WHEN** an empty existing directory is chosen for a new vault
 - **THEN** the default folders are created inside it
 
-### Requirement: A created vault contains exactly the guide and the chosen template
-
-Vault creation SHALL write the guide note into every new vault and, when a template is chosen, the
-notes that template declares. Creation MUST NOT write any other file, and applying a template MUST
-NOT write outside the new vault.
-
-#### Scenario: Blank vault holds only the guide
-
-- **WHEN** a vault is created without a template
-- **THEN** the vault contains the four default folders and the guide note, and no other file
-
-#### Scenario: Templated vault holds the guide and the template
-
-- **WHEN** a vault is created from a template
-- **THEN** the vault contains the four default folders, the guide note, and exactly the notes the
-  template declares
-
-#### Scenario: Template notes land in their declared folders
-
-- **WHEN** a template declares `reference/person/Ada.md` and `projects/Home.md`
-- **THEN** those two files exist at those paths and no folder outside the vault is touched
-
 ### Requirement: Layout is created lazily
 
 Opening or scanning a vault MUST NOT create default folders. Apart from an explicit vault creation, a folder SHALL be created only when a write needs it, and only inside the vault.
@@ -238,3 +216,37 @@ Moving a note to trash SHALL preserve its content and SHALL choose a unique file
 
 - **WHEN** a trashed note is moved back to an active folder
 - **THEN** its inbound references resolve on the next scan
+
+### Requirement: The templates folder holds non-note content
+
+The vault root SHALL reserve `templates/` for reference template cards. Files under it MUST NOT be scanned as notes, appear in the browser, participate in name uniqueness, or resolve as references. The folder name SHALL be matched case-insensitively. Opening or scanning a vault MUST NOT create the folder.
+
+#### Scenario: A card is not scanned
+
+- **WHEN** `templates/person.md` exists
+- **THEN** it does not appear in the scanned note set
+
+#### Scenario: A card name can belong to a note
+
+- **WHEN** `templates/Ada.md` exists and a note named `Ada` is created
+- **THEN** the note is accepted and the two do not collide
+
+#### Scenario: A reference to a card name is unresolved
+
+- **WHEN** a body links to `note:person` and only `templates/person.md` exists
+- **THEN** the reference is unresolved
+
+#### Scenario: Case variants are excluded
+
+- **WHEN** the vault contains `Templates/person.md`
+- **THEN** it is excluded from the note set
+
+#### Scenario: Opening creates nothing
+
+- **WHEN** a vault without `templates/` is opened or scanned
+- **THEN** the folder is not created
+
+#### Scenario: The browser does not list cards
+
+- **WHEN** the browser groups references
+- **THEN** no card appears in any group
