@@ -133,6 +133,10 @@ default folders and writes starter content: opening an existing empty folder thr
 vault** leaves it unseeded, and Afanes creates each folder only when a write needs it. Opening or
 scanning a vault never creates a folder or a file.
 
+**Change vault → Close vault** saves an open page draft, forgets the remembered vault, and returns to
+the welcome screen, so the next launch starts there. A pending page dialog or disk conflict keeps the
+vault open and explains what to resolve.
+
 ## Vault format
 
 A vault is a directory of Markdown files. A note's filename stem is its identity and the name that
