@@ -250,6 +250,17 @@ class WorkspaceView:
         """
         return self.root
 
+    def refresh(self) -> None:
+        """Rebuild the dynamic lists from state and repaint once.
+
+        Notes
+        -----
+        The shell calls this only when a background refresh reports a change.
+        It reads the retained controller state and performs no file I/O.
+        """
+        self._refresh_dynamic()
+        self._update()
+
     async def _capture(self) -> None:
         """Capture the current field text and refresh the browser."""
         text = self.capture_field.value or ""

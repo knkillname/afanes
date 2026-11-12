@@ -620,6 +620,63 @@ class TestScanVault:
         assert len(result.targets) == TWO
 
 
+class TestScanFingerprint:
+    def test_fingerprint_is_stable_for_an_unchanged_vault(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "inbox/Ada.md", body="# Ada\n")
+        _write_note(root / "projects/Grace.md", "project", body="# Grace\n")
+        vault = afanes.core.vault.Vault(root)
+        assert vault.scan_fingerprint() == vault.scan_fingerprint()
+
+    def test_fingerprint_changes_after_an_edit(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        path = _write_note(root / "inbox/Ada.md", body="# Ada\n")
+        vault = afanes.core.vault.Vault(root)
+        before = vault.scan_fingerprint()
+        _set_modified_ns(path, 1_000_000_000_000)
+        path.write_text("---\ntype: note\n---\n\n# Ada edited\n", encoding="utf-8", newline="\n")
+        _set_modified_ns(path, 2_000_000_000_000)
+        assert vault.scan_fingerprint() != before
+
+    def test_fingerprint_changes_after_an_addition(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "inbox/Ada.md", body="# Ada\n")
+        vault = afanes.core.vault.Vault(root)
+        before = vault.scan_fingerprint()
+        _write_note(root / "inbox/Grace.md", body="# Grace\n")
+        assert vault.scan_fingerprint() != before
+
+    def test_fingerprint_changes_after_a_removal(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "inbox/Ada.md", body="# Ada\n")
+        path = _write_note(root / "inbox/Grace.md", body="# Grace\n")
+        vault = afanes.core.vault.Vault(root)
+        before = vault.scan_fingerprint()
+        path.unlink()
+        assert vault.scan_fingerprint() != before
+
+    def test_fingerprint_ignores_the_trash_directory(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "inbox/Ada.md", body="# Ada\n")
+        vault = afanes.core.vault.Vault(root)
+        before = vault.scan_fingerprint()
+        _write_note(root / "trash/Grace.md", body="# Grace\n")
+        assert vault.scan_fingerprint() == before
+
+    def test_fingerprint_ignores_hidden_directories(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "inbox/Ada.md", body="# Ada\n")
+        vault = afanes.core.vault.Vault(root)
+        before = vault.scan_fingerprint()
+        _write_note(root / ".obsidian/Grace.md", body="# Grace\n")
+        assert vault.scan_fingerprint() == before
+
+    def test_fingerprint_is_empty_for_a_vault_without_notes(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        assert afanes.core.vault.Vault(root).scan_fingerprint() == ()
+
+
 class TestReadPage:
     def test_reads_a_note_with_its_text_and_hash(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

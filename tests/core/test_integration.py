@@ -22,6 +22,7 @@ from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType, Status
 
 TODAY = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+TWO_OPEN_STEPS = 2
 
 
 def _write_note(root: Path, relative: str, text: str) -> Path:
@@ -356,6 +357,53 @@ class TestCreatedVaultWorkflow:
             "reference",
             "projects",
         ]
+
+
+class TestWorkspaceLiveness:
+    def test_external_edits_reach_the_browser_and_project_rows(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = Vault(root)
+        vault.create("Launch", NoteType.PROJECT, body="# Launch\n\n- [ ] Old step\n")
+        monkeypatch.setattr(
+            afanes.core.settings.SettingsStore,
+            "settings_path",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
+        )
+        state = afanes.ui.state.app_state
+        state.reset()
+
+        async def scenario() -> tuple[list[str], int, str | None]:
+            await state.choose_vault(root)
+            capture = await state.capture("Old title")
+            assert capture is not None
+            _write_note(root, "inbox/Old title.md", "---\ntype: note\n---\n\n# New title\n")
+            _write_note(
+                root,
+                "projects/Launch.md",
+                "---\ntype: project\n---\n\n# Launch\n\n- [ ] Fresh step\n- [ ] Second step\n",
+            )
+            assert await state.refresh_workspace() is True
+            listing = state.browser_listing
+            assert listing is not None
+            inbox = [note.title for note in listing.group(BrowserSection.INBOX).notes]
+            summaries = [summary for group in state.project_groups for summary in group.projects]
+            launch = next(summary for summary in summaries if summary.note.name == "Launch")
+            next_text = None if launch.next_step is None else launch.next_step.text
+            return inbox, launch.open_count, next_text
+
+        try:
+            inbox, open_count, next_text = asyncio.run(scenario())
+        finally:
+            state.reset()
+
+        assert inbox == ["New title"]
+        assert open_count == TWO_OPEN_STEPS
+        assert next_text == "Fresh step"
 
 
 class TestDocumentedExamples:

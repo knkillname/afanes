@@ -412,6 +412,110 @@ class TestSessionGuard:
         assert isinstance(second.controls[0], ft.Container)
 
 
+def _refresh_tasks() -> list[asyncio.Task[object]]:
+    current = asyncio.current_task()
+    return [
+        task
+        for task in asyncio.all_tasks()
+        if task is not current and task.get_name() == afanes.ui.app.REFRESH_TASK_NAME
+    ]
+
+
+class TestRefreshLoop:
+    def test_a_claimed_session_starts_one_refresh_task(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
+        page = FakePage()
+
+        async def scenario() -> int:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            return len(_refresh_tasks())
+
+        assert asyncio.run(scenario()) == 1
+
+    def test_a_second_session_creates_no_refresh_task(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
+        first = FakePage()
+        second = FakePage(web=True)
+
+        async def scenario() -> int:
+            await afanes.ui.app.main(typing.cast("ft.Page", first))
+            await afanes.ui.app.main(typing.cast("ft.Page", second))
+            return len(_refresh_tasks())
+
+        assert asyncio.run(scenario()) == 1
+
+    def test_a_rejected_session_scans_nothing(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
+        first = FakePage()
+        second = FakePage(web=True)
+        scans = 0
+        original = afanes.core.vault.Vault.scan
+
+        async def scenario() -> None:
+            nonlocal scans
+            await afanes.ui.app.main(typing.cast("ft.Page", first))
+
+            def counting_scan(current: afanes.core.vault.Vault) -> afanes.core.vault.VaultSnapshot:
+                nonlocal scans
+                scans += 1
+                return original(current)
+
+            monkeypatch.setattr(afanes.core.vault.Vault, "scan", counting_scan)
+            await afanes.ui.app.main(typing.cast("ft.Page", second))
+
+        asyncio.run(scenario())
+
+        assert scans == 0
+        assert _find_by_key(second.controls[0], "session-retry") is not None
+
+    def test_closing_the_vault_leaves_no_running_task(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> int:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            close = _typed(_find_by_key(page.controls[0], "workspace-close-vault"), ft.PopupMenuItem)
+            handler = typing.cast("Handler", close.on_click)
+            await handler()
+            return len(_refresh_tasks())
+
+        assert asyncio.run(scenario()) == 0
+        assert state.vault_root is None
+
+
 async def _submit_creation(page: FakePage, path_text: Path | None = None) -> None:
     dialog = page.dialogs[-1]
     if path_text is not None:

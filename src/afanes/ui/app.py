@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Flet application shell and first-run routing."""
 
+import asyncio
+import contextlib
 from pathlib import Path
 
 import flet as ft
@@ -13,6 +15,9 @@ import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.inbox
 import afanes.ui.views.workspace
+
+# Public task name so the shell can be observed without exposing its fields.
+REFRESH_TASK_NAME = "workspace-refresh"
 
 
 class _Shell:
@@ -41,6 +46,8 @@ class _Shell:
         self.state = afanes.ui.state.app_state
         self.is_desktop = not page.web
         self.picker: ft.FilePicker | None = None
+        self.workspace: afanes.ui.views.workspace.WorkspaceView | None = None
+        self.refresh_task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
         """Configure the page, claim the session, and open the first state."""
@@ -56,7 +63,7 @@ class _Shell:
         self.page.title = afanes.ui.strings.APP_TITLE
         self.page.theme_mode = ft.ThemeMode.SYSTEM
         self.page.padding = afanes.ui.theme.PAGE_PADDING
-        self.page.on_disconnect = afanes.ui.state.app_state.release_session
+        self.page.on_disconnect = self.release_session
         if not self.is_desktop:
             return
         self.page.window.width = 1100
@@ -81,8 +88,60 @@ class _Shell:
             return
         await self._start_workspace()
 
+    def release_session(self) -> None:
+        """Release the session and stop the background refresh loop.
+
+        Notes
+        -----
+        Flet calls this when the page disconnects. The loop is cancelled before
+        the session marker is released so a new session never inherits the old
+        task.
+        """
+        self._cancel_refresh_loop()
+        self.state.release_session()
+
+    def _start_refresh_loop(self) -> None:
+        """Start the single background refresh loop when none is running."""
+        if self.refresh_task is not None and not self.refresh_task.done():
+            return
+        self.refresh_task = asyncio.create_task(self._refresh_loop(), name=REFRESH_TASK_NAME)
+
+    def _cancel_refresh_loop(self) -> None:
+        """Cancel the refresh loop without waiting for it."""
+        task = self.refresh_task
+        self.refresh_task = None
+        if task is not None and not task.done():
+            task.cancel()
+
+    async def _stop_refresh_loop(self) -> None:
+        """Cancel and await the refresh loop before replacing the workspace."""
+        task = self.refresh_task
+        self.refresh_task = None
+        if task is None:
+            return
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+    async def _refresh_loop(self) -> None:
+        """Apply external vault changes on the fixed background interval.
+
+        Notes
+        -----
+        The loop reads only :data:`afanes.ui.state.REFRESH_SECONDS`. Each tick
+        asks the controller for a changed scan and repaints only when one was
+        applied. Cancellation closes the loop on vault close, session release,
+        and workspace replacement.
+        """
+        while True:
+            await asyncio.sleep(afanes.ui.state.REFRESH_SECONDS)
+            if await self.state.refresh_workspace() and self.workspace is not None:
+                self.workspace.refresh()
+
     async def render(self) -> None:
         """Render the welcome state or the workspace for the current session."""
+        await self._stop_refresh_loop()
+        self.workspace = None
         self.page.controls.clear()
         if self.state.vault_root is None:
             if self.is_desktop:
@@ -105,19 +164,22 @@ class _Shell:
                 self.choose_vault,
                 self.create_vault,
                 self.close_vault,
-            ).build()
+            )
+            self.workspace = workspace
             digest = self._due_digest()
             if digest is None:
-                self.page.add(workspace)
+                self.page.add(workspace.build())
             else:
                 self.page.add(
                     ft.Column(
-                        controls=[digest, workspace],
+                        controls=[digest, workspace.build()],
                         spacing=afanes.ui.theme.SECTION_GAP,
                         expand=True,
                     )
                 )
         self.page.update()
+        if self.state.vault_root is not None:
+            self._start_refresh_loop()
 
     def _due_digest(self) -> ft.Control | None:
         """Build the launch digest of due work, or ``None`` when there is none.
@@ -210,8 +272,11 @@ class _Shell:
         When the page cannot be committed the workspace stays in place and its
         banner reports the reason.
         """
+        await self._stop_refresh_loop()
         if await self.state.close_vault():
             await self.render()
+        elif self.state.vault_root is not None:
+            self._start_refresh_loop()
 
     async def show_create_dialog(self) -> None:
         """Ask for the vault path and starter content, then create the vault.

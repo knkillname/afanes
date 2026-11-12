@@ -16,7 +16,7 @@ import afanes.ui.state
 import afanes.ui.strings
 from afanes.core.errors import ConfigurationError, TemplateContentError, VaultError
 from afanes.core.frontmatter import NoteDocument
-from afanes.core.processing import ProcessingOutcome
+from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
 from afanes.core.settings import Settings, SettingsStore
 from afanes.core.steps import StepDocument
 from afanes.models.link import ReferenceScheme
@@ -810,6 +810,323 @@ class TestRefresh:
 
         assert state.notes == ()
         assert state.message is None
+
+
+class TestRefreshIfChanged:
+    def _session(self, root: Path) -> afanes.ui.state.VaultSession:
+        vault = afanes.core.vault.Vault.open(root)
+        session = afanes.ui.state.VaultSession(afanes.ui.state.UiStatus())
+        session.vault = vault
+        session.apply_snapshot(vault.scan())
+        return session
+
+    def test_unchanged_vault_returns_none_without_a_scan(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "inbox" / "Ada.md", _note_text("# Ada"))
+        session = self._session(root)
+        calls = 0
+        original = afanes.core.vault.Vault.scan
+
+        def counting_scan(vault: afanes.core.vault.Vault) -> afanes.core.vault.VaultSnapshot:
+            nonlocal calls
+            calls += 1
+            return original(vault)
+
+        monkeypatch.setattr(afanes.core.vault.Vault, "scan", counting_scan)
+
+        result = asyncio.run(session.refresh_if_changed())
+
+        assert result is None
+        assert calls == 0
+
+    def test_a_changed_vault_triggers_exactly_one_scan(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "inbox" / "Ada.md", _note_text("# Ada"))
+        session = self._session(root)
+        calls = 0
+        original = afanes.core.vault.Vault.scan
+
+        def counting_scan(vault: afanes.core.vault.Vault) -> afanes.core.vault.VaultSnapshot:
+            nonlocal calls
+            calls += 1
+            return original(vault)
+
+        monkeypatch.setattr(afanes.core.vault.Vault, "scan", counting_scan)
+        _write_note(root / "inbox" / "Grace.md", _note_text("# Grace"))
+
+        result = asyncio.run(session.refresh_if_changed())
+
+        assert result is not None
+        assert calls == 1
+        assert {note.name for note in session.notes} == {"Ada", "Grace"}
+
+    def test_no_vault_returns_none(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        session = afanes.ui.state.VaultSession(afanes.ui.state.UiStatus())
+
+        assert asyncio.run(session.refresh_if_changed()) is None
+
+
+class TestRefreshWorkspace:
+    def test_without_a_vault_returns_false(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        assert asyncio.run(state.refresh_workspace()) is False
+
+    def test_busy_lock_skips_the_tick(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        entered = threading.Event()
+        release = threading.Event()
+        original = afanes.core.vault.Vault.scan
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+
+            def blocking_scan(current: afanes.core.vault.Vault) -> afanes.core.vault.VaultSnapshot:
+                entered.set()
+                release.wait(timeout=5)
+                return original(current)
+
+            monkeypatch.setattr(afanes.core.vault.Vault, "scan", blocking_scan)
+            first = asyncio.create_task(state.refresh())
+            try:
+                await asyncio.to_thread(entered.wait, 5)
+                return await state.refresh_workspace()
+            finally:
+                release.set()
+                await first
+
+        assert asyncio.run(scenario()) is False
+
+    def test_does_not_set_the_busy_indicator(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        observed: list[bool] = []
+        original = afanes.core.vault.Vault.scan
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+
+            def recording_scan(current: afanes.core.vault.Vault) -> afanes.core.vault.VaultSnapshot:
+                observed.append(state.busy)
+                return original(current)
+
+            monkeypatch.setattr(afanes.core.vault.Vault, "scan", recording_scan)
+            _write_note(vault / "inbox" / "External.md", _note_text("# External"))
+            return await state.refresh_workspace()
+
+        assert asyncio.run(scenario()) is True
+        assert observed == [False]
+
+    def test_pending_processing_plan_is_untouched(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        plan: ProcessingPlan | AppendStepPlan | None = None
+
+        async def scenario() -> None:
+            nonlocal plan
+            await state.choose_vault(vault)
+            capture = await state.capture("Buy milk")
+            assert capture is not None
+            await state.begin_processing(capture)
+            plan = await state.plan_processing(ProcessingOutcome.PROJECT)
+            _write_note(vault / "inbox" / "External.md", _note_text("# External"))
+            changed = await state.refresh_workspace()
+            assert changed is True
+
+        asyncio.run(scenario())
+
+        assert plan is not None
+        assert state.processing_note is not None
+        assert state.processing_plan is plan
+        assert state.processing_body == "# Buy milk"
+        assert "External" in {note.name for note in state.notes}
+
+    def test_clean_page_reloads_an_external_edit(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            capture = await state.capture("Old body")
+            assert capture is not None
+            await state.open_page(capture)
+            _write_note(capture, _note_text("New body\n"))
+            assert await state.refresh_workspace() is True
+
+        asyncio.run(scenario())
+
+        assert state.page_body == "New body\n"
+        assert state.conflict is None
+        assert state.editing is False
+
+    def test_dirty_draft_keeps_its_text_and_raises_changed(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            capture = await state.capture("Old body")
+            assert capture is not None
+            await state.open_page(capture)
+            state.edit_page()
+            await state.set_page_body("Mine\n")
+            _write_note(capture, _note_text("Theirs\n"))
+            assert await state.refresh_workspace() is True
+
+        asyncio.run(scenario())
+
+        assert state.page_body == "Mine\n"
+        assert state.conflict == "changed"
+        assert state.message == afanes.ui.strings.PAGE_CONFLICT_CHANGED
+
+    def test_missing_file_raises_missing_and_keeps_the_draft(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            capture = await state.capture("Old body")
+            assert capture is not None
+            await state.open_page(capture)
+            state.edit_page()
+            await state.set_page_body("Mine\n")
+            capture.unlink()
+            assert await state.refresh_workspace() is True
+
+        asyncio.run(scenario())
+
+        assert state.page_body == "Mine\n"
+        assert state.conflict == "missing"
+        assert state.message == afanes.ui.strings.PAGE_CONFLICT_MISSING
+
+    def test_conflict_resolves_with_the_existing_actions(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            capture = await state.capture("Old body")
+            assert capture is not None
+            await state.open_page(capture)
+            state.edit_page()
+            await state.set_page_body("Mine\n")
+            _write_note(capture, _note_text("Theirs\n"))
+            await state.refresh_workspace()
+            assert await state.overwrite_page() is True
+
+        asyncio.run(scenario())
+
+        assert state.conflict is None
+        assert state.page_body == "Mine\n"
+        assert state.message is None
+
+    def test_a_command_message_survives_the_background_apply(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> str | None:
+            await state.choose_vault(vault)
+            state.message = "Saved by a command"
+            _write_note(vault / "inbox" / "External.md", _note_text("# External"))
+            assert await state.refresh_workspace() is True
+            return state.message
+
+        assert asyncio.run(scenario()) == "Saved by a command"
+
+    def test_a_capture_still_clears_the_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            state.message = "Old message"
+            assert await state.capture("Buy milk") is not None
+
+        asyncio.run(scenario())
+
+        assert state.message is None
+
+    def test_background_refresh_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        def mtimes() -> dict[str, int]:
+            return {
+                path.relative_to(vault).as_posix(): path.stat().st_mtime_ns
+                for path in vault.rglob("*")
+                if path.is_file()
+            }
+
+        async def scenario() -> tuple[dict[str, bytes], dict[str, bytes], dict[str, int], dict[str, int]]:
+            await state.choose_vault(vault)
+            capture = await state.capture("Old body")
+            assert capture is not None
+            _write_note(capture, _note_text("Theirs\n"))
+            before_files = _tree_state(vault)
+            before_mtimes = mtimes()
+            assert await state.refresh_workspace() is True
+            return before_files, _tree_state(vault), before_mtimes, mtimes()
+
+        before_files, after_files, before_mtimes, after_mtimes = asyncio.run(scenario())
+
+        assert before_files
+        assert after_files == before_files
+        assert after_mtimes == before_mtimes
 
 
 class TestConcurrency:

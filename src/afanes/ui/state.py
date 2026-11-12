@@ -76,6 +76,10 @@ logger = logging.getLogger(__name__)
 
 PAGE_HISTORY_LIMIT = 50
 AUTOSAVE_SECONDS = 30
+# Workspace refresh interval. A stat walk is cheap enough that a short poll
+# converges before a side-by-side edit is acted on, and a rescan happens only
+# when the fingerprint moved, so the cost stays bounded.
+REFRESH_SECONDS = 5
 
 
 class VaultOpener:
@@ -360,6 +364,10 @@ class VaultSession:
         Absolute path of the note shown in the preview.
     preview_body : str | None
         Markdown body of the previewed note, without frontmatter.
+    fingerprint : tuple[tuple[str, int, int], ...] | None
+        Fingerprint taken with the last applied scan, or ``None`` when no scan
+        has been applied. It is compared by the background refresh to decide
+        whether a rescan is needed.
     """
 
     status: UiStatus
@@ -369,6 +377,7 @@ class VaultSession:
     failures: tuple[VaultFailure, ...] = ()
     selected: Path | None = None
     preview_body: str | None = None
+    fingerprint: tuple[tuple[str, int, int], ...] | None = None
 
     @property
     def vault_root(self) -> Path | None:
@@ -452,7 +461,57 @@ class VaultSession:
             return
         self.apply_snapshot(snapshot)
 
-    def apply_snapshot(self, snapshot: VaultSnapshot, focus: Path | None = None) -> None:
+    async def refresh_if_changed(self, *, preserve_message: bool = False) -> VaultSnapshot | None:
+        """Rescan the vault only when its change fingerprint moved.
+
+        Parameters
+        ----------
+        preserve_message : bool
+            Whether to keep the current banner message when the new snapshot is
+            applied. Background refresh sets this so feedback from a user
+            command survives an unrequested scan.
+
+        Returns
+        -------
+        VaultSnapshot | None
+            The applied scan when the vault changed, or ``None`` when the
+            fingerprint matches the last applied scan or no vault is open.
+
+        Notes
+        -----
+        The fingerprint is read in a worker thread before any scan, so an
+        unchanged vault costs one stat walk and no parsing. A fingerprint that
+        changed is treated as a request to rescan; the scan result becomes the
+        new snapshot and its own fingerprint is stored. A failed fingerprint
+        walk or scan leaves the previous snapshot and reports nothing, because
+        a background refresh must not interrupt the user. This method performs
+        blocking reads only and never writes.
+        """
+        vault = self.vault
+        if vault is None:
+            return None
+        try:
+            fingerprint = await asyncio.to_thread(vault.scan_fingerprint)
+        except (VaultError, OSError):
+            logger.debug("Vault fingerprint could not be read", exc_info=True)
+            return None
+        if fingerprint == self.fingerprint:
+            return None
+        try:
+            snapshot = await asyncio.to_thread(vault.scan)
+        except (VaultError, OSError):
+            logger.debug("Background rescan failed", exc_info=True)
+            return None
+        self.apply_snapshot(snapshot, preserve_message=preserve_message)
+        return snapshot
+
+    def apply_snapshot(
+        self,
+        snapshot: VaultSnapshot,
+        focus: Path | None = None,
+        *,
+        preserve_message: bool = False,
+    ) -> None:
         """Replace the inbox list from a scan result.
 
         Parameters
@@ -461,8 +520,11 @@ class VaultSession:
             Scan result to retain.
         focus : Path | None
             Note to promote to the top of the inbox list.
+        preserve_message : bool
+            Whether to keep the current banner message instead of clearing it.
         """
         self.snapshot = snapshot
+        self.fingerprint = snapshot.fingerprint
         notes = list(snapshot.inbox_notes())
         if focus is not None:
             for index, note in enumerate(notes):
@@ -474,7 +536,8 @@ class VaultSession:
         if self.selected is not None and all(note.path != self.selected for note in self.notes):
             self.selected = None
             self.preview_body = None
-        self.status.message = None
+        if not preserve_message:
+            self.status.message = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -1673,6 +1736,93 @@ class AppState:
                     self.message = afanes.ui.strings.PREVIEW_FAILED.format(detail=str(exc))
             finally:
                 self.busy = False
+
+    async def refresh_workspace(self) -> bool:
+        """Apply an external vault change without interrupting the user.
+
+        Returns
+        -------
+        bool
+            ``True`` when a changed scan was applied, ``False`` when nothing
+            changed, no vault is open, or a command already holds the lock.
+
+        Notes
+        -----
+        This command is the background counterpart of :meth:`refresh`. It
+        skips the tick instead of waiting when another command holds the
+        command lock, never sets the busy indicator, and preserves a message
+        raised by a user command. A processing or review flow stays on its
+        note. An open page follows the change: a clean draft reloads, a dirty
+        draft raises the existing conflict state, and a vanished file is
+        reported as missing. Blocking reads run in a worker thread and no note
+        file is created, changed, or removed.
+        """
+        if self.vault is None or self._lock.locked():
+            return False
+        async with self._lock:
+            snapshot = await self._vault_session.refresh_if_changed(preserve_message=True)
+            if snapshot is None:
+                return False
+            await self._follow_external_change(snapshot)
+            return True
+
+    async def _follow_external_change(self, snapshot: VaultSnapshot) -> None:
+        """Reconcile the open page after a background rescan.
+
+        Parameters
+        ----------
+        snapshot : VaultSnapshot
+            Scan that was just applied.
+
+        Notes
+        -----
+        A focused processing or review flow keeps its note and is left alone.
+        The open page keeps a dirty draft and raises the existing conflict
+        state; a clean draft is re-read from disk. This helper performs a
+        blocking read in a worker thread and never writes.
+        """
+        vault = self.vault
+        page = self.page
+        if vault is None or page is None or page.path is None:
+            return
+        if self.processing_note is not None or self.processing_result is not None or self.review_session is not None:
+            return
+        note = snapshot.find_note(page.path)
+        if note is None:
+            self._raise_page_conflict("missing")
+            return
+        if note.content_hash == page.baseline_hash:
+            return
+        if page.is_dirty:
+            self._raise_page_conflict("changed")
+            return
+        try:
+            content = await asyncio.to_thread(vault.read_page, page.path)
+            draft = PageDraftFactory.from_page(content, page.reference)
+        except (AfanesError, OSError, UnicodeError):
+            logger.debug("Open page could not follow an external change", exc_info=True)
+            self._raise_page_conflict("missing")
+            return
+        self.page = draft
+        self.editing = self.editing or draft.mode is DraftMode.RAW
+        self.conflict = None
+
+    def _raise_page_conflict(self, conflict: str) -> None:
+        """Set one disk conflict without replacing an existing one.
+
+        Parameters
+        ----------
+        conflict : str
+            ``changed`` when the file was rewritten, or ``missing`` when it
+            disappeared.
+        """
+        if self.conflict is not None:
+            return
+        self.conflict = conflict
+        if conflict == "missing":
+            self.message = afanes.ui.strings.PAGE_CONFLICT_MISSING
+        else:
+            self.message = afanes.ui.strings.PAGE_CONFLICT_CHANGED
 
     async def capture(self, text: str) -> Path | None:
         """Capture raw text into the vault's inbox.
@@ -3311,6 +3461,7 @@ class AppState:
         self.session_active = False
         self.history = ()
         self._snapshot = None
+        self._vault_session.fingerprint = None
         self._clear_processing()
         self._clear_page()
         self._lock = asyncio.Lock()
@@ -3373,6 +3524,7 @@ class AppState:
         """Clear the vault state and show the welcome screen."""
         self._vault_session.vault = None
         self._vault_session.snapshot = None
+        self._vault_session.fingerprint = None
         self._vault_session.notes = ()
         self._vault_session.failures = ()
         self._vault_session.selected = None

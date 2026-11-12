@@ -623,12 +623,17 @@ class VaultSnapshot:
         Notes that could not be parsed, in deterministic path order.
     catalog : NameCatalog
         Name catalog built from the parsed notes.
+    fingerprint : tuple[tuple[str, int, int], ...]
+        Change fingerprint of the files the scan walked, in the same
+        ``(vault-relative path, mtime_ns, size)`` shape as
+        :meth:`afanes.core.vault.Vault.scan_fingerprint`.
     """
 
     root: Path
     notes: tuple[VaultNote, ...]
     failures: tuple[VaultFailure, ...]
     catalog: NameCatalog
+    fingerprint: tuple[tuple[str, int, int], ...] = ()
 
     def inbox_notes(self) -> tuple[VaultNote, ...]:
         """Return the notes currently in this vault's inbox.
@@ -1277,6 +1282,34 @@ class Vault:
         """
         return self._scan()
 
+    def scan_fingerprint(self) -> tuple[tuple[str, int, int], ...]:
+        """Return a cheap change fingerprint for the files a scan would parse.
+
+        Returns
+        -------
+        tuple[tuple[str, int, int], ...]
+            One ``(vault-relative path, mtime_ns, size)`` entry per note file,
+            in deterministic path order. The tuple is empty for a vault with no
+            notes.
+
+        Notes
+        -----
+        The walk is the same one :meth:`scan` uses, so ``trash/`` and hidden
+        directories are excluded and the path policy stays in one place. Only
+        filesystem metadata is read; no note is opened, parsed, or written.
+        A file that cannot be stat'ed is skipped so a single unreadable entry
+        cannot stall every refresh tick. Callers treat any change to the tuple
+        as a reason to rescan, not as proof that the content is different.
+        """
+        entries: list[tuple[str, int, int]] = []
+        for note_path in self._note_paths():
+            try:
+                stat = note_path.path.stat()
+            except OSError:
+                continue
+            entries.append((note_path.relative_path.as_posix(), stat.st_mtime_ns, stat.st_size))
+        return tuple(entries)
+
     def _scan(self) -> VaultSnapshot:
         """Scan this vault's notes and build the name catalog."""
         notes: list[VaultNote] = []
@@ -1290,7 +1323,13 @@ class Vault:
                 failures.append(VaultFailure(path=note_path.relative_path, message=str(exc)))
 
         catalog = NameCatalog.from_entries(CatalogEntry(path=note.path, note_type=note.note_type) for note in notes)
-        return VaultSnapshot(root=self.root, notes=tuple(notes), failures=tuple(failures), catalog=catalog)
+        return VaultSnapshot(
+            root=self.root,
+            notes=tuple(notes),
+            failures=tuple(failures),
+            catalog=catalog,
+            fingerprint=self.scan_fingerprint(),
+        )
 
     def _note_paths(self) -> list[NotePath]:
         """Return note paths and their vault-relative paths in deterministic order."""

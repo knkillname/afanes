@@ -8,8 +8,10 @@ from pathlib import Path
 import flet as ft
 import pytest
 
+import afanes.core.atomic
 import afanes.core.search
 import afanes.core.settings
+import afanes.core.vault
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.views.workspace
@@ -305,6 +307,54 @@ class TestBrowserHistory:
         assert afanes.ui.state.app_state.page is not None
         assert afanes.ui.state.app_state.page.path == first
         assert view.page_view.title.value == "Ada"
+
+
+class TestWorkspaceRefresh:
+    def test_refresh_repaints_once_and_rebuilds_the_rows(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        asyncio.run(state.choose_vault(vault))
+        repaints: list[int] = []
+        view = afanes.ui.views.workspace.WorkspaceView(
+            lambda: repaints.append(1),
+            _change_vault,
+            _create_vault,
+            _close_vault,
+        )
+        _write_note(vault / "inbox" / "External.md", body="# External")
+        asyncio.run(state.refresh())
+        repaints.clear()
+
+        view.refresh()
+
+        assert repaints == [1]
+        assert _row_for(view.browser_list, "External") is not None
+
+    def test_refresh_performs_no_file_io(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.choose_vault(vault))
+        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
+
+        def fail(*_args: object, **_kwargs: object) -> None:
+            message = "the workspace refresh must not touch the filesystem"
+            raise AssertionError(message)
+
+        monkeypatch.setattr(afanes.core.vault.Vault, "scan", fail)
+        monkeypatch.setattr(afanes.core.vault.Vault, "read_body", fail)
+        monkeypatch.setattr(afanes.core.vault.Vault, "read_page", fail)
+        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail)
+
+        view.refresh()
+
+        assert view.root.key == "workspace-view"
 
 
 def _row_for(browser: ft.ListView, title: str) -> ft.ListTile:
