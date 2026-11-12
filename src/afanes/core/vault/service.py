@@ -32,6 +32,7 @@ from afanes.core.errors import (
     VaultUnreadableError,
 )
 from afanes.core.frontmatter import NoteDocument
+from afanes.core.labels import PageLabels
 from afanes.core.links import CatalogEntry, NameCatalog
 from afanes.core.template_cards import TemplateCard, TemplateCardCatalog
 from afanes.core.vault.snapshot import (
@@ -803,23 +804,20 @@ class Vault:
             Canonical document ready to serialize.
         """
         normalized_body = body.replace("\r\n", "\n").replace("\r", "\n").removeprefix("\ufeff")
-        raw: dict[str, object] = {"type": note_type.value}
-        if date is not None:
-            raw["date"] = date.to_yaml_value()
-        if category is not None:
-            raw["category"] = category.value
-        if status is not None:
-            raw["status"] = status.value
-        return NoteDocument(
-            raw=raw,
-            body=normalized_body,
-            newline="\n",
-            has_frontmatter=True,
+        labels = PageLabels(
             note_type=note_type,
             category=category,
             status=status,
-            date=date,
+            date_text="" if date is None else date.text,
         )
+        document = NoteDocument(
+            raw={},
+            body=normalized_body,
+            newline="\n",
+            has_frontmatter=True,
+            note_type=None,
+        )
+        return labels.apply_to(document)
 
     @staticmethod
     def existing_directory(parent: Path, name: Path) -> Path:

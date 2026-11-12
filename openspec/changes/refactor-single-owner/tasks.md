@@ -2,27 +2,27 @@
 
 ## 1. Canonical label writer
 
-- [ ] 1.1 Add `PageLabels.apply_to(document)` with strict NumPy docstrings and a full matrix test in
+- [x] 1.1 Add `PageLabels.apply_to(document)` with strict NumPy docstrings and a full matrix test in
   `tests/core/test_labels.py` covering every note type, category, status, due date, requester, date,
   unknown keys, and CRLF preservation; verify `hatch test tests/core/test_labels.py` passes.
-- [ ] 1.2 Add a Hypothesis round-trip test that
+- [x] 1.2 Add a Hypothesis round-trip test that
   `PageLabels.from_document(labels.apply_to(document))` reproduces the same valid labels; add a
   deterministic regression test for any minimized failure; verify
   `hatch test tests/core/test_labels.py` passes.
-- [ ] 1.3 Route `NormalDraft.to_text` through `PageLabels.apply_to`, keep the log date identity guard
+- [x] 1.3 Route `NormalDraft.to_text` through `PageLabels.apply_to`, keep the log date identity guard
   in `NormalDraft`, and remove `_write_labels`/`_write_date`; verify
   `hatch test tests/core/test_editing.py` passes.
-- [ ] 1.4 Route `VaultPages.set_status` and `VaultNaming.apply_category_move` through the label owner,
+- [x] 1.4 Route `VaultPages.set_status` and `VaultNaming.apply_category_move` through the label owner,
   preserving the current validation message and unknown-key/newline behavior; verify
   `hatch test tests/core/vault/test_pages.py tests/core/vault/test_naming.py` passes.
-- [ ] 1.5 Route `VaultNaming._write_conversion` and `ProcessingPlan.processed_text` through the label
+- [x] 1.5 Route `VaultNaming._write_conversion` and `ProcessingPlan.processed_text` through the label
   owner, preserving the target type/status/date rules for every processing outcome; verify
   `hatch test tests/core/vault/test_naming.py tests/core/test_processing.py` passes.
-- [ ] 1.6 Route `Vault.new_note_document`, the date insertion in `VaultPages.create_page`, and the
+- [x] 1.6 Route `Vault.new_note_document`, the date insertion in `VaultPages.create_page`, and the
   date insertion in `TemplateCatalog` through the label owner; verify
   `hatch test tests/core/vault/test_service.py tests/core/vault/test_pages.py tests/core/test_templates.py`
   passes.
-- [ ] 1.7 Add the architecture tripwire that rejects label-key assignment or `pop` outside
+- [x] 1.7 Add the architecture tripwire that rejects label-key assignment or `pop` outside
   `core/labels.py` and `core/frontmatter.py`; verify
   `hatch test tests/core/test_architecture.py` passes.
 

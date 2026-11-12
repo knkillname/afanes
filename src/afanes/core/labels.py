@@ -250,6 +250,74 @@ class PageLabels:
         """
         return DueDateText.from_text(self.due_date_text).error
 
+    def apply_to(self, document: NoteDocument) -> NoteDocument:
+        """Return a document with these labels written into its frontmatter.
+
+        Parameters
+        ----------
+        document : NoteDocument
+            Parsed note whose body, newline style, and unknown keys are kept.
+
+        Returns
+        -------
+        NoteDocument
+            New document with the editable labels applied and revalidated.
+            Existing keys keep their positions and new keys append in the
+            documented order: type, date, category, status, due_date, asked_by.
+
+        Raises
+        ------
+        NoteParseError
+            If the resulting metadata is not valid for the note type.
+        RetiredValueError
+            If the document declares a retired type or key.
+
+        Notes
+        -----
+        Validation and serialization stay in :class:`NoteDocument`. A malformed
+        non-blank note date already present in the document is left untouched
+        so it can be corrected later; a blank date removes the key. Category,
+        status, due date, and requester are removed when the note type does not
+        allow them.
+        """
+        raw = dict(document.raw)
+        raw["type"] = self.note_type.value
+        self._apply_date(raw)
+        if self.note_type is NoteType.REFERENCE and self.category is not None:
+            raw["category"] = self.category.value
+        else:
+            raw.pop("category", None)
+        if self.status is None:
+            raw.pop("status", None)
+        else:
+            raw["status"] = self.status.value
+        due_date = self.due_date
+        if self.note_type is NoteType.PROJECT and due_date is not None:
+            raw["due_date"] = due_date
+        else:
+            raw.pop("due_date", None)
+        asked_by = self.asked_by_text.strip()
+        if self.note_type is NoteType.PROJECT and asked_by:
+            raw["asked_by"] = asked_by
+        else:
+            raw.pop("asked_by", None)
+        return document.with_metadata(raw)
+
+    def _apply_date(self, raw: dict[str, object]) -> None:
+        """Write the note date into a raw frontmatter mapping.
+
+        Parameters
+        ----------
+        raw : dict[str, object]
+            Mapping copied from the source document. The method mutates it.
+        """
+        if not self.date_text.strip():
+            raw.pop("date", None)
+            return
+        note_date = self.date
+        if note_date is not None:
+            raw["date"] = note_date.to_yaml_value()
+
     def with_type(self, note_type: NoteType) -> Self:
         """Return labels adjusted for a new note type.
 

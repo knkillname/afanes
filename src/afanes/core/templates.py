@@ -21,6 +21,7 @@ import afanes.core.names
 import afanes.core.steps
 from afanes.core.errors import AfanesError, TemplateContentError, UnknownTemplateError
 from afanes.core.frontmatter import NoteDocument
+from afanes.core.labels import PageLabels
 from afanes.models.note import CategoryLabel, NoteDate, NoteType
 
 # Public base language. A locale without its own tree falls back to this one.
@@ -514,10 +515,9 @@ class TemplateCatalog:
             except AfanesError as exc:
                 message = f"Bundled note {relative.as_posix()!r} cannot be parsed: {exc}"
                 raise TemplateContentError(message) from exc
-            if document.date is None and document.date_error is None:
-                raw = dict(document.raw)
-                raw["date"] = NoteDate.from_date(today).to_yaml_value()
-                document = document.with_metadata(raw)
+            if document.note_type is not None and document.date is None and document.date_error is None:
+                labels = PageLabels.from_document(document).with_date_text(NoteDate.from_date(today).text)
+                document = labels.apply_to(document)
                 rendered = document.to_text()
             notes.append(TemplateNote(relative_path=relative, text=rendered, document=document))
         return tuple(notes)

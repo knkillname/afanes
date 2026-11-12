@@ -12,6 +12,7 @@ from typing import Self
 
 from afanes.core.errors import ProcessingError
 from afanes.core.frontmatter import NoteDocument
+from afanes.core.labels import PageLabels
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
 
@@ -241,31 +242,16 @@ class ProcessingPlan:
         if self.outcome is ProcessingOutcome.TRASH:
             return document.to_text()
 
-        raw = dict(document.raw)
-        raw["type"] = self.target_type.value
-        if self.target_status is None:
-            raw.pop("status", None)
-        else:
-            raw["status"] = self.target_status.value
-        if self.due_date is None:
-            raw.pop("due_date", None)
-        else:
-            raw["due_date"] = self.due_date
-        if self.category is None:
-            raw.pop("category", None)
-        else:
-            raw["category"] = self.category.value
+        labels = PageLabels.from_document(document).with_type(self.target_type)
+        labels = labels.with_status(self.target_status)
+        labels = labels.with_category(self.category)
+        labels = labels.with_due_date_text("" if self.due_date is None else self.due_date.isoformat())
         if self.target_date is not None:
-            raw["date"] = self.target_date.to_yaml_value()
-        if self.target_type is NoteType.LOG:
-            raw.pop("category", None)
-            raw.pop("status", None)
-            raw.pop("due_date", None)
-            raw.pop("asked_by", None)
+            labels = labels.with_date_text(self.target_date.text)
         body = document.body if self.body_override is None else self.body_override
         if self.scaffold is not None:
             body = self._append_scaffold(body, document.newline)
-        return document.with_body(body).with_metadata(raw).to_text()
+        return labels.apply_to(document.with_body(body)).to_text()
 
     def _append_scaffold(self, body: str, newline: str) -> str:
         """Append the starter body below the capture text.

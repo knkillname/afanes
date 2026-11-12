@@ -18,10 +18,10 @@ import afanes.core.links
 import afanes.core.names
 from afanes.core.errors import AfanesError, NoteParseError
 from afanes.core.frontmatter import NoteDocument
-from afanes.core.labels import DueDateText, PageLabels
+from afanes.core.labels import PageLabels
 from afanes.core.vault.snapshot import PageContent, ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import CategoryLabel, NoteType
+from afanes.models.note import NoteType
 
 
 class DraftMode(StrEnum):
@@ -134,27 +134,18 @@ class NormalDraft:
         reference wording is preserved in the heading even when the identity is
         sanitized.
         """
-        if reference.scheme is ReferenceScheme.PROJECT:
-            note_type = NoteType.PROJECT
-            category: CategoryLabel | None = None
-        else:
-            note_type = NoteType.REFERENCE
-            category = None
+        note_type = NoteType.PROJECT if reference.scheme is ReferenceScheme.PROJECT else NoteType.REFERENCE
 
         body = f"# {reference.name}\n\n"
-        raw: dict[str, object] = {"type": note_type.value}
-        if category is not None:
-            raw["category"] = category.value
         document = NoteDocument(
-            raw=raw,
+            raw={},
             body=body,
             newline="\n",
             has_frontmatter=True,
-            note_type=note_type,
-            category=category,
-            status=None,
+            note_type=None,
         )
-        labels = PageLabels.from_document(document)
+        labels = PageLabels(note_type=note_type)
+        document = labels.apply_to(document)
         identity = afanes.core.names.safe_filename(reference.name)
         template = document.to_text()
         common = DraftCommon(
@@ -330,48 +321,12 @@ class NormalDraft:
             raise NoteParseError(self.labels.due_date_error)
         if self.labels.date_error is not None:
             raise NoteParseError(self.labels.date_error)
-        raw = dict(self.source.raw)
-        self._write_labels(raw)
-        document = self.source.with_body(self.body).with_metadata(raw)
+        self._reject_log_date_change()
+        document = self.labels.apply_to(self.source.with_body(self.body))
         return document.to_text()
 
-    def _write_labels(self, raw: dict[str, object]) -> None:
-        """Write the editor-owned labels into a raw frontmatter mapping.
-
-        Parameters
-        ----------
-        raw : dict[str, object]
-            Mapping copied from the source document. The method mutates it.
-        """
-        labels = self.labels
-        raw["type"] = labels.note_type.value
-        if labels.note_type is not NoteType.REFERENCE or labels.category is None:
-            raw.pop("category", None)
-        else:
-            raw["category"] = labels.category.value
-        if labels.status is None:
-            raw.pop("status", None)
-        else:
-            raw["status"] = labels.status.value
-        due_date = DueDateText.from_text(labels.due_date_text).date
-        if labels.note_type is not NoteType.PROJECT or due_date is None:
-            raw.pop("due_date", None)
-        else:
-            raw["due_date"] = due_date
-        asked_by = labels.asked_by_text.strip()
-        if labels.note_type is not NoteType.PROJECT or not asked_by:
-            raw.pop("asked_by", None)
-        else:
-            raw["asked_by"] = asked_by
-        self._write_date(raw)
-
-    def _write_date(self, raw: dict[str, object]) -> None:
-        """Write the note date, refusing a log identity change through a draft.
-
-        Parameters
-        ----------
-        raw : dict[str, object]
-            Mapping copied from the source document. The method mutates it.
+    def _reject_log_date_change(self) -> None:
+        """Refuse a log date edited through the draft.
 
         Raises
         ------
@@ -387,10 +342,6 @@ class NormalDraft:
             if self.source.date is not None and note_date != self.source.date:
                 message = "Change a log entry's date from the Date field"
                 raise NoteParseError(message)
-        if note_date is None:
-            raw.pop("date", None)
-        else:
-            raw["date"] = note_date.to_yaml_value()
 
     def after_write(self, text: str, *, content_hash: str, path: Path | None = None) -> Self:
         """Return a draft whose baseline matches a successful write.

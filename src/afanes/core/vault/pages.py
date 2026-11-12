@@ -23,6 +23,7 @@ from afanes.core.errors import (
     VaultPathError,
 )
 from afanes.core.frontmatter import NoteDocument
+from afanes.core.labels import PageLabels
 from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.models.link import ReferenceScheme
@@ -167,9 +168,8 @@ class VaultPages:
                 message = "Note text does not match the requested type and category"
                 raise NoteParseError(message)
             if parsed.date is None and parsed.date_error is None:
-                raw = dict(parsed.raw)
-                raw["date"] = NoteDate.from_date(self.vault.today()).to_yaml_value()
-                parsed = parsed.with_metadata(raw)
+                labels = PageLabels.from_document(parsed).with_date_text(NoteDate.from_date(self.vault.today()).text)
+                parsed = labels.apply_to(parsed)
                 text = parsed.to_text()
             content = text
 
@@ -336,12 +336,8 @@ class VaultPages:
             raise ContentChangedError(message)
 
         document = NoteDocument.from_text(data.decode("utf-8"))
-        raw = dict(document.raw)
-        if status is None:
-            raw.pop("status", None)
-        else:
-            raw["status"] = status.value
-        text = document.with_metadata(raw).to_text()
+        labels = dataclasses.replace(PageLabels.from_document(document), status=status)
+        text = labels.apply_to(document).to_text()
         afanes.core.atomic.write_text_atomic(source, text)
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 

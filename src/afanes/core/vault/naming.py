@@ -26,6 +26,7 @@ from afanes.core.errors import (
     VaultPathError,
 )
 from afanes.core.frontmatter import NoteDocument
+from afanes.core.labels import PageLabels
 from afanes.core.links import ReferenceKey
 from afanes.core.vault.naming_reports import (
     CategoryMovePreview,
@@ -204,12 +205,8 @@ class VaultNaming:
         source = self.vault.contained(preview.note_path)
         target = self.vault.contained(preview.target_path)
         document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
-        raw = dict(document.raw)
-        if preview.category is None:
-            raw.pop("category", None)
-        else:
-            raw["category"] = preview.category.value
-        afanes.core.atomic.write_text_atomic(source, document.with_metadata(raw).to_text())
+        labels = PageLabels.from_document(document).with_category(preview.category)
+        afanes.core.atomic.write_text_atomic(source, labels.apply_to(document).to_text())
         if VaultPath.same(source, target):
             return source
         if target.exists():
@@ -427,22 +424,12 @@ class VaultNaming:
             message = f"Note changed on disk: {source}"
             raise ContentChangedError(message)
         document = NoteDocument.from_text(data.decode("utf-8"))
-        raw = dict(document.raw)
+        labels = PageLabels.from_document(document)
         if preview.new_type is not None:
-            raw["type"] = preview.new_type.value
-            if preview.new_type is NoteType.LOG:
-                raw.pop("category", None)
-                raw.pop("status", None)
-                raw.pop("due_date", None)
-                raw.pop("asked_by", None)
-            elif preview.new_type is NoteType.PROJECT:
-                raw.pop("category", None)
-            else:
-                raw.pop("due_date", None)
-                raw.pop("asked_by", None)
+            labels = labels.with_type(preview.new_type)
         if preview.new_date is not None:
-            raw["date"] = preview.new_date.to_yaml_value()
-        afanes.core.atomic.write_text_atomic(source, document.with_metadata(raw).to_text())
+            labels = labels.with_date_text(preview.new_date.text)
+        afanes.core.atomic.write_text_atomic(source, labels.apply_to(document).to_text())
 
     def _apply_heading_update(
         self,
