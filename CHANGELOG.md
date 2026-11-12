@@ -7,13 +7,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-11
+
 ### Added
 
+- Packaged desktop builds: `flet build linux|macos|windows --build-version "$(hatch version)"` bundles the Flet client, records the project version in the artifact, and starts without contacting a remote origin. The README documents the build command, the Flutter SDK and native toolchain prerequisites, the per-platform rule, the output directory, and the offline launch check; `src/main.py` is the packaged launcher. Linux was built and launched with networking unavailable, and its captured note matched a source run byte for byte. This implements the `close-mvp-gaps` OpenSpec change.
+- The workspace follows edits made outside the application without a manual refresh. A stat fingerprint limits the work to a rescan only after a change; the browser, project rows, and review queue update, a clean page reloads, a dirty draft raises the existing conflict state, and a deleted page is reported. Background refresh is read-only, preserves user-visible messages, and leaves a processing or review flow on its note.
 - New vaults can start from bundled **Personal**, **Work**, or **Study** starter content, or from a blank vault that still receives a `Getting started` guide note. Creation shows the templates with descriptions and a preview in both presentations, and `afanes vault create --template ID` reproduces the choice headlessly. Dates in starter content are relative to creation, so examples stay current while a new vault still opens with nothing to review. `afanes vault templates` lists the catalog. This implements the `add-vault-templates` OpenSpec change.
 - **Change vault → Close vault** saves an open page draft, forgets the remembered vault, and returns to the welcome screen, so the next launch starts there. This implements the `add-close-vault` OpenSpec change.
 
 ### Changed
 
+- The repository documentation now describes the real module tree and marks the planned SQLite index and the `afanes index` and `afanes doctor` commands as planned instead of present.
 - The change-vault menu now distinguishes **Open another vault** from **Create a new vault**, and closing is a separate action.
 
 - Releases are now versioned for pre-1.0 development: `0.5.0` is the current milestone and `1.0.0` is reserved for the first usable MVP. Earlier entries were renumbered from the previous `1.x`–`4.x` labels, which never corresponded to a tag or a shipped release.
