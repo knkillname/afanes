@@ -24,6 +24,7 @@ import afanes.core.links
 import afanes.core.names
 import afanes.core.search
 import afanes.core.steps
+import afanes.core.templates
 import afanes.ui.strings
 from afanes.core.editing import DraftMode, NormalDraft, PageDraft, PageDraftFactory, PageLabels, RawDraft
 from afanes.core.errors import (
@@ -33,6 +34,7 @@ from afanes.core.errors import (
     EmptyCaptureError,
     InvalidReferenceError,
     NoteParseError,
+    TemplateError,
     VaultError,
     VaultMissingError,
     VaultNotDirectoryError,
@@ -51,6 +53,7 @@ from afanes.core.search import (
     ReviewItemKind,
 )
 from afanes.core.settings import Settings, SettingsStore
+from afanes.core.templates import TemplateSummary
 from afanes.core.vault import (
     CategoryMovePreview,
     LinkOutcome,
@@ -117,27 +120,33 @@ class VaultOpener:
             raise VaultError(afanes.ui.strings.VAULT_UNREADABLE) from exc
 
     @staticmethod
-    def create(path: Path) -> VaultCreation:
+    def create(path: Path, *, template: str | None = None) -> VaultCreation:
         """Create a new vault and translate refusals into interface messages.
 
         Parameters
         ----------
         path : pathlib.Path
             Directory to create or seed. It must be missing or empty.
+        template : str | None
+            Bundled template identifier, or ``None`` to write only the guide
+            note.
 
         Returns
         -------
         VaultCreation
-            Created vault, the intermediate directories made for it, and the
-            default folders created inside it.
+            Created vault, the intermediate directories made for it, the
+            default folders created inside it, and the notes written into it.
 
         Raises
         ------
         VaultError
-            If the path is not a directory, is not empty, or cannot be created.
+            If the path is not a directory, is not empty, cannot be created, or
+            the bundled starter content cannot be written.
         """
         try:
-            return Vault.create_directory(path)
+            return Vault.create_directory(path, template=template)
+        except TemplateError as exc:
+            raise VaultError(afanes.ui.strings.NEW_VAULT_TEMPLATE_FAILED.format(detail=exc)) from exc
         except VaultNotEmptyError as exc:
             raise VaultError(afanes.ui.strings.VAULT_NOT_EMPTY) from exc
         except VaultNotDirectoryError as exc:
@@ -1453,7 +1462,7 @@ class AppState:
         finally:
             self.busy = False
 
-    async def create_vault(self, path: Path) -> bool:
+    async def create_vault(self, path: Path, template: str | None = None) -> bool:
         """Create a new vault, seed it, and open it.
 
         Parameters
@@ -1461,6 +1470,9 @@ class AppState:
         path : pathlib.Path
             Directory to create or seed. Missing intermediate folders are
             created.
+        template : str | None
+            Bundled template identifier, or ``None`` to write only the guide
+            note.
 
         Returns
         -------
@@ -1476,9 +1488,30 @@ class AppState:
         file I/O runs in a worker thread.
         """
         async with self._lock:
-            return await self._create_vault_state(path)
+            return await self._create_vault_state(path, template)
 
-    async def _create_vault_state(self, path: Path) -> bool:
+    async def template_summaries(self) -> tuple[TemplateSummary, ...] | None:
+        """Read the bundled template catalog without blocking the interface.
+
+        Returns
+        -------
+        tuple[TemplateSummary, ...] | None
+            Every catalog entry with the number of notes it writes, or ``None``
+            when the bundled content cannot be read.
+
+        Notes
+        -----
+        A read failure is an expected degradation: the creation action still
+        offers a vault without starter content. The read performs blocking
+        package I/O in a worker thread and never writes.
+        """
+        try:
+            return await asyncio.to_thread(afanes.core.templates.TemplateCatalog.bundled().summaries)
+        except (VaultError, OSError):
+            logger.debug("Bundled starter content could not be read", exc_info=True)
+            return None
+
+    async def _create_vault_state(self, path: Path, template: str | None) -> bool:
         """Create a vault while the command lock is held."""
         if not await self._commit_current():
             return False
@@ -1486,7 +1519,7 @@ class AppState:
         self.message = None
         try:
             try:
-                creation = await asyncio.to_thread(VaultOpener.create, path)
+                creation = await asyncio.to_thread(VaultOpener.create, path, template=template)
                 snapshot = await asyncio.to_thread(creation.vault.scan)
             except (VaultError, OSError) as exc:
                 logger.debug("New vault could not be created", exc_info=True)

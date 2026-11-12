@@ -65,6 +65,18 @@ class CommandLine:
             dest="no_remember",
             help=afanes.cli.strings.NO_REMEMBER_HELP,
         )
+        create.add_argument(
+            "--template",
+            metavar="ID",
+            dest="template",
+            default=None,
+            help=afanes.cli.strings.TEMPLATE_OPTION_HELP,
+        )
+        actions.add_parser(
+            afanes.cli.strings.TEMPLATES_COMMAND,
+            help=afanes.cli.strings.TEMPLATES_HELP,
+            description=afanes.cli.strings.TEMPLATES_HELP,
+        )
         return parser
 
     @classmethod
@@ -96,7 +108,16 @@ class CommandLine:
             status = exc.code
             return status if isinstance(status, int) else USAGE_EXIT_CODE
         if options.command == afanes.cli.strings.VAULT_COMMAND and options.action == afanes.cli.strings.CREATE_COMMAND:
-            return afanes.cli.vault.VaultCommand.create(options.directory, remember=not options.no_remember)
+            return afanes.cli.vault.VaultCommand.create(
+                options.directory,
+                remember=not options.no_remember,
+                template=options.template,
+            )
+        if (
+            options.command == afanes.cli.strings.VAULT_COMMAND
+            and options.action == afanes.cli.strings.TEMPLATES_COMMAND
+        ):
+            return afanes.cli.vault.VaultCommand.templates()
         return USAGE_EXIT_CODE
 
 

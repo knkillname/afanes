@@ -10,10 +10,12 @@ import flet as ft
 import pytest
 
 import afanes.core.settings
+import afanes.core.templates
 import afanes.core.vault
 import afanes.ui.app
 import afanes.ui.state
 import afanes.ui.strings
+from afanes.core.errors import TemplateContentError
 from afanes.core.settings import Settings
 
 Handler = Callable[[], Awaitable[None]]
@@ -408,12 +410,21 @@ class TestSessionGuard:
         assert isinstance(second.controls[0], ft.Container)
 
 
-async def _submit_creation(page: FakePage, path_text: Path) -> None:
+async def _submit_creation(page: FakePage, path_text: Path | None = None) -> None:
     dialog = page.dialogs[-1]
-    field = _typed(_find_by_key(dialog, "create-vault-path"), ft.TextField)
-    field.value = str(path_text)
+    if path_text is not None:
+        field = _typed(_find_by_key(dialog, "create-vault-path"), ft.TextField)
+        field.value = str(path_text)
     submit = _typed(_find_by_key(dialog, "create-vault-submit"), ft.FilledButton)
     await typing.cast("Handler", submit.on_click)()
+
+
+def _select_template(page: FakePage, identifier: str) -> None:
+    selector = _typed(_find_by_key(page.dialogs[-1], "create-vault-template"), ft.Dropdown)
+    selector.value = identifier
+    handler = selector.on_select
+    assert handler is not None
+    typing.cast("typing.Any", handler)()
 
 
 class TestCreation:
@@ -450,6 +461,8 @@ class TestCreation:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
+            assert _find_by_key(page.dialogs[-1], "create-vault-chosen-path") is not None
+            await _submit_creation(page)
 
         asyncio.run(scenario())
 
@@ -457,6 +470,7 @@ class TestCreation:
         assert (target / "inbox").is_dir()
         assert (target / "reference").is_dir()
         assert (target / "projects").is_dir()
+        assert (target / "reference" / "Getting started.md").is_file()
         assert page.dialogs == []
         assert isinstance(page.controls[0], ft.Column)
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
@@ -483,7 +497,7 @@ class TestCreation:
         assert not settings.exists()
         assert isinstance(page.controls[0], ft.Container)
 
-    def test_desktop_creation_error_returns_to_the_welcome(
+    def test_desktop_creation_error_stays_in_the_dialog(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
@@ -501,12 +515,17 @@ class TestCreation:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
+            await _submit_creation(page)
 
         asyncio.run(scenario())
 
         assert state.vault_root is None
         assert state.message == afanes.ui.strings.VAULT_NOT_EMPTY
         assert not settings.exists()
+        assert len(page.dialogs) == 1
+        error = _typed(_find_by_key(page.dialogs[0], "create-vault-error"), ft.Text)
+        assert error.visible is True
+        assert error.value == afanes.ui.strings.VAULT_NOT_EMPTY
 
     def test_web_creation_dialog_previews_and_creates_the_vault(
         self,
@@ -527,6 +546,12 @@ class TestCreation:
             assert "inbox/" in (preview.value or "")
             assert "projects/" in (preview.value or "")
             assert "actions/" not in (preview.value or "")
+            assert (
+                afanes.ui.strings.NEW_VAULT_PREVIEW_GUIDE.format(
+                    folders="inbox/, trash/, reference/, projects/",
+                )
+                == preview.value
+            )
             await _submit_creation(page, target)
 
         asyncio.run(scenario())
@@ -588,6 +613,88 @@ class TestCreation:
         assert state.vault_root is None
         assert not settings.exists()
 
+    def test_creation_preselects_no_starter_content(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        page = FakePage(web=True)
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+
+        asyncio.run(scenario())
+        selector = _typed(_find_by_key(page.dialogs[0], "create-vault-template"), ft.Dropdown)
+
+        assert selector.value == ""
+        assert [option.key for option in selector.options] == ["", "personal", "work", "study"]
+        assert all(option.text for option in selector.options)
+        preview = _typed(_find_by_key(page.dialogs[0], "create-vault-preview"), ft.Text)
+        assert "guide note" in (preview.value or "")
+
+    def test_selecting_a_template_updates_the_preview_and_is_created(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        target = tmp_path / "vault"
+        page = FakePage(web=True)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+            preview = _typed(_find_by_key(page.dialogs[0], "create-vault-preview"), ft.Text)
+            assert "guide note" in (preview.value or "")
+            _select_template(page, "personal")
+            assert "5 notes" in (preview.value or "")
+            assert "guide note" in (preview.value or "")
+            await _submit_creation(page, target)
+
+        asyncio.run(scenario())
+
+        assert state.vault_root == target.resolve()
+        assert (target / "reference" / "Getting started.md").is_file()
+        assert (target / "projects" / "Home insurance.md").is_file()
+        assert (target / "reference" / "person" / "Sam Rivera.md").is_file()
+
+    def test_unreadable_catalog_degrades_to_a_blank_vault(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        target = tmp_path / "vault"
+        page = FakePage(web=True)
+        state = afanes.ui.state.app_state
+
+        def refuse(_cls: object) -> None:
+            message = "bundled content is broken"
+            raise TemplateContentError(message)
+
+        monkeypatch.setattr(afanes.core.templates.TemplateCatalog, "summaries", refuse)
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+            warning = _typed(_find_by_key(page.dialogs[0], "create-vault-templates-error"), ft.Text)
+            assert warning.visible is True
+            selector = _typed(_find_by_key(page.dialogs[0], "create-vault-template"), ft.Dropdown)
+            assert [option.key for option in selector.options] == [""]
+            await _submit_creation(page, target)
+
+        asyncio.run(scenario())
+
+        assert state.vault_root == target.resolve()
+        assert (target / "reference" / "Getting started.md").is_file()
+        assert [path.name for path in (target / "projects").iterdir()] == []
+
     def test_creating_a_second_vault_from_the_change_action(
         self,
         tmp_path: Path,
@@ -608,11 +715,14 @@ class TestCreation:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
             create = _typed(_find_by_key(page.controls[0], "workspace-change-create"), ft.PopupMenuItem)
             await typing.cast("Handler", create.on_click)()
+            _select_template(page, "study")
+            await _submit_creation(page)
 
         asyncio.run(scenario())
 
         assert state.vault_root == second.resolve()
         assert (second / "inbox").is_dir()
+        assert (second / "projects" / "Research essay.md").is_file()
         assert not (first / "inbox").exists()
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(second.resolve())
 

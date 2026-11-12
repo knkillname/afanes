@@ -16,6 +16,7 @@ import afanes.core.atomic
 import afanes.core.links
 import afanes.core.names
 import afanes.core.steps
+import afanes.core.templates
 from afanes.core.errors import (
     AfanesError,
     ContentChangedError,
@@ -25,6 +26,7 @@ from afanes.core.errors import (
     NoteParseError,
     ProcessingError,
     ReferenceRewriteError,
+    TemplateWriteError,
     VaultError,
     VaultMissingError,
     VaultNotDirectoryError,
@@ -1085,19 +1087,31 @@ class Vault:
         )
 
     @classmethod
-    def create_directory(cls, path: Path) -> "VaultCreation":
+    def create_directory(
+        cls,
+        path: Path,
+        *,
+        template: str | None = None,
+        locale: str | None = None,
+    ) -> "VaultCreation":
         """Create and seed a vault directory.
 
         Parameters
         ----------
         path : pathlib.Path
             Directory to create or seed. It must be missing or empty.
+        template : str | None
+            Bundled template identifier, or ``None`` for a vault with no
+            starter content apart from the guide note.
+        locale : str | None
+            Locale used to resolve bundled content. ``None`` uses the base
+            locale, and a missing locale falls back to it.
 
         Returns
         -------
         VaultCreation
-            Created vault, the intermediate directories made for it, and the
-            default folders created inside it.
+            Created vault, the intermediate directories made for it, the
+            default folders created inside it, and the notes written into it.
 
         Raises
         ------
@@ -1105,6 +1119,13 @@ class Vault:
             If the path exists and is not a directory.
         VaultNotEmptyError
             If the directory exists and already contains entries.
+        UnknownTemplateError
+            If ``template`` names no catalog entry.
+        TemplateContentError
+            If the bundled content is missing or violates a vault validity rule.
+        TemplateWriteError
+            If a bundled note cannot be written. Notes written before the
+            failure remain in place.
         VaultError
             If a directory cannot be created or seeded.
 
@@ -1112,8 +1133,10 @@ class Vault:
         -----
         Missing intermediate folders are created. The path is resolved before
         it is inspected, so a symlink cannot smuggle a populated directory past
-        the emptiness check. Nothing is rolled back when seeding fails partway:
-        the directories already created stay in place.
+        the emptiness check. Bundled content is resolved and validated before
+        the first directory is created, so a refused tree leaves the filesystem
+        unchanged. Nothing is rolled back when seeding or writing fails partway:
+        the directories and notes already created stay in place.
         """
         target = path.expanduser().resolve()
         try:
@@ -1123,6 +1146,13 @@ class Vault:
             if target.is_dir() and any(target.iterdir()):
                 message = f"Vault path is not empty: {path}"
                 raise VaultNotEmptyError(message)
+        except OSError as exc:
+            message = f"Could not inspect the vault directory: {path}"
+            raise VaultError(message) from exc
+
+        bundle = afanes.core.templates.TemplateCatalog.bundled().bundle(template, locale)
+
+        try:
             created = cls._missing_directories(target.parent)
             target.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
@@ -1134,7 +1164,48 @@ class Vault:
         except OSError as exc:
             message = f"Could not seed the vault directory: {path}"
             raise VaultError(message) from exc
-        return VaultCreation(vault=vault, created_directories=created, seeded_directories=seeded)
+        written = vault._write_bundle(bundle)
+        return VaultCreation(
+            vault=vault,
+            created_directories=created,
+            seeded_directories=seeded,
+            written_notes=written,
+            template=bundle.template,
+        )
+
+    def _write_bundle(self, bundle: afanes.core.templates.TemplateBundle) -> tuple[Path, ...]:
+        """Write the guide and template notes into this new vault.
+
+        Parameters
+        ----------
+        bundle : afanes.core.templates.TemplateBundle
+            Validated content resolved for this creation.
+
+        Returns
+        -------
+        tuple[pathlib.Path, ...]
+            Absolute paths of the notes written, in creation order.
+
+        Raises
+        ------
+        TemplateWriteError
+            If a note cannot be written. The message names the failing note and
+            the notes already written, which stay in place.
+        """
+        written: list[Path] = []
+        for note in bundle.ordered_notes:
+            target = self.contained(note.relative_path)
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                afanes.core.atomic.write_text_atomic(target, note.text)
+            except (OSError, VaultError) as exc:
+                already = ", ".join(path.relative_to(self.root).as_posix() for path in written) or "none"
+                message = (
+                    f"Could not write bundled note {note.relative_path.as_posix()!r}; notes already written: {already}"
+                )
+                raise TemplateWriteError(message) from exc
+            written.append(target)
+        return tuple(written)
 
     @staticmethod
     def _missing_directories(start: Path) -> tuple[Path, ...]:
@@ -3138,7 +3209,7 @@ class Vault:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class VaultCreation:
-    """Directories produced by one vault creation.
+    """Directories and notes produced by one vault creation.
 
     Attributes
     ----------
@@ -3149,8 +3220,15 @@ class VaultCreation:
         The vault root itself is not included.
     seeded_directories : tuple[pathlib.Path, ...]
         Default folders created inside the vault, in layout order.
+    written_notes : tuple[pathlib.Path, ...]
+        Notes written into the vault, guide first, in creation order.
+    template : str | None
+        Template identifier used for the notes, or ``None`` for a vault without
+        starter content.
     """
 
     vault: Vault
     created_directories: tuple[Path, ...]
     seeded_directories: tuple[Path, ...]
+    written_notes: tuple[Path, ...]
+    template: str | None

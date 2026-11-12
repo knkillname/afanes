@@ -347,10 +347,15 @@ class TestVaultCreation:
 
         assert list(creation.seeded_directories) == expected
 
-    def test_seeding_creates_no_files(self, tmp_path: Path) -> None:
+    def test_creation_writes_only_the_guide(self, tmp_path: Path) -> None:
         creation = afanes.core.vault.Vault.create_directory(tmp_path / "vault")
 
-        assert [path for path in creation.vault.root.rglob("*") if path.is_file()] == []
+        files = [
+            path.relative_to(creation.vault.root).as_posix()
+            for path in creation.vault.root.rglob("*")
+            if path.is_file()
+        ]
+        assert files == ["reference/Getting started.md"]
 
     def test_refusal_writes_nothing(self, tmp_path: Path) -> None:
         target = tmp_path / "vault"

@@ -1,0 +1,16 @@
+---
+type: project
+status: active
+---
+
+# Run the quarterly planning session
+
+The group agrees on one outcome for the quarter, then splits it into concrete steps. The room and
+the agenda are the only fixed parts.
+
+- [ ] Collect last quarter's results into one page
+- [ ] Ask each team to send two candidate outcomes
+- [ ] Book the room and send the agenda
+- [ ] Run the session and record the chosen outcome
+- [ ] Split the outcome into steps and put them in order
+- [ ] Share the plan with [The platform group](<note:The platform group>)

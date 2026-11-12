@@ -10,10 +10,11 @@ from pathlib import Path
 import pytest
 
 import afanes.core.settings
+import afanes.core.templates
 import afanes.core.vault
 import afanes.ui.state
 import afanes.ui.strings
-from afanes.core.errors import ConfigurationError, VaultError
+from afanes.core.errors import ConfigurationError, TemplateContentError, VaultError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import ProcessingOutcome
 from afanes.core.settings import Settings, SettingsStore
@@ -2359,7 +2360,69 @@ class TestCreateVault:
         assert (target / "reference").is_dir()
         assert (target / "projects").is_dir()
         assert not (target / "reference" / "people").exists()
+        assert (target / "reference" / "Getting started.md").is_file()
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
+
+    def test_creates_a_vault_from_a_template(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        target = tmp_path / "vault"
+        state = afanes.ui.state.app_state
+
+        opened = asyncio.run(state.create_vault(target, template="work"))
+
+        assert opened is True
+        assert state.vault_root == target.resolve()
+        assert (target / "reference" / "Getting started.md").is_file()
+        assert (target / "projects" / "Quarterly planning.md").is_file()
+
+    def test_reports_a_template_failure_through_the_controller(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        target = tmp_path / "vault"
+
+        def refuse(_cls: object) -> None:
+            message = "bundled content is broken"
+            raise TemplateContentError(message)
+
+        monkeypatch.setattr(afanes.core.templates.TemplateCatalog, "bundled", classmethod(refuse))
+
+        opened = asyncio.run(state.create_vault(target, template="personal"))
+
+        assert opened is False
+        assert state.vault_root is None
+        assert state.message is not None
+        assert "bundled content is broken" in state.message
+        assert not target.exists()
+
+    def test_template_summaries_report_the_catalog(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        summaries = asyncio.run(state.template_summaries())
+
+        assert summaries is not None
+        assert [summary.identifier for summary in summaries] == ["personal", "work", "study"]
+
+    def test_template_summaries_degrade_when_the_bundle_is_unreadable(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        def refuse(_cls: object) -> None:
+            message = "bundled content is broken"
+            raise TemplateContentError(message)
+
+        monkeypatch.setattr(afanes.core.templates.TemplateCatalog, "summaries", refuse)
+
+        assert asyncio.run(state.template_summaries()) is None
 
     def test_refuses_a_non_empty_directory(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")

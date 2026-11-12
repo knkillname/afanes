@@ -15,6 +15,7 @@ from pathlib import Path
 
 import afanes.cli.strings
 import afanes.core.settings
+import afanes.core.templates
 import afanes.core.vault
 from afanes.core.errors import ConfigurationError, VaultError
 from afanes.core.settings import Settings
@@ -65,10 +66,10 @@ class CommandOutput:
 
 
 class VaultCommand:
-    """Create vault directories from the command line."""
+    """Create vault directories and list starter content from the command line."""
 
     @classmethod
-    def create(cls, path: Path, *, remember: bool) -> int:
+    def create(cls, path: Path, *, remember: bool, template: str | None = None) -> int:
         """Create and seed a vault directory.
 
         Parameters
@@ -77,6 +78,9 @@ class VaultCommand:
             Directory to create or seed. It must be missing or empty.
         remember : bool
             Whether the new vault becomes the one Afanes opens next launch.
+        template : str | None
+            Bundled template identifier, or ``None`` to write only the guide
+            note.
 
         Returns
         -------
@@ -91,7 +95,7 @@ class VaultCommand:
         blocking filesystem I/O and never opens the interface.
         """
         try:
-            creation = afanes.core.vault.Vault.create_directory(path)
+            creation = afanes.core.vault.Vault.create_directory(path, template=template)
         except VaultError as exc:
             CommandOutput.error(afanes.cli.strings.CREATE_FAILED.format(detail=exc))
             return EXIT_FAILURE
@@ -108,6 +112,41 @@ class VaultCommand:
         return EXIT_SUCCESS
 
     @classmethod
+    def templates(cls) -> int:
+        """Report every bundled template with its identifier and description.
+
+        Returns
+        -------
+        int
+            ``0`` when the catalog was read, ``1`` when it is unavailable.
+
+        Notes
+        -----
+        The command reads package data only. It opens no vault, requires no
+        display, and writes no file.
+        """
+        try:
+            summaries = afanes.core.templates.TemplateCatalog.bundled().summaries()
+        except VaultError as exc:
+            CommandOutput.error(afanes.cli.strings.TEMPLATES_FAILED.format(detail=exc))
+            return EXIT_FAILURE
+        for summary in summaries:
+            notes = (
+                afanes.cli.strings.TEMPLATE_NOTES_ONE
+                if summary.note_count == 1
+                else afanes.cli.strings.TEMPLATE_NOTES_MANY.format(count=summary.note_count)
+            )
+            CommandOutput.line(
+                afanes.cli.strings.TEMPLATE_LINE.format(
+                    identifier=summary.identifier,
+                    label=summary.label,
+                    description=summary.description,
+                    notes=notes,
+                ),
+            )
+        return EXIT_SUCCESS
+
+    @classmethod
     def _report(cls, creation: VaultCreation, *, remembered: bool) -> None:
         """Write the structured creation summary."""
         root = creation.vault.root
@@ -117,5 +156,11 @@ class VaultCommand:
             CommandOutput.line(afanes.cli.strings.CREATED_PARENTS.format(paths=parents))
         folders = ", ".join(f"{path.relative_to(root).as_posix()}/" for path in creation.seeded_directories)
         CommandOutput.line(afanes.cli.strings.SEEDED_FOLDERS.format(folders=folders))
+        template = creation.template or afanes.cli.strings.TEMPLATE_NONE
+        CommandOutput.line(afanes.cli.strings.TEMPLATE_USED.format(template=template))
+        notes = ", ".join(path.relative_to(root).as_posix() for path in creation.written_notes)
+        CommandOutput.line(
+            afanes.cli.strings.WRITTEN_NOTES.format(notes=notes or afanes.cli.strings.TEMPLATE_NONE),
+        )
         message = afanes.cli.strings.REMEMBERED if remembered else afanes.cli.strings.NOT_REMEMBERED
         CommandOutput.line(message)

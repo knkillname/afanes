@@ -58,6 +58,46 @@ class ContentChangedError(VaultError):
     """Raised when a note changed on disk after it was read for editing."""
 
 
+class TemplateError(VaultError):
+    """Base class for failures in bundled starter content.
+
+    Notes
+    -----
+    Every template failure is a vault creation refusal, so the interface and
+    the command line report it with the same path as an unseeded directory.
+    """
+
+
+class UnknownTemplateError(TemplateError):
+    """Raised when a requested template identifier is not in the catalog.
+
+    Notes
+    -----
+    The message lists the valid identifiers so a mistyped command can be
+    corrected without opening the interface.
+    """
+
+
+class TemplateContentError(TemplateError):
+    """Raised when bundled content violates the vault format.
+
+    Notes
+    -----
+    The message names the offending template and note. Nothing is written when
+    this error is raised.
+    """
+
+
+class TemplateWriteError(TemplateError):
+    """Raised when a bundled note cannot be written into a new vault.
+
+    Notes
+    -----
+    Notes written before the failure remain in place, and the message names
+    both the failing note and the notes already written.
+    """
+
+
 class NoteParseError(AfanesError):
     """Raised when a note's frontmatter or metadata cannot be parsed."""
 

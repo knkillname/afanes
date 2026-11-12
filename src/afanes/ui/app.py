@@ -193,28 +193,77 @@ class _Shell:
         Notes
         -----
         A desktop session uses the native directory dialog, whose New Folder
-        action names the folder that does not exist yet. A browser session has
-        no such dialog, so it asks for an absolute path instead.
+        action names the folder that does not exist yet, and then asks for the
+        starter content. A browser session has no such dialog, so it asks for an
+        absolute path and the starter content in one form.
         """
         if not self.is_desktop:
-            self.show_create_dialog()
+            await self.show_create_dialog()
             return
         if self.picker is None:
             return
         selected = await self.picker.get_directory_path(dialog_title=afanes.ui.strings.NEW_VAULT_ACTION)
         if selected is None:
             return
-        await self.state.create_vault(Path(selected))
-        await self.render()
+        await self.show_create_dialog(Path(selected))
 
-    def show_create_dialog(self) -> None:
-        """Ask for a new vault path in a browser session and create it."""
+    async def show_create_dialog(self, path: Path | None = None) -> None:
+        """Ask for the vault path and starter content, then create the vault.
+
+        Parameters
+        ----------
+        path : pathlib.Path | None
+            Folder already chosen by the desktop directory dialog, or ``None``
+            in a browser session, which asks for the path in a field.
+
+        Notes
+        -----
+        The catalog is read through the controller, so the package resources
+        are not touched on the interface thread. When the catalog cannot be
+        read, the dialog explains it and offers a vault without starter
+        content instead of failing to open.
+        """
+        summaries = await self.state.template_summaries()
+        by_identifier = {summary.identifier: summary for summary in summaries or ()}
         field = ft.TextField(
             label=afanes.ui.strings.NEW_VAULT_PATH_LABEL,
             hint_text=afanes.ui.strings.WELCOME_PATH_HINT,
             value="",
-            autofocus=True,
+            autofocus=path is None,
+            visible=path is None,
             key="create-vault-path",
+        )
+        selector = ft.Dropdown(
+            label=afanes.ui.strings.NEW_VAULT_TEMPLATE_LABEL,
+            options=[
+                ft.dropdown.Option(key="", text=afanes.ui.strings.NEW_VAULT_TEMPLATE_NONE),
+                *[
+                    ft.dropdown.Option(
+                        key=summary.identifier,
+                        text=afanes.ui.strings.NEW_VAULT_TEMPLATE_OPTION.format(
+                            label=summary.label,
+                            description=summary.description,
+                        ),
+                    )
+                    for summary in summaries or ()
+                ],
+            ],
+            value="",
+            key="create-vault-template",
+        )
+        unavailable = ft.Text(
+            afanes.ui.strings.NEW_VAULT_TEMPLATE_UNAVAILABLE,
+            color=afanes.ui.theme.ERROR_COLOR,
+            visible=summaries is None,
+            key="create-vault-templates-error",
+        )
+        folders = ", ".join(f"{folder.as_posix()}/" for folder in afanes.core.vault.Vault.default_layout())
+        preview = ft.Text(
+            afanes.ui.strings.NEW_VAULT_PREVIEW_GUIDE.format(folders=folders),
+            size=12,
+            color=afanes.ui.theme.MUTED_TEXT_COLOR,
+            selectable=True,
+            key="create-vault-preview",
         )
         error = ft.Text(
             "",
@@ -222,21 +271,38 @@ class _Shell:
             visible=False,
             key="create-vault-error",
         )
-        folders = ", ".join(f"{path.as_posix()}/" for path in afanes.core.vault.Vault.default_layout())
-        preview = ft.Text(
-            afanes.ui.strings.NEW_VAULT_PREVIEW.format(folders=folders),
+        chosen = ft.Text(
+            str(path) if path is not None else "",
             size=12,
             color=afanes.ui.theme.MUTED_TEXT_COLOR,
             selectable=True,
-            key="create-vault-preview",
+            visible=path is not None,
+            key="create-vault-chosen-path",
         )
 
+        def refresh_preview() -> None:
+            summary = by_identifier.get(selector.value or "")
+            if summary is None:
+                preview.value = afanes.ui.strings.NEW_VAULT_PREVIEW_GUIDE.format(folders=folders)
+            else:
+                preview.value = afanes.ui.strings.NEW_VAULT_PREVIEW_TEMPLATE.format(
+                    folders=folders,
+                    notes=afanes.ui.strings.note_count(summary.note_count),
+                )
+            self.page.update()
+
+        selector.on_select = refresh_preview
+
         async def submit() -> None:
-            text = (field.value or "").strip()
-            if not text:
-                self._show_create_error(error, afanes.ui.strings.VAULT_PATH_REQUIRED)
-                return
-            if not await self.state.create_vault(Path(text)):
+            if path is None:
+                text = (field.value or "").strip()
+                if not text:
+                    self._show_create_error(error, afanes.ui.strings.VAULT_PATH_REQUIRED)
+                    return
+                target = Path(text)
+            else:
+                target = path
+            if not await self.state.create_vault(target, template=selector.value or None):
                 self._show_create_error(error, self.state.message or afanes.ui.strings.VAULT_PATH_REQUIRED)
                 return
             self.page.pop_dialog()
@@ -247,13 +313,19 @@ class _Shell:
             self.page.update()
 
         field.on_submit = submit
+        body = (
+            afanes.ui.strings.NEW_VAULT_DIALOG_BODY if path is None else afanes.ui.strings.NEW_VAULT_DIALOG_BODY_CHOSEN
+        )
         self.page.show_dialog(
             ft.AlertDialog(
                 title=ft.Text(afanes.ui.strings.NEW_VAULT_DIALOG_TITLE),
                 content=ft.Column(
                     controls=[
-                        ft.Text(afanes.ui.strings.NEW_VAULT_DIALOG_BODY),
+                        ft.Text(body),
                         field,
+                        chosen,
+                        selector,
+                        unavailable,
                         preview,
                         error,
                     ],
