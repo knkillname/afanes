@@ -265,6 +265,9 @@ class VaultNote:
         other note type.
     search_text : str
         Body text used by browser search, with step metadata comments removed.
+    asked_by : str | None
+        Requester name declared by a project, or ``None`` when the key is
+        absent or the note is not a project.
     """
 
     path: Path
@@ -281,6 +284,7 @@ class VaultNote:
     body_references: tuple[NoteReference, ...]
     steps: tuple[ProjectStep, ...]
     search_text: str
+    asked_by: str | None = None
 
     @property
     def references(self) -> tuple[NoteReference, ...]:

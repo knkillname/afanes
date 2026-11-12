@@ -13,6 +13,7 @@ from pathlib import Path
 
 import flet as ft
 
+import afanes.core.connections
 import afanes.core.search
 import afanes.ui.state
 import afanes.ui.strings
@@ -179,6 +180,32 @@ class PageView:
             on_tap_link=self.handle_link,
         )
         self.project_body = ProjectBodyView(self._update, self.follow, self._pick_date)
+        self._show_completed_steps = False
+        self._show_finished_projects = False
+        self._connections_page: Path | None = None
+        self.connections_steps_toggle = ft.Checkbox(
+            label=afanes.ui.strings.PAGE_CONNECTIONS_SHOW_COMPLETED_STEPS,
+            value=False,
+            on_change=self.toggle_completed_steps,
+            key="connections-completed-steps",
+        )
+        self.connections_projects_toggle = ft.Checkbox(
+            label=afanes.ui.strings.PAGE_CONNECTIONS_SHOW_FINISHED_PROJECTS,
+            value=False,
+            on_change=self.toggle_finished_projects,
+            key="connections-finished-projects",
+        )
+        self.connections_body = ft.Column(
+            controls=[],
+            spacing=afanes.ui.theme.CONNECTIONS_GAP,
+            key="connections-body",
+        )
+        self.connections_panel = Panel(
+            afanes.ui.strings.PAGE_CONNECTIONS_TITLE,
+            self.connections_body,
+            [],
+        ).build()
+        self.connections_panel.visible = False
 
         self.identity_text = ft.Text("", selectable=True, size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
         self.body_field = ft.TextField(
@@ -471,7 +498,7 @@ class PageView:
             spacing=afanes.ui.theme.ITEM_GAP,
         )
         self.content = ft.Column(
-            controls=[self.empty_text, self.project_body.build(), self.read_body],
+            controls=[self.empty_text, self.project_body.build(), self.read_body, self.connections_panel],
             spacing=afanes.ui.theme.ITEM_GAP,
             scroll=ft.ScrollMode.AUTO,
             expand=True,
@@ -540,6 +567,7 @@ class PageView:
         self._refresh_header(page, editing=editing)
         self._refresh_meta(page, editing=editing)
         self._refresh_read(page, editing=editing)
+        self._refresh_connections(page, editing=editing)
         self._refresh_edit(page, editing=editing)
         self._refresh_raw(page)
         self._refresh_banners()
@@ -585,6 +613,127 @@ class PageView:
         self.project_body.refresh()
         if visible and page is not None and not is_project:
             self.read_body.value = state.pages.page_read_text
+
+    def _refresh_connections(self, page: PageDraft | None, *, editing: bool) -> None:
+        """Refresh the read-only Connections section after the rendered body."""
+        state = self._state
+        path = page.path if page is not None else None
+        if path != self._connections_page:
+            self._connections_page = path
+            self._show_completed_steps = False
+            self._show_finished_projects = False
+        labels = state.pages.page_labels if page is not None else None
+        parsed = (
+            page is not None
+            and path is not None
+            and not editing
+            and page.mode is DraftMode.NORMAL
+            and labels is not None
+        )
+        connections = state.session.connections if parsed else None
+        result = connections.for_note(path) if connections is not None and path is not None else None
+        if result is None or not result.has_connections:
+            self.connections_panel.visible = False
+            self.connections_body.controls = []
+            return
+        self.connections_steps_toggle.value = self._show_completed_steps
+        self.connections_steps_toggle.visible = result.has_completed_steps
+        self.connections_projects_toggle.value = self._show_finished_projects
+        self.connections_projects_toggle.visible = bool(result.finished_projects)
+        self.connections_body.controls = [
+            self._connection_subsection(
+                afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM,
+                self._linked_from_controls(result),
+            ),
+            self._connection_subsection(
+                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS,
+                self._owned_step_controls(result),
+                self.connections_steps_toggle,
+            ),
+            self._connection_subsection(
+                afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
+                self._requested_project_controls(result),
+                self.connections_projects_toggle,
+            ),
+        ]
+        self.connections_panel.visible = True
+
+    def _connection_subsection(
+        self,
+        title: str,
+        rows: list[ft.Control],
+        toggle: ft.Checkbox | None = None,
+    ) -> ft.Column:
+        """Build one labeled group of connection rows."""
+        controls: list[ft.Control] = [
+            ft.Text(title, style=afanes.ui.theme.SECTION_LABEL_TEXT_STYLE),
+            *rows,
+        ]
+        if toggle is not None:
+            controls.append(toggle)
+        return ft.Column(controls=controls, spacing=afanes.ui.theme.ITEM_GAP)
+
+    def _linked_from_controls(self, result: afanes.core.connections.ConnectionSet) -> list[ft.Control]:
+        """Build one row per note whose body links here."""
+        if not result.linked_from:
+            return [
+                ft.Text(afanes.ui.strings.PAGE_CONNECTIONS_EMPTY_LINKED_FROM, style=afanes.ui.theme.METADATA_TEXT_STYLE)
+            ]
+        return [
+            ft.TextButton(
+                content=note.title,
+                on_click=self._connection_handler(note.path),
+            )
+            for note in result.linked_from
+        ]
+
+    def _owned_step_controls(self, result: afanes.core.connections.ConnectionSet) -> list[ft.Control]:
+        """Build owned-step rows grouped by project."""
+        rows: list[ft.Control] = []
+        shown = 0
+        for owned in result.owned_projects:
+            steps = list(owned.open_steps)
+            if self._show_completed_steps:
+                steps.extend(owned.completed_steps)
+            if not steps:
+                continue
+            shown += 1
+            rows.append(
+                ft.TextButton(
+                    content=ft.Text(owned.project.title, style=afanes.ui.theme.METADATA_TEXT_STYLE),
+                    on_click=self._connection_handler(owned.project.path),
+                )
+            )
+            rows.extend(
+                ft.Container(
+                    content=ft.TextButton(
+                        content=step.text,
+                        on_click=self._connection_handler(owned.project.path),
+                    ),
+                    padding=ft.Padding.only(left=afanes.ui.theme.STEP_INDENT),
+                )
+                for step in steps
+            )
+        if shown == 0:
+            return [ft.Text(afanes.ui.strings.PAGE_CONNECTIONS_EMPTY_STEPS, style=afanes.ui.theme.METADATA_TEXT_STYLE)]
+        return rows
+
+    def _requested_project_controls(self, result: afanes.core.connections.ConnectionSet) -> list[ft.Control]:
+        """Build requested-project rows, with finished projects behind the toggle."""
+        projects = list(result.requested_projects)
+        if self._show_finished_projects:
+            projects.extend(result.finished_projects)
+        if not projects:
+            return [
+                ft.Text(afanes.ui.strings.PAGE_CONNECTIONS_EMPTY_PROJECTS, style=afanes.ui.theme.METADATA_TEXT_STYLE)
+            ]
+        return [
+            ft.TextButton(
+                content=project.title,
+                on_click=self._connection_handler(project.path),
+            )
+            for project in projects
+        ]
 
     def _refresh_meta(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the note date and the project status and due-date row."""
@@ -937,6 +1086,50 @@ class PageView:
         if page is None or page.path is None or self._on_process is None:
             return
         await self._on_process(page.path)
+
+    async def open_connection(self, path: Path) -> None:
+        """Open one connection target in the page pane.
+
+        Parameters
+        ----------
+        path : Path
+            Absolute path of the linked note or project.
+        """
+        await self._state.navigation.open_page(path)
+        self.refresh()
+        self._update()
+
+    async def toggle_completed_steps(self, event: ft.Event[ft.Checkbox]) -> None:
+        """Show or hide completed owned steps.
+
+        Parameters
+        ----------
+        event : flet.Event[flet.Checkbox]
+            Toggle event whose control carries the new boolean value.
+        """
+        self._show_completed_steps = bool(event.control.value)
+        self.refresh()
+        self._update()
+
+    async def toggle_finished_projects(self, event: ft.Event[ft.Checkbox]) -> None:
+        """Show or hide finished requested projects.
+
+        Parameters
+        ----------
+        event : flet.Event[flet.Checkbox]
+            Toggle event whose control carries the new boolean value.
+        """
+        self._show_finished_projects = bool(event.control.value)
+        self.refresh()
+        self._update()
+
+    def _connection_handler(self, path: Path) -> Callable[[], Awaitable[None]]:
+        """Bind a no-argument async handler to one connection path."""
+
+        async def handle() -> None:
+            await self.open_connection(path)
+
+        return handle
 
     async def choose_page(self, path: Path) -> None:
         """Open one candidate from the picker."""

@@ -643,6 +643,7 @@ class TestCreationWritesBundledContent:
 
         files = sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
         assert files == [
+            "afanes.yaml",
             "reference/Getting started.md",
             "templates/daily.md",
             "templates/organization.md",

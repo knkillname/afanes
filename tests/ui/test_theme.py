@@ -34,3 +34,7 @@ class TestTheme:
         assert filled.style.bgcolor == afanes.ui.theme.ACTION_COLOR
         assert tiles is not None
         assert tiles.selected_tile_color == afanes.ui.theme.SELECTED_ROW_COLOR
+
+    def test_adoption_panel_spacing_matches_a_section_gap(self) -> None:
+        assert afanes.ui.theme.ADOPTION_PANEL_GAP == afanes.ui.theme.SECTION_GAP
+        assert afanes.ui.theme.ADOPTION_PANEL_GAP > 0

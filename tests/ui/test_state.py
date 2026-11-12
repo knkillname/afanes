@@ -9,10 +9,12 @@ from pathlib import Path
 
 import pytest
 
+import afanes.core.connections
 import afanes.core.settings
 import afanes.core.templates
 import afanes.core.vault.pages
 import afanes.core.vault.processing
+import afanes.core.vault.schema
 import afanes.core.vault.service
 import afanes.core.vault.snapshot
 import afanes.ui.state
@@ -22,7 +24,12 @@ import afanes.ui.state.session
 import afanes.ui.state.status
 import afanes.ui.strings
 from afanes.core.editing import NormalDraft
-from afanes.core.errors import ConfigurationError, TemplateContentError, VaultError
+from afanes.core.errors import (
+    ConfigurationError,
+    TemplateContentError,
+    VaultError,
+    VaultSchemaWriteError,
+)
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.log import LogMode
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
@@ -32,6 +39,8 @@ from afanes.core.steps import StepDocument
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 from afanes.models.step import ProjectStep, StepEdit, StepEditKind
+from tests.support import ensure_vault as _ensure_vault
+from tests.support import versioned as _versioned
 
 OLD_NS = 1_700_000_000_000_000_000
 NEW_NS = 1_700_000_001_000_000_000
@@ -57,9 +66,17 @@ def _write_settings(path: Path, vault: Path) -> None:
 
 
 def _write_note(path: Path, content: str) -> Path:
+    _ensure_vault(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     return path
+
+
+def _adoptable(root: Path) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    for folder in afanes.core.vault.schema.DEFAULT_FOLDERS:
+        (root / folder).mkdir()
+    return root
 
 
 def _note_text(body: str) -> str:
@@ -83,6 +100,7 @@ def _write_typed_note(
     due_date: str | None = None,
     body: str = "",
 ) -> Path:
+    _ensure_vault(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["---", f"type: {note_type}"]
     if status is not None:
@@ -103,7 +121,7 @@ def _tree_state(root: Path) -> dict[str, bytes]:
 class TestProcessingState:
     def test_begin_processing_loads_the_capture(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -123,7 +141,7 @@ class TestProcessingState:
 
     def test_begin_processing_rejects_a_missing_capture(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -138,7 +156,7 @@ class TestProcessingState:
 
     def test_begin_processing_performs_no_writes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -156,6 +174,7 @@ class TestProcessingState:
 
     def test_begin_processing_loads_the_valid_cards(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
+        _versioned(vault)
         card = vault / "templates" / "person.md"
         card.parent.mkdir(parents=True)
         card.write_text(
@@ -180,7 +199,7 @@ class TestProcessingState:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -197,6 +216,7 @@ class TestProcessingState:
 
     def test_begin_processing_reports_invalid_cards(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
+        _versioned(vault)
         broken = vault / "templates" / "broken.md"
         broken.parent.mkdir(parents=True)
         broken.write_text("---\ntype: reference\n---\n", encoding="utf-8")
@@ -216,6 +236,7 @@ class TestProcessingState:
 
     def test_build_plan_uses_the_selected_card(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
+        _versioned(vault)
         card = vault / "templates" / "person.md"
         card.parent.mkdir(parents=True)
         card.write_text(
@@ -240,7 +261,7 @@ class TestProcessingState:
 
     def test_build_plan_empty_uses_general(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -260,7 +281,7 @@ class TestProcessingState:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -279,7 +300,7 @@ class TestProcessingState:
 
     def test_plan_processing_failure_sets_a_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -302,7 +323,7 @@ class TestProcessingState:
 
     def test_apply_processing_moves_the_capture(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -329,7 +350,7 @@ class TestProcessingState:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         note = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
@@ -352,7 +373,7 @@ class TestProcessingState:
 
     def test_apply_processing_failure_keeps_the_plan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         capture_path: Path | None = None
@@ -382,7 +403,7 @@ class TestProcessingState:
 
     def test_cancel_processing_clears_the_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -404,7 +425,7 @@ class TestProcessingState:
 
     def test_finish_processing_clears_the_success_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -426,6 +447,7 @@ class TestProcessingState:
 class TestTemplateCards:
     def test_reads_valid_cards(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
+        _versioned(vault)
         card = vault / "templates" / "person.md"
         card.parent.mkdir(parents=True)
         card.write_text("---\ntype: reference\ncategory: person\ntitle: Person\n---\n", encoding="utf-8")
@@ -444,7 +466,7 @@ class TestTemplateCards:
 
     def test_a_missing_folder_is_empty(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -460,6 +482,7 @@ class TestTemplateCards:
 
     def test_invalid_cards_are_reported(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
+        _versioned(vault)
         broken = vault / "templates" / "broken.md"
         broken.parent.mkdir(parents=True)
         broken.write_text("---\ntype: reference\n---\n", encoding="utf-8")
@@ -484,7 +507,7 @@ class TestTemplateCards:
 class TestCreateReference:
     def test_creates_and_opens_the_note_in_edit_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         state.browser.query = "stale"
@@ -508,7 +531,7 @@ class TestCreateReference:
 
     def test_empty_uses_the_general_category(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -526,7 +549,7 @@ class TestCreateReference:
 
     def test_a_blank_name_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -580,7 +603,7 @@ class TestCreateReference:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         original = afanes.core.vault.service.Vault.scan
@@ -627,7 +650,7 @@ class TestAssignmentCandidates:
 
     def test_candidates_follow_a_refresh(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -696,7 +719,7 @@ class TestStartup:
 
     def test_valid_settings_opens_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(vault)).capture("First")
         second = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(vault)).capture("Second")
         os.utime(first, ns=(OLD_NS, OLD_NS))
@@ -714,7 +737,7 @@ class TestStartup:
 
     def test_starting_does_not_create_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         settings = tmp_path / "settings.json"
         _write_settings(settings, vault)
         _use_settings_file(monkeypatch, settings)
@@ -728,7 +751,7 @@ class TestStartup:
 
     def test_unreadable_notes_are_reported(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(vault)).capture("Good")
         bad = _write_note(vault / "inbox" / "Bad.md", "---\ntype: [unclosed\n---\n")
         settings = tmp_path / "settings.json"
@@ -746,7 +769,7 @@ class TestStartup:
 class TestChooseVault:
     def test_choose_vault_saves_settings_and_lists_notes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(vault)).capture("Buy milk")
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
@@ -783,7 +806,7 @@ class TestChooseVault:
 
     def test_choose_vault_reports_a_save_failure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -800,7 +823,7 @@ class TestChooseVault:
 
     def test_choose_vault_does_not_write_to_the_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         before = _tree_state(vault)
@@ -816,8 +839,8 @@ class TestChangeVault:
     ) -> None:
         first = tmp_path / "first"
         second = tmp_path / "second"
-        first.mkdir()
-        second.mkdir()
+        _versioned(first)
+        _versioned(second)
         afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(first)).capture("First note")
         afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(second)).capture("Second note")
         settings = tmp_path / "settings.json"
@@ -840,7 +863,7 @@ class TestChangeVault:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         first = tmp_path / "first"
-        first.mkdir()
+        _versioned(first)
         afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(first)).capture("First note")
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
@@ -855,6 +878,257 @@ class TestChangeVault:
         assert state.session.vault_root == first.resolve()
         assert state.status.message == afanes.ui.strings.VAULT_MISSING
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(first.resolve())
+
+
+class TestAdoption:
+    def test_welcome_offers_adoption_for_a_remembered_folder(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = _adoptable(tmp_path / "vault")
+        settings = tmp_path / "settings.json"
+        _write_settings(settings, vault)
+        _use_settings_file(monkeypatch, settings)
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.start())
+
+        assert state.session.vault_root is None
+        assert state.session.adoption_target == vault.resolve()
+        assert state.status.message == afanes.ui.strings.VAULT_SCHEMA_ADOPT_MESSAGE
+        assert not (vault / "afanes.yaml").exists()
+
+    def test_welcome_refuses_a_folder_without_the_defaults(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        settings = tmp_path / "settings.json"
+        _write_settings(settings, vault)
+        _use_settings_file(monkeypatch, settings)
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.start())
+
+        assert state.session.vault_root is None
+        assert state.session.adoption_target is None
+        assert state.status.message == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
+        assert list(vault.iterdir()) == []
+
+    def test_change_vault_offers_adoption_and_keeps_the_current_vault(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        first = _versioned(tmp_path / "first")
+        second = _adoptable(tmp_path / "second")
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(first)
+            await state.workspace.change_vault(second)
+
+        asyncio.run(scenario())
+
+        assert state.session.vault_root == first.resolve()
+        assert state.session.adoption_target == second.resolve()
+        assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(first.resolve())
+        assert not (second / "afanes.yaml").exists()
+
+    def test_declining_adoption_keeps_the_current_vault(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        first = _versioned(tmp_path / "first")
+        second = _adoptable(tmp_path / "second")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(first)
+            await state.workspace.change_vault(second)
+
+        asyncio.run(scenario())
+        state.workspace.cancel_adoption()
+
+        assert state.session.adoption_target is None
+        assert state.session.vault_root == first.resolve()
+        assert not (second / "afanes.yaml").exists()
+
+    def test_confirming_adoption_writes_only_the_settings_file(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        first = _versioned(tmp_path / "first")
+        second = _adoptable(tmp_path / "second")
+        note = second / "inbox" / "Buy milk.md"
+        note.write_text(_note_text("# Buy milk"), encoding="utf-8")
+        before = _tree_state(second)
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(first)
+            await state.workspace.change_vault(second)
+            await state.workspace.adopt_vault()
+
+        asyncio.run(scenario())
+
+        after = _tree_state(second)
+        assert state.session.vault_root == second.resolve()
+        assert state.session.adoption_target is None
+        assert [item.name for item in state.session.notes] == ["Buy milk"]
+        assert set(after) - set(before) == {"afanes.yaml"}
+        assert all(after[path] == content for path, content in before.items())
+        assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(second.resolve())
+
+    def test_adoption_write_failure_keeps_the_offer(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        first = _versioned(tmp_path / "first")
+        second = _adoptable(tmp_path / "second")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        def fail_adopt(_store: afanes.core.vault.schema.VaultSchemaStore) -> None:
+            message = "disk full"
+            raise VaultSchemaWriteError(message)
+
+        monkeypatch.setattr(afanes.core.vault.schema.VaultSchemaStore, "adopt", fail_adopt)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(first)
+            await state.workspace.change_vault(second)
+            await state.workspace.adopt_vault()
+
+        asyncio.run(scenario())
+
+        assert state.session.vault_root == first.resolve()
+        assert state.session.adoption_target == second.resolve()
+        assert state.status.message == "disk full"
+        assert not (second / "afanes.yaml").exists()
+
+    def test_adoption_remember_failure_still_opens_the_vault(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        first = _versioned(tmp_path / "first")
+        second = _adoptable(tmp_path / "second")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        def fail_save(_store: SettingsStore, _settings: Settings) -> None:
+            message = "settings are read-only"
+            raise ConfigurationError(message)
+
+        monkeypatch.setattr(SettingsStore, "save", fail_save)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(first)
+            await state.workspace.change_vault(second)
+            await state.workspace.adopt_vault()
+
+        asyncio.run(scenario())
+
+        assert state.session.vault_root == second.resolve()
+        assert state.session.adoption_target is None
+        assert state.status.message == afanes.ui.strings.VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED.format(
+            detail="settings are read-only",
+        )
+
+    def test_invalid_schema_is_reported_and_preserved(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = vault / "afanes.yaml"
+        path.write_text("schema_version: 1\nextra: true\n", encoding="utf-8")
+        before = path.read_bytes()
+        settings = tmp_path / "settings.json"
+        _write_settings(settings, vault)
+        _use_settings_file(monkeypatch, settings)
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.start())
+
+        assert state.session.vault_root is None
+        assert state.session.adoption_target is None
+        assert "exactly schema_version" in (state.status.message or "")
+        assert path.read_bytes() == before
+
+    def test_newer_schema_is_refused_with_an_update_message(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        (vault / "afanes.yaml").write_text("schema_version: 2\n", encoding="utf-8")
+        settings = tmp_path / "settings.json"
+        _write_settings(settings, vault)
+        _use_settings_file(monkeypatch, settings)
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.start())
+
+        assert state.session.vault_root is None
+        assert state.session.adoption_target is None
+        assert "update Afanes" in (state.status.message or "")
+
+    def test_a_read_only_unversioned_folder_is_refused_without_an_offer(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = _adoptable(tmp_path / "vault")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        monkeypatch.setattr(
+            afanes.core.vault.schema.os,
+            "access",
+            lambda _path, mode: mode == os.R_OK,
+        )
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.choose_vault(vault))
+
+        assert state.session.vault_root is None
+        assert state.session.adoption_target is None
+        assert state.status.message == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
+        assert not (vault / "afanes.yaml").exists()
+
+    def test_an_unversioned_supplied_folder_is_not_offered_adoption(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = _adoptable(tmp_path / "vault")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.open_vault_for_run(vault))
+
+        assert state.session.vault_root is None
+        assert state.session.adoption_target is None
+        assert state.status.message == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
+        assert not (vault / "afanes.yaml").exists()
+
+    def test_adoption_requires_a_pending_offer(self) -> None:
+        state = afanes.ui.state.app_state
+
+        assert asyncio.run(state.workspace.adopt_vault()) is False
 
 
 class TestLogMode:
@@ -881,7 +1155,7 @@ class TestLogMode:
 
     def test_mode_is_remembered_for_the_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -895,7 +1169,7 @@ class TestLogMode:
 
     def test_unknown_mode_falls_back_to_entries(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -910,7 +1184,7 @@ class TestLogMode:
 class TestLogEntryCreation:
     def test_creates_and_opens_a_log_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -934,7 +1208,7 @@ class TestLogEntryCreation:
 
     def test_occupied_date_opens_the_existing_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -960,7 +1234,7 @@ class TestLogEntryCreation:
 
     def test_blank_title_is_reported(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -980,7 +1254,7 @@ class TestLogEntryCreation:
 class TestCapture:
     def test_capture_writes_and_promotes_the_note(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1000,7 +1274,7 @@ class TestCapture:
 
     def test_empty_capture_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1016,7 +1290,7 @@ class TestCapture:
 
     def test_successful_capture_clears_the_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1032,7 +1306,7 @@ class TestCapture:
 
     def test_capture_failure_reports_and_keeps_the_list(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1054,7 +1328,7 @@ class TestCapture:
 
     def test_repeated_captures_get_distinct_names(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1085,7 +1359,7 @@ class TestCapture:
 
     def test_capture_does_not_infer_structure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1121,7 +1395,7 @@ class TestCapture:
 class TestPreview:
     def test_select_note_loads_body_without_frontmatter(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1138,7 +1412,7 @@ class TestPreview:
 
     def test_preview_performs_no_write(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         before: list[tuple[bytes, int]] = []
@@ -1157,7 +1431,7 @@ class TestPreview:
 
     def test_preview_failure_clears_the_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1175,10 +1449,69 @@ class TestPreview:
         assert state.status.message.startswith("Could not read this note:")
 
 
+class TestSessionConnections:
+    def test_builds_one_index_per_snapshot(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "notes" / "Ada.md", _note_text("# Ada"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        calls = 0
+        original = afanes.core.connections.Connections
+
+        def counting_connections(
+            snapshot: afanes.core.vault.snapshot.VaultSnapshot,
+        ) -> afanes.core.connections.Connections:
+            nonlocal calls
+            calls += 1
+            return original(snapshot)
+
+        monkeypatch.setattr(afanes.core.connections, "Connections", counting_connections)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            first = state.session.connections
+            second = state.session.connections
+            assert first is second
+
+        asyncio.run(scenario())
+
+        assert calls == 1
+
+    def test_rebuilds_after_a_new_snapshot(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "notes" / "Ada.md", _note_text("# Ada"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            first = state.session.connections
+            _write_note(vault / "notes" / "Grace.md", _note_text("# Grace"))
+            await state.workspace.refresh()
+            second = state.session.connections
+            assert second is not first
+
+        asyncio.run(scenario())
+
+    def test_reset_clears_the_index(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "notes" / "Ada.md", _note_text("# Ada"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            assert state.session.connections is not None
+            state.reset()
+            assert state.session.connections is None
+
+        asyncio.run(scenario())
+
+
 class TestRefresh:
     def test_refresh_adds_an_external_note(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1193,7 +1526,7 @@ class TestRefresh:
 
     def test_refresh_removes_a_deleted_note(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1209,7 +1542,7 @@ class TestRefresh:
 
     def test_refresh_updates_the_selected_preview(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1227,7 +1560,7 @@ class TestRefresh:
 
     def test_refresh_clears_a_disappeared_selection(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1332,7 +1665,7 @@ class TestRefreshWorkspace:
 
     def test_busy_lock_skips_the_tick(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         entered = threading.Event()
@@ -1360,7 +1693,7 @@ class TestRefreshWorkspace:
 
     def test_does_not_set_the_busy_indicator(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         observed: list[bool] = []
@@ -1386,7 +1719,7 @@ class TestRefreshWorkspace:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         plan: ProcessingPlan | AppendStepPlan | None = None
@@ -1416,7 +1749,7 @@ class TestRefreshWorkspace:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1440,7 +1773,7 @@ class TestRefreshWorkspace:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1466,7 +1799,7 @@ class TestRefreshWorkspace:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1492,7 +1825,7 @@ class TestRefreshWorkspace:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1519,7 +1852,7 @@ class TestRefreshWorkspace:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1534,7 +1867,7 @@ class TestRefreshWorkspace:
 
     def test_a_capture_still_clears_the_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1549,7 +1882,7 @@ class TestRefreshWorkspace:
 
     def test_background_refresh_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1580,7 +1913,7 @@ class TestRefreshWorkspace:
 class TestConcurrency:
     def test_commands_are_serialized(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         entered = threading.Event()
@@ -1614,7 +1947,7 @@ class TestConcurrency:
 class TestPageSession:
     def test_open_page_loads_a_read_only_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -1635,7 +1968,7 @@ class TestPageSession:
 
     def test_opening_a_second_page_pushes_history(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = _write_note(vault / "notes" / "First.md", _note_text("# First\n"))
         second = _write_note(vault / "notes" / "Second.md", _note_text("# Second\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -1659,7 +1992,7 @@ class TestPageSession:
 
     def test_back_discards_an_untouched_new_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = _write_note(vault / "notes" / "First.md", _note_text("# First\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -1680,7 +2013,7 @@ class TestPageSession:
 
     def test_history_is_bounded(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         paths = [
             _write_note(vault / "notes" / f"Note {index:02d}.md", _note_text(f"# Note {index:02d}\n"))
             for index in range(55)
@@ -1701,7 +2034,7 @@ class TestPageSession:
 
     def test_back_skips_a_missing_history_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = _write_note(vault / "notes" / "First.md", _note_text("# First\n"))
         second = _write_note(vault / "notes" / "Second.md", _note_text("# Second\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -1721,7 +2054,7 @@ class TestPageSession:
 
     def test_done_editing_commits_the_body(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -1744,7 +2077,7 @@ class TestPageSession:
 
     def test_reset_clears_the_page_and_history(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = _write_note(vault / "notes" / "First.md", _note_text("# First\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -1766,7 +2099,7 @@ class TestPageLabels:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         person = _write_note(
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
@@ -1802,7 +2135,7 @@ class TestPageLabels:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         person = _write_note(
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
@@ -1827,7 +2160,7 @@ class TestPageLabels:
 
     def test_same_scheme_type_change_applies_immediately(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         reference = _write_note(vault / "reference" / "Call.md", _typed_note("reference", "# Call\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -1848,7 +2181,7 @@ class TestPageLabels:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1866,7 +2199,7 @@ class TestPageLabels:
 
     def test_invalid_status_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -1885,7 +2218,7 @@ class TestPageLabels:
 
     def test_due_date_updates_the_labels(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         project = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -1908,7 +2241,7 @@ class TestPageLabels:
 
     def test_requester_updates_the_labels(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         project = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -1933,7 +2266,7 @@ class TestPageLabels:
 
     def test_assignment_suggestions_come_from_the_scan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         person = _write_note(
             vault / "projects" / "Ada.md",
             _typed_note("project", "# Ada, Countess of Lovelace\n"),
@@ -1952,7 +2285,7 @@ class TestPageLabels:
 class TestPageSaving:
     def test_autosave_writes_a_dirty_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -1974,7 +2307,7 @@ class TestPageSaving:
 
     def test_autosave_skips_a_clean_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -1989,7 +2322,7 @@ class TestPageSaving:
 
     def test_untouched_new_draft_is_not_written(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -2005,7 +2338,7 @@ class TestPageSaving:
 
     def test_new_draft_is_created_on_first_autosave(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -2028,7 +2361,7 @@ class TestPageSaving:
 
     def test_external_change_stops_autosave(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2052,7 +2385,7 @@ class TestPageSaving:
 
     def test_reload_replaces_the_conflicted_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2077,7 +2410,7 @@ class TestPageSaving:
 
     def test_overwrite_keeps_the_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2102,7 +2435,7 @@ class TestPageSaving:
 
     def test_recreate_after_the_file_disappears(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2126,7 +2459,7 @@ class TestPageSaving:
 
     def test_discard_drops_the_draft_without_writing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         before = path.read_bytes()
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -2146,7 +2479,7 @@ class TestPageSaving:
 
     def test_back_on_a_dirty_draft_commits_first(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = _write_note(vault / "notes" / "First.md", _note_text("# First\n"))
         second = _write_note(vault / "notes" / "Second.md", _note_text("# Second\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -2169,7 +2502,7 @@ class TestPageSaving:
 
     def test_navigation_commits_a_dirty_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = _write_note(vault / "notes" / "First.md", _note_text("# First\n"))
         second = _write_note(vault / "notes" / "Second.md", _note_text("# Second\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -2192,7 +2525,7 @@ class TestPageSaving:
 
     def test_conflict_blocks_back_until_discarded(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = _write_note(vault / "notes" / "First.md", _note_text("# First\n"))
         second = _write_note(vault / "notes" / "Second.md", _note_text("# Second\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -2223,7 +2556,7 @@ class TestPageSaving:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2257,7 +2590,7 @@ class TestPageSaving:
 class TestPageLinks:
     def test_resolved_link_opens_its_target(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         person = _write_note(
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
@@ -2277,7 +2610,7 @@ class TestPageLinks:
 
     def test_ambiguous_link_exposes_the_candidates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = _write_note(
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
@@ -2297,7 +2630,7 @@ class TestPageLinks:
 
     def test_choosing_a_candidate_opens_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = _write_note(
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
@@ -2319,7 +2652,7 @@ class TestPageLinks:
 
     def test_missing_references_create_the_right_drafts(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -2345,7 +2678,7 @@ class TestPageLinks:
 
     def test_broken_link_opens_raw_rescue(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         broken = _write_note(vault / "reference" / "Broken.md", "---\ntype: refrence\n---\nBody\n")
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2363,7 +2696,7 @@ class TestPageLinks:
 
     def test_multiple_broken_files_ask_for_a_candidate(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = _write_note(vault / "reference" / "Broken.md", "---\ntype: refrence\n---\nBody\n")
         second = _write_note(vault / "notes" / "Broken.md", "---\ntype: refrence\n---\nBody\n")
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -2380,7 +2713,7 @@ class TestPageLinks:
 
     def test_non_internal_destinations_are_inert(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -2403,7 +2736,7 @@ class TestPageLinks:
 
     def test_unsafe_name_is_created_and_repaired(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         source = _write_note(vault / "notes" / "Source.md", _note_text("[Q1](<note:Q1: Planning?>)\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2427,7 +2760,7 @@ class TestPageLinks:
 
     def test_keep_leaves_the_unsafe_reference_alone(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         source = _write_note(vault / "notes" / "Source.md", _note_text("[Q1](<note:Q1: Planning?>)\n"))
         before = source.read_bytes()
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -2448,7 +2781,7 @@ class TestPageLinks:
 
     def test_cancelling_the_repair_restores_the_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         source = _write_note(vault / "notes" / "Source.md", _note_text("[Q1](<note:Q1: Planning?>)\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2473,7 +2806,7 @@ class TestPageLinks:
 
     def test_existing_safe_page_is_reused(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         existing = _write_note(vault / "reference" / "Q1 Planning.md", _note_text("# Q1 Planning\n"))
         _write_note(vault / "notes" / "Source.md", _note_text("[Q1](<note:Q1: Planning?>)\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -2493,7 +2826,7 @@ class TestPageLinks:
 class TestPageRenameTrash:
     def test_rename_is_previewed_and_applied(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         person = _write_note(
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
@@ -2528,7 +2861,7 @@ class TestPageRenameTrash:
 
     def test_cancelling_a_rename_changes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         person = _write_note(
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
@@ -2552,7 +2885,7 @@ class TestPageRenameTrash:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         first = _write_note(vault / "notes" / "First.md", _note_text("# First\n"))
         second = _write_note(vault / "notes" / "Second.md", _note_text("# Second\n"))
         _write_note(vault / "notes" / "Ref.md", _note_text("[Second](<note:Second>)\n"))
@@ -2581,7 +2914,7 @@ class TestPageRenameTrash:
 
     def test_cancelling_trash_changes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         second = _write_note(vault / "notes" / "Second.md", _note_text("# Second\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2602,7 +2935,7 @@ class TestPageRenameTrash:
 class TestPageRescue:
     def test_open_failure_opens_raw_rescue(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         broken = _write_note(vault / "reference" / "Broken.md", "---\ntype: refrence\n---\nBody\n")
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2622,7 +2955,7 @@ class TestPageRescue:
 
     def test_raw_save_that_still_fails_stays_raw(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         broken = _write_note(vault / "reference" / "Broken.md", "---\ntype: refrence\n---\nBody\n")
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2643,7 +2976,7 @@ class TestPageRescue:
 
     def test_raw_save_that_parses_upgrades_to_normal(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         broken = _write_note(vault / "reference" / "Broken.md", "---\ntype: refrence\n---\nBody\n")
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2678,7 +3011,7 @@ class TestPageRescue:
 
     def test_raw_save_stops_on_an_external_change(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         broken = _write_note(vault / "reference" / "Broken.md", "---\ntype: refrence\n---\nBody\n")
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2700,7 +3033,7 @@ class TestPageRescue:
 class TestPageRecoveryLifecycle:
     def test_conflict_rescue_rename_and_trash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         note = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         broken = _write_note(vault / "reference" / "Broken.md", "---\ntype: refrence\n---\nBody\n")
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -2830,7 +3163,7 @@ class TestReviewState:
 
     def test_zero_pending_starts_no_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -3091,7 +3424,7 @@ class TestReviewState:
 class TestReset:
     def test_reset_clears_the_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -3113,7 +3446,7 @@ class TestReset:
 
     def test_reset_allows_a_second_event_loop(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -3127,7 +3460,7 @@ class TestReset:
 class TestOpenVaultPath:
     def test_typed_path_opens_and_saves_settings(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(vault)).capture("Buy milk")
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
@@ -3172,7 +3505,7 @@ class TestOpenVaultPath:
 
     def test_unreadable_path_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
 
         def deny_access(*_args: object, **_kwargs: object) -> bool:
@@ -3323,7 +3656,7 @@ class TestCloseVault:
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         state = afanes.ui.state.app_state
         assert state.status.begin_session() is True
 
@@ -3396,7 +3729,7 @@ class TestCloseVault:
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         state = afanes.ui.state.app_state
 
         def fail_clear(_self: SettingsStore) -> None:
@@ -3467,7 +3800,7 @@ class TestCloseVault:
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         state = afanes.ui.state.app_state
 
         async def scenario() -> bool:
@@ -3487,11 +3820,12 @@ class TestCloseVault:
     ) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         vault = tmp_path / "vault"
-        vault.mkdir()
+        _versioned(vault)
         state = afanes.ui.state.app_state
 
         async def scenario() -> bool:
             await state.workspace.choose_vault(vault)
+            (vault / afanes.core.vault.schema.SCHEMA_FILENAME).unlink()
             vault.rmdir()
             return await state.workspace.close_vault()
 
@@ -3513,7 +3847,7 @@ class TestOpenVaultForRun:
         remembered = tmp_path / "remembered"
         remembered.mkdir()
         supplied = tmp_path / "supplied"
-        supplied.mkdir()
+        _versioned(supplied)
         afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(supplied)).capture("Buy milk")
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)

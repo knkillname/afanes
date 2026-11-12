@@ -18,6 +18,7 @@ import afanes.ui.strings
 import afanes.ui.views.processing
 from afanes.core.processing import ProcessingOutcome, ProcessingPlan
 from afanes.models.note import CategoryLabel, NoteType, Status
+from tests.support import versioned
 
 
 @pytest.fixture(autouse=True)
@@ -108,7 +109,7 @@ class TestProcessingView:
 
     def test_capture_panel_shows_the_heading_title(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         capture = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).capture("Q1: Planning?")
         _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
@@ -296,7 +297,7 @@ class TestProcessingView:
 
     def test_plan_preview_shows_the_destination(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = afanes.core.vault.service.Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
@@ -312,7 +313,7 @@ class TestProcessingView:
 
     def test_plan_preview_names_the_category_and_starter_body(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = afanes.core.vault.service.Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Approve the invoice")
         card = afanes.core.template_cards.TemplateCard(
@@ -338,7 +339,7 @@ class TestProcessingView:
 
     def test_plan_preview_names_general_for_empty(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = afanes.core.vault.service.Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Approve the invoice")
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.REFERENCE)
@@ -353,7 +354,7 @@ class TestProcessingView:
 
     def test_plan_preview_shows_the_scheme_warning(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = afanes.core.vault.service.Vault(root)
         note = vault.create("Note", NoteType.REFERENCE, body="[Launch](<note:Launch>)\n")
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Launch")
@@ -370,7 +371,7 @@ class TestProcessingView:
 
     def test_append_preview_shows_the_project_and_step(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = afanes.core.vault.service.Vault(root)
         project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Call the plumber")
@@ -527,7 +528,7 @@ class TestProcessingView:
 
     def test_project_suggestions_store_the_identity(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = afanes.core.vault.service.Vault(root)
         vault.create("Launch", NoteType.PROJECT, body="# Launch the product\n")
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Plan")
@@ -552,7 +553,7 @@ class TestProcessingView:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = afanes.core.vault.service.Vault(root)
         vault.create("Home", NoteType.PROJECT, body="# Home improvements\n")
         vault.create("Cabin", NoteType.PROJECT, body="# Home improvements\n")

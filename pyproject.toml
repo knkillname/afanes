@@ -128,7 +128,7 @@ convention = "numpy"
 
 [tool.pyrefly]
 project-includes = ["src/afanes", "tests"]
-search-path = ["src"]
+search-path = ["src", "."]
 python-version = "3.13"
 preset = "strict"
 disable-search-path-heuristics = true

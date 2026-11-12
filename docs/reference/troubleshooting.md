@@ -6,7 +6,8 @@ These are the failures a user is most likely to see, and the shortest path throu
 :class: note
 
 Most problems come from a missing interface runtime, a browser session that lost its Python process, a
-note whose frontmatter cannot be parsed, or an external program changing a file during an edit.
+note whose frontmatter cannot be parsed, a vault without a valid `afanes.yaml`, or an external program
+changing a file during an edit.
 :::
 
 ## 🔌 The desktop window does not start
@@ -64,6 +65,30 @@ Notes under `trash/` are excluded from scans, name uniqueness, and reference res
 `inbox/` appears only under **Inbox**; a `type: note` outside `inbox/` appears under **Needs attention**.
 Unreadable notes appear only in their own group. Folders are conventions, so a note is still in the
 vault even when its folder is unusual.
+
+## ⚙️ A folder is refused as a vault
+
+Afanes accepts a folder only when its root contains a valid `afanes.yaml` settings file. The current
+contents are exactly:
+
+```yaml
+schema_version: 1
+```
+
+- **The folder has no settings file.** If it is writable and has all five default folders (`inbox/`,
+  `trash/`, `reference/`, `projects/`, and `log/`), Afanes offers adoption. Confirm the offer, or run
+  `afanes vault adopt DIR`. Adoption writes only `afanes.yaml`. A folder missing a default folder or
+  without write access cannot be adopted.
+- **The settings file is invalid.** Extra keys, malformed YAML, a missing or non-integer
+  `schema_version`, and duplicate keys are refused. The file is left byte for byte unchanged. Fix it by
+  hand to contain only `schema_version: 1`, or restore a copy from a backup.
+- **The schema is newer or older.** This version of Afanes supports schema `1`. A newer file asks you
+  to update Afanes. An older schema is refused before 1.0 rather than migrated.
+- **The vault is read-only.** A valid versioned vault opens for browsing even when it cannot be
+  written. An unversioned read-only folder cannot be adopted because the settings file cannot be
+  created; add `afanes.yaml` from a writable copy.
+
+Afanes never repairs, rewrites, deletes, or guesses at a settings file it cannot validate.
 
 ## 🧭 See also
 

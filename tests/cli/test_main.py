@@ -10,6 +10,7 @@ import afanes.cli
 import afanes.cli.main
 import afanes.core.atomic
 import afanes.core.settings
+import afanes.core.vault.schema
 import afanes.core.vault.service
 from afanes.core.errors import ConfigurationError
 from afanes.core.settings import Settings
@@ -20,6 +21,17 @@ FAILING_WRITE_CALL = 2
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
     monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
+
+
+def _adoptable(root: Path) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    for folder in afanes.core.vault.schema.DEFAULT_FOLDERS:
+        (root / folder).mkdir()
+    return root
+
+
+def _tree_state(root: Path) -> dict[str, bytes]:
+    return {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
 
 
 def _first_party_and_third_party_imports(path: Path) -> set[str]:
@@ -98,9 +110,11 @@ class TestCreateCommand:
         assert f"Created vault {target.resolve()}" in captured.out
         assert f"Parent folders created: {tmp_path / 'notes'}" in captured.out
         assert "Seeded: inbox/, trash/, reference/, projects/" in captured.out
+        assert "Settings file: afanes.yaml (schema version 1)" in captured.out
         assert "Template: none" in captured.out
         assert "Notes written: reference/Getting started.md" in captured.out
         assert "Remembered" in captured.out
+        assert (target / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"
         assert (target / "reference").is_dir()
         assert (target / "projects").is_dir()
         assert not (target / "reference" / "people").exists()
@@ -260,6 +274,174 @@ class TestCreateCommand:
         assert "reference/Getting started.md" in captured.err
         assert (target / "reference" / "Getting started.md").is_file()
         assert not settings.exists()
+
+
+class TestAdoptCommand:
+    def test_adopts_remembers_and_reports_the_settings_file(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        target = _adoptable(tmp_path / "vault")
+
+        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+
+        captured = capsys.readouterr()
+        assert status == 0
+        assert captured.err == ""
+        assert f"Adopted vault {target.resolve()}" in captured.out
+        assert "Settings file: afanes.yaml (schema version 1)" in captured.out
+        assert "Remembered" in captured.out
+        assert (target / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"
+        assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
+
+    def test_no_remember_leaves_preferences_untouched(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        remembered = _adoptable(tmp_path / "remembered")
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=remembered))
+        target = _adoptable(tmp_path / "vault")
+
+        status = afanes.cli.main.main(["vault", "adopt", str(target), "--no-remember"])
+
+        captured = capsys.readouterr()
+        assert status == 0
+        assert "Not remembered" in captured.out
+        assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(remembered.resolve())
+
+    def test_missing_default_folder_is_refused(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        target = _adoptable(tmp_path / "vault")
+        (target / "log").rmdir()
+
+        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+
+        captured = capsys.readouterr()
+        assert status == 1
+        assert captured.out == ""
+        assert "log/" in captured.err
+        assert not (target / "afanes.yaml").exists()
+        assert not settings.exists()
+
+    def test_read_only_folder_is_refused(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        target = _adoptable(tmp_path / "vault")
+        monkeypatch.setattr(
+            afanes.core.vault.schema.os,
+            "access",
+            lambda _path, _mode: False,
+        )
+
+        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+
+        captured = capsys.readouterr()
+        assert status == 1
+        assert "not writable" in captured.err
+        assert not (target / "afanes.yaml").exists()
+        assert not settings.exists()
+
+    def test_invalid_settings_file_is_refused_and_preserved(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        target = _adoptable(tmp_path / "vault")
+        path = target / "afanes.yaml"
+        path.write_text("schema_version: 2\n", encoding="utf-8")
+        before = path.read_bytes()
+
+        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+
+        captured = capsys.readouterr()
+        assert status == 1
+        assert "schema version 2" in captured.err
+        assert path.read_bytes() == before
+        assert not settings.exists()
+
+    def test_already_versioned_folder_is_reported_unchanged(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        target = _adoptable(tmp_path / "vault")
+        path = target / "afanes.yaml"
+        path.write_text("schema_version: 1\n", encoding="utf-8")
+        before = path.read_bytes()
+
+        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+
+        captured = capsys.readouterr()
+        assert status == 0
+        assert "already a vault" in captured.out
+        assert path.read_bytes() == before
+        assert not settings.exists()
+
+    def test_adoption_writes_only_the_settings_file(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        target = _adoptable(tmp_path / "vault")
+        note = target / "inbox" / "Buy milk.md"
+        note.write_text("---\ntype: note\n---\n# Buy milk\n", encoding="utf-8")
+        before = _tree_state(target)
+
+        status = afanes.cli.main.main(["vault", "adopt", str(target), "--no-remember"])
+
+        assert status == 0
+        after = _tree_state(target)
+        assert set(after) - set(before) == {"afanes.yaml"}
+        assert all(after[path] == content for path, content in before.items())
+
+    def test_a_preferences_failure_reports_the_adopted_vault(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        target = _adoptable(tmp_path / "vault")
+
+        def fail_save(_self: afanes.core.settings.SettingsStore, _settings: Settings) -> None:
+            message = "settings are read-only"
+            raise ConfigurationError(message)
+
+        monkeypatch.setattr(afanes.core.settings.SettingsStore, "save", fail_save)
+
+        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+
+        captured = capsys.readouterr()
+        assert status == 1
+        assert f"Adopted vault {target.resolve()}" in captured.out
+        assert "could not be remembered" in captured.err
+        assert (target / "afanes.yaml").is_file()
 
 
 class TestTemplatesCommand:

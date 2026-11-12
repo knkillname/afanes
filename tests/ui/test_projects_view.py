@@ -12,6 +12,7 @@ import afanes.core.settings
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.views.projects
+from tests.support import ensure_vault, versioned
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
 
@@ -33,6 +34,7 @@ def _write_note(
     due_date: str | None = None,
     body: str = "",
 ) -> Path:
+    ensure_vault(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["---", f"type: {note_type}"]
     if status is not None:
@@ -57,7 +59,7 @@ def _open_view(
     monkeypatch.setattr(
         afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: tmp_path / "settings.json")
     )
-    asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(tmp_path / "vault"))
+    asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
     return afanes.ui.views.projects.ProjectsView(_noop, on_select)
 
 

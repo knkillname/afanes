@@ -18,11 +18,15 @@ import afanes.core.vault.service
 import afanes.core.vault.steps
 from afanes.core.errors import (
     NoteParseError,
+    TemplateWriteError,
     VaultError,
     VaultMissingError,
     VaultNotDirectoryError,
     VaultNotEmptyError,
     VaultPathError,
+    VaultSchemaInvalidError,
+    VaultSchemaMissingError,
+    VaultSchemaUnsupportedError,
     VaultUnreadableError,
 )
 from afanes.core.frontmatter import NoteDocument
@@ -66,6 +70,12 @@ def _write_note(
 
 def _tree_state(root: Path) -> dict[str, bytes]:
     return {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+
+
+def _write_schema(root: Path) -> Path:
+    path = root / "afanes.yaml"
+    path.write_text("schema_version: 1\n", encoding="utf-8", newline="")
+    return path
 
 
 def _set_modified_ns(path: Path, modified_ns: int) -> None:
@@ -125,6 +135,7 @@ class TestVaultOpen:
     def test_opens_an_existing_directory(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
+        _write_schema(root)
 
         vault = afanes.core.vault.service.Vault.open(root)
 
@@ -152,11 +163,77 @@ class TestVaultOpen:
     def test_resolves_a_relative_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"
         root.mkdir()
+        _write_schema(root)
         monkeypatch.chdir(tmp_path)
 
         vault = afanes.core.vault.service.Vault.open(Path("vault"))
 
         assert vault.root == root.resolve()
+
+    def test_a_missing_settings_file_is_refused(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        with pytest.raises(VaultSchemaMissingError):
+            afanes.core.vault.service.Vault.open(root)
+
+    def test_opening_does_not_create_a_settings_file(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        with pytest.raises(VaultSchemaMissingError):
+            afanes.core.vault.service.Vault.open(root)
+
+        assert list(root.iterdir()) == []
+
+    def test_an_invalid_settings_file_is_refused_and_preserved(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        path = root / "afanes.yaml"
+        path.write_text("schema_version: 1\nextra: true\n", encoding="utf-8")
+        before = path.read_bytes()
+
+        with pytest.raises(VaultSchemaInvalidError):
+            afanes.core.vault.service.Vault.open(root)
+
+        assert path.read_bytes() == before
+
+    def test_a_newer_schema_is_refused(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        _write_schema(root)
+        (root / "afanes.yaml").write_text("schema_version: 2\n", encoding="utf-8")
+
+        with pytest.raises(VaultSchemaUnsupportedError):
+            afanes.core.vault.service.Vault.open(root)
+
+    def test_a_read_only_versioned_vault_opens(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        _write_schema(root)
+        monkeypatch.setattr(
+            afanes.core.vault.service.os,
+            "access",
+            lambda _path, mode: mode == os.R_OK,
+        )
+
+        vault = afanes.core.vault.service.Vault.open(root)
+
+        assert vault.root == root.resolve()
+
+    def test_opening_a_valid_vault_writes_nothing(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        _write_schema(root)
+        before = _tree_state(root)
+
+        afanes.core.vault.service.Vault.open(root)
+
+        assert _tree_state(root) == before
 
 
 class TestDirectoryFor:
@@ -345,6 +422,7 @@ class TestVaultCreation:
             if path.is_file()
         ]
         assert files == [
+            "afanes.yaml",
             "reference/Getting started.md",
             "templates/daily.md",
             "templates/organization.md",
@@ -366,6 +444,57 @@ class TestVaultCreation:
             "topic.md",
         ]
         assert all(path.is_relative_to(creation.vault.root) for path in creation.written_cards)
+
+    def test_creation_writes_the_settings_file(self, tmp_path: Path) -> None:
+        target = tmp_path / "vault"
+
+        creation = afanes.core.vault.service.Vault.create_directory(target)
+
+        assert creation.settings_file == target.resolve() / "afanes.yaml"
+        assert creation.settings_file.read_text(encoding="utf-8") == "schema_version: 1\n"
+
+    def test_a_new_vault_opens_immediately(self, tmp_path: Path) -> None:
+        target = tmp_path / "vault"
+
+        afanes.core.vault.service.Vault.create_directory(target)
+
+        assert afanes.core.vault.service.Vault.open(target).root == target.resolve()
+
+    def test_the_settings_file_survives_a_starter_content_failure(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        target = tmp_path / "vault"
+
+        def fail_bundle(_self: object, _bundle: object) -> tuple[Path, ...]:
+            message = "starter content failed"
+            raise TemplateWriteError(message)
+
+        monkeypatch.setattr(afanes.core.vault.service.Vault, "_write_bundle", fail_bundle)
+        with pytest.raises(TemplateWriteError):
+            afanes.core.vault.service.Vault.create_directory(target)
+
+        assert (target / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"
+        assert afanes.core.vault.service.Vault.open(target).root == target.resolve()
+
+    def test_the_settings_file_survives_a_layout_failure(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        target = tmp_path / "vault"
+
+        def fail_layout(_self: object) -> tuple[Path, ...]:
+            message = "layout failed"
+            raise OSError(message)
+
+        monkeypatch.setattr(afanes.core.vault.service.Vault, "_seed_layout", fail_layout)
+        with pytest.raises(VaultError, match="Could not seed"):
+            afanes.core.vault.service.Vault.create_directory(target)
+
+        assert (target / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"
+        assert afanes.core.vault.service.Vault.open(target).root == target.resolve()
 
     def test_refusal_writes_nothing(self, tmp_path: Path) -> None:
         target = tmp_path / "vault"
@@ -397,6 +526,24 @@ class TestScanVault:
         _write_note(root / "a/Alpha.md")
         snapshot = afanes.core.vault.service.Vault(root).scan()
         assert [note.name for note in snapshot.notes] == ["Alpha", "Beta"]
+
+    def test_the_settings_file_is_not_scanned_as_a_note(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "inbox/Ada.md")
+        _write_schema(root)
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+
+        assert [note.name for note in snapshot.notes] == ["Ada"]
+        assert all(note.relative_path.as_posix() != "afanes.yaml" for note in snapshot.notes)
+
+    def test_a_reference_to_the_settings_filename_is_unresolved(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "inbox/Note.md", body="[Settings](note:afanes)")
+        _write_schema(root)
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+
+        resolution = snapshot.catalog.resolve(NoteReference(scheme=ReferenceScheme.NOTE, name="afanes"))
+        assert resolution.outcome is ResolutionOutcome.UNRESOLVED
 
     def test_skips_dot_directories(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

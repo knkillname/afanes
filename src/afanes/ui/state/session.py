@@ -5,6 +5,7 @@ import dataclasses
 import logging
 from pathlib import Path
 
+import afanes.core.connections
 import afanes.core.editing
 import afanes.core.links
 import afanes.core.names
@@ -77,6 +78,18 @@ class VaultOpener:
         VaultError
             If the path is missing, is not a directory, cannot be read, or
             cannot be resolved.
+        VaultSchemaMissingError
+            If the directory has no settings file.
+        VaultSchemaInvalidError
+            If its settings file does not match the current shape.
+        VaultSchemaUnsupportedError
+            If its settings file declares another schema version.
+
+        Notes
+        -----
+        Path failures become interface messages here. Schema failures keep
+        their domain type so the caller can distinguish a missing file that can
+        be adopted from a file that must be repaired by hand.
         """
         try:
             return Vault.open(path)
@@ -110,6 +123,9 @@ class VaultOpener:
         VaultError
             If the path is not a directory, is not empty, cannot be created, or
             the bundled starter content cannot be written.
+        VaultSchemaWriteError
+            If the settings file cannot be written. No default folder or
+            starter content is written in that case.
         """
         try:
             return Vault.create_directory(path, template=template)
@@ -151,6 +167,9 @@ class VaultSession:
         Fingerprint taken with the last applied scan, or ``None`` when no scan
         has been applied. It is compared by the background refresh to decide
         whether a rescan is needed.
+    adoption_target : Path | None
+        Resolved unversioned folder awaiting an explicit adoption decision, or
+        ``None`` when no adoption offer is pending.
     """
 
     status: UiStatus
@@ -162,6 +181,9 @@ class VaultSession:
     selected: Path | None = None
     preview_body: str | None = None
     fingerprint: tuple[tuple[str, int, int], ...] | None = None
+    adoption_target: Path | None = None
+    _connections: afanes.core.connections.Connections | None = dataclasses.field(default=None, repr=False)
+    _connections_snapshot: VaultSnapshot | None = dataclasses.field(default=None, repr=False)
 
     @property
     def vault_root(self) -> Path | None:
@@ -174,6 +196,31 @@ class VaultSession:
         """
         return None if self.vault is None else self.vault.root
 
+    @property
+    def connections(self) -> afanes.core.connections.Connections | None:
+        """Return the connection index for the current snapshot.
+
+        Returns
+        -------
+        afanes.core.connections.Connections | None
+            Read-only index for :attr:`snapshot`, or ``None`` when no vault is
+            open.
+
+        Notes
+        -----
+        The index is built lazily the first time a page needs it and reused
+        while the snapshot object stays the same. A background refresh that
+        applies a new snapshot invalidates the cache by identity, so the next
+        reader rebuilds it without an explicit invalidation step.
+        """
+        snapshot = self.snapshot
+        if snapshot is None:
+            return None
+        if self._connections is None or self._connections_snapshot is not snapshot:
+            self._connections = afanes.core.connections.Connections(snapshot)
+            self._connections_snapshot = snapshot
+        return self._connections
+
     def reset(self) -> None:
         """Return the session to the welcome state."""
         self.vault = None
@@ -183,6 +230,9 @@ class VaultSession:
         self.selected = None
         self.preview_body = None
         self.fingerprint = None
+        self.adoption_target = None
+        self._connections = None
+        self._connections_snapshot = None
 
     def note_title(self, path: Path) -> str:
         """Return the display title for a note in the latest scan.

@@ -13,6 +13,7 @@ import afanes.ui.strings
 import afanes.ui.views.inbox
 from afanes.core.editing import DraftMode
 from afanes.core.vault.snapshot import VaultFailure
+from tests.support import ensure_vault, versioned
 
 TWO_BANNERS = 2
 
@@ -39,6 +40,7 @@ async def _open_path(_text: str) -> None:
 
 
 def _write_note(path: Path, body: str) -> Path:
+    ensure_vault(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"---\ntype: note\n---\n{body}", encoding="utf-8")
     return path
@@ -104,7 +106,7 @@ class TestInboxView:
 
     def test_shows_a_captured_note_and_preview(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",
@@ -223,7 +225,7 @@ class TestInboxView:
 
     def test_process_button_calls_the_callback(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",
@@ -262,7 +264,7 @@ class TestInboxView:
 
     def test_failure_path_opens_raw_rescue(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         broken = vault / "reference" / "Broken.md"
         broken.parent.mkdir(parents=True)
         broken.write_text("---\ntype: refrence\n---\nBody\n", encoding="utf-8")

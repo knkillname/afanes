@@ -65,6 +65,7 @@ class TestNoteOrder:
             body_references=(),
             steps=(),
             search_text="",
+            asked_by=None,
         )
 
     def test_dated_notes_sort_before_undated_notes(self) -> None:
@@ -396,3 +397,17 @@ class TestNoteHelpers:
         note = afanes.core.vault.service.Vault(root).scan().notes[0]
 
         assert note.is_misplaced is False
+
+    def test_scan_keeps_the_declared_requester(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        (root / "projects").mkdir(parents=True)
+        (root / "projects" / "Call.md").write_text(
+            "---\ntype: project\nasked_by: Priya Nair\n---\n# Call\n", encoding="utf-8"
+        )
+        (root / "projects" / "Home.md").write_text("---\ntype: project\n---\n# Home\n", encoding="utf-8")
+
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+        by_name = {note.name: note for note in snapshot.notes}
+
+        assert by_name["Call"].asked_by == "Priya Nair"
+        assert by_name["Home"].asked_by is None

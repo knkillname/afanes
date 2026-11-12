@@ -1,13 +1,15 @@
 # 🗂️ Create or open your first vault
 
-A vault is a folder of Markdown files. Afanes never hides your notes in a database: opening a vault
-points the application at that folder, and every note remains readable and portable without Afanes.
+A vault is a folder of Markdown files with an `afanes.yaml` settings file at its root. Afanes never
+hides your notes in a database: opening a vault points the application at that folder, and every note
+remains readable and portable without Afanes.
 
 :::{admonition} tl;dr
 :class: note
 
-Open an existing folder or create a new vault. Creation seeds the default folders and the `Getting
-started` guide; opening an existing folder never writes anything.
+Open an existing versioned folder or create a new vault. Creation seeds the settings file, the default
+folders, and the `Getting started` guide; opening an existing vault never writes anything. A folder
+from an older release can be adopted explicitly.
 :::
 
 ## 🚪 Open an existing folder
@@ -15,9 +17,15 @@ started` guide; opening an existing folder never writes anything.
 On first launch, choose an existing folder or create a new vault. Use **Open another vault** from
 **Change vault** to switch while Afanes is running.
 
-Opening an existing folder is read-only. Afanes scans the folder, groups the notes it can parse, and
-opens the **Inbox** group. It does not seed folders, repair notes, or modify files just because the
-vault was opened. Folders are created only when a write needs them.
+A folder is a vault only when it contains a valid `afanes.yaml` settings file. Opening a versioned
+folder is read-only: Afanes scans the notes it can parse and opens the **Inbox** group. It does not
+seed folders, repair notes, or modify files just because the vault was opened. Folders are created
+only when a write needs them.
+
+If the folder has no settings file but contains all five default folders (`inbox/`, `trash/`,
+`reference/`, `projects/`, and `log/`), Afanes offers to create `afanes.yaml`. Confirming writes only
+that file; no note, folder, guide, or template card changes. A folder that cannot be adopted is
+refused with a message, and nothing is written.
 
 ## ✨ Create a new vault
 
@@ -31,8 +39,8 @@ open. The form asks for:
 On desktop, **Choose folder** opens a folder picker. In the browser presentation, type an absolute path
 because a browser cannot return a folder path from a native dialog.
 
-Creation writes the `Getting started` guide, writes the chosen template's notes, seeds the default
-folders, and remembers the vault for the next launch.
+Creation writes `afanes.yaml` with the current schema, writes the `Getting started` guide, writes the
+chosen template's notes, seeds the default folders, and remembers the vault for the next launch.
 
 :::{tip}
 You can create a second vault without closing the application. **Change vault → Create a new vault**
@@ -61,6 +69,7 @@ A new vault contains:
 
 ```text
 vault/
+  afanes.yaml     schema version
   inbox/          captures
   trash/          recoverable discards
   reference/      non-actionable notes
@@ -76,6 +85,20 @@ Creation refuses a folder that is not empty and a path that names a file. It rep
 writes nothing. Only **Create a new vault** seeds content; **Open another vault** leaves an existing
 empty folder unseeded.
 :::
+
+## 🧬 Adopt an older vault
+
+A vault created before `afanes.yaml` existed can be adopted when it is writable and contains all five
+default folders, matched case-insensitively. `templates/` is optional and extra folders are allowed.
+The interface offers adoption in the welcome state or when changing vaults. From the command line:
+
+```console
+afanes vault adopt ~/Notes/Afanes
+```
+
+Adoption writes only `afanes.yaml`, remembers the vault unless `--no-remember` is supplied, and reports
+the settings file and schema version. It never changes a note, folder, guide, or template card. A
+folder that is missing a default folder or cannot be written is refused.
 
 ## 🔒 Opening and closing
 

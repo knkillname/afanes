@@ -15,6 +15,7 @@ import afanes.core.links
 import afanes.core.names
 import afanes.core.steps
 import afanes.core.templates
+import afanes.core.vault.schema
 import afanes.core.vault.snapshot
 import afanes.models.step
 from afanes.core.errors import (
@@ -112,17 +113,25 @@ class Vault:
             If the path exists and is not a directory.
         VaultUnreadableError
             If the directory cannot be read.
+        VaultSchemaMissingError
+            If the vault has no settings file.
+        VaultSchemaInvalidError
+            If the settings file does not match the current schema shape.
+        VaultSchemaUnsupportedError
+            If the settings file declares another schema version.
 
         Notes
         -----
-        This method performs blocking filesystem checks and never writes. It is
-        the single validation path shared by the interface and the command
-        line.
+        This method performs blocking filesystem checks and never writes. It
+        reads ``afanes.yaml`` to validate the on-disk schema, so a valid
+        read-only vault opens for browsing. It is the single validation path
+        shared by the interface and the command line.
         """
         vault = cls(path)
         if not os.access(vault.root, os.R_OK):
             message = f"Vault root cannot be read: {path}"
             raise VaultUnreadableError(message)
+        afanes.core.vault.schema.VaultSchemaStore(vault.root).require()
         return vault
 
     @classmethod
@@ -194,6 +203,9 @@ class Vault:
         TemplateCardWriteError
             If a bundled template card cannot be written. Cards written before
             the failure remain in place.
+        VaultSchemaWriteError
+            If the settings file cannot be written. The folder may exist, but
+            no default folder or starter content is written.
         VaultError
             If a directory cannot be created or seeded.
 
@@ -229,6 +241,8 @@ class Vault:
             message = f"Could not create the vault directory: {path}"
             raise VaultError(message) from exc
         vault = cls(target)
+        settings = afanes.core.vault.schema.VaultSchemaStore(vault.root)
+        settings.create_current()
         try:
             seeded = vault._seed_layout()
         except OSError as exc:
@@ -243,6 +257,7 @@ class Vault:
             written_notes=written,
             written_cards=written_cards,
             template=bundle.template,
+            settings_file=settings.settings_path,
         )
 
     def _write_bundle(self, bundle: afanes.core.templates.TemplateBundle) -> tuple[Path, ...]:
@@ -492,6 +507,7 @@ class Vault:
             body_references=body_references,
             steps=steps,
             search_text=search_text,
+            asked_by=document.asked_by,
         )
 
     def directory_for(self, note_type: NoteType, category: CategoryLabel | None = None) -> Path:
@@ -839,6 +855,8 @@ class VaultCreation:
     template : str | None
         Template identifier used for the notes, or ``None`` for a vault without
         starter content.
+    settings_file : pathlib.Path
+        Settings file written before the default folders and starter content.
     """
 
     vault: Vault
@@ -847,3 +865,4 @@ class VaultCreation:
     written_notes: tuple[Path, ...]
     written_cards: tuple[Path, ...]
     template: str | None
+    settings_file: Path

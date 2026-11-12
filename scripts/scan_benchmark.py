@@ -21,7 +21,10 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+import afanes.core.connections
+import afanes.core.vault.schema
 import afanes.core.vault.service
+import afanes.core.vault.snapshot
 
 DEFAULT_NOTES = (1_000, 5_000, 10_000)
 DEFAULT_REPEAT = 5
@@ -161,6 +164,11 @@ def generate_vault(
         raise ValueError(message)
 
     root.mkdir(parents=True, exist_ok=True)
+    settings = root / afanes.core.vault.schema.SCHEMA_FILENAME
+    settings.write_text(
+        f"schema_version: {afanes.core.vault.schema.CURRENT_SCHEMA_VERSION}\n",
+        encoding="utf-8",
+    )
     references = round(notes * reference_ratio)
     remaining = notes - references
     captures = remaining // 2
@@ -235,6 +243,19 @@ def _timed(callable_: Callable[[], object], repeat: int) -> list[float]:
     return samples
 
 
+def _first_page_connections(snapshot: afanes.core.vault.snapshot.VaultSnapshot, path: Path) -> None:
+    """Build the connection index and query one page.
+
+    Parameters
+    ----------
+    snapshot : afanes.core.vault.snapshot.VaultSnapshot
+        Scanned vault to index.
+    path : Path
+        Note whose connections the first page shows.
+    """
+    afanes.core.connections.Connections(snapshot).for_note(path)
+
+
 def _format_samples(samples: list[float]) -> str:
     """Format min, median, and max milliseconds for one phase."""
     return f"{min(samples) * 1000:8.2f} {statistics.median(samples) * 1000:8.2f} {max(samples) * 1000:8.2f}"
@@ -281,9 +302,13 @@ def benchmark(
             scan_samples = _timed(vault.scan, repeat)
             fingerprint_samples = _timed(vault.scan_fingerprint, repeat)
             open_samples = _timed(functools.partial(afanes.core.vault.service.Vault.open, root), repeat)
+            snapshot = vault.scan()
+            first_note = snapshot.notes[0].path if snapshot.notes else root
+            connection_samples = _timed(functools.partial(_first_page_connections, snapshot, first_note), repeat)
             lines.append(f"{size:>6}  {'open':<16} {_format_samples(open_samples)}")
             lines.append(f"{size:>6}  {'scan':<16} {_format_samples(scan_samples)}")
             lines.append(f"{size:>6}  {'scan_fingerprint':<16} {_format_samples(fingerprint_samples)}")
+            lines.append(f"{size:>6}  {'connections':<16} {_format_samples(connection_samples)}")
         sys.stdout.write("\n".join(lines) + "\n")
 
 

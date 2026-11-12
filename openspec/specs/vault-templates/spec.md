@@ -28,8 +28,13 @@ special status.
 #### Scenario: No provenance is recorded
 
 - **WHEN** a templated vault is created
-- **THEN** no marker file is written, no settings entry records which notes came from a template, and
-  no note carries a key identifying its origin
+- **THEN** no template marker file is written, no settings entry records which notes came from a
+  template, and no note carries a key identifying its origin
+
+#### Scenario: The schema file is not template provenance
+
+- **WHEN** a templated vault is created
+- **THEN** `afanes.yaml` records only the vault schema version and names no template or note
 
 ### Requirement: The catalog is fixed and ordered
 
@@ -273,19 +278,27 @@ note.
 
 ### Requirement: A created vault contains the guide, template cards, and chosen template
 
-Vault creation SHALL write the guide note, the eight template cards under `templates/`, and, when a
-starter template is chosen, the notes that template declares. Creation MUST NOT write any other file,
-and applying a starter template MUST NOT write outside the new vault.
+Vault creation SHALL write `afanes.yaml` with the current schema, the guide note, the eight template
+cards under `templates/`, and, when a starter template is chosen, the notes that template declares.
+Creation MUST NOT write any other file, and applying a starter template MUST NOT write outside the
+new vault.
 
 #### Scenario: Blank vault holds the guide and cards
 
 - **WHEN** a vault is created without a starter template
-- **THEN** it contains the guide note and the eight template cards, and no other note
+- **THEN** it contains the guide note, the settings file, and the eight template cards, and no other
+  note
 
 #### Scenario: Templated vault holds the guide, cards, and notes
 
 - **WHEN** a vault is created from a starter template
-- **THEN** it contains the guide, the eight cards, and exactly the notes the starter template declares
+- **THEN** it contains the guide, the settings file, the eight cards, and exactly the notes the
+  starter template declares
+
+#### Scenario: Created vault is versioned
+
+- **WHEN** a vault is created
+- **THEN** `afanes.yaml` exists at its root with `schema_version: 1`
 
 #### Scenario: Cards land in templates
 

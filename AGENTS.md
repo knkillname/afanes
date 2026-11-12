@@ -16,6 +16,7 @@
 
 - Offline, local-first Markdown vault: a personal wiki plus project engine. The `.md` files are authoritative; there is no account, telemetry, cloud, or hidden network call in application code.
 - Flow: capture -> clarify -> browse -> review. Three note types: `note` (Inbox capture), `reference` (optional free-form `category`), `project` (body holds Markdown task-list steps). Filename stem is identity; the first H1 is the display title.
+- Vaults are versioned. A vault root contains `afanes.yaml` with `schema_version: 1`; a folder without a valid file is refused. An older writable folder with the five default folders can be adopted explicitly, which writes only that file. Opening a versioned vault is read-only.
 - Default layout: `inbox/`, `trash/`, `reference/<category>/`, `projects/`. Folders are conventions, not requirements. `trash/` is excluded from scans and reference resolution.
 - Current state: there is no SQLite index. Each vault is scanned into an in-memory `VaultSnapshot`; `core/search.py` derives browser, project, and review views from it. Do not add `indexer`, `afanes index`, or `afanes doctor` without an approved change.
 - Behavior details belong to `openspec/specs/*/spec.md` (normative) and `docs/` (user-facing narrative); `README.md` is the landing page. Do not duplicate or re-derive them here.
@@ -132,7 +133,8 @@ Strict NumPy-style docstrings are mandatory for every public module, class, enum
 - Preserve body, unknown frontmatter keys, and existing newline style. New files are UTF-8 without BOM, LF.
 - Compare content before overwriting; if another program changed the file, stop and ask.
 - Confirm rename, move, and trash. Trash moves to `trash/`; no recursive or permanent deletes, never follow symlinks, never touch paths outside the vault.
-- Startup and scanning are read-only: opening or scanning a vault must not create files or folders.
+- Startup and scanning are read-only: opening or scanning a vault must not create files or folders. A valid read-only vault still opens for browsing.
+- A vault root contains `afanes.yaml` with `schema_version: 1`. Opening requires it and never creates it. Creating a vault writes it before the default folders and starter content; adoption of an older folder writes only that file.
 - One writer per vault; serialize writes.
 
 ### 4.6 Flet UI and concurrency

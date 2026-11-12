@@ -21,6 +21,7 @@ import afanes.ui.views.workspace
 from afanes.core.editing import DraftMode
 from afanes.core.log import LogMode
 from afanes.models.note import NoteDate
+from tests.support import ensure_vault, versioned
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
 SECTION_COUNT = 5
@@ -71,6 +72,7 @@ def _write_note(
     body: str = "",
     date: str | None = None,
 ) -> Path:
+    ensure_vault(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["---", f"type: {note_type}"]
     if category is not None:
@@ -86,7 +88,7 @@ def _write_note(
 
 def _open_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.views.workspace.WorkspaceView:
     _use_settings_file(monkeypatch, tmp_path / "settings.json")
-    asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(tmp_path / "vault"))
+    asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
     return afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
 
 
@@ -118,7 +120,7 @@ def _find_control(control: ft.Control, key: str) -> ft.Control | None:
 class TestWorkspaceShell:
     def test_builds_capture_bar_and_browser(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
         view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
@@ -136,7 +138,7 @@ class TestWorkspaceShell:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
         calls: list[str] = []
@@ -371,7 +373,7 @@ class TestFrozenControlRecovery:
 class TestCaptureBar:
     def test_capture_creates_a_note_and_clears_the_field(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         view = _open_workspace(tmp_path, monkeypatch)
         view.capture_field.value = "Buy milk"
 
@@ -383,7 +385,7 @@ class TestCaptureBar:
 
     def test_empty_capture_keeps_the_field_and_reports(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         view = _open_workspace(tmp_path, monkeypatch)
         view.capture_field.value = "   "
 
@@ -457,7 +459,7 @@ class TestWorkspaceRefresh:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         asyncio.run(state.workspace.choose_vault(vault))
@@ -479,7 +481,7 @@ class TestWorkspaceRefresh:
 
     def test_refresh_performs_no_file_io(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
         view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
@@ -541,7 +543,7 @@ class TestBrowserCreationAction:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
         calls: list[str] = []
@@ -571,7 +573,7 @@ class TestBrowserCreationAction:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
         observed: list[bool] = []
@@ -628,7 +630,7 @@ class TestLogSection:
         on_log_entry: Callable[[NoteDate], Coroutine[typing.Any, typing.Any, None]] | None = None,
     ) -> afanes.ui.views.workspace.WorkspaceView:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
-        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(tmp_path / "vault"))
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
         view = afanes.ui.views.workspace.WorkspaceView(
             _noop,
             _change_vault,
@@ -667,7 +669,7 @@ class TestLogSection:
 
     def test_empty_calendar_day_requests_creation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         requested: list[NoteDate] = []
 
         async def on_log_entry(date: NoteDate) -> None:
@@ -682,7 +684,7 @@ class TestLogSection:
 
     def test_today_button_requests_today(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         requested: list[NoteDate] = []
 
         async def on_log_entry(date: NoteDate) -> None:
@@ -696,7 +698,7 @@ class TestLogSection:
 
     def test_mode_switch_changes_the_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         view = self._open_log(tmp_path, monkeypatch)
 
         asyncio.run(view.show_log_mode("everything"))
@@ -739,7 +741,7 @@ class TestLogSection:
 
     def test_tree_refreshes_after_a_new_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         view = self._open_log(tmp_path, monkeypatch)
         today = _today()
         self._log_path(vault, today, "New")

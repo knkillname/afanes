@@ -72,6 +72,23 @@ class CommandLine:
             default=None,
             help=afanes.cli.strings.TEMPLATE_OPTION_HELP,
         )
+        adopt = actions.add_parser(
+            afanes.cli.strings.ADOPT_COMMAND,
+            help=afanes.cli.strings.ADOPT_HELP,
+            description=afanes.cli.strings.ADOPT_HELP,
+        )
+        adopt.add_argument(
+            "directory",
+            metavar="DIR",
+            type=Path,
+            help=afanes.cli.strings.ADOPT_DIRECTORY_HELP,
+        )
+        adopt.add_argument(
+            "--no-remember",
+            action="store_true",
+            dest="no_remember",
+            help=afanes.cli.strings.ADOPT_NO_REMEMBER_HELP,
+        )
         actions.add_parser(
             afanes.cli.strings.TEMPLATES_COMMAND,
             help=afanes.cli.strings.TEMPLATES_HELP,
@@ -112,6 +129,11 @@ class CommandLine:
                 options.directory,
                 remember=not options.no_remember,
                 template=options.template,
+            )
+        if options.command == afanes.cli.strings.VAULT_COMMAND and options.action == afanes.cli.strings.ADOPT_COMMAND:
+            return afanes.cli.vault.VaultCommand.adopt(
+                options.directory,
+                remember=not options.no_remember,
             )
         if (
             options.command == afanes.cli.strings.VAULT_COMMAND

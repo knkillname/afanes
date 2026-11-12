@@ -12,6 +12,7 @@ import pytest
 import afanes.core.settings
 import afanes.core.templates
 import afanes.core.vault.pages
+import afanes.core.vault.schema
 import afanes.core.vault.service
 import afanes.core.vault.snapshot
 import afanes.ui.app
@@ -22,6 +23,7 @@ from afanes.core.errors import TemplateContentError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.settings import Settings
 from afanes.models.note import CategoryLabel
+from tests.support import versioned
 
 Handler = Callable[[], Awaitable[None]]
 WINDOW_WIDTH = 1100
@@ -88,6 +90,13 @@ def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
     monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
 
 
+def _adoptable(root: Path) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    for folder in afanes.core.vault.schema.DEFAULT_FOLDERS:
+        (root / folder).mkdir()
+    return root
+
+
 def _find_by_key(control: ft.Control, key: str) -> ft.Control | None:
     if getattr(control, "key", None) == key:
         return control
@@ -126,7 +135,7 @@ class TestAppShell:
 
     def test_choosing_a_vault_opens_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         picker = FakePicker(str(vault))
@@ -166,7 +175,7 @@ class TestAppShell:
 
     def test_saved_settings_reopen_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
@@ -181,7 +190,7 @@ class TestAppShell:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
@@ -210,6 +219,75 @@ class TestAppShell:
         assert state.processing.note is None
         assert _find_by_key(page.controls[0], "processing-view") is None
         assert _find_by_key(page.controls[0], "process-note") is not None
+
+
+class TestAdoptionPanel:
+    def test_adoptable_remembered_folder_shows_the_panel(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = _adoptable(tmp_path / "vault")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        afanes.core.settings.SettingsStore(tmp_path / "settings.json").save(Settings(vault=vault))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+
+        panel = _find_by_key(page.controls[0], "adoption-panel")
+        assert isinstance(panel, ft.Container)
+        assert afanes.ui.strings.VAULT_SCHEMA_ADOPT_TITLE in _all_texts(panel)
+        confirm = _typed(_find_by_key(panel, "adoption-confirm"), ft.FilledButton)
+        cancel = _typed(_find_by_key(panel, "adoption-cancel"), ft.TextButton)
+        assert confirm.content == afanes.ui.strings.VAULT_SCHEMA_ADOPT_ACTION
+        assert cancel.content == afanes.ui.strings.CANCEL_ACTION
+        assert state.session.vault_root is None
+        assert state.session.adoption_target == vault.resolve()
+        assert not (vault / "afanes.yaml").exists()
+
+    def test_confirming_adoption_writes_the_file_and_opens_the_vault(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = _adoptable(tmp_path / "vault")
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            panel = _typed(_find_by_key(page.controls[0], "adoption-panel"), ft.Container)
+            confirm = _typed(_find_by_key(panel, "adoption-confirm"), ft.FilledButton)
+            await typing.cast("Handler", confirm.on_click)()
+
+        asyncio.run(scenario())
+
+        assert (vault / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"
+        assert state.session.vault_root == vault.resolve()
+        assert state.session.adoption_target is None
+        assert _find_by_key(page.controls[0], "adoption-panel") is None
+        assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(vault.resolve())
+
+    def test_cancelling_adoption_leaves_the_folder_unmodified(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = _adoptable(tmp_path / "vault")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        afanes.core.settings.SettingsStore(tmp_path / "settings.json").save(Settings(vault=vault))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            panel = _typed(_find_by_key(page.controls[0], "adoption-panel"), ft.Container)
+            cancel = _typed(_find_by_key(panel, "adoption-cancel"), ft.TextButton)
+            await typing.cast("Handler", cancel.on_click)()
+
+        asyncio.run(scenario())
+
+        assert state.session.adoption_target is None
+        assert state.session.vault_root is None
+        assert _find_by_key(page.controls[0], "adoption-panel") is None
+        assert isinstance(page.controls[0], ft.Container)
+        assert not (vault / "afanes.yaml").exists()
 
 
 class TestDesktopPresentation:
@@ -263,7 +341,7 @@ class TestWebPresentation:
 
     def test_entering_a_path_opens_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(vault)).capture("Buy milk")
@@ -308,9 +386,9 @@ class TestWebPresentation:
 
     def test_change_vault_dialog_switches_the_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         first = tmp_path / "first"
-        first.mkdir()
+        versioned(first)
         second = tmp_path / "second"
-        second.mkdir()
+        versioned(second)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=first))
@@ -337,7 +415,7 @@ class TestWebPresentation:
 
     def test_change_vault_dialog_cancel_keeps_the_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         first = tmp_path / "first"
-        first.mkdir()
+        versioned(first)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=first))
@@ -364,8 +442,7 @@ class TestLaunchVault:
     def test_supplied_vault_overrides_the_remembered_one(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         remembered = tmp_path / "remembered"
         remembered.mkdir()
-        supplied = tmp_path / "supplied"
-        supplied.mkdir()
+        supplied = versioned(tmp_path / "supplied")
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=remembered))
@@ -381,7 +458,7 @@ class TestLaunchVault:
 class TestSessionGuard:
     def test_second_session_gets_a_notice(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
@@ -400,6 +477,27 @@ class TestSessionGuard:
         assert [note.name for note in state.session.notes] == ["Buy milk"]
         assert _find_by_key(second.controls[0], "session-retry") is not None
         assert _find_by_key(second.controls[0], "welcome-path") is None
+
+    def test_a_second_session_does_not_adopt(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = _adoptable(tmp_path / "vault")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        afanes.core.settings.SettingsStore(tmp_path / "settings.json").save(Settings(vault=vault))
+        first = FakePage()
+        second = FakePage(web=True)
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", first))
+            await afanes.ui.app.main(typing.cast("ft.Page", second))
+
+        asyncio.run(scenario())
+
+        assert _find_by_key(first.controls[0], "adoption-panel") is not None
+        assert _find_by_key(second.controls[0], "session-retry") is not None
+        assert not (vault / "afanes.yaml").exists()
 
     def test_disconnect_releases_the_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -440,7 +538,7 @@ class TestRefreshLoop:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
@@ -458,7 +556,7 @@ class TestRefreshLoop:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
@@ -478,7 +576,7 @@ class TestRefreshLoop:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
@@ -510,7 +608,7 @@ class TestRefreshLoop:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
@@ -725,6 +823,7 @@ class TestCreation:
             preview = _typed(_find_by_key(page.dialogs[0], "create-vault-preview"), ft.Text)
             assert "inbox/" in (preview.value or "")
             assert "projects/" in (preview.value or "")
+            assert "afanes.yaml" in (preview.value or "")
             assert "actions/" not in (preview.value or "")
             assert (
                 afanes.ui.strings.NEW_VAULT_PREVIEW_GUIDE.format(
@@ -886,7 +985,7 @@ class TestCreation:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         first = tmp_path / "first"
-        first.mkdir()
+        versioned(first)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=first))
@@ -920,7 +1019,7 @@ class TestCreation:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         first = tmp_path / "first"
-        first.mkdir()
+        versioned(first)
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=first))
@@ -942,7 +1041,7 @@ class TestCreation:
 
 class TestLaunchDigest:
     def _vault_with_due_step(self, tmp_path: Path) -> Path:
-        vault = tmp_path / "vault"
+        vault = versioned(tmp_path / "vault")
         path = vault / "projects" / "Home.md"
         path.parent.mkdir(parents=True)
         path.write_text(
@@ -978,7 +1077,7 @@ class TestLaunchDigest:
     def test_no_digest_without_due_work(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         page = FakePage()
 
         asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page), vault))
@@ -1000,7 +1099,7 @@ def _all_texts(control: ft.Control) -> list[str]:
 
 class TestBrowserReferenceCreation:
     def _open_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[FakePage, Path]:
-        vault = tmp_path / "vault"
+        vault = versioned(tmp_path / "vault")
         card = vault / "templates" / "person.md"
         card.parent.mkdir(parents=True)
         card.write_text(

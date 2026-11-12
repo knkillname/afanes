@@ -17,6 +17,7 @@ import afanes.ui.theme
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.steps import StepDocument
 from afanes.ui.views.project_body import ProjectBodyView
+from tests.support import ensure_vault
 
 PLAN = datetime.date(2026, 12, 1)
 
@@ -31,6 +32,7 @@ def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
 
 
 def _write_note(path: Path, content: str) -> Path:
+    ensure_vault(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     return path

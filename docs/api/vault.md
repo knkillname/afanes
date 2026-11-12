@@ -12,6 +12,13 @@ rechecks containment and preserves the note bytes it did not intend to change.
    :members:
 ```
 
+### 🧩 afanes.core.vault.schema
+
+```{eval-rst}
+.. automodule:: afanes.core.vault.schema
+   :members:
+```
+
 ### 🧩 afanes.core.vault.snapshot
 
 ```{eval-rst}

@@ -28,12 +28,14 @@ from afanes.core.vault.snapshot import UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType, Status
 from afanes.models.step import StepEdit, StepEditKind
+from tests.support import versioned
 
 TODAY = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
 TWO_OPEN_STEPS = 2
 
 
 def _write_note(root: Path, relative: str, text: str) -> Path:
+    versioned(root)
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -43,7 +45,7 @@ def _write_note(root: Path, relative: str, text: str) -> Path:
 class TestReferenceLifecycle:
     def test_link_survives_a_move_and_follows_a_rename(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
         ada = vault.create("Ada Lovelace", NoteType.REFERENCE, category=CategoryLabel("person"))
         note = vault.create("Prepare report", NoteType.NOTE, body="Ask [Ada Lovelace](<note:Ada Lovelace>).\n")
@@ -67,7 +69,7 @@ class TestReferenceLifecycle:
 class TestVaultLayoutAndTrash:
     def test_default_creation_uses_the_documented_layout(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
 
         project = vault.create("Launch", NoteType.PROJECT)
@@ -80,7 +82,7 @@ class TestVaultLayoutAndTrash:
 
     def test_trash_then_restore_updates_resolution(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
         ada = vault.create("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
         referring = vault.create("Note", NoteType.NOTE, body="[Ada](<note:Ada>)\n")
@@ -103,7 +105,7 @@ class TestVaultLayoutAndTrash:
 class TestProcessingLifecycle:
     def test_capture_to_reference(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Read the manual")
 
@@ -116,7 +118,7 @@ class TestProcessingLifecycle:
 
     def test_capture_to_later(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Read the manual")
 
@@ -127,7 +129,7 @@ class TestProcessingLifecycle:
 
     def test_capture_to_project_with_steps_from_the_body(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture(
             "Launch\n\n- [ ] Call the printer\n- [ ] Book the room\n"
@@ -144,7 +146,7 @@ class TestProcessingLifecycle:
 
     def test_capture_to_done_now(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Send the invoice")
 
@@ -161,7 +163,7 @@ class TestProcessingLifecycle:
 
     def test_capture_to_append_step(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
         project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Call the plumber\n\nAsk about the boiler")
@@ -180,7 +182,7 @@ class TestProcessingLifecycle:
 
     def test_capture_to_trash_and_restore(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Obsolete")
 
@@ -196,7 +198,7 @@ class TestProcessingLifecycle:
 class TestInboxCapture:
     def test_capture_scan_list_and_preview_body(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
 
         path = afanes.core.vault.pages.VaultPages(vault).capture("Call Ada\n\nAbout the report.")
@@ -214,7 +216,7 @@ class TestInboxCapture:
 class TestPageEditingLifecycle:
     def test_capture_link_follow_create_and_edit(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
         ada = vault.create("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
         capture = vault.create(
@@ -366,7 +368,7 @@ class TestReviewWorkflow:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Launch the site")
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
@@ -441,7 +443,7 @@ class TestWorkspaceLiveness:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         vault = Vault(root)
         vault.create("Launch", NoteType.PROJECT, body="# Launch\n\n- [ ] Old step\n")
         monkeypatch.setattr(

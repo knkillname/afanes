@@ -18,6 +18,7 @@ import afanes.ui.views.inbox
 import afanes.ui.views.workspace
 from afanes.core.template_cards import TemplateCard, TemplateCardListing
 from afanes.models.note import CategoryLabel, NoteDate, NoteType
+from afanes.ui.components.panel import Panel
 
 # Public task name so the shell can be observed without exposing its fields.
 REFRESH_TASK_NAME = "workspace-refresh"
@@ -149,6 +150,8 @@ class _Shell:
         await self._stop_refresh_loop()
         self.workspace = None
         self.page.controls.clear()
+        if self.state.session.adoption_target is not None:
+            self.page.add(self._adoption_panel())
         if self.state.session.vault_root is None:
             if self.is_desktop:
                 self.page.add(
@@ -189,6 +192,61 @@ class _Shell:
         self.page.update()
         if self.state.session.vault_root is not None:
             self._start_refresh_loop()
+
+    def _adoption_panel(self) -> ft.Control:
+        """Build the pending adoption offer above the current screen.
+
+        Returns
+        -------
+        flet.Control
+            Shared panel with the explanation and the confirm and cancel
+            actions.
+
+        Notes
+        -----
+        The panel reads the pending target from the session and performs no
+        file I/O. Confirming delegates the write to the workspace controller;
+        cancelling clears the offer.
+        """
+        target = self.state.session.adoption_target
+        if target is None:
+            return ft.Container(visible=False)
+        body = ft.Text(
+            afanes.ui.strings.VAULT_SCHEMA_ADOPT_BODY.format(path=target),
+            selectable=True,
+        )
+        actions: list[ft.Control] = [
+            ft.TextButton(
+                content=afanes.ui.strings.CANCEL_ACTION,
+                on_click=self.cancel_adoption,
+                key="adoption-cancel",
+            ),
+            ft.FilledButton(
+                content=afanes.ui.strings.VAULT_SCHEMA_ADOPT_ACTION,
+                on_click=self.adopt_vault,
+                key="adoption-confirm",
+            ),
+        ]
+        panel = Panel(
+            afanes.ui.strings.VAULT_SCHEMA_ADOPT_TITLE,
+            body,
+            actions,
+        ).build()
+        return ft.Container(
+            key="adoption-panel",
+            content=panel,
+            margin=ft.Margin.only(bottom=afanes.ui.theme.ADOPTION_PANEL_GAP),
+        )
+
+    async def adopt_vault(self) -> None:
+        """Adopt the pending folder, open it, and repaint."""
+        await self.state.workspace.adopt_vault()
+        await self.render()
+
+    async def cancel_adoption(self) -> None:
+        """Dismiss the adoption offer and repaint without writing."""
+        self.state.workspace.cancel_adoption()
+        await self.render()
 
     def _due_digest(self) -> ft.Control | None:
         """Build the launch digest of due work, or ``None`` when there is none.

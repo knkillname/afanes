@@ -9,9 +9,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **Versioned vaults.** Every vault root now carries `afanes.yaml` with `schema_version: 1`. Creation writes it
+  before starter content, and opening a valid read-only vault remains read-only. An older writable folder with the
+  five default folders can be adopted through the interface or `afanes vault adopt DIR`, which writes only that
+  file. This implements the `vault-schema` OpenSpec change.
 - **Connections.** Read mode lists the notes that link to the open page, the open steps owned by a person, and the
   projects they requested. Each completed view is opt-in, the section is read-only, and it is hidden when empty.
   This implements the `note-connections` OpenSpec change.
+
+### Changed
+
+- **Breaking:** a folder without a valid `afanes.yaml` is no longer opened as a vault. Invalid or unsupported
+  settings files are refused and preserved byte for byte; a newer schema asks the user to update Afanes.
 
 ### Fixed
 

@@ -30,7 +30,9 @@ build bundles the client.
 
 ## 🚀 First five minutes
 
-1. **Open or create a vault.** A vault is a folder of Markdown files; opening one is read-only.
+1. **Open or create a vault.** A vault is a folder of Markdown files with an `afanes.yaml` settings
+   file at its root; opening a versioned vault is read-only. A folder from an older release can be
+   adopted explicitly.
    [Create or open your first vault](https://github.com/knkillname/afanes/blob/main/docs/getting-started/first-vault.md)
 2. **Capture a thought.** Type one line in the Inbox. The first line becomes the note's name and
    title.

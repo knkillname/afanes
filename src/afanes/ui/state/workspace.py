@@ -8,9 +8,17 @@ from pathlib import Path
 import afanes.core.templates
 import afanes.ui.strings
 from afanes.core.editing import PageDraftFactory
-from afanes.core.errors import AfanesError, ConfigurationError, VaultError
+from afanes.core.errors import (
+    AfanesError,
+    ConfigurationError,
+    VaultError,
+    VaultSchemaError,
+    VaultSchemaMissingError,
+    VaultSchemaNotAdoptableError,
+)
 from afanes.core.log import LogMode
 from afanes.core.settings import Settings, SettingsStore
+from afanes.core.vault.schema import VaultSchemaStore
 from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.ui.state.browser import BrowserState
@@ -87,6 +95,14 @@ class WorkspaceController:
                 try:
                     vault = await asyncio.to_thread(VaultOpener.open, settings.vault)
                     snapshot = await asyncio.to_thread(vault.scan)
+                except VaultSchemaMissingError:
+                    logger.debug("Remembered vault has no settings file", exc_info=True)
+                    await self._offer_adoption(settings.vault, welcome=True)
+                    return
+                except VaultSchemaError as exc:
+                    logger.debug("Remembered vault settings cannot be used", exc_info=True)
+                    self._show_welcome(str(exc))
+                    return
                 except (VaultError, OSError) as exc:
                     logger.debug("Saved vault could not be opened", exc_info=True)
                     self._show_welcome(str(exc))
@@ -154,6 +170,40 @@ class WorkspaceController:
         async with self.command_lock:
             await self._open_vault_state(path, remember=False)
 
+    async def _offer_adoption(self, path: Path, *, welcome: bool) -> None:
+        """Offer adoption for an unversioned folder without writing to it.
+
+        Parameters
+        ----------
+        path : Path
+            Folder the user selected or that the preferences name.
+        welcome : bool
+            Whether to return to the welcome state. A change-vault offer keeps
+            the current vault open.
+
+        Notes
+        -----
+        The eligibility check is read-only and runs in a worker thread. A
+        folder that cannot be adopted is refused with a message and no pending
+        target.
+        """
+        target: Path | None = None
+        adoptable = False
+        try:
+            store = VaultSchemaStore(path)
+            adoptable = await asyncio.to_thread(store.is_adoptable)
+            target = store.root
+        except (VaultError, OSError):
+            logger.debug("Adoption eligibility could not be checked", exc_info=True)
+        if welcome:
+            self._show_welcome(None)
+        if adoptable and target is not None:
+            self.session.adoption_target = target
+            self.status.show_message(afanes.ui.strings.VAULT_SCHEMA_ADOPT_MESSAGE)
+            return
+        self.session.adoption_target = None
+        self.status.show_message(afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE)
+
     async def _open_vault_state(self, path: Path, *, remember: bool) -> None:
         """Open a vault while the command lock is held."""
         if not await self.pages.commit():
@@ -165,6 +215,17 @@ class WorkspaceController:
             try:
                 vault = await asyncio.to_thread(VaultOpener.open, path)
                 snapshot = await asyncio.to_thread(vault.scan)
+            except VaultSchemaMissingError:
+                logger.debug("Selected folder has no settings file", exc_info=True)
+                if remember:
+                    await self._offer_adoption(path, welcome=False)
+                else:
+                    self.status.show_message(afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE)
+                return
+            except VaultSchemaError as exc:
+                logger.debug("Selected folder settings cannot be used", exc_info=True)
+                self.status.show_message(str(exc))
+                return
             except (VaultError, OSError) as exc:
                 logger.debug("Selected vault could not be opened", exc_info=True)
                 self.status.show_message(str(exc))
@@ -249,6 +310,76 @@ class WorkspaceController:
                 return True
             finally:
                 self.status.set_busy(busy=False)
+
+    async def adopt_vault(self) -> bool:
+        """Write the settings file for the pending adoption target and open it.
+
+        Returns
+        -------
+        bool
+            ``True`` when the folder became a vault and opened, ``False``
+            when no offer is pending, the draft could not be saved, or the
+            write or open failed.
+
+        Notes
+        -----
+        Only ``afanes.yaml`` is written. The current vault stays open until the
+        settings file exists and the adopted folder scans successfully. A write
+        failure leaves the pending target in place so the user can retry.
+        Blocking file I/O runs in a worker thread.
+        """
+        target = self.session.adoption_target
+        if target is None:
+            return False
+        async with self.command_lock:
+            return await self._adopt_vault_state(target)
+
+    def cancel_adoption(self) -> None:
+        """Dismiss the pending adoption offer without writing anything."""
+        self.session.adoption_target = None
+        self.status.clear_message()
+
+    async def _adopt_vault_state(self, target: Path) -> bool:
+        """Adopt and open one folder while the command lock is held."""
+        if not await self.pages.commit():
+            return False
+        self.status.set_busy(busy=True)
+        self.status.clear_message()
+        try:
+            try:
+                await asyncio.to_thread(VaultSchemaStore(target).adopt)
+                vault = await asyncio.to_thread(VaultOpener.open, target)
+                snapshot = await asyncio.to_thread(vault.scan)
+            except VaultSchemaNotAdoptableError as exc:
+                logger.debug("Adoption target is no longer eligible", exc_info=True)
+                self.status.show_message(
+                    afanes.ui.strings.VAULT_SCHEMA_NOT_ADOPTABLE.format(detail=str(exc)),
+                )
+                return False
+            except (VaultError, OSError) as exc:
+                logger.debug("Adoption target could not be opened", exc_info=True)
+                self.status.show_message(str(exc))
+                return False
+            existing = await self._load_settings()
+            remember_failure: str | None = None
+            try:
+                await asyncio.to_thread(
+                    SettingsStore.default().save,
+                    self._settings_for(existing, vault.root),
+                )
+            except ConfigurationError as exc:
+                logger.debug("Adopted vault could not be remembered", exc_info=True)
+                remember_failure = afanes.ui.strings.VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED.format(detail=str(exc))
+            self._enter_vault(
+                vault,
+                snapshot,
+                existing.log_mode_for(vault.root) if existing is not None else "entries",
+            )
+            if remember_failure is not None:
+                self.status.show_message(remember_failure)
+            return True
+        finally:
+            self.status.set_busy(busy=False)
 
     async def _create_vault_state(self, path: Path, template: str | None) -> bool:
         """Create a vault while the command lock is held."""
@@ -355,6 +486,7 @@ class WorkspaceController:
     def _enter_vault(self, vault: Vault, snapshot: VaultSnapshot, log_mode: str = "entries") -> None:
         """Reset per-vault state and apply a freshly scanned snapshot."""
         self.session.vault = vault
+        self.session.adoption_target = None
         self.session.selected = None
         self.session.preview_body = None
         self.processing.clear()

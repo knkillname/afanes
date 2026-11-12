@@ -1,8 +1,8 @@
 # 📄 Vault format
 
-A vault is a directory of Markdown files. A note's filename stem is its identity and the name that
-references resolve against. Its display title is the first level-1 heading in the body, falling back to
-the filename stem when there is no heading.
+A vault is a directory of Markdown files with an `afanes.yaml` settings file at its root. A note's
+filename stem is its identity and the name that references resolve against. Its display title is the
+first level-1 heading in the body, falling back to the filename stem when there is no heading.
 
 :::{admonition} tl;dr
 :class: note
@@ -84,10 +84,39 @@ category: person
 Ada's contact page.
 ```
 
+## ⚙️ Vault settings file
+
+A vault root contains `afanes.yaml`. The filename is exact and must be a regular UTF-8 file, not a
+symbolic link or a directory. The current contents are exactly:
+
+```yaml
+schema_version: 1
+```
+
+The file records the on-disk vault format, not the Afanes package version. Opening a folder without a
+valid file is refused. Opening a versioned vault never creates, changes, or repairs the file, so a
+read-only vault with a valid file still opens for browsing.
+
+The file is validated strictly. Extra keys, duplicate keys, malformed YAML, a missing
+`schema_version`, a non-integer value, and any version other than `1` are refused. An invalid or
+unsupported file is preserved byte for byte; Afanes never guesses, rewrites, or deletes it.
+
+A folder created before this file existed can be adopted. Adoption is offered only for a writable
+folder that contains all five default folders: `inbox/`, `trash/`, `reference/`, `projects/`, and
+`log/`. Folder names are matched case-insensitively, `templates/` is optional, and extra folders are
+allowed. Adoption writes only `afanes.yaml`; it does not create notes, folders, the guide, or template
+cards. Use the adoption action in the interface or `afanes vault adopt DIR` on the command line.
+
+The schema version changes only when the on-disk vault contract changes. Before 1.0, a schema change
+may refuse older vaults. From 1.0 onward, every schema bump ships with a forward migration. A newer
+schema is always refused by an older application, and downgrades are not supported. The application
+preferences file is separate and lives outside the vault.
+
 ## 📁 Default layout
 
 ```text
 vault/
+  afanes.yaml     schema version
   inbox/          captures
   trash/          recoverable discards
   reference/      non-actionable notes
@@ -99,9 +128,9 @@ vault/
 ```
 
 These folders are conveniences, not requirements. Existing notes anywhere in the vault still resolve.
-Folders are created only when a write needs them. A newly created vault also contains the `Getting
-started` guide, the eight template cards under `templates/`, and the chosen template's notes; a vault
-opened later is never seeded or repaired.
+Folders are created only when a write needs them. A newly created vault also contains `afanes.yaml`,
+the `Getting started` guide, the eight template cards under `templates/`, and the chosen template's
+notes; a vault opened later is never seeded or repaired.
 
 :::{warning}
 `templates/` is reserved. If an existing vault already used that folder for ordinary notes, those

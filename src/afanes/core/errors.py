@@ -54,6 +54,49 @@ class VaultPathError(VaultError):
     """Raised when a path escapes the vault root or is not a regular note."""
 
 
+class VaultSchemaError(VaultError):
+    """Base class for vault settings-file failures.
+
+    Notes
+    -----
+    The settings file records the on-disk vault schema. Every failure here is
+    a vault refusal, and the existing file is preserved byte for byte.
+    """
+
+
+class VaultSchemaMissingError(VaultSchemaError):
+    """Raised when a folder has no ``afanes.yaml`` settings file."""
+
+
+class VaultSchemaInvalidError(VaultSchemaError):
+    """Raised when the settings file does not match the current schema shape.
+
+    Notes
+    -----
+    The file may be a symlink, a directory, oversized, invalid UTF-8 or YAML,
+    or contain extra or duplicate keys. The application never repairs or
+    rewrites it.
+    """
+
+
+class VaultSchemaUnsupportedError(VaultSchemaError):
+    """Raised when the settings file declares a different schema version.
+
+    Notes
+    -----
+    Before 1.0, older schemas may be refused without a migration. A newer
+    schema is always refused. The message distinguishes the two cases.
+    """
+
+
+class VaultSchemaWriteError(VaultSchemaError):
+    """Raised when the settings file cannot be written."""
+
+
+class VaultSchemaNotAdoptableError(VaultSchemaError):
+    """Raised when adoption targets an ineligible folder."""
+
+
 class ContentChangedError(VaultError):
     """Raised when a note changed on disk after it was read for editing."""
 

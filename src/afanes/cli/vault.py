@@ -16,6 +16,7 @@ from pathlib import Path
 import afanes.cli.strings
 import afanes.core.settings
 import afanes.core.templates
+import afanes.core.vault.schema
 import afanes.core.vault.service
 from afanes.core.errors import ConfigurationError, VaultError
 from afanes.core.settings import Settings
@@ -112,6 +113,56 @@ class VaultCommand:
         return EXIT_SUCCESS
 
     @classmethod
+    def adopt(cls, path: Path, *, remember: bool) -> int:
+        """Add the vault settings file to an existing folder.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+            Existing folder that contains the five default folders.
+        remember : bool
+            Whether the adopted vault becomes the one Afanes opens next launch.
+
+        Returns
+        -------
+        int
+            ``0`` when the folder was adopted or already versioned, ``1`` when
+            adoption or the preferences write failed.
+
+        Notes
+        -----
+        Adoption writes only ``afanes.yaml``. A valid settings file that
+        already exists is reported and left unchanged, including preferences.
+        The command performs blocking filesystem I/O and never opens the
+        interface.
+        """
+        try:
+            adoption = afanes.core.vault.schema.VaultSchemaStore(path).adopt()
+        except VaultError as exc:
+            CommandOutput.error(afanes.cli.strings.ADOPT_FAILED.format(detail=exc))
+            return EXIT_FAILURE
+        if not adoption.created:
+            CommandOutput.line(
+                afanes.cli.strings.ALREADY_VAULT.format(
+                    path=adoption.root,
+                    version=adoption.schema.version,
+                ),
+            )
+            return EXIT_SUCCESS
+        cls._report_adoption(adoption.root, adoption.schema.version)
+        if remember:
+            try:
+                afanes.core.settings.SettingsStore.default().save(Settings(vault=adoption.root))
+            except ConfigurationError as exc:
+                CommandOutput.error(
+                    afanes.cli.strings.ADOPT_REMEMBER_FAILED.format(path=adoption.root, detail=exc),
+                )
+                return EXIT_FAILURE
+        message = afanes.cli.strings.REMEMBERED if remember else afanes.cli.strings.NOT_REMEMBERED
+        CommandOutput.line(message)
+        return EXIT_SUCCESS
+
+    @classmethod
     def templates(cls) -> int:
         """Report every bundled template with its identifier and description.
 
@@ -156,6 +207,7 @@ class VaultCommand:
             CommandOutput.line(afanes.cli.strings.CREATED_PARENTS.format(paths=parents))
         folders = ", ".join(f"{path.relative_to(root).as_posix()}/" for path in creation.seeded_directories)
         CommandOutput.line(afanes.cli.strings.SEEDED_FOLDERS.format(folders=folders))
+        cls._report_settings(creation.settings_file, root)
         template = creation.template or afanes.cli.strings.TEMPLATE_NONE
         CommandOutput.line(afanes.cli.strings.TEMPLATE_USED.format(template=template))
         notes = ", ".join(path.relative_to(root).as_posix() for path in creation.written_notes)
@@ -164,3 +216,24 @@ class VaultCommand:
         )
         message = afanes.cli.strings.REMEMBERED if remembered else afanes.cli.strings.NOT_REMEMBERED
         CommandOutput.line(message)
+
+    @classmethod
+    def _report_adoption(cls, root: Path, version: int) -> None:
+        """Write the structured adoption summary."""
+        CommandOutput.line(afanes.cli.strings.ADOPTED_VAULT.format(path=root))
+        CommandOutput.line(
+            afanes.cli.strings.SETTINGS_FILE.format(
+                path=afanes.core.vault.schema.SCHEMA_FILENAME,
+                version=version,
+            ),
+        )
+
+    @staticmethod
+    def _report_settings(settings_file: Path, root: Path) -> None:
+        """Write the settings-file line for a created vault."""
+        CommandOutput.line(
+            afanes.cli.strings.SETTINGS_FILE.format(
+                path=settings_file.relative_to(root).as_posix(),
+                version=afanes.core.vault.schema.CURRENT_SCHEMA_VERSION,
+            ),
+        )

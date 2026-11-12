@@ -18,6 +18,7 @@ from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import PageContent, PageFile, ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
+from tests.support import versioned
 
 PROJECT_NOTE = """---
 type: project
@@ -476,7 +477,7 @@ class TestCategoryMoveAndTypeChange:
 
     def test_adding_a_category_moves_the_file(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         path = self._reference(root)
         vault = Vault(root)
 
@@ -491,7 +492,7 @@ class TestCategoryMoveAndTypeChange:
 
     def test_removing_a_category_moves_back_to_the_root(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         path = self._reference(root, "reference/place/Ada.md", category="place")
         vault = Vault(root)
 
@@ -505,7 +506,7 @@ class TestCategoryMoveAndTypeChange:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         path = self._reference(root)
         before = path.read_bytes()
         monkeypatch.setattr(
@@ -534,7 +535,7 @@ class TestCategoryMoveAndTypeChange:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         path = self._reference(root)
         vault = Vault(root)
         preview = afanes.core.vault.naming.VaultNaming(vault).plan_category_move(path, CategoryLabel("place"))
@@ -559,7 +560,7 @@ class TestCategoryMoveAndTypeChange:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         reference = self._reference(root)
         referrer = root / "notes" / "Ref.md"
         referrer.parent.mkdir()
@@ -592,7 +593,7 @@ class TestCategoryMoveAndTypeChange:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         root = tmp_path / "vault"
-        root.mkdir()
+        versioned(root)
         reference = self._reference(root)
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,

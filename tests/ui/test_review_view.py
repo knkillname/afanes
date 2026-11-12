@@ -16,6 +16,7 @@ import afanes.ui.views.review
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.steps import StepDocument
 from afanes.models.note import Status
+from tests.support import ensure_vault, versioned
 
 TODAY = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
@@ -38,6 +39,7 @@ def _write_note(
     due_date: str | None = None,
     body: str = "",
 ) -> Path:
+    ensure_vault(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["---", f"type: {note_type}"]
     if status is not None:
@@ -56,7 +58,7 @@ def _choose_vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.
         classmethod(lambda _cls: tmp_path / "settings.json"),
     )
     state = afanes.ui.state.app_state
-    asyncio.run(state.workspace.choose_vault(tmp_path / "vault"))
+    asyncio.run(state.workspace.choose_vault(versioned(tmp_path / "vault")))
     return state
 
 
@@ -130,7 +132,7 @@ def _start(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.c
 class TestReviewEntry:
     def test_zero_pending_shows_the_zero_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        vault.mkdir()
+        versioned(vault)
         state = _choose_vault(tmp_path, monkeypatch)
         asyncio.run(state.review.start())
 

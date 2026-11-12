@@ -39,42 +39,91 @@ modify any vault file before a vault is chosen.
 - **WHEN** the user cancels the selection without choosing a directory
 - **THEN** the welcome state remains and no settings file is written
 
-### Requirement: Any existing directory is a vault
+### Requirement: A versioned directory is a vault
 
-The application SHALL accept any existing, readable directory as a vault, including an empty one. It MUST NOT require a marker file, a specific subdirectory layout, or pre-existing notes.
+The application SHALL accept an existing, readable directory as a vault when it contains a valid `afanes.yaml`. It MUST NOT require a specific subdirectory layout or pre-existing notes in a versioned vault. A directory without a valid settings file is not opened as a vault.
 
-#### Scenario: Empty directory is accepted
+#### Scenario: Versioned empty directory is accepted
 
-- **WHEN** the user selects an empty directory
+- **WHEN** an empty directory contains a valid `afanes.yaml`
 - **THEN** the vault opens and the Inbox shows an empty state
 
 #### Scenario: Notes are discovered on open
 
-- **WHEN** the selected directory contains notes
-- **THEN** the Inbox shows the notes under its `inbox/` directory
+- **WHEN** a versioned vault contains notes
+- **THEN** the Inbox shows the notes under its inbox directory
 
-#### Scenario: No marker is created
+#### Scenario: Versioned custom layout is accepted
 
-- **WHEN** an empty directory is opened
-- **THEN** the application creates no marker file or directory in it
+- **WHEN** a versioned vault stores notes outside the default folders
+- **THEN** it opens and scans those notes
+
+#### Scenario: Unversioned directory is refused
+
+- **WHEN** a directory has no `afanes.yaml`
+- **THEN** it is not opened as a vault and no file is created
+
+#### Scenario: No marker is created on open
+
+- **WHEN** an unversioned directory is opened
+- **THEN** no marker file or directory is created
+
+### Requirement: An unversioned vault can be adopted
+
+When a folder without `afanes.yaml` is selected and contains all five default folders, the application SHALL offer adoption. Confirming SHALL create only `afanes.yaml` and open the folder. When a vault is already open, the current vault MUST remain open and MUST NOT be replaced until adoption is confirmed.
+
+#### Scenario: Welcome state offers adoption
+
+- **WHEN** the user chooses an adoptable folder and no vault is open
+- **THEN** the welcome state explains the missing settings file and offers to create it
+
+#### Scenario: A remembered adoptable folder is offered on launch
+
+- **WHEN** the remembered folder is adoptable and has no settings file
+- **THEN** the welcome state offers adoption and the folder stays unmodified
+
+#### Scenario: Change vault offers adoption
+
+- **WHEN** a vault is open and the user chooses an adoptable folder
+- **THEN** the current vault stays open and the application offers to create the settings file
+
+#### Scenario: Confirming adoption opens the folder
+
+- **WHEN** the user confirms adoption
+- **THEN** only `afanes.yaml` is created and the folder opens as a vault
+
+#### Scenario: Declining adoption changes nothing
+
+- **WHEN** the user dismisses the adoption offer
+- **THEN** no settings file is written and the previous screen or vault remains
+
+#### Scenario: Incompatible folder is not offered adoption
+
+- **WHEN** the chosen unversioned folder is missing a default folder or is not writable
+- **THEN** the application refuses it and does not offer adoption
 
 ### Requirement: A vault can be created on request
 
 From the welcome state and from the change-vault action, the user SHALL be able to create a vault at
 a path that does not exist or is an empty directory. Creation SHALL create the path and any missing
-intermediate folders, seed the default folders, write the guide and any chosen template's notes,
-remember the vault, and open it. A non-empty directory MUST be refused, and no open, scan, or
-recovery step may create a vault.
+intermediate folders, write `afanes.yaml` with the current schema, seed the default folders, write
+the guide and any chosen template's notes, remember the vault, and open it. A non-empty directory MUST
+be refused, and no open, scan, or recovery step may create a vault.
 
 #### Scenario: Missing path is created and opened
 
 - **WHEN** the user creates a vault at a path that does not exist
-- **THEN** the directory is created, seeded, remembered, and the workspace opens
+- **THEN** the directory is created, versioned, seeded, remembered, and the workspace opens
 
 #### Scenario: Empty directory is seeded and opened
 
 - **WHEN** the user creates a vault at an existing empty directory
-- **THEN** the directory is seeded, remembered, and the workspace opens
+- **THEN** the directory is versioned, seeded, remembered, and the workspace opens
+
+#### Scenario: Created vault contains the settings file
+
+- **WHEN** a vault is created
+- **THEN** `afanes.yaml` exists at its root with `schema_version: 1`
 
 #### Scenario: Non-empty directory is refused
 
@@ -95,8 +144,8 @@ recovery step may create a vault.
 #### Scenario: Browser creation names what it will write
 
 - **WHEN** a browser session user opens the creation action
-- **THEN** it names the default folders and the notes that will be created before anything is
-  written
+- **THEN** it names the default folders, the settings file, and the notes that will be created before
+  anything is written
 
 #### Scenario: Cancelling creation writes nothing
 
@@ -147,8 +196,8 @@ recovery step may create a vault.
 #### Scenario: Chosen template is written
 
 - **WHEN** the user creates a vault and selects a template
-- **THEN** the template's notes are written into the new vault, the guide note is written, and the
-  workspace opens
+- **THEN** the template's notes are written into the new vault, the guide note is written, the
+  settings file exists, and the workspace opens
 
 ### Requirement: Creation offers the bundled templates
 
@@ -221,18 +270,29 @@ The application SHALL persist the selected vault outside the vault and SHALL reo
 ### Requirement: The user can change vaults
 
 From the Inbox, the user SHALL be able to choose a different vault without restarting, using the
-selection action available in the current presentation. The new path SHALL be persisted, and the
-previous vault MUST NOT be modified.
+selection action available in the current presentation. The new path SHALL be persisted only after
+the new vault opens, and the previous vault MUST NOT be modified. A folder without a valid settings
+file is not opened until adoption is confirmed.
 
 #### Scenario: Changing the vault
 
-- **WHEN** the user chooses a different directory through Change vault
+- **WHEN** the user chooses a different versioned directory through Change vault
 - **THEN** the Inbox shows the new vault and the new path is saved
 
 #### Scenario: Changing the vault in a browser session
 
-- **WHEN** a browser session user enters the path of a different directory
+- **WHEN** a browser session user enters the path of a different versioned directory
 - **THEN** the Inbox shows the new vault and the new path is saved
+
+#### Scenario: Changing to an adoptable folder offers adoption
+
+- **WHEN** the user chooses an adoptable unversioned folder
+- **THEN** the current vault stays open and the application offers to create the settings file
+
+#### Scenario: Changing to an incompatible folder is refused
+
+- **WHEN** the user chooses an unversioned folder that is not adoptable
+- **THEN** the current vault stays open, the message explains why, and the saved path is unchanged
 
 #### Scenario: Cancelling keeps the current vault
 
@@ -289,9 +349,10 @@ single-session guard, and MUST NOT modify the vault apart from the open page sav
 
 ### Requirement: Missing or unreadable vault is recoverable
 
-When the saved vault is missing, is not a directory, or cannot be read, the application SHALL show
-the welcome state with an actionable message and MUST NOT create the missing path. The saved value
-SHALL remain until the user chooses another folder.
+When the saved vault is missing, is not a directory, cannot be read, or does not contain a valid
+`afanes.yaml`, the application SHALL show the welcome state with an actionable message and MUST NOT
+create the missing path or settings file. The saved value SHALL remain until the user chooses another
+folder or confirms adoption.
 
 #### Scenario: Saved path no longer exists
 
@@ -312,6 +373,17 @@ SHALL remain until the user chooses another folder.
 
 - **WHEN** the saved vault directory cannot be read
 - **THEN** the welcome state explains the problem and offers vault selection
+
+#### Scenario: Saved folder has no settings file
+
+- **WHEN** the saved folder has no `afanes.yaml`
+- **THEN** the welcome state explains the problem, offers adoption when the folder is adoptable, and
+  writes nothing
+
+#### Scenario: Saved folder has an unsupported schema
+
+- **WHEN** the saved folder has an invalid or unsupported `afanes.yaml`
+- **THEN** the welcome state explains the problem and leaves the file unchanged
 
 ### Requirement: Corrupt settings are not overwritten silently
 
@@ -369,13 +441,18 @@ The application SHALL resolve the selected directory to an absolute path before 
 
 The application SHALL accept a vault directory supplied at start. That directory SHALL be used for
 the run, resolved to an absolute path, and validated like any other vault path. It MUST NOT replace
-the vault remembered in settings. An invalid supplied path SHALL be reported and the application
-SHALL exit with a non-zero status.
+the vault remembered in settings. An invalid supplied path, including a folder without a valid
+settings file, SHALL be reported and the application SHALL exit with a non-zero status.
 
 #### Scenario: Supplied vault opens for the run
 
-- **WHEN** the application starts with an existing directory supplied for this run only
+- **WHEN** the application starts with an existing versioned directory supplied for this run only
 - **THEN** it opens that vault without asking the user to choose
+
+#### Scenario: Read-only versioned vault opens for the run
+
+- **WHEN** the application starts with a read-only directory that contains a valid `afanes.yaml`
+- **THEN** it opens that vault for browsing
 
 #### Scenario: Remembered vault is not replaced
 
@@ -386,3 +463,14 @@ SHALL exit with a non-zero status.
 
 - **WHEN** the supplied path is missing, is not a directory, or cannot be read
 - **THEN** the application reports the problem and exits non-zero without opening the workspace
+
+#### Scenario: Unversioned supplied folder is reported
+
+- **WHEN** the supplied folder has no `afanes.yaml`
+- **THEN** the application reports the problem, points at the adoption command, and exits non-zero
+  without writing to the folder
+
+#### Scenario: Supplied folder is not auto-adopted
+
+- **WHEN** the supplied folder is adoptable but has no `afanes.yaml`
+- **THEN** the application does not create the file and exits non-zero
