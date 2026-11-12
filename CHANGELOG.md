@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - A Sphinx documentation site under `docs/` with MyST Markdown, the Furo theme, getting-started, guide, reference, contributor, and API pages, four screenshots, a docs-style test, and local `hatch run docs:build` / `hatch run docs:serve` commands. The API reference covers all public `models/` and `core/` modules. This implements the `add-documentation-site` OpenSpec change.
 - A per-change documentation review rule in `AGENTS.md` and the OpenSpec archive guidance: every change updates the affected docs page or records why no user-facing documentation changed.
+- Project read mode now renders prose and accent-tinted step cards as one surface. Each step row shows checked state, text, owners, plan and actual dates, and tags, with always-visible calendar and person actions that set or clear the plan date and manage the owner list. A project meta row shows status and the optional due date, with a calendar action that sets or clears it from read mode. Step edits rewrite only the affected line and preserve completion, tags, unknown metadata, and frontmatter bytes. This implements the `step-aware-project-page` OpenSpec change.
 
 ### Changed
 
