@@ -62,6 +62,24 @@ class NoteParseError(AfanesError):
     """Raised when a note's frontmatter or metadata cannot be parsed."""
 
 
+class RetiredValueError(NoteParseError):
+    """Raised when a note uses a value retired by the three-note model.
+
+    Notes
+    -----
+    The message names the retired value and its replacement so an old note can
+    be repaired by hand in raw rescue mode. The file is never rewritten.
+    """
+
+
+class StepMetadataError(AfanesError):
+    """Raised when step metadata cannot be written as one valid HTML comment."""
+
+
+class StepEditError(AfanesError):
+    """Raised when a step line cannot be rewritten safely."""
+
+
 class ProcessingError(VaultError):
     """Raised when a processing plan is invalid or cannot be applied."""
 
@@ -72,6 +90,16 @@ class EmptyCaptureError(AfanesError):
 
 class InvalidReferenceError(AfanesError):
     """Raised when a value is not a valid internal note reference."""
+
+
+class RetiredReferenceSchemeError(InvalidReferenceError):
+    """Raised when a destination uses the retired ``person`` scheme.
+
+    Notes
+    -----
+    The message names ``note:`` as the replacement so a hand repair is
+    obvious. No link is resolved or rewritten automatically.
+    """
 
 
 class NameCollisionError(AfanesError):

@@ -93,9 +93,11 @@ class TestCreateCommand:
         assert captured.err == ""
         assert f"Created vault {target.resolve()}" in captured.out
         assert f"Parent folders created: {tmp_path / 'notes'}" in captured.out
-        assert "Seeded: inbox/, trash/, reference/, reference/people/, projects/, actions/" in captured.out
+        assert "Seeded: inbox/, trash/, reference/, projects/" in captured.out
         assert "Remembered" in captured.out
-        assert (target / "reference" / "people").is_dir()
+        assert (target / "reference").is_dir()
+        assert (target / "projects").is_dir()
+        assert not (target / "reference" / "people").exists()
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
 
     def test_no_remember_leaves_preferences_untouched(

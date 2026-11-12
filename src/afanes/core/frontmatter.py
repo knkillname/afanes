@@ -4,12 +4,14 @@
 """Frontmatter-aware note documents.
 
 The module exposes one cohesive value object, :class:`NoteDocument`, which
-owns fence parsing, safe YAML loading, serialization, and reference rewriting.
-Keeping those behaviors together preserves the document's invariants: metadata,
-body, newline style, declared type, and references always travel as one unit.
+owns fence parsing, safe YAML loading, serialization, and validation of the four
+recognized frontmatter keys. Keeping those behaviors together preserves the
+document's invariants: metadata, body, newline style, declared type, category,
+status, and due date always travel as one unit.
 """
 
 import dataclasses
+import datetime
 from typing import Self
 
 import yaml
@@ -17,13 +19,16 @@ from markdown_it import MarkdownIt
 from markdown_it.token import Token
 from yaml import YAMLError
 
-from afanes.core.errors import InvalidReferenceError, NoteParseError
-from afanes.core.links import ReferenceKey, ReferenceParser
-from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType, ReferenceCategory, Status
+from afanes.core.errors import NoteParseError, RetiredValueError
+from afanes.models.note import CategoryLabel, NoteType, Status
 
 # Public canonical frontmatter delimiter.
 FRONTMATTER_FENCE = "---"
+
+# Public retired frontmatter keys. They are rejected instead of migrated.
+RETIRED_KEYS = frozenset({"people", "project"})
+# Public retired note type value.
+RETIRED_NOTE_TYPES = frozenset({"action", "person"})
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -62,13 +67,13 @@ class NoteDocument:
         Whether the source began with a complete ``---`` fence block.
     note_type : NoteType | None
         Declared type, or ``None`` when the note has no ``type`` key.
-    references : tuple[NoteReference, ...]
-        References declared by the ``people`` and ``project`` values.
-    category : ReferenceCategory | None
-        Reference category, or ``None`` for an uncategorized reference or a
-        non-reference note.
+    category : CategoryLabel | None
+        Free-form reference category, or ``None`` for an uncategorized
+        reference or a non-reference note.
     status : Status | None
         Validated workflow status, or ``None`` when the key is absent.
+    due_date : datetime.date | None
+        Calendar due date for a project, or ``None`` when absent.
 
     Notes
     -----
@@ -82,9 +87,9 @@ class NoteDocument:
     newline: str
     has_frontmatter: bool
     note_type: NoteType | None
-    references: tuple[NoteReference, ...]
-    category: ReferenceCategory | None = None
+    category: CategoryLabel | None = None
     status: Status | None = None
+    due_date: datetime.date | None = None
 
     @classmethod
     def from_text(cls, text: str) -> Self:
@@ -99,19 +104,19 @@ class NoteDocument:
         Returns
         -------
         NoteDocument
-            Raw metadata, body, newline style, declared type, and frontmatter
-            references.
+            Raw metadata, body, newline style, declared type, category, status,
+            and due date.
 
         Raises
         ------
         NoteParseError
             If the opening fence is never closed, the YAML is malformed or is
-            not a mapping, a key is not a string, the declared type is unknown,
-            the category is invalid or misplaced, or the status is unknown or
-            not valid for the declared type.
-        InvalidReferenceError
-            If ``people`` or ``project`` is not made of valid scheme
-            references.
+            not a mapping, a key is not a string, the declared type or status
+            is unknown, the category is invalid or misplaced, the due date is
+            invalid or misplaced, or the status is not valid for the type.
+        RetiredValueError
+            If the note declares ``type: action``, ``type: person``, or a
+            ``people`` or ``project`` key.
 
         Notes
         -----
@@ -120,18 +125,20 @@ class NoteDocument:
         """
         split = cls._split_frontmatter(text)
         newline = "\r\n" if "\r\n" in text else "\n"
+        cls._reject_retired_keys(split.raw)
         note_type = cls._declared_note_type(split.raw)
         category = cls._declared_category(split.raw, note_type)
         status = cls._declared_status(split.raw, note_type)
+        due_date = cls._declared_due_date(split.raw, note_type)
         return cls(
             raw=split.raw,
             body=split.body,
             newline=newline,
             has_frontmatter=split.has_frontmatter,
             note_type=note_type,
-            references=cls._references_from_raw(split.raw),
             category=category,
             status=status,
+            due_date=due_date,
         )
 
     def to_text(self) -> str:
@@ -267,88 +274,29 @@ class NoteDocument:
         ------
         NoteParseError
             If the replacement metadata has an unknown type, an invalid
-            category or status, or malformed values.
-        InvalidReferenceError
-            If ``people`` or ``project`` is not made of valid scheme
-            references.
+            category, status, or due date, or malformed values.
+        RetiredValueError
+            If the replacement metadata declares a retired type or key.
 
         Notes
         -----
-        Unknown keys are preserved. Category and status values are normalized
-        to their canonical lowercase forms.
+        Unknown keys are preserved. Category values preserve their written
+        form; retired keys are never accepted back.
         """
         new_raw = dict(raw)
+        self._reject_retired_keys(new_raw)
         note_type = self._declared_note_type(new_raw)
         category = self._declared_category(new_raw, note_type)
         status = self._declared_status(new_raw, note_type)
-        references = self._references_from_raw(new_raw)
+        due_date = self._declared_due_date(new_raw, note_type)
         return dataclasses.replace(
             self,
             raw=new_raw,
             note_type=note_type,
             category=category,
             status=status,
-            references=references,
+            due_date=due_date,
         )
-
-    def rewrite_references(self, old: NoteReference, new: NoteReference) -> tuple[Self, int]:
-        """Rewrite matching frontmatter reference values.
-
-        Parameters
-        ----------
-        old : NoteReference
-            Scheme and name to replace. The label is ignored.
-        new : NoteReference
-            Replacement scheme and name.
-
-        Returns
-        -------
-        tuple[NoteDocument, int]
-            Document with updated raw metadata and references, plus the number
-            of values changed. When nothing matches, the original document is
-            returned with zero.
-
-        Raises
-        ------
-        InvalidReferenceError
-            If an existing value is not a valid reference for its key. Parsed
-            documents normally cannot reach this state.
-
-        Notes
-        -----
-        Only the ``people`` and ``project`` values change. Unknown keys and
-        their order are preserved. Frontmatter values never use angle brackets.
-        """
-        raw = dict(self.raw)
-        old_key = ReferenceKey.from_reference(old)
-        count = 0
-
-        people = raw.get("people")
-        if isinstance(people, list):
-            rewritten_people: list[object] = []
-            for value in people:
-                reference = self._person_reference(value)
-                if ReferenceKey.from_reference(reference) == old_key:
-                    rewritten_people.append(self._frontmatter_value(new))
-                    count += 1
-                else:
-                    rewritten_people.append(value)
-            raw["people"] = rewritten_people
-
-        project = raw.get("project")
-        if isinstance(project, str):
-            reference = self._project_reference(project)
-            if ReferenceKey.from_reference(reference) == old_key:
-                raw["project"] = self._frontmatter_value(new)
-                count += 1
-
-        if count == 0:
-            return self, 0
-        return dataclasses.replace(
-            self,
-            raw=raw,
-            references=self._references_from_raw(raw),
-        ), count
 
     @staticmethod
     def _split_frontmatter(text: str) -> FrontmatterSplit:
@@ -396,6 +344,22 @@ class NoteDocument:
         return raw
 
     @staticmethod
+    def _reject_retired_keys(raw: dict[str, object]) -> None:
+        """Reject the frontmatter keys retired by the three-type model."""
+        for key in sorted(RETIRED_KEYS & raw.keys()):
+            if key == "people":
+                message = (
+                    "The 'people' key was retired; link people in the body with "
+                    "[Name](<note:Name>) or list them as step owners"
+                )
+            else:
+                message = (
+                    "The 'project' key was retired; move the work into the project body "
+                    "as a step or link it in the body"
+                )
+            raise RetiredValueError(message)
+
+    @staticmethod
     def _declared_note_type(raw: dict[str, object]) -> NoteType | None:
         """Return the declared note type, or ``None`` when absent."""
         if "type" not in raw:
@@ -404,6 +368,12 @@ class NoteDocument:
         if not isinstance(value, str):
             message = "Frontmatter type must be a string"
             raise NoteParseError(message)
+        if value in RETIRED_NOTE_TYPES:
+            if value == "action":
+                message = "The 'action' note type was retired; make a one-step project instead"
+            else:
+                message = "The 'person' note type was retired; create a reference with a category label instead"
+            raise RetiredValueError(message)
         try:
             return NoteType(value)
         except ValueError as exc:
@@ -414,7 +384,7 @@ class NoteDocument:
     def _declared_category(
         raw: dict[str, object],
         note_type: NoteType | None,
-    ) -> ReferenceCategory | None:
+    ) -> CategoryLabel | None:
         """Return the validated reference category, or ``None`` when absent."""
         if "category" not in raw:
             return None
@@ -426,9 +396,9 @@ class NoteDocument:
             message = "Frontmatter category is only valid on reference notes"
             raise NoteParseError(message)
         try:
-            category = ReferenceCategory(value.strip().casefold())
+            category = CategoryLabel(value.strip())
         except ValueError as exc:
-            message = f"Unknown reference category: {value!r}"
+            message = f"Invalid reference category: {value!r}"
             raise NoteParseError(message) from exc
         raw["category"] = category.value
         return category
@@ -462,51 +432,56 @@ class NoteDocument:
         return status
 
     @staticmethod
-    def _references_from_raw(raw: dict[str, object]) -> tuple[NoteReference, ...]:
-        """Validate and collect references declared by frontmatter values."""
-        references: list[NoteReference] = []
-
-        if "people" in raw:
-            people = raw["people"]
-            if not isinstance(people, list):
-                message = "Frontmatter people must be a list of person references"
-                raise InvalidReferenceError(message)
-            references.extend(NoteDocument._person_reference(value) for value in people)
-
-        project = raw.get("project")
-        if project is not None:
-            references.append(NoteDocument._project_reference(project))
-
-        return tuple(references)
-
-    @staticmethod
-    def _person_reference(value: object) -> NoteReference:
-        """Validate one person reference value."""
-        if not isinstance(value, str):
-            message = "Frontmatter people entries must be strings"
-            raise InvalidReferenceError(message)
-        reference = ReferenceParser().parse(value)
-        if reference.scheme is not ReferenceScheme.PERSON:
-            message = f"Frontmatter people entry is not a person reference: {value!r}"
-            raise InvalidReferenceError(message)
-        return reference
+    def _declared_due_date(
+        raw: dict[str, object],
+        note_type: NoteType | None,
+    ) -> datetime.date | None:
+        """Return the validated calendar due date, or ``None`` when absent."""
+        if "due_date" not in raw:
+            return None
+        value = raw["due_date"]
+        if value is None:
+            return None
+        if note_type is not NoteType.PROJECT:
+            message = "Frontmatter due_date is only valid on project notes"
+            raise NoteParseError(message)
+        due_date = NoteDocument._calendar_date(value)
+        raw["due_date"] = due_date
+        return due_date
 
     @staticmethod
-    def _project_reference(value: object) -> NoteReference:
-        """Validate the single project reference value."""
-        if not isinstance(value, str):
-            message = "Frontmatter project must be a string"
-            raise InvalidReferenceError(message)
-        reference = ReferenceParser().parse(value)
-        if reference.scheme is not ReferenceScheme.PROJECT:
-            message = f"Frontmatter project value is not a project reference: {value!r}"
-            raise InvalidReferenceError(message)
-        return reference
+    def _calendar_date(value: object) -> datetime.date:
+        """Convert one frontmatter value into a calendar date.
 
-    @staticmethod
-    def _frontmatter_value(reference: NoteReference) -> str:
-        """Render a reference as a frontmatter value without angle brackets."""
-        return f"{reference.scheme.value}:{reference.name}"
+        Parameters
+        ----------
+        value : object
+            Raw loaded value, normally a YAML date or an ISO date string.
+
+        Returns
+        -------
+        datetime.date
+            Calendar date with no time or timezone.
+
+        Raises
+        ------
+        NoteParseError
+            If the value is a timestamp, is not a date, or is not a valid
+            ``YYYY-MM-DD`` calendar date.
+        """
+        if isinstance(value, datetime.datetime):
+            message = "A due date is a calendar date, not a timestamp"
+            raise NoteParseError(message)
+        if isinstance(value, datetime.date):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.date.fromisoformat(value.strip())
+            except ValueError as exc:
+                message = f"Invalid due date: {value!r}; use YYYY-MM-DD"
+                raise NoteParseError(message) from exc
+        message = "Frontmatter due_date must be a date written as YYYY-MM-DD"
+        raise NoteParseError(message)
 
     def _body_title(self) -> str | None:
         """Return the plain text of the first level-1 heading in the body.

@@ -8,21 +8,21 @@ Defines how Afanes expresses, extracts, and resolves references between notes us
 
 ### Requirement: Internal reference syntax
 
-Afanes SHALL recognize an internal reference only as a Markdown link whose destination is `scheme:name`, where the scheme is `person`, `project`, or `note`. The label is presentation only. Angle-bracketed destinations are accepted, and are required when the name contains characters that a bare Markdown destination cannot carry.
+Afanes SHALL recognize an internal reference only as a Markdown link whose destination is `scheme:name`, where the scheme is `project` or `note`. The label is presentation only. Angle-bracketed destinations are accepted, and are required when the name contains characters that a bare Markdown destination cannot carry.
 
 #### Scenario: Simple reference
 
-- **WHEN** a note body contains `[Ada Lovelace](<person:Ada Lovelace>)`
-- **THEN** the system reads it as a reference to the person named `Ada Lovelace`
+- **WHEN** a note body contains `[Ada Lovelace](<note:Ada Lovelace>)`
+- **THEN** the system reads it as a reference to the note named `Ada Lovelace`
 
 #### Scenario: Bare destination
 
-- **WHEN** a note body contains `[Ada](person:Ada)`
-- **THEN** the system reads it as the same reference as `[Ada](<person:Ada>)`
+- **WHEN** a note body contains `[Ada](note:Ada)`
+- **THEN** the system reads it as the same reference as `[Ada](<note:Ada>)`
 
 #### Scenario: Label is not identity
 
-- **WHEN** a note body contains `[my colleague](person:Ada)`
+- **WHEN** a note body contains `[my colleague](note:Ada)`
 - **THEN** the reference targets `Ada` and the label is not part of the name
 
 #### Scenario: Bracket syntax is not recognized
@@ -30,43 +30,38 @@ Afanes SHALL recognize an internal reference only as a Markdown link whose desti
 - **WHEN** a note body contains `[[Ada Lovelace]]`
 - **THEN** the system does not treat it as a reference and does not resolve it
 
-### Requirement: Scheme vocabulary and target types
+### Requirement: Two schemes address the vault
 
-The `person` scheme SHALL resolve only to reference notes with category `person`; `project` only to `project`; and `note` to `note`, `action`, or an uncategorized `reference`. Scheme names SHALL be matched case-insensitively. Each scheme is a separate namespace: a name is looked up only within its scheme.
+The `project` scheme SHALL resolve only to `project` notes. The `note` scheme SHALL resolve to `note` notes and to `reference` notes in any category. Scheme names SHALL be matched case-insensitively. Each scheme is a separate namespace: a name is looked up only within its scheme.
 
-#### Scenario: Person reference resolves a person
+#### Scenario: Project reference resolves a project
 
-- **WHEN** `person:Ada` names a reference note with category `person`
+- **WHEN** `project:Release 1.0` names a project note
+- **THEN** the reference resolves to that project
+
+#### Scenario: Note reference resolves a reference in any category
+
+- **WHEN** `note:Paris` names a reference with `category: place`
 - **THEN** the reference resolves to that note
 
-#### Scenario: Document family shares one scheme
+#### Scenario: Notes and references share one scheme
 
-- **WHEN** an action note is referenced as `[Call dentist](<note:Call dentist>)`
-- **THEN** the reference resolves to the action note
-
-#### Scenario: Uncategorized reference is a document
-
-- **WHEN** an uncategorized reference is referenced as `[Reading](<note:Reading>)`
-- **THEN** the reference resolves to the reference note
-
-#### Scenario: Categorized reference is outside the note scheme
-
-- **WHEN** `note:Ada` is resolved and the only note named `Ada` has category `person`
-- **THEN** the reference is unresolved
+- **WHEN** a note declares `type: note` and a reference declares `type: reference`
+- **THEN** both are addressable through the `note` scheme
 
 #### Scenario: Namespaces are separate
 
-- **WHEN** `person:Ada` is resolved and the only note named `Ada` is a project
+- **WHEN** `note:Ada` is resolved and the only note named `Ada` is a project
 - **THEN** the reference is unresolved and does not resolve to the project
 
 #### Scenario: Unknown scheme is external
 
-- **WHEN** a destination uses `https:`, `mailto:`, or any scheme outside the three internal schemes
+- **WHEN** a destination uses `https:`, `mailto:`, or any scheme outside the two internal schemes
 - **THEN** the system treats it as an external link and never as an internal reference
 
-### Requirement: Reference extraction scope
+### Requirement: Reference extraction reads body text
 
-References SHALL be extracted from Markdown text content and from the `people` and `project` frontmatter values. They SHALL NOT be extracted from fenced code, indented code, inline code, HTML comments, or image destinations.
+References SHALL be extracted from Markdown text content. They SHALL NOT be extracted from fenced code, indented code, inline code, HTML comments, image destinations, or step metadata.
 
 #### Scenario: Fenced code is excluded
 
@@ -78,15 +73,15 @@ References SHALL be extracted from Markdown text content and from the `people` a
 - **WHEN** a reference appears inside an inline code span
 - **THEN** the system does not extract it
 
-#### Scenario: Frontmatter values are references
-
-- **WHEN** frontmatter contains `people: ["person:Ada"]`
-- **THEN** the system extracts a person reference from the note's metadata
-
 #### Scenario: Images are not references
 
 - **WHEN** a note body contains `![diagram](attachments/diagram.png)`
 - **THEN** the destination is not extracted as a note reference
+
+#### Scenario: Step metadata is not a body reference
+
+- **WHEN** a step declares `owners: [Ada]` in its metadata comment
+- **THEN** no body reference is extracted from the comment and the owner resolves as a step owner
 
 ### Requirement: Name matching
 
@@ -141,25 +136,6 @@ Resolution SHALL produce exactly one outcome: resolved, unresolved, or ambiguous
 - **WHEN** a reference name contains path separators or traversal segments
 - **THEN** the system treats it as a name that matches nothing and does not open any file
 
-### Requirement: Frontmatter reference values
-
-The `people` key SHALL hold zero or more `person:name` references. The `project` key SHALL hold at most one `project:name` reference. A value that is not a scheme reference SHALL produce a validation error and MUST NOT be coerced or silently reinterpreted.
-
-#### Scenario: Valid people list
-
-- **WHEN** a note declares `people: ["person:Ada", "person:Grace"]`
-- **THEN** both person references are extracted
-
-#### Scenario: Bare name is rejected
-
-- **WHEN** a note declares `people: ["Ada"]`
-- **THEN** the value produces a validation error rather than being resolved as a person
-
-#### Scenario: Project value is validated
-
-- **WHEN** a note declares a `project` value that is not a `project:name` reference
-- **THEN** the value produces a validation error
-
 ### Requirement: Attachment and external distinction
 
 A destination without a scheme SHALL be treated as a relative file or attachment path and MUST NOT resolve as a note reference. Only the three internal schemes SHALL resolve as internal references. Active schemes such as `javascript:` SHALL be classified as unsafe and MUST NOT resolve as an internal reference or become a navigable internal target.
@@ -179,26 +155,26 @@ A destination without a scheme SHALL be treated as a relative file or attachment
 - **WHEN** a note body contains a `javascript:` destination
 - **THEN** the system classifies it as unsafe and does not resolve it as an internal reference
 
-### Requirement: Type changes
+### Requirement: Type changes between note and project
 
-A note SHALL resolve only under a scheme that covers its current type and category. When a note changes type or category, references that no longer match SHALL become unresolved and be reported; they MUST NOT be retargeted automatically. References within the document family SHALL survive changes between `note`, `action`, and an uncategorized `reference`.
+A note SHALL resolve only under the scheme that covers its current type. When a note changes type, references that no longer match SHALL become unresolved and be reported; they MUST NOT be retargeted automatically. References within the `note` scheme SHALL survive changes between `note` and any `reference`, including a category change.
 
-#### Scenario: Note becomes an action
+#### Scenario: Note becomes a reference
 
-- **WHEN** a note referenced as `note:Prepare report` changes type from `note` to `action`
+- **WHEN** a note referenced as `note:Prepare report` changes type from `note` to `reference`
 - **THEN** `note:Prepare report` still resolves to it
 
-#### Scenario: Note becomes an uncategorized reference
+#### Scenario: A reference gains a category
 
-- **WHEN** a note referenced as `note:Prepare report` changes type from `note` to an uncategorized `reference`
-- **THEN** `note:Prepare report` still resolves to it
+- **WHEN** a note referenced as `note:Ada` becomes a reference with `category: person`
+- **THEN** `note:Ada` still resolves to it
 
-#### Scenario: Note gains a category
-
-- **WHEN** a note referenced as `note:Ada` changes to a reference with category `person`
-- **THEN** the inbound `note:Ada` reference is reported as unresolved and is not retargeted
-
-#### Scenario: Note leaves the document family
+#### Scenario: Note leaves the note scheme
 
 - **WHEN** a note referenced as `note:Prepare report` changes type to `project`
 - **THEN** the inbound reference is reported as unresolved and is not retargeted to `project:Prepare report`
+
+#### Scenario: References are not retargeted
+
+- **WHEN** a type change makes a reference unresolved
+- **THEN** the application does not rewrite the reference to the new scheme

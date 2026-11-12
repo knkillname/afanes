@@ -71,20 +71,20 @@ REVIEW_OPEN_PROJECT = "Open project"
 REVIEW_OPEN_ACTION = "Open"
 REVIEW_NEXT_STEP = "Next step"
 REVIEW_NO_NEXT_STEP = "This project has no next step yet."
-REVIEW_OTHER_ACTIONS = "Other open actions"
-REVIEW_CREATE_ACTION = "Create next action"
-REVIEW_ACTION_TITLE_LABEL = "Action title"
-REVIEW_ACTION_TITLE_HINT = "What is the next step?"
-REVIEW_ACTION_CONFIRM = "Create action"
-REVIEW_ACTION_CANCEL = "Cancel"
-REVIEW_TITLE_REQUIRED = "Enter a title for the next action."
+REVIEW_OTHER_STEPS = "Other open steps"
+REVIEW_CREATE_STEP = "Add next step"
+REVIEW_STEP_TITLE_LABEL = "Next step"
+REVIEW_STEP_TITLE_HINT = "What is the next step?"
+REVIEW_STEP_CONFIRM = "Add step"
+REVIEW_STEP_CANCEL = "Cancel"
+REVIEW_TITLE_REQUIRED = "Enter text for the next step."
 REVIEW_MARK_DONE = "Mark project done"
 REVIEW_DEFER = "Defer to later"
 REVIEW_CONFIRM_DONE = "Confirm done"
 REVIEW_CONFIRM_DEFER = "Confirm later"
 REVIEW_CANCEL = "Cancel"
-REVIEW_ACTION_CREATED = "Next action created: {path}"
-REVIEW_ACTION_FAILED = "Could not create the next action: {detail}"
+REVIEW_STEP_CREATED = "Next step added to {path}"
+REVIEW_STEP_FAILED = "Could not update this step: {detail}"
 REVIEW_PROJECT_FAILED = "Could not update this project: {detail}"
 REVIEW_CAPTURE_READ_FAILED = "Could not read this capture: {detail}"
 REVIEW_DUE = "Due {date}"
@@ -92,14 +92,12 @@ WORKSPACE_SECTION_LABELS = MappingProxyType(
     {
         "inbox": "Inbox",
         "projects": "Projects",
-        "actions": "Actions",
-        "people": "People",
         "references": "References",
-        "notes": "Notes",
+        "needs_attention": "Needs attention",
     }
 )
 BROWSER_SEARCH_LABEL = "Search"
-BROWSER_SEARCH_HINT = "Title or identity"
+BROWSER_SEARCH_HINT = "Title, identity, or text"
 BROWSER_EMPTY = "No notes in this section."
 BROWSER_NO_MATCH = "No notes match this search."
 BROWSER_FAILURES = "Unreadable notes"
@@ -111,10 +109,10 @@ PROJECT_GROUP_LABELS = MappingProxyType(
         "closed": "Closed",
     }
 )
-PROJECT_OPEN_ACTIONS_ONE = "1 open action"
-PROJECT_OPEN_ACTIONS_MANY = "{count} open actions"
-PROJECT_NEXT_ACTION = "Next: {title}"
-PROJECT_NO_NEXT_ACTION = "No next action"
+PROJECT_OPEN_STEPS_ONE = "1 open step"
+PROJECT_OPEN_STEPS_MANY = "{count} open steps"
+PROJECT_NEXT_STEP = "Next: {title}"
+PROJECT_NO_NEXT_STEP = "No next step"
 PROJECT_DUE = "Due {date}"
 PROJECT_STATUS = "Status: {status}"
 PROCESS_ACTION = "Process"
@@ -123,7 +121,6 @@ PROCESSING_CAPTURE = "Capture"
 PROCESSING_OUTCOME_LABEL = "Outcome"
 PROCESSING_STATUS_LABEL = "Status"
 PROCESSING_DUE_DATE_LABEL = "Due date (YYYY-MM-DD)"
-PROCESSING_PEOPLE_LABEL = "People (comma-separated)"
 PROCESSING_PROJECT_LABEL = "Project"
 PROCESSING_PREVIEW_ACTION = "Preview"
 PROCESSING_CONFIRM_ACTION = "Confirm"
@@ -161,8 +158,9 @@ PROCESSING_OUTCOME_LABELS = MappingProxyType(
         "trash": "Trash",
         "later": "Later",
         "reference": "Reference",
-        "action": "Action",
         "project": "Project",
+        "append_step": "Append step",
+        "done_now": "Done now",
     }
 )
 PROCESSING_STATUS_LABELS = MappingProxyType(
@@ -204,8 +202,6 @@ PAGE_TYPE_LABEL = "Type"
 PAGE_CATEGORY_LABEL = "Category"
 PAGE_STATUS_LABEL = "Status"
 PAGE_DUE_DATE_LABEL = "Due date (YYYY-MM-DD)"
-PAGE_PEOPLE_LABEL = "People"
-PAGE_PROJECT_LABEL = "Project"
 PAGE_RAW_WARNING = "This page's metadata cannot be read. Edit the text directly; labels return once it parses."
 PAGE_RAW_SAVE = "Save text"
 PAGE_SAVING = "Saving"
@@ -249,18 +245,42 @@ PAGE_RAW_UPGRADED = "The page now parses; labels are available."
 PAGE_TYPE_CHANGE_LEAVE = "Confirm or cancel the type change before leaving this page."
 PAGE_NONE = "None"
 PAGE_NEW = "New page"
+PAGE_CATEGORY_HINT = "Any label, such as person or place"
+PAGE_CATEGORY_INVALID = "A category must be one non-empty folder name without path separators."
+PAGE_CATEGORY_MOVE_TITLE = "Move this page?"
+PAGE_CATEGORY_MOVE_BODY = "The page will move to {path}. Its name and references stay the same."
+PAGE_CATEGORY_MOVE_CONFIRM = "Move page"
+PAGE_CATEGORY_MOVE_FAILED = "Could not move this page to its category folder: {detail}"
+PAGE_STEP_TICK = "Mark complete"
+PAGE_STEP_UNTICK = "Reopen"
+PAGE_STEP_OWNERS = "Owners: {owners}"
+PAGE_STEP_PLAN = "Plan: {date}"
+PAGE_STEP_ACTUAL = "Done: {date}"
+PAGE_STEP_TAGS = "Tags: {tags}"
+PAGE_STEP_WAITING = "Waiting"
+PAGE_STEP_FAILED = "Could not update this step: {detail}"
+PAGE_STEPS_TITLE = "Steps"
+REVIEW_DUE_STEP_TITLE = "Due step"
+REVIEW_WAITING_STEP_TITLE = "Waiting step"
+REVIEW_DO_NOW = "Do it now"
+REVIEW_POSTPONE = "Postpone"
+REVIEW_DELEGATE = "Delegate"
+REVIEW_REASSIGN = "Reassign"
+REVIEW_OWNER_LABEL = "Owner"
+REVIEW_OWNER_REQUIRED = "Enter an owner before confirming."
+REVIEW_POSTPONE_LABEL = "New plan date (YYYY-MM-DD)"
+REVIEW_INVALID_DATE = "Enter the plan date as YYYY-MM-DD."
+REVIEW_CONFIRM = "Confirm"
+REVIEW_STEP_OWNERS = "Owners: {owners}"
+REVIEW_LAUNCH_DIGEST_ONE = "1 due step needs attention"
+REVIEW_LAUNCH_DIGEST_MANY = "{count} due steps need attention"
+REVIEW_LAUNCH_DIGEST_ACTION = "Start review"
 
 PAGE_TYPE_LABELS = MappingProxyType(
     {
         "note": "Note",
-        "action": "Action",
         "project": "Project",
         "reference": "Reference",
-    }
-)
-PAGE_CATEGORY_LABELS = MappingProxyType(
-    {
-        "person": "Person",
     }
 )
 
@@ -301,20 +321,20 @@ def note_count(count: int) -> str:
     return NOTE_COUNT_ONE if count == 1 else NOTE_COUNT_MANY.format(count=count)
 
 
-def open_action_count(count: int) -> str:
-    """Return the open-action count label for a project row.
+def open_step_count(count: int) -> str:
+    """Return the open-step count label for a project row.
 
     Parameters
     ----------
     count : int
-        Number of open actions.
+        Number of open steps.
 
     Returns
     -------
     str
         Singular or plural label.
     """
-    return PROJECT_OPEN_ACTIONS_ONE if count == 1 else PROJECT_OPEN_ACTIONS_MANY.format(count=count)
+    return PROJECT_OPEN_STEPS_ONE if count == 1 else PROJECT_OPEN_STEPS_MANY.format(count=count)
 
 
 def review_pending(count: int) -> str:

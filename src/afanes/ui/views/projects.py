@@ -125,15 +125,15 @@ class ProjectsView:
             )
         details.append(
             ft.Text(
-                afanes.ui.strings.open_action_count(summary.open_count),
+                afanes.ui.strings.open_step_count(summary.open_count),
                 size=12,
                 color=afanes.ui.theme.MUTED_TEXT_COLOR,
             )
         )
-        if summary.next_action is None:
-            next_text = afanes.ui.strings.PROJECT_NO_NEXT_ACTION
+        if summary.next_step is None:
+            next_text = afanes.ui.strings.PROJECT_NO_NEXT_STEP
         else:
-            next_text = afanes.ui.strings.PROJECT_NEXT_ACTION.format(title=summary.next_action.title)
+            next_text = afanes.ui.strings.PROJECT_NEXT_STEP.format(title=summary.next_step.text)
         details.append(ft.Text(next_text, size=12, selectable=True))
         page = self._state.page
         return ft.ListTile(

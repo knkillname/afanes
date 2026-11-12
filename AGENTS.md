@@ -18,7 +18,7 @@
 
 ### 1.1 What Afanes is
 
-Afanes is a cross-platform desktop productivity engine and personal wiki. It captures unfiltered thoughts, clarifies them into action items or reference material, and organizes work through projects, due dates, people, and bidirectional name-based references.
+Afanes is a cross-platform desktop productivity engine and personal wiki. It captures unfiltered thoughts, clarifies them into reference material or project steps, and organizes work through projects, due dates, and bidirectional name-based references.
 
 The application is local-first. A user's vault is an ordinary directory of Markdown files that remains readable, editable, and portable without Afanes. The application is a lens over those files, not a replacement for them.
 
@@ -39,41 +39,40 @@ The application is local-first. A user's vault is an ordinary directory of Markd
 
 A vault is a directory tree containing Markdown files. New files use UTF-8 without a BOM and LF line endings. Existing files keep their current newline style when edited.
 
-Each note has YAML frontmatter delimited by `---` at the start of the file, followed by a Markdown body.
+Each note has YAML frontmatter delimited by `---` at the start of the file, followed by a Markdown body. A project body may contain task list items whose completion and metadata are part of the document.
 
 ```markdown
 ---
-type: action
+type: project
 status: active
 due_date: 2026-11-20
-people:
-  - "person:Ada Lovelace"
-project: "project:Release 1.0"
 ---
 
 # Release migration checklist
 
-Draft the migration checklist and link it to [Release 1.0](<project:Release 1.0>).
+- [ ] Draft the migration checklist <!-- {plan: 2026-11-18} -->
+- [ ] Ask [Ada Lovelace](<note:Ada Lovelace>) to review it <!-- {owners: [Ada Lovelace]} -->
 ```
 
 Frontmatter contract:
 
 | Key | Type | Rules |
 | --- | --- | --- |
-| `type` | string enum | Required. Initial values: `note`, `action`, `project`, `reference`. Extend only through an OpenSpec change. |
-| `category` | string enum or absent | Optional on `reference` notes only. Initial value: `person`. A categorized reference belongs to its category scheme; an uncategorized reference belongs to the `note` scheme. |
-| `status` | string enum or absent | Optional. Actions and projects: `active`, `waiting`, `done`, `cancelled`, `archived`, `later`. References: `later`, `archived`, or absent. Captures: absent. `inbox` is not a status. Per-type validity is defined by `models/` and the relevant spec. |
-| `due_date` | ISO date or absent/null | `YYYY-MM-DD`, date-only, no timezone. A due date is a calendar date, not an instant. |
-| `people` | list of strings | Zero or more `person:Name` references, for example `["person:Ada Lovelace"]`. |
-| `project` | string or absent/null | At most one `project:Name` reference, for example `"project:Release 1.0"`. |
+| `type` | string enum | Required. Values: `note`, `reference`, `project`. Extend only through an OpenSpec change. |
+| `category` | free-form label or absent | Optional on `reference` notes only. Any non-empty single path segment; case is preserved and compared case-insensitively. A category selects a folder and never a scheme. |
+| `status` | string enum or absent | Optional. Projects: `active`, `waiting`, `done`, `cancelled`, `archived`, `later`. References: `later`, `archived`, or absent. Captures: absent. `inbox` is not a status. Per-type validity is defined by `models/` and the relevant spec. |
+| `due_date` | ISO date or absent/null | Optional on projects only. `YYYY-MM-DD`, date-only, no timezone. A due date is a calendar date, not an instant. |
 
 Rules for frontmatter:
 
+- The keys `people` and `project` are retired and are validation errors. The values `type: action`, `type: person`, and the `person:` link scheme are also validation errors. There is no automatic migration; affected notes are repaired by hand in raw rescue mode.
 - Unknown keys are preserved when a note is rewritten. Never silently drop data.
 - Unknown enum values are not coerced. Surface a validation error and offer a raw edit path.
-- A captured note has no `status`. The Inbox is the `inbox/` directory; capture adds no status, category, project, people, or due date.
-- A person page is a `reference` note with `category: person`; `person` is not a note type. The `person` scheme resolves only to those notes. The `note` scheme resolves to `note`, `action`, and an uncategorized `reference`. A note belongs to exactly one scheme.
-- The body is standard Markdown. Internal references use `[Label](scheme:Name)` with the schemes `person`, `project`, and `note`; use angle brackets when the name contains spaces, for example `[Ada](<person:Ada Lovelace>)`. Resolution rules live in `core/links.py` and the relevant spec.
+- A captured note has no `status`, category, due date, or project. The Inbox is the `inbox/` directory; a `type: note` outside `inbox/` is misplaced and is not processed.
+- A person page is a `reference` note with `category: person`; `person` is neither a note type nor a scheme. The `note` scheme resolves to `note` and to `reference` notes in any category. The `project` scheme resolves to projects. A note belongs to exactly one scheme.
+- The body is standard Markdown. Internal references use `[Label](scheme:Name)` with the schemes `project` and `note`; use angle brackets when the name contains spaces, for example `[Ada](<note:Ada Lovelace>)`. Resolution rules live in `core/links.py` and the relevant spec.
+- A step is a task list item in a project body: a list item whose content begins with `[ ]` or `[x]`. Steps have no identity, filename, or catalog entry.
+- Step metadata is a trailing single-line HTML comment holding a flow-style YAML mapping with the recognized keys `owners`, `plan`, `actual`, and `tags`. The comment must be the last content on the line; unknown keys are preserved; a malformed value drops only that key and reports the line; `--` inside a value is rejected.
 - A malformed frontmatter block is a parse error, not an invitation to guess. Do not overwrite the file.
 - New files use stable key order and canonical YAML. Existing files only have keys modified that the current operation owns.
 - The filename stem is the note's identity and reference name. The display title is the first level-1 Markdown heading in the body, falling back to the stem when there is none; it is derived and never stored. Directories classify only; moving a note never changes a reference. No `id` or `title` key participates in identity.
@@ -84,19 +83,20 @@ Rules for frontmatter:
 | Workflow | Required behavior | Primary code |
 | --- | --- | --- |
 | Inbox | Rapid capture of a raw thought as a Markdown file under `inbox/`. The first non-blank line becomes the filename and is written as a level-1 heading at the start of the body; all other text is preserved. No status or other classification is assigned at capture time; the Inbox lists the folder newest first and shows each note by display title with its vault-relative path as the secondary line. | `ui/views/inbox.py`, `core/vault.py` |
-| Processing Wizard | Step-by-step clarification into one of Trash, Later, Reference, Action, or Project, with status, due date, people, and project assignment where applicable. People and project inputs suggest existing pages by display title or identity and store identities. Every step is explicit, previewed, and confirmed before writing. | `ui/views/processing.py`, `core/processing.py`, `core/vault.py` |
-| Clarification Pipeline | The plan/apply state machine and validation used by the Processing Wizard. Must be testable without Flet. | `core/processing.py`, `core/vault.py`, `models/` |
-| Timeline | Dynamic view ordered by `due_date`, including overdue and undated buckets. | `ui/views/timeline.py`, `core/search.py` |
-| People / Contacts | Network view over reference notes with `category: person` and their bidirectional links to actions, projects, and references. | `ui/views/people.py`, `core/links.py` |
-| Next Actions | Matrix view over open action items. Exact axes and filters are defined by the spec, not improvised in the UI. | `ui/views/next_actions.py`, `core/search.py` |
+| Processing Wizard | Step-by-step clarification into Trash, Later, Reference, Project, Append step, or Done now. Project outcomes accept status and due date; Append step targets an existing project by identity. Every step is explicit, previewed, and confirmed before writing. | `ui/views/processing.py`, `core/processing.py`, `core/vault.py` |
+| Clarification Pipeline | The plan/apply state machine and validation used by the Processing Wizard, including the append plan and its ordered write. Must be testable without Flet. | `core/processing.py`, `core/vault.py`, `models/` |
+| Projects | Project rows report status, due date, open steps, and the first unchecked step in document order. Steps live in the project body; status is never changed by step completion. | `ui/views/projects.py`, `core/search.py` |
+| Browser and references | Sections for Inbox, Projects, References grouped by category label, Needs attention, and Unreadable notes. Search covers title, identity, prose, and step text. | `ui/views/workspace.py`, `core/search.py` |
+| Review | Guided queue of pending captures, due own steps, waiting steps, and stalled projects, with explicit step and project actions and a launch digest. | `ui/views/review.py`, `ui/state.py`, `core/search.py` |
 
-The default vault layout is `inbox/` for captures, `trash/` for recoverable discards, `reference/` for non-actionable notes with category folders such as `reference/people/`, `projects/` for outcomes, and `actions/` for single steps. These are default destinations, not required structure. Notes under `trash/` are excluded from scans, identity, and reference resolution.
+The default vault layout is `inbox/` for captures, `trash/` for recoverable discards, `reference/` for non-actionable notes with category folders such as `reference/person/`, and `projects/` for outcomes. These are default destinations, not required structure. Notes under `trash/` are excluded from scans, identity, and reference resolution.
 
 ### 1.5 What Afanes is not
 
 - Not a cloud service, sync product, account system, or collaboration platform.
 - Not a general-purpose document editor. Markdown is the interface and the storage format.
 - Not a task database. SQLite is an index and cache, never the system of record.
+- Not a one-file-per-step tracker. Steps are checkbox items in a project document, not notes.
 - Not a clone or rebrand of any proprietary productivity methodology. All vocabulary and workflows are original and neutral.
 
 ---
@@ -228,7 +228,7 @@ afanes/
 │       │   ├── vault.py           # vault discovery, path safety, note operations
 │       │   ├── processing.py      # processing plan, outcomes, and apply
 │       │   ├── indexer.py         # incremental SQLite index
-│       │   ├── search.py          # timeline, people, next-actions queries
+│       │   ├── search.py          # browser, project, and review queries
 │       │   └── settings.py        # platform paths and app configuration
 │       ├── models/
 │       │   ├── __init__.py
@@ -246,8 +246,7 @@ afanes/
 │       │   │   ├── inbox.py
 │       │   │   ├── processing.py
 │       │   │   ├── timeline.py
-│       │   │   ├── people.py
-│       │   │   └── next_actions.py
+│       │   │   └── workspace.py
 │       │   └── components/
 │       │       ├── __init__.py
 │       │       ├── note_editor.py
@@ -350,11 +349,12 @@ Approved neutral vocabulary:
 | --- | --- | --- |
 | Capture queue | **Inbox** | Proprietary method names |
 | Classification flow | **Processing Wizard**, **Clarification Pipeline** | Proprietary method names |
-| Single actionable unit | **Action Item** | Proprietary task terminology |
-| Prioritized open work | **Next Actions** | Proprietary method names |
-| Outcome containing multiple actions | **Project** | Proprietary method names |
+| Single actionable unit | **Step** | Proprietary task terminology |
+| First open step | **Next step** | Proprietary method names |
+| Outcome containing steps | **Project** | Proprietary method names |
 | Non-actionable knowledge | **Reference** | Proprietary method names |
-| Contact page | **Person** | Proprietary relationship terminology |
+| Free-form reference grouping | **Category label** | Proprietary category names |
+| Contact page | **Person** (a `category: person` reference) | Proprietary relationship terminology |
 
 Additional rules:
 
@@ -593,14 +593,15 @@ def parse_note(path: pathlib.Path, vault_root: pathlib.Path) -> Note:
 - Models do not import Flet, `core/`, `ui/`, or `cli/`.
 - Validate at the boundary that can raise domain errors. `models/` value objects stay standard-library-only and may enforce local invariants in `__post_init__`; parsing and cross-field validation that need domain exceptions happen in `core/` factories such as `NoteDocument.from_text` and `NameCatalog.from_entries`. Never use a bare `ValueError` at a public boundary unless the spec defines it.
 - Normalize at the parse boundary:
-  - `due_date` becomes `datetime.date | None`.
-  - `people` becomes a tuple of `NoteReference` values with the `person` scheme.
-  - `project` becomes a `NoteReference` with the `project` scheme.
-  - `type`, `category`, and `status` become enums.
+  - `due_date` becomes `datetime.date | None`, and only on projects.
+  - `category` becomes a `CategoryLabel | None`, preserving case and comparing case-insensitively.
+  - `type` and `status` become enums.
+  - A project body becomes a tuple of `ProjectStep` values, each carrying `StepMetadata`.
 - Preserve the raw frontmatter mapping on the model so unknown keys can be written back. Do not discard unknown data.
 - Identity is the filename stem: it is the note's name, identity, and reference target. The display title is derived from the first level-1 heading in the body, falling back to the stem when there is none; it is not stored and does not participate in identity. Directories are classification, never identity. No `id` or `title` key participates. Never rewrite paths or identities silently.
 - Due dates are calendar dates. Do not attach a timezone or convert them to instants.
-- People are stored as `person:Name` reference values. Resolve them through the name catalog; do not duplicate denormalized names into note bodies or auto-link bare words.
+- Step owners are plain names resolved through the `note` catalog. Do not store owner references in frontmatter or auto-link bare words.
+- Steps are not models with identity. `ProjectStep` and `StepMetadata` are immutable value objects derived from a project body; they never enter the name catalog or create a file.
 - Models are immutable and safe to pass across threads. Return new instances instead of mutating shared state.
 
 ### 4.8 Errors and logging

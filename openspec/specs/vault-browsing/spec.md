@@ -30,39 +30,49 @@ While browsing a vault, the application SHALL show a persistent navigation brows
 - **WHEN** the user expands a group, switches sections, or searches
 - **THEN** no note file is created, changed, or removed
 
-### Requirement: The browser groups every parsed note by type
+### Requirement: The browser groups every parsed note
 
-The browser SHALL expose every parsed note under Inbox, Projects, Actions, People, References, or Notes. A note SHALL appear in exactly one group. Captures under `inbox/` SHALL appear only under Inbox, and notes under `trash/` SHALL NOT appear.
+The browser SHALL expose every parsed note under Inbox, Projects, References, Needs attention, or Unreadable notes. A note SHALL appear in exactly one group. References SHALL be grouped by their category label. Captures under `inbox/` SHALL appear only under Inbox, and notes under `trash/` SHALL NOT appear.
 
 #### Scenario: Project appears under Projects
 
 - **WHEN** the vault contains a parsed `type: project` note
 - **THEN** the browser lists it under Projects
 
-#### Scenario: Person appears under People
+#### Scenario: A person reference groups by its label
 
-- **WHEN** the vault contains a parsed reference with `category: person`
-- **THEN** the browser lists it under People
+- **WHEN** the vault contains a reference with `category: person`
+- **THEN** the browser groups it under the `person` label
+
+#### Scenario: Categorized references group by label
+
+- **WHEN** the vault contains references with `category: person` and `category: place`
+- **THEN** the browser groups each under its own label
 
 #### Scenario: Uncategorized reference appears under References
 
-- **WHEN** the vault contains a parsed reference with no category
+- **WHEN** the vault contains a reference with no category
 - **THEN** the browser lists it under References
 
 #### Scenario: Capture appears only under Inbox
 
 - **WHEN** a note is under `inbox/`
-- **THEN** it appears under Inbox and not under Notes
+- **THEN** it appears under Inbox and in no other group
+
+#### Scenario: Misplaced note needs attention
+
+- **WHEN** a parsed `type: note` exists outside `inbox/`
+- **THEN** the browser lists it under Needs attention
 
 #### Scenario: Trashed note is absent
 
 - **WHEN** a note is under `trash/`
 - **THEN** it appears in no browser group
 
-#### Scenario: Inbox capture becomes an action
+#### Scenario: Inbox capture becomes a project
 
-- **WHEN** a capture is processed into an action
-- **THEN** it leaves the Inbox group and appears under Actions
+- **WHEN** a capture is processed into a project
+- **THEN** it leaves the Inbox group and appears under Projects
 
 ### Requirement: Selecting a browser entry opens it in the page pane
 
@@ -88,9 +98,9 @@ Selecting any browser entry SHALL open that note in the page pane with its displ
 - **WHEN** the current page has an unresolved disk conflict
 - **THEN** selecting another browser entry does not change the page until the conflict is resolved
 
-### Requirement: The browser searches titles and identities
+### Requirement: The browser searches titles, identities, and bodies
 
-The browser SHALL provide a search field that filters entries by display title or identity. Matching SHALL ignore case, Unicode form, and repeated whitespace. Search in this capability SHALL NOT read note bodies.
+The browser SHALL provide a search field that filters entries by display title, identity, prose body text, and step text. Matching SHALL ignore case, Unicode form, and repeated whitespace. Step metadata comments SHALL NOT be searched.
 
 #### Scenario: Title match is listed
 
@@ -102,15 +112,25 @@ The browser SHALL provide a search field that filters entries by display title o
 - **WHEN** the user types part of a page's identity
 - **THEN** that page is listed
 
+#### Scenario: Body match is listed
+
+- **WHEN** a search term appears only in a note's prose body
+- **THEN** that note is listed
+
+#### Scenario: Step text match names the project
+
+- **WHEN** a search term appears in a step
+- **THEN** the project is listed and the matching step is shown with its project
+
+#### Scenario: Metadata is not searched
+
+- **WHEN** a term appears only inside a step's metadata comment
+- **THEN** no result is produced for that term
+
 #### Scenario: Matching ignores case and repeated whitespace
 
 - **WHEN** the user types `ada` or `Ada,   Countess of Lovelace`
 - **THEN** the matching page is listed
-
-#### Scenario: Body-only term is not matched
-
-- **WHEN** a search term appears only in a note body
-- **THEN** the browser does not list that note in this capability
 
 ### Requirement: The browser reflects vault changes
 

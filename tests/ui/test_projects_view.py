@@ -31,7 +31,6 @@ def _write_note(
     note_type: str = "project",
     status: str | None = None,
     due_date: str | None = None,
-    project: str | None = None,
     body: str = "",
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -40,8 +39,6 @@ def _write_note(
         lines.append(f"status: {status}")
     if due_date is not None:
         lines.append(f"due_date: {due_date}")
-    if project is not None:
-        lines.append(f'project: "{project}"')
     lines.extend(["---", body])
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
@@ -125,19 +122,20 @@ class TestProjectGrouping:
 
 
 class TestProjectRows:
-    def test_row_shows_due_date_open_count_and_next_action(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_row_shows_due_date_open_count_and_next_step(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        _write_note(vault / "projects" / "Launch.md", status="active", due_date="2026-11-20")
-        _write_note(vault / "actions" / "Write copy.md", note_type="action", status="active", project="project:Launch")
-        _write_note(vault / "actions" / "Done.md", note_type="action", status="done", project="project:Launch")
+        _write_note(
+            vault / "projects" / "Launch.md",
+            status="active",
+            due_date="2026-11-20",
+            body="# Launch\n\n- [ ] Write copy\n- [x] Done\n",
+        )
         view = _open_view(tmp_path, monkeypatch)
 
         details = _details(_project_tiles(view, "active")[0])
 
         assert "Due 2026-11-20" in details
-        assert "1 open action" in details
+        assert "1 open step" in details
         assert "Next: Write copy" in details
 
     def test_row_without_due_date_omits_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -149,27 +147,28 @@ class TestProjectRows:
 
         assert all(not detail.startswith("Due ") for detail in details)
 
-    def test_later_action_is_not_counted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_checked_step_is_not_counted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        _write_note(vault / "projects" / "Launch.md", status="active")
-        _write_note(vault / "actions" / "Someday.md", note_type="action", status="later", project="project:Launch")
+        _write_note(vault / "projects" / "Launch.md", status="active", body="# Launch\n\n- [x] Someday\n")
         view = _open_view(tmp_path, monkeypatch)
 
         details = _details(_project_tiles(view, "active")[0])
 
-        assert "0 open actions" in details
-        assert "No next action" in details
+        assert "0 open steps" in details
+        assert "No next step" in details
 
-    def test_remaining_open_actions_are_counted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_remaining_open_steps_are_counted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
-        _write_note(vault / "projects" / "Launch.md", status="active")
-        _write_note(vault / "actions" / "One.md", note_type="action", status="active", project="project:Launch")
-        _write_note(vault / "actions" / "Two.md", note_type="action", status="waiting", project="project:Launch")
+        _write_note(
+            vault / "projects" / "Launch.md",
+            status="active",
+            body="# Launch\n\n- [ ] One\n- [ ] Two\n",
+        )
         view = _open_view(tmp_path, monkeypatch)
 
         details = _details(_project_tiles(view, "active")[0])
 
-        assert "2 open actions" in details
+        assert "2 open steps" in details
 
 
 class TestProjectSelection:
@@ -203,33 +202,29 @@ class TestProjectSelection:
 
 
 class TestProjectRefresh:
-    def test_counts_and_next_action_recompute_after_a_change(
+    def test_counts_and_next_step_recompute_after_a_change(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
-        _write_note(vault / "projects" / "Launch.md", status="active")
-        action = _write_note(
-            vault / "actions" / "Write copy.md",
-            note_type="action",
+        _write_note(
+            vault / "projects" / "Launch.md",
             status="active",
-            project="project:Launch",
+            body="# Launch\n\n- [ ] Write copy\n",
         )
         view = _open_view(tmp_path, monkeypatch)
-        assert "1 open action" in _details(_project_tiles(view, "active")[0])
+        assert "1 open step" in _details(_project_tiles(view, "active")[0])
 
         _write_note(
-            vault / "actions" / "Write copy.md",
-            note_type="action",
-            status="done",
-            project="project:Launch",
+            vault / "projects" / "Launch.md",
+            status="active",
+            body="# Launch\n\n- [x] Write copy\n",
         )
         asyncio.run(afanes.ui.state.app_state.refresh())
         view.refresh()
 
         details = _details(_project_tiles(view, "active")[0])
-        assert action.is_file()
-        assert "0 open actions" in details
-        assert "No next action" in details
+        assert "0 open steps" in details
+        assert "No next step" in details
 
     def test_search_filters_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

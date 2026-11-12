@@ -70,7 +70,7 @@ report names them:
 ```text
 Created vault /home/you/Notes/Afanes
 Parent folders created: /home/you/Notes
-Seeded: inbox/, trash/, reference/, reference/people/, projects/, actions/
+Seeded: inbox/, trash/, reference/, projects/
 Remembered as the vault to open next launch.
 ```
 
@@ -113,8 +113,7 @@ its session, so Afanes can be reopened in a new one.
 
 On first launch, choose an existing folder or create a new vault. **New vault** opens the system
 folder chooser on desktop, where you can create the folder you want, or asks for a folder path in a
-browser session. It then seeds `inbox/`, `trash/`, `reference/`, `reference/people/`, `projects/`,
-and `actions/`, and remembers the result in the platform configuration directory.
+browser session. It then seeds `inbox/`, `trash/`, `reference/`, and `projects/`, and remembers the result in the platform configuration directory.
 Afanes reopens that vault next time, and the [workspace browser](#workspace-browser) lists every note
 in it, opening on the [Inbox](#inbox) group.
 
@@ -131,27 +130,26 @@ references resolve against. Its display title is the first level-1 heading in th
 to the filename stem when there is no heading. Directories only classify; moving a note between
 folders never changes a reference.
 
-Notes use one of four types:
+Notes use one of three types:
 
-- `note` is an unprocessed capture or a free-form document.
-- `action` is one actionable step.
-- `project` is an outcome made of action steps.
-- `reference` is non-actionable knowledge. A reference may declare a `category`; for example,
-  `category: person` marks a person page. People are reference notes, not a separate type.
+- `note` is an unclarified capture. It belongs in `inbox/` and means "not clarified yet".
+- `reference` is non-actionable knowledge. A reference may declare a free-form `category` label;
+  for example, `category: person` marks a person page. People are references, not a note type.
+- `project` is an outcome whose body is a checklist. Each task list item is a step; steps have no
+  filename, identity, or reference namespace.
 
 ```markdown
 ---
-type: action
+type: project
 status: active
-people:
-  - "person:Ada Lovelace"
-project: "project:Turing Machine"
+due_date: 2026-11-30
 ---
 
-# Ask Ada for the draft
+# Release migration checklist
 
-Ask [Ada Lovelace](<person:Ada Lovelace>) for the draft and file it under
-[Turing Machine](project:TuringMachine).
+- [ ] Draft the checklist <!-- {plan: 2026-11-20} -->
+- [ ] Ask [Ada Lovelace](<note:Ada Lovelace>) to review it <!-- {owners: [Ada Lovelace], tags: [review]} -->
+- [x] Open the tracking page <!-- {plan: 2026-11-14, actual: 2026-11-15} -->
 ```
 
 ```markdown
@@ -165,6 +163,18 @@ category: person
 Ada's contact page.
 ```
 
+The recognized frontmatter keys are:
+
+| Key | Valid on | Values |
+| --- | --- | --- |
+| `type` | every note | `note`, `reference`, or `project` |
+| `category` | references only | any non-empty single folder label; case is preserved |
+| `status` | projects and references | projects: `active`, `waiting`, `done`, `cancelled`, `archived`, `later`; references: `later`, `archived`, or absent |
+| `due_date` | projects only | a calendar date written as `YYYY-MM-DD` |
+
+Unknown keys are preserved. A capture has no status; `status: inbox` is not valid because the folder
+is the queue. A due date is a date, not a timestamp.
+
 The default vault layout is:
 
 ```text
@@ -172,42 +182,78 @@ vault/
   inbox/          captures
   trash/          recoverable discards
   reference/      non-actionable notes
-    people/       reference notes with category: person
+    <category>/   optional category folders, such as reference/person/
   projects/       project notes
-  actions/        action notes
 ```
 
 These folders are conveniences, not requirements. Existing notes anywhere in the vault still
-resolve. Folders are created only when a write needs them. Notes under `trash/` are excluded from
-scans, name uniqueness, and reference resolution; moving a note back restores it.
+resolve. Folders are created only when a write needs them. A categorized reference is filed under
+`reference/<category-folder>/`, where the folder is derived from the label through the
+cross-platform filename policy and an existing case variant is reused. Notes under `trash/` are
+excluded from scans, name uniqueness, and reference resolution; moving a note back restores it.
 
-Actions and projects may use `active`, `waiting`, `done`, `cancelled`, `archived`, or `later`.
-References may omit status or use `later` or `archived`. A capture has no status; `status: inbox`
-is not valid because the folder is the queue.
+### Step metadata
 
-Use `person:` for reference notes with `category: person`, `project:` for project notes, and
-`note:` for notes, actions, and uncategorized references. A note belongs to exactly one scheme.
-Names are matched case-insensitively, so `[Ada](<person:ada lovelace>)` resolves to the same note.
+Steps are Markdown task list items. A task list item is a list item whose content begins with `[ ]`
+or `[x]`. Only a project body contributes steps; checkboxes in any other note are ordinary Markdown.
+Ticking a step writes `[x]` and adds `actual: <today>`; unticking removes `actual` and keeps `plan`.
+
+A step may end with one metadata comment made of a flow-style YAML object:
+
+```markdown
+- [ ] Call the plumber <!-- {owners: [Ada], plan: 2026-11-20, actual: 2026-11-14, tags: [phone]} -->
+```
+
+| Key | Meaning |
+| --- | --- |
+| `owners` | people the step waits on. No owner means the step is yours. |
+| `plan` | day the step was supposed to happen, as `YYYY-MM-DD` |
+| `actual` | day it was completed, as `YYYY-MM-DD`; written by ticking |
+| `tags` | free-form labels used only to filter steps |
+
+The comment must be the last content on the line and the line must end with `-->`; text after the
+comment makes it prose. Every key is optional, and a comment without a mapping is prose. Unknown keys
+are preserved when the step is rewritten. A malformed comment or invalid value drops only that key,
+keeps the note readable, and reports the line. A value containing `--` cannot appear inside an HTML
+comment, so the app reports it instead of writing invalid metadata. Step owners resolve through the
+same catalog as `note:` references.
+
+### Schemes and categories
+
+Use `project:` for project notes and `note:` for every other note, including references in any
+category. A note belongs to exactly one scheme. Names are matched case-insensitively, so
+`[Ada](<note:ada lovelace>)` resolves to the same note. Categories never select a namespace; they
+only group references in the browser and choose a default folder.
+
+### Upgrading from the four-type model
+
+This release is a hard break. Notes declaring `type: action`, links using `person:Name`, and notes
+carrying the retired `people` or `project` frontmatter keys are validation errors. They appear under
+**Unreadable notes** and open in raw rescue mode without being rewritten. There is no automatic
+migration: create a one-step project for an action, move its work into the project body as a step,
+and rewrite `person:Name` links as `note:Name`. Any `category: person` reference remains valid and
+keeps working.
 
 ## Workspace browser
 
-The workspace keeps a navigation browser beside the page pane. The browser groups every parsed
-note by type:
+The workspace keeps a navigation browser beside the page pane. The browser groups every parsed note:
 
 - **Inbox** lists captures under `inbox/`, newest first.
 - **Projects** lists project notes grouped by status.
-- **Actions** lists action notes.
-- **People** lists reference notes with `category: person`.
-- **References** lists uncategorized reference notes.
-- **Notes** lists free-form notes outside the inbox.
+- **References** lists reference notes, grouped by their category label. Uncategorized references
+  appear under the plain **References** heading.
+- **Needs attention** lists parsed `type: note` notes found outside `inbox/`. They cannot be
+  processed; move them back to the Inbox or clarify them by hand.
+- **Unreadable notes** lists files that could not be parsed. Selecting one opens the complete file in
+  raw rescue mode.
 
-A note appears in exactly one group. Notes under `trash/` are absent. A note that cannot be parsed
-appears in **Unreadable notes**, where selecting it opens the complete file in raw rescue mode.
-Selecting any entry opens it in the page pane without changing the browser section.
+A note appears in exactly one group. Captures under `inbox/` appear only under **Inbox**, and notes
+under `trash/` are absent. Selecting any entry opens it in the page pane without changing the
+browser section.
 
-The search field filters the active section by display title or identity. Matching ignores case,
-Unicode form, and repeated whitespace. Search does not read note bodies; a term that appears only in
-a body does not match.
+The search field filters the active section by display title, identity, prose body text, and step
+text. Matching ignores case, Unicode form, and repeated whitespace. Step metadata comments are
+excluded, so an owner name or date inside a comment is not a search result.
 
 The capture field stays at the top of the workspace. It behaves exactly like the Inbox composer:
 the first non-blank line becomes the filename and heading, and the note is written under `inbox/`
@@ -218,8 +264,8 @@ with only `type: note`.
 Captures live in `inbox/`. Capturing a thought uses the first non-blank line as the filename and
 writes that line as a level-1 heading at the start of the body. All other text is preserved, even
 when the filename had to sanitize characters that are unsafe on some platforms. The frontmatter
-contains only `type: note`. No status, project, people, or due date is inferred; clarification is a
-separate step.
+contains only `type: note`. No status, category, project, people, or due date is inferred;
+clarification is a separate step.
 
 Capturing `Call Ada` followed by `about the invoice` writes:
 
@@ -242,16 +288,15 @@ The Projects group lists every parsed project under **Active**, **Waiting**, **L
 **Closed**. A project without a status is active. `done`, `cancelled`, and `archived` projects are
 closed, and the Closed group starts collapsed.
 
-Each project row shows its status, optional due date, count of open actions, and next action. An
-action is open when it has no status or is `active` or `waiting`; `later`, `done`, `cancelled`, and
-`archived` actions are not open. A project's next action is computed, never stored: the open action
-with the earliest due date wins; when no open action has a due date, `active` ranks before
-`waiting`, then the display title breaks the tie.
+Each project row shows its status, optional due date, count of open steps, and next step. An open
+step is an unchecked task list item in the project body; checked steps are not counted. The next
+step is the first unchecked step in document order. Dates and owners never reorder the steps. When
+the first unchecked step has an owner, the row marks it as waiting.
 
-An action belongs to a project only when its `project` frontmatter reference resolves uniquely to
-that project. Links in the body do not count as steps, and an ambiguous or unresolved reference is
-not attributed to any project. Changing actions never changes a project's status automatically, and
-closing a project never changes its actions.
+Steps belong to a project by containment: the project whose body holds the task list item owns it.
+A body link to a project does not create a step, and a project may have no steps at all. Checking
+every step does not close the project, and closing a project does not change its steps. Adding,
+ticking, or removing a step updates the workspace after the next scan or save.
 
 ## Pages and editing
 
@@ -266,7 +311,6 @@ its type and default folder:
 | Reference | Type | Default folder |
 | --- | --- | --- |
 | `note:Quarterly budget` | uncategorized reference | `reference/` |
-| `person:Ada` | reference with `category: person` | `reference/people/` |
 | `project:Release 1.0` | project | `projects/` |
 
 The draft starts with the reference name as its level-1 heading and is written only after you type
@@ -275,11 +319,25 @@ stops the first save instead of adding a suffix. If the original name was unsafe
 first save offers to rewrite the references that still use it. If the safe name already belongs to a
 page in the same scheme, that page opens instead of creating a duplicate.
 
-Choose Edit to change the raw Markdown body and the labels: type, category, status, due date, people,
-and project. The body includes its level-1 heading, which is the display title. Category is offered
-only for references, and status choices follow the selected type. People and project fields suggest
-existing pages by display title or identity. Changing the type or category previews the inbound
-references that would become unresolved before applying the change.
+Choose Edit to change the raw Markdown body and the labels: type, category, status, and due date.
+The body includes its level-1 heading, which is the display title, and project steps with their
+metadata. Category is offered only for references and accepts any label. The due date is offered
+only for projects. Status choices follow the selected type. There are no `people` or `project`
+fields.
+
+Read mode renders a project's steps as rows with the step text, checked state, owners, plan and
+actual dates, and tags. Metadata comments are hidden from the rendered text. Ticking or unticking a
+step rewrites only that line atomically and leaves every other byte of the file unchanged.
+
+Changing a reference's category previews its new folder and moves the file only after confirmation.
+The name, identity, and inbound references do not change. Cancelling leaves both the category and
+the file location unchanged; if a move fails, the note keeps the new category in its old folder and
+the drift is invisible because grouping uses the label.
+
+Changing the type between the document family (`note` or `reference`) and `project` previews the
+inbound references that would become unresolved and requires confirmation; no reference is
+retargeted automatically. A change between `note` and `reference` shares the `note` scheme and needs
+no confirmation.
 
 A dirty draft is written roughly every 30 seconds and when you choose Done, press Back, or open
 another page. Before every write, Afanes compares the file with the version it read; if another
@@ -298,31 +356,46 @@ unresolved until a page with that name appears again.
 
 ## Processing
 
-Select a capture in the Inbox and choose Process. The wizard asks whether the thought is
-actionable. If it is not, choose Trash, Later, or Reference. If it is, choose a single Action or a
-multi-step Project, then set a status, optional due date, people, and a project where applicable.
+Select a capture in the Inbox and choose Process. The wizard asks what the capture should become:
 
-The preview shows the destination and any person or project references that do not have a page
-yet. People and project fields suggest existing pages by display title or identity and store the
-page identity. Those references are allowed and resolve automatically when the page appears.
-Confirming writes the classified frontmatter atomically and then moves the note out of `inbox/`. A
-failed move leaves the note in the Inbox so the same plan can be retried.
+- **Trash** moves it to `trash/` without rewriting it.
+- **Later** keeps it as a reference with `status: later`.
+- **Reference** keeps it as an uncategorized reference with no status.
+- **Project** turns it into a project with a status and optional due date. Task list items already in
+  the capture body become steps, and a project may start empty.
+- **Append step** adds the capture as a step of an existing project and moves the capture to trash.
+- **Done now** writes a completed one-step project with `status: done`.
 
-Project steps are action notes linked by the `project` key. Trash moves the note to `trash/`
-without rewriting any referring note; moving it back restores it and resolves its inbound
-references again.
+The preview shows the destination and, when the outcome changes scheme, how many inbound references
+will become unresolved. Append step suggests existing projects by display title or identity and
+stores the identity; text that matches no project is rejected.
+
+Append step writes the target project first and then moves the capture to trash. A failed project
+write leaves both notes unchanged. If the write succeeds and the trash move fails, the step is
+already present; retrying the same plan detects the existing step and does not duplicate it.
+
+Trash moves the note without rewriting any referring note; moving it back restores it and resolves
+its inbound references again. Every other outcome writes the classified frontmatter atomically and
+then moves the note out of `inbox/`. A failed move leaves the note in the Inbox so the same plan can
+be retried.
 
 ## Review
 
-The **Review** entry shows how many items need attention: pending Inbox captures plus open projects
-with no open action. Healthy open projects do not contribute to the badge. Selecting Review with
-zero pending items shows the zero state and starts no session.
+At launch Afanes shows a digest when one or more own steps are due or overdue. The digest reports the
+count, writes nothing, and starts the guided review when activated. With no due work, no digest is
+shown.
+
+The **Review** entry shows how many items need attention: pending Inbox captures, due or overdue own
+steps, waiting steps, and open projects with no open step. Healthy open projects do not contribute
+to the badge. Selecting Review with zero pending items shows the zero state and starts no session.
 
 Starting a review snapshots a queue in this order:
 
 1. Pending Inbox captures.
-2. Open projects with no next action.
-3. Healthy open projects, for a quick confirmation.
+2. Due or overdue own steps.
+3. Waiting steps.
+4. Open projects with no open step.
+5. Healthy open projects, for a quick confirmation.
 
 Closed projects are excluded. Notes created during a session appear in the browser immediately but
 wait for the next review session.
@@ -331,16 +404,22 @@ An Inbox item opens the existing Processing Wizard. Confirming an outcome applie
 the session; cancelling leaves the capture in the Inbox. The review never chooses an outcome or
 metadata from the capture text.
 
-A project card shows the project title, status, optional due date, its next action, and any other
-open actions. Open project or the next action to work on either page. For a project with no open
-action, the card offers creating a next action, marking the project done, deferring it to `later`,
-or skipping. Creating an action requires a title and writes an action linked to the project; the
-project note itself is unchanged. Marking done and deferring both require confirmation. Skip leaves
-the project exactly as it was, so it remains in the next session's pending count.
+A due step card offers do it now, postpone, delegate, open project, and skip. Do it now checks the
+step and records `actual`; postpone replaces `plan`; delegate adds an owner and moves the step to
+waiting; open project shows the project page; skip changes nothing. A waiting step card shows its
+owners and offers reassign, open project, and skip. Reassign replaces the owners.
 
-After the last item, the session reports how many items were reviewed and skipped and returns to the
-browser. The session is not persisted across restarts; the pending count is always recomputed from
-the vault.
+A project card shows the project title, status, optional due date, its next step, and any other open
+steps. Open project to work on the page. For a project with no open step, the card offers adding a
+next step, marking the project done, deferring it to `later`, or skipping. Adding a step requires
+text and appends a task list item to the project body; the refreshed card shows it as the next step.
+Marking done and deferring both require confirmation. Skip leaves the project exactly as it was, so
+it remains in the next session's pending count.
+
+The review never classifies captures, changes a project status, checks a step, or creates a note
+without an explicit choice. After the last item, the session reports how many items were reviewed
+and skipped and returns to the browser. The session is not persisted across restarts; the pending
+count is always recomputed from the vault.
 
 ## Changelog
 

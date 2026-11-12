@@ -23,6 +23,7 @@ import afanes.core.editing
 import afanes.core.links
 import afanes.core.names
 import afanes.core.search
+import afanes.core.steps
 import afanes.ui.strings
 from afanes.core.editing import DraftMode, NormalDraft, PageDraft, PageDraftFactory, PageLabels, RawDraft
 from afanes.core.errors import (
@@ -40,7 +41,7 @@ from afanes.core.errors import (
     VaultUnreadableError,
 )
 from afanes.core.links import DestinationKind, ReferenceParser
-from afanes.core.processing import ProcessingOutcome, ProcessingPlan
+from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
 from afanes.core.search import (
     BrowserListing,
     BrowserSection,
@@ -51,6 +52,7 @@ from afanes.core.search import (
 )
 from afanes.core.settings import Settings, SettingsStore
 from afanes.core.vault import (
+    CategoryMovePreview,
     LinkOutcome,
     ReferenceRepairPreview,
     ReferenceSite,
@@ -60,10 +62,12 @@ from afanes.core.vault import (
     VaultCreation,
     VaultFailure,
     VaultNote,
+    VaultPath,
     VaultSnapshot,
 )
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType, ReferenceCategory, Status
+from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.step import ProjectStep
 
 logger = logging.getLogger(__name__)
 
@@ -150,28 +154,22 @@ class WorkspaceSection(StrEnum):
     Attributes
     ----------
     REVIEW : str
-        Guided review of pending inbox captures and projects.
+        Guided review of pending captures, steps, and projects.
     INBOX : str
         Captures stored under the inbox directory.
     PROJECTS : str
         Project notes grouped by status.
-    ACTIONS : str
-        Action notes.
-    PEOPLE : str
-        Reference notes with ``category: person``.
     REFERENCES : str
-        Uncategorized reference notes.
-    NOTES : str
-        Free-form notes outside the inbox.
+        Reference notes grouped by category label.
+    NEEDS_ATTENTION : str
+        Unclarified notes found outside the inbox.
     """
 
     REVIEW = "review"
     INBOX = "inbox"
     PROJECTS = "projects"
-    ACTIONS = "actions"
-    PEOPLE = "people"
     REFERENCES = "references"
-    NOTES = "notes"
+    NEEDS_ATTENTION = "needs_attention"
 
     @property
     def browser_section(self) -> BrowserSection | None:
@@ -575,6 +573,8 @@ class PageEditorState:
         Candidate paths waiting for the user to choose one.
     pending_labels : PageLabels | None
         Labels waiting for a scheme-change confirmation.
+    category_move : CategoryMovePreview | None
+        Category move waiting for confirmation.
     type_change_sites : tuple[ReferenceSite, ...]
         Notes whose references would become unresolved by a pending type
         change.
@@ -598,6 +598,7 @@ class PageEditorState:
     conflict: str | None = None
     ambiguous: tuple[Path, ...] = ()
     pending_labels: PageLabels | None = None
+    category_move: CategoryMovePreview | None = None
     type_change_sites: tuple[ReferenceSite, ...] = ()
     repair_preview: ReferenceRepairPreview | None = None
     rename_preview: RenamePreview | None = None
@@ -620,7 +621,7 @@ class ProcessingState:
         Capture currently open in the wizard.
     body : str | None
         Markdown body of the processing capture.
-    plan : ProcessingPlan | None
+    plan : ProcessingPlan | AppendStepPlan | None
         Validated plan waiting for confirmation.
     result : Path | None
         Destination of the last successful processing apply.
@@ -630,7 +631,7 @@ class ProcessingState:
     status: UiStatus
     note: Path | None = None
     body: str | None = None
-    plan: ProcessingPlan | None = None
+    plan: ProcessingPlan | AppendStepPlan | None = None
     result: Path | None = None
 
 
@@ -856,6 +857,15 @@ class AppState:
         self._pages.type_change_sites = value
 
     @property
+    def category_move(self) -> CategoryMovePreview | None:
+        """Return the category move waiting for confirmation."""
+        return self._pages.category_move
+
+    @category_move.setter
+    def category_move(self, value: CategoryMovePreview | None) -> None:
+        self._pages.category_move = value
+
+    @property
     def repair_preview(self) -> ReferenceRepairPreview | None:
         """Return the unsafe-name repair waiting for an action."""
         return self._pages.repair_preview
@@ -919,12 +929,12 @@ class AppState:
         self._processing.body = value
 
     @property
-    def processing_plan(self) -> ProcessingPlan | None:
+    def processing_plan(self) -> ProcessingPlan | AppendStepPlan | None:
         """Return the validated plan waiting for confirmation."""
         return self._processing.plan
 
     @processing_plan.setter
-    def processing_plan(self, value: ProcessingPlan | None) -> None:
+    def processing_plan(self, value: ProcessingPlan | AppendStepPlan | None) -> None:
         self._processing.plan = value
 
     @property
@@ -1028,6 +1038,25 @@ class AppState:
             return 0
         return self._browser.pending_count()
 
+    @property
+    def review_due_count(self) -> int:
+        """Return the number of due or overdue own steps.
+
+        Returns
+        -------
+        int
+            Due own steps from the latest scan. Zero when no vault is open.
+
+        Notes
+        -----
+        This property is pure in-memory work over the latest scan. It never
+        writes to the vault.
+        """
+        snapshot = self._snapshot
+        if snapshot is None:
+            return 0
+        return afanes.core.search.ReviewPlanner(snapshot).due_count()
+
     async def set_section(self, section: WorkspaceSection) -> None:
         """Select one workspace sidebar destination.
 
@@ -1124,50 +1153,148 @@ class AppState:
             await self._enter_current_review_item()
             return True
 
-    async def create_review_action(self, title: str) -> Path | None:
-        """Create a next action for the current project in review.
+    async def add_review_step(self, text: str) -> Path | None:
+        """Append the next step to the current stalled project.
 
         Parameters
         ----------
-        title : str
-            Action title typed into the review card. Whitespace-only input is
+        text : str
+            Step text typed into the review card. Whitespace-only input is
             rejected without writing.
 
         Returns
         -------
         Path | None
-            Absolute path of the created action, or ``None`` when nothing was
-            written.
+            Absolute path of the project that gained the step, or ``None``
+            when nothing was written.
 
         Notes
         -----
-        The project note is never changed. The refreshed project summary is
-        applied to the current session item so the card shows the new next
-        action. Blocking writes and scans run in a worker thread.
+        Only the project body changes. The refreshed summary is applied to the
+        current item so the card shows the new next step. Blocking writes and
+        scans run in a worker thread.
         """
         async with self._lock:
             item = self._current_review_project()
             vault = self.vault
-            if item is None or vault is None or not title.strip():
-                return None
-            project = item.project
-            if project is None:
+            if item is None or vault is None or not text.strip():
                 return None
             self.busy = True
             self.message = None
             try:
-                reference = NoteReference(scheme=ReferenceScheme.PROJECT, name=project.note.name)
                 try:
-                    path = await asyncio.to_thread(vault.create_project_action, title, reference)
+                    await asyncio.to_thread(vault.append_step, item.path, text, confirm=True)
                 except (AfanesError, OSError) as exc:
-                    logger.debug("Review action creation failed", exc_info=True)
-                    self.message = afanes.ui.strings.REVIEW_ACTION_FAILED.format(detail=str(exc))
+                    logger.debug("Review step creation failed", exc_info=True)
+                    self.message = afanes.ui.strings.REVIEW_STEP_FAILED.format(detail=str(exc))
                     return None
                 await self._refresh_snapshot()
                 self._replace_review_project(item.path)
-                return path
+                return item.path
             finally:
                 self.busy = False
+
+    async def review_do_now(self) -> bool:
+        """Complete the current due step and record today as its actual date.
+
+        Returns
+        -------
+        bool
+            ``True`` when the step was written and the session advanced.
+        """
+        item = self._current_review_step()
+        if item is None or item.step is None:
+            return False
+        return await self._update_review_step(
+            lambda vault: vault.tick_step(
+                item.path,
+                item.step.line_index,
+                datetime.datetime.now(tz=datetime.UTC).astimezone().date(),
+                confirm=True,
+            ),
+        )
+
+    async def review_postpone(self, plan: datetime.date) -> bool:
+        """Postpone the current due step to a later plan date.
+
+        Parameters
+        ----------
+        plan : datetime.date
+            New calendar plan date.
+
+        Returns
+        -------
+        bool
+            ``True`` when the step was written and the session advanced.
+        """
+        item = self._current_review_step()
+        if item is None or item.step is None:
+            return False
+        return await self._update_review_step(
+            lambda vault: vault.plan_step(item.path, item.step.line_index, plan, confirm=True),
+        )
+
+    async def review_delegate(self, owner: str) -> bool:
+        """Add an owner to the current due step, moving it to waiting.
+
+        Parameters
+        ----------
+        owner : str
+            Owner name. Whitespace-only input is rejected without writing.
+
+        Returns
+        -------
+        bool
+            ``True`` when the step was written and the session advanced.
+        """
+        item = self._current_review_step()
+        if item is None or item.step is None or not owner.strip():
+            return False
+        owners = (*item.step.owners, owner.strip())
+        return await self._update_review_step(
+            lambda vault: vault.set_step_owners(item.path, item.step.line_index, owners, confirm=True),
+        )
+
+    async def review_reassign(self, owner: str) -> bool:
+        """Replace the owners of the current waiting step.
+
+        Parameters
+        ----------
+        owner : str
+            New owner name. Whitespace-only input is rejected without writing.
+
+        Returns
+        -------
+        bool
+            ``True`` when the step was written and the session advanced.
+        """
+        item = self._current_review_step()
+        if item is None or item.step is None or not owner.strip():
+            return False
+        return await self._update_review_step(
+            lambda vault: vault.set_step_owners(
+                item.path,
+                item.step.line_index,
+                (owner.strip(),),
+                confirm=True,
+            ),
+        )
+
+    async def review_open_project(self) -> bool:
+        """Open the project page for the current review item.
+
+        Returns
+        -------
+        bool
+            ``True`` when the project page was loaded.
+        """
+        item = self._current_review_step() or self._current_review_project()
+        if item is None:
+            return False
+        if not await self.open_page(item.path):
+            return False
+        await self.set_section(WorkspaceSection.PROJECTS)
+        return True
 
     async def mark_review_project_done(self) -> bool:
         """Mark the current review project ``done`` after confirmation.
@@ -1613,6 +1740,41 @@ class AppState:
         return None if self.page is None else self.page.labels
 
     @property
+    def page_steps(self) -> tuple[ProjectStep, ...]:
+        """Return the current page's project steps.
+
+        Returns
+        -------
+        tuple[ProjectStep, ...]
+            Steps from the latest scan for the open project, or an empty tuple
+            for a non-project or unopened page.
+        """
+        page = self.page
+        snapshot = self._snapshot
+        if page is None or page.path is None or snapshot is None:
+            return ()
+        note = next((value for value in snapshot.notes if value.path == page.path), None)
+        return () if note is None else note.steps
+
+    @property
+    def page_read_text(self) -> str:
+        """Return the read-mode body, with step metadata comments hidden.
+
+        Returns
+        -------
+        str
+            Raw Markdown body for most pages, or the step-stripped body for a
+            project so comments are not shown as text.
+        """
+        page = self.page
+        if page is None:
+            return ""
+        labels = page.labels
+        if labels is not None and labels.note_type is NoteType.PROJECT:
+            return afanes.core.steps.StepDocument(self.page_body).search_text
+        return self.page_body
+
+    @property
     def page_raw_text(self) -> str:
         """Return the current page's complete text.
 
@@ -1804,6 +1966,56 @@ class AppState:
             if isinstance(page, NormalDraft):
                 self.page = page.with_body(body)
 
+    async def toggle_page_step(self, line_index: int, *, checked: bool) -> bool:
+        """Check or reopen one step of the open project page.
+
+        Parameters
+        ----------
+        line_index : int
+            Zero-based body line of the step.
+        checked : bool
+            ``True`` to complete the step, ``False`` to reopen it.
+
+        Returns
+        -------
+        bool
+            ``True`` when the line was rewritten and the page reloaded.
+
+        Notes
+        -----
+        Only the target line changes. The write is atomic and the scan is
+        refreshed so the Projects workspace sees the new state.
+        """
+        async with self._lock:
+            page = self.page
+            vault = self.vault
+            if page is None or page.path is None or vault is None:
+                return False
+            self.busy = True
+            self.message = None
+            try:
+                try:
+                    if checked:
+                        await asyncio.to_thread(
+                            vault.tick_step,
+                            page.path,
+                            line_index,
+                            datetime.datetime.now(tz=datetime.UTC).astimezone().date(),
+                            confirm=True,
+                        )
+                    else:
+                        await asyncio.to_thread(vault.untick_step, page.path, line_index, confirm=True)
+                except (AfanesError, OSError) as exc:
+                    logger.debug("Step toggle failed", exc_info=True)
+                    self.message = afanes.ui.strings.PAGE_STEP_FAILED.format(detail=str(exc))
+                    return False
+                if not await self._load_page(page.path, previous=None):
+                    return False
+                await self._refresh_snapshot()
+                return True
+            finally:
+                self.busy = False
+
     async def set_page_raw_text(self, text: str) -> None:
         """Replace raw rescue text.
 
@@ -1834,21 +2046,53 @@ class AppState:
         async with self._lock:
             return await self._apply_label_change(lambda labels: labels.with_type(note_type))
 
-    async def set_page_category(self, category: ReferenceCategory | None) -> bool:
-        """Change the draft reference category, previewing stranded references.
+    async def set_page_category(self, category: CategoryLabel | None) -> bool:
+        """Change the draft category, previewing the folder move.
 
         Parameters
         ----------
-        category : ReferenceCategory | None
+        category : CategoryLabel | None
             New category, or ``None`` for an uncategorized reference.
 
         Returns
         -------
         bool
-            ``True`` when the change was applied immediately.
+            ``True`` when the labels changed without a pending move.
+            ``False`` means a move is pending or the change failed.
         """
         async with self._lock:
-            return await self._apply_label_change(lambda labels: labels.with_category(category))
+            page = self.page
+            if not isinstance(page, NormalDraft):
+                return False
+            proposed = page.labels.with_category(category)
+            if proposed == page.labels:
+                return True
+            if page.path is None:
+                self.page = page.with_labels(proposed)
+                self.message = None
+                return True
+            vault = self.vault
+            if vault is None:
+                return False
+            try:
+                preview = await asyncio.to_thread(
+                    vault.plan_category_move,
+                    page.path,
+                    proposed.category,
+                    snapshot=self._snapshot,
+                )
+            except (AfanesError, OSError) as exc:
+                logger.debug("Category move planning failed", exc_info=True)
+                self.message = afanes.ui.strings.PAGE_CATEGORY_MOVE_FAILED.format(detail=str(exc))
+                return False
+            if VaultPath.same(preview.target_path, preview.note_path):
+                self.page = page.with_labels(proposed)
+                self.message = None
+                return True
+            self.category_move = preview
+            self.pending_labels = proposed
+            self.message = None
+            return False
 
     async def set_page_status(self, status: Status | None) -> None:
         """Change the draft workflow status.
@@ -1872,27 +2116,50 @@ class AppState:
         async with self._lock:
             await self._mutate_labels(lambda labels: labels.with_due_date_text(text))
 
-    async def set_page_people(self, people: tuple[str, ...]) -> None:
-        """Replace the draft person assignments.
+    async def apply_category_move(self) -> bool:
+        """Apply the pending category change and move the file.
 
-        Parameters
-        ----------
-        people : tuple[str, ...]
-            Person identities.
+        Returns
+        -------
+        bool
+            ``True`` when the category was written and the file moved.
         """
         async with self._lock:
-            await self._mutate_labels(lambda labels: labels.with_people(people))
+            preview = self.category_move
+            labels = self.pending_labels
+            vault = self.vault
+            if preview is None or labels is None or vault is None:
+                return False
+            self.busy = True
+            try:
+                try:
+                    target = await asyncio.to_thread(vault.apply_category_move, preview, confirm=True)
+                except (AfanesError, OSError) as exc:
+                    logger.debug("Category move failed", exc_info=True)
+                    self.message = afanes.ui.strings.PAGE_CATEGORY_MOVE_FAILED.format(detail=str(exc))
+                    return False
+                self.category_move = None
+                self.pending_labels = None
+                self.history = tuple(target if path == preview.note_path else path for path in self.history)
+                if not await self._load_page(target, previous=None):
+                    return False
+                self.editing = False
+                await self._refresh_snapshot()
+                return True
+            finally:
+                self.busy = False
 
-    async def set_page_project(self, project: str | None) -> None:
-        """Replace the draft project assignment.
+    async def cancel_category_move(self) -> None:
+        """Discard a pending category change and keep the file in place.
 
-        Parameters
-        ----------
-        project : str | None
-            Project identity, or ``None`` to clear it.
+        Notes
+        -----
+        The category and the file location are unchanged.
         """
         async with self._lock:
-            await self._mutate_labels(lambda labels: labels.with_project(project))
+            self.category_move = None
+            self.pending_labels = None
+            self.message = None
 
     async def apply_type_change(self) -> bool:
         """Apply a type or category change that was waiting for confirmation.
@@ -2382,9 +2649,8 @@ class AppState:
         *,
         status: Status | None = None,
         due_date: datetime.date | None = None,
-        people: tuple[str, ...] = (),
         project: str | None = None,
-    ) -> ProcessingPlan | None:
+    ) -> ProcessingPlan | AppendStepPlan | None:
         """Build a processing preview for the open capture.
 
         Parameters
@@ -2394,15 +2660,13 @@ class AppState:
         status : Status | None
             Requested target status, when the outcome accepts one.
         due_date : datetime.date | None
-            Optional calendar due date for an action or project.
-        people : tuple[str, ...]
-            Person names assigned to the target.
+            Optional calendar due date for a new project.
         project : str | None
-            Project name assigned to an action.
+            Target project identity for Append step.
 
         Returns
         -------
-        ProcessingPlan | None
+        ProcessingPlan | AppendStepPlan | None
             The validated plan, or ``None`` when planning failed.
 
         Notes
@@ -2426,7 +2690,6 @@ class AppState:
                         outcome,
                         status=status,
                         due_date=due_date,
-                        people=people,
                         project=project,
                     )
                 except (AfanesError, OSError) as exc:
@@ -2508,6 +2771,45 @@ class AppState:
             return None
         return item
 
+    def _current_review_step(self) -> ReviewItem | None:
+        """Return the current step review item, or ``None``."""
+        session = self.review_session
+        if session is None:
+            return None
+        item = session.current
+        if item is None or item.kind not in (ReviewItemKind.DUE_STEP, ReviewItemKind.WAITING_STEP):
+            return None
+        if item.step is None or item.project is None:
+            return None
+        return item
+
+    async def _update_review_step(
+        self,
+        action: Callable[[Vault], object],
+    ) -> bool:
+        """Apply one confirmed write to the current review step."""
+        async with self._lock:
+            vault = self.vault
+            if vault is None:
+                return False
+            self.busy = True
+            self.message = None
+            try:
+                try:
+                    await asyncio.to_thread(action, vault)
+                except (AfanesError, OSError) as exc:
+                    logger.debug("Review step write failed", exc_info=True)
+                    self.message = afanes.ui.strings.REVIEW_STEP_FAILED.format(detail=str(exc))
+                    return False
+                await self._refresh_snapshot()
+                session = self.review_session
+                if session is not None:
+                    self.review_session = session.record_reviewed()
+                await self._enter_current_review_item()
+                return True
+            finally:
+                self.busy = False
+
     async def _enter_current_review_item(self) -> None:
         """Load the current review item, skipping captures that disappeared."""
         while True:
@@ -2520,7 +2822,7 @@ class AppState:
                 self.selected = None
                 self.preview_body = None
                 return
-            if item.kind is ReviewItemKind.PROJECT:
+            if item.kind is not ReviewItemKind.INBOX:
                 self.selected = None
                 self.preview_body = None
                 return
@@ -2911,6 +3213,7 @@ class AppState:
     def _clear_page_dialogs(self) -> None:
         """Clear pending page dialogs without changing the current page."""
         self.pending_labels = None
+        self.category_move = None
         self.type_change_sites = ()
         self.repair_preview = None
         self.rename_preview = None

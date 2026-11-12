@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-11
+
+### Added
+
+- A three-type note model: `note` is an unclarified capture, `reference` is non-actionable knowledge, and `project` is an outcome whose body holds its steps. Person pages are ordinary references with a `category` label.
+- Project steps as Markdown task list items in the project body, with optional `owners`, `plan`, `actual`, and `tags` in a trailing flow-style YAML comment. Ticking a step records the current date; unticking removes it and keeps the plan.
+- Free-form reference categories that select a folder under `reference/` without selecting a reference scheme. Category changes preview the move, preserve identity, and keep inbound references resolved.
+- Processing outcomes **Append step** and **Done now**, alongside Trash, Later, Reference, and Project. Append step writes the capture's first line and detail into an existing project and then trashes the capture.
+- Guided review of due or overdue own steps and waiting steps, with do it now, postpone, delegate, reassign, open project, and skip actions. A launch digest reports due work and opens the session without writing to the vault.
+- Browser search across display titles, identities, prose bodies, and step text, with results grouped by reference category label and a Needs attention group for misplaced captures.
+- Step controls in the page: tick, untick, plan, reassign owners, and append a step.
+
+### Changed
+
+- The frontmatter contract now recognizes only `type`, `category`, `status`, and `due_date`; `category` is valid only on references and `due_date` only on projects. Unknown keys are still preserved.
+- Project rows, the Projects workspace, and review cards report open steps and the first unchecked step in document order instead of action notes.
+- `Vault.plan_processing` accepts `today` and returns `ProcessingPlan | AppendStepPlan`; it no longer accepts `people`.
+- Public Python API migrations for the three-note model:
+  - `NoteType.ACTION` was removed. A single actionable unit is a step; use a one-step project or Append step.
+  - `ReferenceCategory` was replaced by `CategoryLabel`, a validated free-form label with case-insensitive equality.
+  - `ReferenceScheme.PERSON` was removed, and `ReferenceScheme.for_note(note_type, category)` is `ReferenceScheme.for_note(note_type)`; every reference resolves through `note:`.
+  - `ACTION_STATUSES` was removed; use `PROJECT_STATUSES`.
+  - `CatalogEntry.category` was removed because categories no longer select a scheme.
+  - `NoteDocument.references` was removed and `NoteDocument.category` is `CategoryLabel | None`; `NoteDocument.due_date` was added as `datetime.date | None`. `NoteDocument.rewrite_references(old, new)` is `MarkdownBody(document.body).rewrite_references(old, new)`.
+  - `VaultNote.action_order()` was removed; use `VaultNote.open_steps()` and `VaultNote.next_step()`. `VaultNote.is_open_action()` was removed because steps are not notes.
+  - `Vault.create_project_action(...)` was removed; use `Vault.append_step(...)` for an existing project, or `Vault.plan_step(...)`.
+  - `ProcessingOutcome.ACTION` was removed; `ProcessingOutcome.APPEND_STEP` and `ProcessingOutcome.DONE_NOW` were added.
+  - `ProcessingPlan.target_category`, `.people`, `.project`, and `.unresolved_references` were removed, and `.body_override` was added. Append step uses `AppendStepPlan`.
+  - `PageLabels.with_people` and `PageLabels.with_project` were removed, and `PageLabels.with_category` takes `CategoryLabel | None`.
+  - `search.ProjectSummary.open_actions` and `.next_action` are `search.ProjectSummary.open_steps` and `.next_step`. `search.ReviewPlanner` accepts `today=` and exposes `due_count()`.
+- This release was built and tested against Flet 1.1.2, markdown-it-py 4.3.0, and PyYAML 6.0.3. The oldest supported versions are tested in the same run.
+
+### Removed
+
+- The `people` and `project` frontmatter keys, the `action` and `person` note types, and the `person:` reference scheme. There is no automatic migration; repair affected notes by hand in raw rescue mode.
+- The `actions/` default folder and the `reference/people/` seed.
+
 ## [0.4.3] - 2026-11-11
 
 ### Added

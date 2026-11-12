@@ -15,9 +15,9 @@ from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
 import afanes.core.names
-from afanes.core.errors import InvalidReferenceError, ReferenceRewriteError
+from afanes.core.errors import InvalidReferenceError, ReferenceRewriteError, RetiredReferenceSchemeError
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType, ReferenceCategory
+from afanes.models.note import NoteType
 
 _SCHEME_PATTERN = re.compile(r"^(?P<scheme>[A-Za-z][A-Za-z0-9+.\-]*):(?P<name>.*)$", re.DOTALL)
 _LINK_DESTINATION_PATTERN = re.compile(r"\]\(\s*(?P<destination><[^>\n]*>|[^)\s]+)")
@@ -64,7 +64,7 @@ class DestinationKind(StrEnum):
     Attributes
     ----------
     INTERNAL : str
-        A destination in one of the three internal reference schemes.
+        A destination in one of the two internal reference schemes.
     EXTERNAL : str
         An absolute URL outside the application.
     ATTACHMENT : str
@@ -98,7 +98,7 @@ class DestinationKind(StrEnum):
 
         Notes
         -----
-        Only the three internal schemes produce :attr:`DestinationKind.INTERNAL`.
+        Only the two internal schemes produce :attr:`DestinationKind.INTERNAL`.
         Active schemes such as ``javascript:`` are classified as unsafe so no
         caller can turn them into a navigable internal target.
         """
@@ -113,6 +113,8 @@ class DestinationKind(StrEnum):
             return cls.ATTACHMENT
 
         scheme = match.group("scheme").casefold()
+        if scheme == "person":
+            return cls.INTERNAL
         if cls._internal_scheme(scheme) is not None:
             return cls.INTERNAL
         if scheme in UNSAFE_SCHEMES:
@@ -160,8 +162,10 @@ class ReferenceParser:
         Raises
         ------
         InvalidReferenceError
-            If the destination has no scheme, uses a scheme outside ``person``,
-            ``project``, and ``note``, or carries an empty name.
+            If the destination has no scheme, uses a scheme outside
+            ``project`` and ``note``, or carries an empty name.
+        RetiredReferenceSchemeError
+            If the destination uses the retired ``person`` scheme.
         """
         value = urllib.parse.unquote(DestinationText(destination).stripped)
         match = self._pattern.match(value)
@@ -170,6 +174,9 @@ class ReferenceParser:
             raise InvalidReferenceError(message)
 
         scheme_token = match.group("scheme")
+        if scheme_token.casefold() == "person":
+            message = "The person scheme was retired; link people as note:Name instead"
+            raise RetiredReferenceSchemeError(message)
         try:
             scheme = ReferenceScheme(scheme_token.casefold())
         except ValueError as exc:
@@ -231,14 +238,10 @@ class CatalogEntry:
         Note path. Its stem is the identity indexed by the catalog.
     note_type : NoteType
         Declared note type.
-    category : ReferenceCategory | None
-        Reference category, or ``None`` for an uncategorized reference or a
-        non-reference note.
     """
 
     path: Path
     note_type: NoteType
-    category: ReferenceCategory | None = None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -283,9 +286,9 @@ class NameCatalog:
     Build catalogs with :meth:`from_entries` rather than constructing the
     internal mapping by hand. A name may map to several paths when the vault
     contains duplicates; the catalog keeps every candidate so resolution can
-    report ambiguity instead of choosing one. ``note``, ``action``, and
-    uncategorized references share the ``note`` namespace; a categorized
-    reference belongs only to its category scheme.
+    report ambiguity instead of choosing one. ``note``, uncategorized, and
+    categorized references share the ``note`` namespace; a project belongs only
+    to the ``project`` namespace.
     """
 
     _entries: dict[ReferenceKey, tuple[Path, ...]]
@@ -310,8 +313,7 @@ class NameCatalog:
         Parameters
         ----------
         entries : Iterable[CatalogEntry]
-            Note path, declared type, and optional reference category for
-            every note in the vault.
+            Note path and declared type for every note in the vault.
 
         Returns
         -------
@@ -319,11 +321,11 @@ class NameCatalog:
             Catalog with normalized names, sorted candidate tuples, and
             deterministic iteration order. Names containing path syntax are
             ignored so they can never resolve. Each note is indexed under
-            exactly one scheme.
+            exactly one scheme; every reference shares the ``note`` scheme.
         """
         grouped: dict[ReferenceKey, list[Path]] = {}
         for entry in entries:
-            scheme = ReferenceScheme.for_note(entry.note_type, entry.category)
+            scheme = ReferenceScheme.for_note(entry.note_type)
             name = afanes.core.names.normalize_name(entry.path.stem)
             if NameCatalog._has_path_syntax(name):
                 continue

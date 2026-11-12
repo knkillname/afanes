@@ -6,19 +6,14 @@ Defines the default storage folders for captures, processed work, references, an
 
 ## Requirements
 
-### Requirement: Default storage folders
+### Requirement: Default storage folders hold four destinations
 
-The application SHALL use `inbox/`, `trash/`, `reference/`, `projects/`, and `actions/` as the default storage folders for notes it creates. These folders are defaults, not requirements on an existing vault.
+The application SHALL use `inbox/`, `trash/`, `reference/`, and `projects/` as the default storage folders for notes it creates. These folders are defaults, not requirements on an existing vault.
 
 #### Scenario: Capture is filed under inbox
 
 - **WHEN** the user captures a thought
 - **THEN** the note is created under `inbox/`
-
-#### Scenario: Action is filed under actions
-
-- **WHEN** a capture is processed into an action
-- **THEN** the note is filed under `actions/`
 
 #### Scenario: Project is filed under projects
 
@@ -35,43 +30,43 @@ The application SHALL use `inbox/`, `trash/`, `reference/`, `projects/`, and `ac
 - **WHEN** the user discards a note through the Trash outcome
 - **THEN** the note is moved under `trash/`
 
-### Requirement: Category folders live under reference
+### Requirement: Category labels select reference folders
 
-Categorized references created by the application SHALL be filed under `reference/<category-folder>/`. The initial mapping is category `person` to `people`. Uncategorized references created by the application SHALL be filed directly under `reference/`.
+Categorized references created by the application SHALL be filed under `reference/<category-folder>/`, where the folder name is derived from the label through the cross-platform name policy. Uncategorized references SHALL be filed directly under `reference/`.
 
-#### Scenario: Person page uses the people folder
+#### Scenario: A label selects the folder
 
-- **WHEN** a reference note has `category: person`
-- **THEN** its default destination is `reference/people/`
+- **WHEN** a reference has `category: place`
+- **THEN** its default destination is `reference/place/`
 
 #### Scenario: Uncategorized reference uses the reference root
 
-- **WHEN** a reference note has no category
+- **WHEN** a reference has no category
 - **THEN** its default destination is `reference/`
 
 #### Scenario: Existing category folder is reused
 
-- **WHEN** `reference/People/` already exists
-- **THEN** the application uses that folder and does not create `reference/people/`
+- **WHEN** `reference/Place/` already exists
+- **THEN** the application uses that folder and does not create `reference/place/`
 
-### Requirement: Projects and actions are flat
+### Requirement: Projects are flat and steps are not notes
 
-Project notes created by the application SHALL be filed directly under `projects/`; action notes directly under `actions/`. Project membership SHALL be represented by the `project` frontmatter reference, not by nested directories.
+Project notes created by the application SHALL be filed directly under `projects/`. Steps SHALL NOT be files; they live in the project body. A project's file location MUST NOT encode its steps.
 
 #### Scenario: Project file is flat
 
 - **WHEN** a project is created
 - **THEN** it is a file directly under `projects/`
 
-#### Scenario: Project step is an action
+#### Scenario: Steps are not files
 
-- **WHEN** a project has a step
-- **THEN** the step is an action note under `actions/` with a `project:` reference
+- **WHEN** a project has five steps
+- **THEN** no step creates a file and the project remains one file
 
-#### Scenario: Changing the project does not move the action file
+#### Scenario: Adding a step does not move the project
 
-- **WHEN** an action's `project` reference changes
-- **THEN** its file location and name are unchanged
+- **WHEN** a step is added to a project
+- **THEN** the project's path is unchanged
 
 ### Requirement: Trash is excluded from the catalog
 
@@ -118,15 +113,12 @@ The application SHALL match default folder names case-insensitively and SHALL re
 
 ### Requirement: Creating a vault seeds the default folders
 
-Creating a vault SHALL seed `inbox/`, `trash/`, `reference/`, `reference/people/`, `projects/`, and
-`actions/` inside the new vault. Seeding SHALL create those folders and no files. The seeded layout
-MUST remain a convenience: its absence on a later open SHALL NOT be an error, and it SHALL NOT
-become a marker or a validation requirement.
+Creating a vault SHALL seed `inbox/`, `trash/`, `reference/`, and `projects/` inside the new vault. Seeding SHALL create those folders and no files. The seeded layout MUST remain a convenience: its absence on a later open SHALL NOT be an error, and it SHALL NOT become a marker or a validation requirement.
 
 #### Scenario: All default folders are created
 
 - **WHEN** a vault is created
-- **THEN** all six default folders exist inside the new vault
+- **THEN** all four default folders exist inside the new vault
 
 #### Scenario: Seeding creates no files
 

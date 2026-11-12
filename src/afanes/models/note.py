@@ -3,11 +3,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Note vocabulary used by the reference engine, the parser, and the vault."""
 
+import dataclasses
+import typing
 from enum import StrEnum
 
 
 class Status(StrEnum):
-    """Workflow states for actionable notes and references.
+    """Workflow states for projects and references.
 
     Attributes
     ----------
@@ -35,7 +37,7 @@ class Status(StrEnum):
 
 # Public per-type status policy. Absence of a status is always allowed; these
 # sets constrain a status only when the key is present.
-ACTION_STATUSES: frozenset[Status] = frozenset(
+PROJECT_STATUSES: frozenset[Status] = frozenset(
     {
         Status.ACTIVE,
         Status.WAITING,
@@ -45,7 +47,6 @@ ACTION_STATUSES: frozenset[Status] = frozenset(
         Status.LATER,
     }
 )
-PROJECT_STATUSES: frozenset[Status] = ACTION_STATUSES
 REFERENCE_STATUSES: frozenset[Status] = frozenset({Status.LATER, Status.ARCHIVED})
 NOTE_STATUSES: frozenset[Status] = frozenset()
 
@@ -56,17 +57,14 @@ class NoteType(StrEnum):
     Attributes
     ----------
     NOTE : str
-        Free-form document note, also the unprocessed capture type.
-    ACTION : str
-        Single actionable unit.
-    PROJECT : str
-        Outcome that groups related actions.
+        Unclarified capture that still needs an explicit processing outcome.
     REFERENCE : str
         Non-actionable knowledge kept for later consultation.
+    PROJECT : str
+        Outcome whose body contains the steps that advance it.
     """
 
     NOTE = "note"
-    ACTION = "action"
     PROJECT = "project"
     REFERENCE = "reference"
 
@@ -80,8 +78,6 @@ class NoteType(StrEnum):
             Statuses allowed when a status key is present. An absent status is
             always allowed and is not represented in the result.
         """
-        if self is NoteType.ACTION:
-            return ACTION_STATUSES
         if self is NoteType.PROJECT:
             return PROJECT_STATUSES
         if self is NoteType.REFERENCE:
@@ -89,13 +85,87 @@ class NoteType(StrEnum):
         return NOTE_STATUSES
 
 
-class ReferenceCategory(StrEnum):
-    """Categories that group reference notes.
+@dataclasses.dataclass(frozen=True, slots=True, eq=False)
+class CategoryLabel:
+    """Free-form label that groups reference notes and selects a folder.
 
     Attributes
     ----------
-    PERSON : str
-        Reference notes about people.
+    value : str
+        Written label, preserving its original case and spacing.
+
+    Raises
+    ------
+    ValueError
+        If the label is blank, is a traversal segment, or contains a path
+        separator. The frontmatter parser converts this into a domain error.
+
+    Notes
+    -----
+    Labels are not a closed list and do not select a reference scheme. Two
+    labels that differ only in case compare equal and produce the same hash, so
+    grouping and folder reuse are case-insensitive while the written form is
+    preserved.
     """
 
-    PERSON = "person"
+    value: str
+
+    def __post_init__(self) -> None:
+        r"""Validate that the label is one non-empty path segment.
+
+        Raises
+        ------
+        ValueError
+            If the label is blank, is ``.`` or ``..``, or contains ``/`` or
+            ``\\``.
+        """
+        label = self.value.strip()
+        if not label:
+            message = "A category label must not be empty"
+            raise ValueError(message)
+        if "/" in label or "\\" in label:
+            message = "A category label must be a single path segment"
+            raise ValueError(message)
+        if label in {".", ".."}:
+            message = "A category label must name a folder, not a traversal"
+            raise ValueError(message)
+
+    @property
+    def key(self) -> str:
+        """Return the case-folded comparison key.
+
+        Returns
+        -------
+        str
+            Case-folded label used for grouping and folder reuse.
+        """
+        return self.value.casefold()
+
+    @typing.override
+    def __eq__(self, other: object) -> bool:
+        """Compare labels case-insensitively.
+
+        Parameters
+        ----------
+        other : object
+            Value to compare against.
+
+        Returns
+        -------
+        bool
+            ``True`` when ``other`` is a :class:`CategoryLabel` with the same
+            case-folded value.
+        """
+        if not isinstance(other, CategoryLabel):
+            return NotImplemented
+        return self.key == other.key
+
+    def __hash__(self) -> int:
+        """Return a hash consistent with case-insensitive equality.
+
+        Returns
+        -------
+        int
+            Hash of the case-folded label.
+        """
+        return hash(self.key)

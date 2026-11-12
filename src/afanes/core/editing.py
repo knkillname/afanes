@@ -21,7 +21,7 @@ from afanes.core.errors import AfanesError, NoteParseError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.vault import PageContent, ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType, ReferenceCategory, Status
+from afanes.models.note import CategoryLabel, NoteType, Status
 
 
 class DraftMode(StrEnum):
@@ -128,25 +128,19 @@ class PageLabels:
     ----------
     note_type : NoteType
         Declared note type.
-    category : ReferenceCategory | None
-        Reference category, or ``None`` for an uncategorized reference or a
-        non-reference note.
+    category : CategoryLabel | None
+        Free-form reference category, or ``None`` for an uncategorized
+        reference or a non-reference note.
     status : Status | None
         Workflow status, or ``None`` when the key is absent.
     due_date_text : str
         Due-date field text exactly as shown in the editor.
-    people : tuple[str, ...]
-        Person identities assigned to the note, in display order.
-    project : str | None
-        Project identity assigned to the note, or ``None``.
     """
 
     note_type: NoteType
-    category: ReferenceCategory | None = None
+    category: CategoryLabel | None = None
     status: Status | None = None
     due_date_text: str = ""
-    people: tuple[str, ...] = ()
-    project: str | None = None
 
     @classmethod
     def from_document(cls, document: NoteDocument) -> Self:
@@ -160,8 +154,8 @@ class PageLabels:
         Returns
         -------
         PageLabels
-            Labels populated from the document's type, category, status,
-            due date, and frontmatter references.
+            Labels populated from the document's type, category, status, and
+            due date.
 
         Raises
         ------
@@ -171,20 +165,12 @@ class PageLabels:
         if document.note_type is None:
             message = "Note has no type"
             raise NoteParseError(message)
-        people = tuple(
-            reference.name for reference in document.references if reference.scheme is ReferenceScheme.PERSON
-        )
-        project = next(
-            (reference.name for reference in document.references if reference.scheme is ReferenceScheme.PROJECT),
-            None,
-        )
+        due_date = document.raw.get("due_date")
         return cls(
             note_type=document.note_type,
             category=document.category,
             status=document.status,
-            due_date_text=DueDateText.from_raw(document.raw.get("due_date")).text,
-            people=people,
-            project=project,
+            due_date_text=DueDateText.from_raw(due_date).text,
         )
 
     @property
@@ -194,9 +180,9 @@ class PageLabels:
         Returns
         -------
         ReferenceScheme
-            Scheme derived from the type and category.
+            Scheme derived from the type. Category never changes it.
         """
-        return ReferenceScheme.for_note(self.note_type, self.category)
+        return ReferenceScheme.for_note(self.note_type)
 
     @property
     def due_date(self) -> datetime.date | None:
@@ -231,19 +217,27 @@ class PageLabels:
         Returns
         -------
         PageLabels
-            New labels. Category is kept only for references, and a status the
-            new type does not allow is cleared.
+            New labels. Category is kept only for references, due-date text is
+            kept only for projects, and a status the new type does not allow is
+            cleared.
         """
         category = self.category if note_type is NoteType.REFERENCE else None
+        due_date_text = self.due_date_text if note_type is NoteType.PROJECT else ""
         status = self.status if self.status in note_type.allowed_statuses else None
-        return dataclasses.replace(self, note_type=note_type, category=category, status=status)
+        return dataclasses.replace(
+            self,
+            note_type=note_type,
+            category=category,
+            status=status,
+            due_date_text=due_date_text,
+        )
 
-    def with_category(self, category: ReferenceCategory | None) -> Self:
+    def with_category(self, category: CategoryLabel | None) -> Self:
         """Return labels with a reference category.
 
         Parameters
         ----------
-        category : ReferenceCategory | None
+        category : CategoryLabel | None
             New category, or ``None`` for an uncategorized reference.
 
         Returns
@@ -289,43 +283,12 @@ class PageLabels:
         Returns
         -------
         PageLabels
-            New labels carrying the text.
+            New labels carrying the text, or blank labels for a non-project
+            note.
         """
+        if self.note_type is not NoteType.PROJECT:
+            return dataclasses.replace(self, due_date_text="")
         return dataclasses.replace(self, due_date_text=text)
-
-    def with_people(self, people: tuple[str, ...]) -> Self:
-        """Return labels with normalized person identities.
-
-        Parameters
-        ----------
-        people : tuple[str, ...]
-            Person identities. Surrounding whitespace is trimmed and blank
-            entries are dropped; order is preserved.
-
-        Returns
-        -------
-        PageLabels
-            New labels with the person list replaced.
-        """
-        cleaned = tuple(name.strip() for name in people if name.strip())
-        return dataclasses.replace(self, people=cleaned)
-
-    def with_project(self, project: str | None) -> Self:
-        """Return labels with a normalized project identity.
-
-        Parameters
-        ----------
-        project : str | None
-            Project identity, or ``None`` to clear it. Surrounding whitespace
-            is trimmed and a blank value clears the project.
-
-        Returns
-        -------
-        PageLabels
-            New labels with the project replaced.
-        """
-        trimmed = None if project is None else project.strip() or None
-        return dataclasses.replace(self, project=trimmed)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -417,17 +380,14 @@ class NormalDraft:
 
         Notes
         -----
-        ``note:`` and ``person:`` references create a reference note;
-        ``person:`` additionally sets category ``person``. ``project:``
-        references create a project. The reference wording is preserved in the
-        heading even when the identity is sanitized.
+        A ``note:`` reference creates an uncategorized reference note; a
+        ``project:`` reference creates a project. There is no person case. The
+        reference wording is preserved in the heading even when the identity is
+        sanitized.
         """
-        if reference.scheme is ReferenceScheme.PERSON:
-            note_type = NoteType.REFERENCE
-            category: ReferenceCategory | None = ReferenceCategory.PERSON
-        elif reference.scheme is ReferenceScheme.PROJECT:
+        if reference.scheme is ReferenceScheme.PROJECT:
             note_type = NoteType.PROJECT
-            category = None
+            category: CategoryLabel | None = None
         else:
             note_type = NoteType.REFERENCE
             category = None
@@ -442,7 +402,6 @@ class NormalDraft:
             newline="\n",
             has_frontmatter=True,
             note_type=note_type,
-            references=(),
             category=category,
             status=None,
         )
@@ -624,7 +583,7 @@ class NormalDraft:
 
         raw = dict(self.source.raw)
         raw["type"] = self.labels.note_type.value
-        if self.labels.category is None:
+        if self.labels.note_type is not NoteType.REFERENCE or self.labels.category is None:
             raw.pop("category", None)
         else:
             raw["category"] = self.labels.category.value
@@ -633,18 +592,10 @@ class NormalDraft:
         else:
             raw["status"] = self.labels.status.value
         due_date = due_text.date
-        if due_date is None:
+        if self.labels.note_type is not NoteType.PROJECT or due_date is None:
             raw.pop("due_date", None)
         else:
-            raw["due_date"] = due_date.isoformat()
-        if self.labels.people:
-            raw["people"] = [f"{ReferenceScheme.PERSON.value}:{name}" for name in self.labels.people]
-        else:
-            raw.pop("people", None)
-        if self.labels.project is None:
-            raw.pop("project", None)
-        else:
-            raw["project"] = f"{ReferenceScheme.PROJECT.value}:{self.labels.project}"
+            raw["due_date"] = due_date
 
         document = self.source.with_body(self.body).with_metadata(raw)
         return document.to_text()

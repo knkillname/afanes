@@ -6,164 +6,127 @@ Defines how reference notes are grouped into categories such as people and place
 
 ## Requirements
 
-### Requirement: Reference categories are optional
+### Requirement: Categories are free-form labels
 
-The application SHALL accept a reference note with or without a `category` key. The initial category is `person`. Future categories are added by explicit specification changes. An uncategorized reference SHALL remain valid.
+A reference MAY declare any non-empty `category` label. The label is not a closed list and does not select a scheme. Labels SHALL be compared case-insensitively for grouping and folder reuse, and the written form SHALL be preserved. A label MUST be a single path segment.
 
-#### Scenario: Person category is valid
+#### Scenario: Arbitrary label is accepted
 
-- **WHEN** a reference note declares `category: person`
-- **THEN** the note parses successfully
+- **WHEN** a reference declares `category: place`
+- **THEN** the note parses with the `place` label
 
 #### Scenario: Uncategorized reference is valid
 
-- **WHEN** a reference note has no `category` key
-- **THEN** the note parses successfully
+- **WHEN** a reference has no `category` key
+- **THEN** the note parses
 
-#### Scenario: Unknown category is rejected
+#### Scenario: Empty label is rejected
 
-- **WHEN** a reference note declares an unknown category
+- **WHEN** a reference declares an empty `category`
 - **THEN** parsing reports a validation error
 
-### Requirement: People are reference notes
+#### Scenario: Path separator is rejected
 
-A person page SHALL be a `type: reference` note with `category: person`. `person` SHALL NOT be a standalone note type. The `people` frontmatter key SHALL continue to hold `person:` references.
+- **WHEN** a category label contains a path separator
+- **THEN** parsing reports a validation error
+
+#### Scenario: Case variants group together
+
+- **WHEN** two references declare `category: Place` and `category: place`
+- **THEN** they group under one label and reuse one folder
+
+### Requirement: Category changes move the file
+
+Changing a reference's category SHALL change its default folder. The application SHALL preview the destination and move the file only after confirmation. Identity, name, and inbound references MUST NOT change.
+
+#### Scenario: Adding a category moves the file
+
+- **WHEN** an uncategorized reference gains `category: place`
+- **THEN** the confirmation names `reference/place/` as the destination and the file moves only after confirmation
+
+#### Scenario: Removing a category moves the file back
+
+- **WHEN** a reference's category is removed
+- **THEN** the confirmation names `reference/` as the destination
+
+#### Scenario: Cancelling changes nothing
+
+- **WHEN** the user cancels the category move
+- **THEN** the category and the file location are unchanged
+
+#### Scenario: References survive the move
+
+- **WHEN** a categorized reference moves to its category folder
+- **THEN** its inbound references still resolve
+
+### Requirement: People are ordinary references
+
+A person page SHALL be a `type: reference` note carrying a free-form category, conventionally `person`. `person` SHALL NOT be a standalone note type and SHALL NOT own a reference scheme.
 
 #### Scenario: Person page has the reference shape
 
 - **WHEN** a person page is created
-- **THEN** it has `type: reference` and `category: person`
-
-#### Scenario: Person reference resolves the page
-
-- **WHEN** `person:Ada` is resolved and a reference note named `Ada` has `category: person`
-- **THEN** the reference resolves to that note
+- **THEN** it has `type: reference` and a category label
 
 #### Scenario: Person is not a note type
 
 - **WHEN** a note declares `type: person`
 - **THEN** parsing reports a validation error
 
-#### Scenario: People metadata is unchanged
+#### Scenario: Person is not a scheme
 
-- **WHEN** a note declares `people: ["person:Ada"]`
-- **THEN** the value remains a valid person reference
-
-### Requirement: Category selects the scheme
-
-A categorized reference SHALL resolve only under its category's scheme. An uncategorized reference SHALL resolve under the `note` scheme. A note SHALL belong to exactly one scheme.
-
-#### Scenario: Person category selects the person scheme
-
-- **WHEN** a reference note has `category: person`
-- **THEN** it is addressable as `person:Name` and not as `note:Name`
-
-#### Scenario: Uncategorized reference selects the note scheme
-
-- **WHEN** a reference note has no category
-- **THEN** it is addressable as `note:Name`
-
-#### Scenario: Categorized reference is not a note target
-
-- **WHEN** `note:Ada` is resolved and the only note named `Ada` has `category: person`
-- **THEN** the reference is unresolved
-
-#### Scenario: No note belongs to two schemes
-
-- **WHEN** a reference note has `category: person`
-- **THEN** it is not also a candidate under the `note` scheme
-
-### Requirement: Category values are validated
-
-The `category` value SHALL be a known category and SHALL be valid only on `type: reference`. Unknown values, empty values, and placement on another type SHALL produce a validation error. Category values SHALL be matched case-insensitively and written in canonical lowercase.
-
-#### Scenario: Empty category is rejected
-
-- **WHEN** a reference declares an empty `category` value
+- **WHEN** a body contains a `person:Ada` destination
 - **THEN** parsing reports a validation error
 
-#### Scenario: Category on an action is rejected
+#### Scenario: People are linked as notes
 
-- **WHEN** an action declares `category: person`
-- **THEN** parsing reports a validation error
+- **WHEN** a body links to a person page named `Ada`
+- **THEN** the destination is `note:Ada`
 
-#### Scenario: Category case is normalized
+### Requirement: Each label maps to a reference folder
 
-- **WHEN** a reference declares `category: Person`
-- **THEN** it parses as the `person` category and serializes as `person`
+Each category SHALL map to a default folder under `reference/` named from the label through the cross-platform name policy. An uncategorized reference SHALL default to `reference/`. The folder SHALL be a destination hint, not part of identity.
 
-#### Scenario: Unknown keys are preserved
+#### Scenario: A label maps to a folder
 
-- **WHEN** a reference declares an unknown key other than `category`
-- **THEN** the key and value are preserved
+- **WHEN** a reference has `category: place`
+- **THEN** its default destination is `reference/place/`
 
-### Requirement: Category changes affect resolution
+#### Scenario: Uncategorized reference uses the reference root
 
-Changing a reference's category SHALL change its scheme. References under the old scheme SHALL become unresolved and SHALL be reported; they MUST NOT be retargeted. Moving a file between category folders without changing the category MUST NOT change resolution.
+- **WHEN** a reference has no category
+- **THEN** its default destination is `reference/`
 
-#### Scenario: Category is removed
+#### Scenario: Existing case variant is reused
 
-- **WHEN** a reference's `category` key is removed
-- **THEN** `person:` references become unresolved and `note:` references resolve to it
-
-#### Scenario: Folder move keeps the scheme
-
-- **WHEN** a person reference moves from `reference/people/` to another active folder without changing its category
-- **THEN** `person:` references still resolve
-
-#### Scenario: No automatic retarget
-
-- **WHEN** a category change makes a reference unresolved
-- **THEN** the application does not rewrite the reference to the new scheme
-
-### Requirement: Category folders are default destinations
-
-The application SHALL map each category to a default folder under `reference/`. The initial mapping is `person` to `people`. The folder SHALL be a destination hint, not part of identity.
-
-#### Scenario: Person category maps to people
-
-- **WHEN** a person page is created by the application
-- **THEN** it is filed under `reference/people/`
+- **WHEN** `reference/Place/` already exists
+- **THEN** the application uses that folder and does not create `reference/place/`
 
 #### Scenario: Folder is not identity
 
-- **WHEN** a person page lives outside `reference/people/`
-- **THEN** its name remains its identity and `person:` references still resolve
+- **WHEN** a categorized reference lives outside its default folder
+- **THEN** its name remains its identity and its references still resolve
 
-### Requirement: The person scheme is a category filter
+### Requirement: Reference names are unique in the note scheme
 
-The `person` scheme SHALL resolve only to reference notes with `category: person`. It MUST NOT resolve to projects or uncategorized references.
+Every reference SHALL participate in `note` scheme name uniqueness, regardless of category. A categorized reference and a note MUST NOT share a name. A reference and a project MAY share a name.
 
-#### Scenario: Person page resolves
+#### Scenario: Reference and project share a name
 
-- **WHEN** a reference note named `Ada` has `category: person`
-- **THEN** `person:Ada` resolves to it
-
-#### Scenario: Project with the same name does not resolve
-
-- **WHEN** `person:Ada` is resolved and the only note named `Ada` is a project
-- **THEN** the reference is unresolved
-
-#### Scenario: Uncategorized reference does not resolve
-
-- **WHEN** `person:Ada` is resolved and the only note named `Ada` is an uncategorized reference
-- **THEN** the reference is unresolved
-
-### Requirement: Per-scheme uniqueness includes categories
-
-Category notes SHALL participate in per-scheme name uniqueness. Notes in different schemes MAY share a name; two notes in the same scheme MAY NOT.
-
-#### Scenario: Person and uncategorized reference share a name
-
-- **WHEN** a person note and an uncategorized reference are both named `Ada`
+- **WHEN** a reference and a project are both named `Ada`
 - **THEN** both are accepted because their schemes differ
 
-#### Scenario: Duplicate person names are ambiguous
+#### Scenario: Duplicate references are ambiguous
 
-- **WHEN** two person notes are named `Ada`
-- **THEN** `person:Ada` is reported as ambiguous
+- **WHEN** two references are named `Ada`
+- **THEN** `note:Ada` is reported as ambiguous
 
 #### Scenario: Case variants are duplicates
 
-- **WHEN** two person notes are named `Ada` and `ada`
-- **THEN** `person:Ada` is reported as ambiguous
+- **WHEN** two references are named `Ada` and `ada`
+- **THEN** `note:Ada` is reported as ambiguous
+
+#### Scenario: A categorized and an uncategorized reference collide
+
+- **WHEN** a reference with `category: person` and an uncategorized reference are both named `Ada`
+- **THEN** the vault reports duplicate note names

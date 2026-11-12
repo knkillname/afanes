@@ -27,36 +27,70 @@ Processing SHALL operate only on a note under `inbox/` and SHALL require an expl
 
 ### Requirement: The outcome set is fixed
 
-A processed capture SHALL become exactly one of Trash, Later, Reference, Action, or Project. The user SHALL choose the outcome; processing MUST NOT infer it.
+A processed capture SHALL become exactly one of Trash, Later, Reference, Project, Append step, or Done now. The user SHALL choose the outcome; processing MUST NOT infer it.
 
 #### Scenario: One outcome per apply
 
 - **WHEN** a processing plan is applied
-- **THEN** exactly one outcome is recorded and the note moves to exactly one destination
+- **THEN** exactly one outcome is recorded and the capture leaves the Inbox
 
 #### Scenario: Classification is not inferred
 
 - **WHEN** the capture text contains words that resemble a person, project, date, or action
 - **THEN** processing does not choose an outcome or metadata from that text
 
-### Requirement: Actionable captures become actions or projects
+#### Scenario: A single action is a project
 
-When the user marks a capture actionable, a single-step item SHALL become an action and a multi-step outcome SHALL become a project. The user SHALL choose which.
+- **WHEN** the user treats one step as the whole commitment
+- **THEN** the outcome is a one-step project, not an action note
 
-#### Scenario: Single step becomes an action
+### Requirement: Actionable captures become projects or steps
 
-- **WHEN** the user marks an actionable capture as a single step
-- **THEN** the note becomes type `action` and is filed under `actions/`
+An actionable capture SHALL become a new project, a step appended to an existing project, or a completed one-step project. The user SHALL choose which; processing MUST NOT infer it.
 
-#### Scenario: Multi-step outcome becomes a project
+#### Scenario: A single step becomes a one-step project
 
-- **WHEN** the user marks an actionable capture as a multi-step outcome
-- **THEN** the note becomes type `project` and is filed under `projects/`
+- **WHEN** the user marks an actionable capture as a new project with one step
+- **THEN** the note becomes `type: project` and is filed under `projects/`
+
+#### Scenario: A multi-step outcome becomes a project
+
+- **WHEN** the user marks an actionable capture as a new multi-step project
+- **THEN** the note becomes `type: project` and is filed under `projects/`
+
+#### Scenario: The step joins an existing project
+
+- **WHEN** the user chooses Append step and selects a project
+- **THEN** the step is written into that project's body and the capture is trashed
+
+#### Scenario: A quick action is completed immediately
+
+- **WHEN** the user chooses Done now
+- **THEN** a one-step project is written with its step ticked and `status: done`
 
 #### Scenario: Actionable capture requires a choice
 
-- **WHEN** the user marks a capture actionable without choosing action or project
+- **WHEN** the user marks a capture actionable without choosing new project, append, or done
 - **THEN** processing does not apply
+
+### Requirement: Appending a step preserves capture detail
+
+When a capture is appended to a project, its first non-blank line SHALL become the step text and the remaining body SHALL be indented beneath that step. The step line and its detail SHALL be written to the target project in one atomic write. The capture SHALL then be moved to trash.
+
+#### Scenario: First line becomes the step
+
+- **WHEN** a capture `Call the plumber` with detail is appended
+- **THEN** the project gains `- [ ] Call the plumber` followed by the indented detail
+
+#### Scenario: The capture is trashed after the write
+
+- **WHEN** the append succeeds
+- **THEN** the capture is moved to `trash/`
+
+#### Scenario: Failed append leaves both notes unchanged
+
+- **WHEN** the target project changed after the plan was created
+- **THEN** the capture stays in `inbox/` and the project is unchanged
 
 ### Requirement: Non-actionable captures become trash, later, or reference
 
@@ -77,92 +111,68 @@ When the user marks a capture non-actionable, it SHALL become Trash, Later, or R
 - **WHEN** the user chooses Reference
 - **THEN** the note becomes `type: reference` with no status and is filed under `reference/`
 
-### Requirement: Action metadata and status
-
-An action outcome SHALL allow a status, an optional due date, zero or more people, and an optional project. The default status SHALL be `active`; a delegated action SHALL use `waiting`; a scheduled action SHALL carry a due date.
-
-#### Scenario: Default action is active
-
-- **WHEN** the user creates an action without choosing a status
-- **THEN** the note is written with `status: active`
-
-#### Scenario: Delegated action waits
-
-- **WHEN** the user delegates an action to a person
-- **THEN** the action is written with `status: waiting` and that `person:` reference
-
-#### Scenario: Scheduled action carries a due date
-
-- **WHEN** the user schedules an action for a calendar date
-- **THEN** the action carries that `due_date`
-
-#### Scenario: Unresolved person is allowed
-
-- **WHEN** the user assigns a person with no page yet
-- **THEN** the action keeps the `person:` reference and reports it as unresolved
-
-#### Scenario: Completed quick action is done
-
-- **WHEN** the user completes a quick action immediately
-- **THEN** the action is written with `status: done`
-
 ### Requirement: Project metadata and steps
 
-A project outcome SHALL become `type: project` with a status and optional due date and people. Project steps SHALL be action notes linked by the `project` key; processing SHALL NOT create steps in the same apply.
+A project outcome SHALL become `type: project` with a status and an optional due date. Its steps are checkbox items in its body. Processing SHALL preserve any task list item carried by the capture and MUST NOT create steps in another note unless the user chooses Append step.
 
 #### Scenario: Project is filed flat
 
 - **WHEN** a capture becomes a project
 - **THEN** the project note is filed directly under `projects/`
 
+#### Scenario: Steps come from the capture body
+
+- **WHEN** the capture body contains task list items
+- **THEN** those lines become the project's steps
+
 #### Scenario: Steps are added later
 
 - **WHEN** the user adds a step to a project
-- **THEN** it is an action note under `actions/` with a `project:` reference
+- **THEN** a task list item is appended to the project body
+
+#### Scenario: A project may start empty
+
+- **WHEN** the capture body contains no task list item
+- **THEN** the project is created with no steps and parses
 
 #### Scenario: Project has no project key
 
 - **WHEN** a project note is written
 - **THEN** it does not declare a `project` key
 
-### Requirement: Name entry suggests pages by title and identity
+### Requirement: The append target suggests projects
 
-When the user assigns people or a project during processing, the input SHALL suggest existing pages by display title or identity. Selecting a suggestion SHALL store that page's identity. Text that matches no page SHALL remain an unresolved identity so the reference can resolve when the page is created.
+When the user chooses Append step, the project input SHALL suggest existing projects by display title or identity. Selecting a suggestion SHALL target that project's identity. Text that matches no project SHALL be rejected, because a step requires an existing project.
 
-#### Scenario: Typing a title suggests the page
+#### Scenario: Typing a title suggests the project
 
-- **WHEN** a person page has identity `Ada` and display title `Ada, Countess of Lovelace`
-- **THEN** typing part of the title suggests that page
+- **WHEN** a project has identity `Home` and display title `Home improvements`
+- **THEN** typing part of the title suggests that project
 
-#### Scenario: Typing the identity suggests the page
+#### Scenario: Typing the identity suggests the project
 
-- **WHEN** the user types `Ada` and a person page has identity `Ada`
-- **THEN** that page is suggested
+- **WHEN** the user types `Home` and a project has identity `Home`
+- **THEN** that project is suggested
 
 #### Scenario: Selecting a suggestion stores the identity
 
-- **WHEN** the user selects the suggestion for a page whose title differs from its identity
-- **THEN** the stored reference uses the identity, not the title
+- **WHEN** the user selects a project whose title differs from its identity
+- **THEN** the plan targets the identity, not the title
 
-#### Scenario: Free text stays unresolved
+#### Scenario: Free text that matches no project is rejected
 
-- **WHEN** the user types a name that matches no person page
-- **THEN** the reference is stored with that name and reported as unresolved
+- **WHEN** the user types a project name that matches no project
+- **THEN** the plan is rejected and nothing is written
 
 #### Scenario: Duplicate titles are distinct suggestions
 
-- **WHEN** two person pages have the same display title
+- **WHEN** two projects have the same display title
 - **THEN** both appear as separate suggestions distinguished by their identities
-
-#### Scenario: The project field follows the same rule
-
-- **WHEN** the user assigns a project whose title differs from its identity
-- **THEN** the stored reference uses the project's identity
 
 #### Scenario: Matching ignores case and repeated whitespace
 
-- **WHEN** the user types `ada` or `Ada,   Countess of Lovelace`
-- **THEN** the matching page is suggested
+- **WHEN** the user types `home` or `Home,   improvements`
+- **THEN** the matching project is suggested
 
 ### Requirement: Reference outcome is uncategorized
 
@@ -178,24 +188,24 @@ The Reference and Later outcomes SHALL create uncategorized references. Processi
 - **WHEN** the user chooses Later
 - **THEN** the note has `type: reference`, `status: later`, and no `category` key
 
-### Requirement: Status vocabulary is explicit
+### Requirement: Processing writes a valid status
 
-Captures SHALL have no status. Actions and projects SHALL allow `active`, `waiting`, `done`, `cancelled`, `archived`, and `later`. References SHALL allow `later` and `archived`, or no status. `inbox` SHALL NOT be a valid status.
+Processing SHALL write a status valid for the target type. A new project defaults to `active`, a done-now project is `done`, and a reference uses no status or `later`. Processing MUST NOT write `inbox`, or `waiting` on a reference.
 
-#### Scenario: Capture has no status
+#### Scenario: Project defaults to active
 
-- **WHEN** a note is captured
-- **THEN** it has no `status` key
+- **WHEN** the user creates a project without choosing a status
+- **THEN** the project is written with `status: active`
 
-#### Scenario: Action status is valid
+#### Scenario: Done now is done
 
-- **WHEN** an action declares `status: waiting`
-- **THEN** the note parses successfully
+- **WHEN** the user chooses Done now
+- **THEN** the one-step project is written with `status: done`
 
-#### Scenario: Later reference is valid
+#### Scenario: Later reference is later
 
-- **WHEN** a reference declares `status: later`
-- **THEN** the note parses successfully
+- **WHEN** the user chooses Later
+- **THEN** the reference is written with `status: later`
 
 #### Scenario: Inbox is not a status
 
@@ -209,35 +219,45 @@ Captures SHALL have no status. Actions and projects SHALL allow `active`, `waiti
 
 ### Requirement: Apply writes then moves atomically
 
-Applying a processing plan SHALL write the classified frontmatter atomically to the source note, then move it to the destination. It MUST abort before any change when the plan is invalid, the source changed after planning, or the destination collides. On success the note leaves `inbox/`.
+Applying a plan SHALL write every affected note atomically and then move the capture out of `inbox/`. Append step SHALL write the target project first and then trash the capture. A plan MUST be rejected before any change when it is invalid, a source changed after planning, or a destination collides.
 
 #### Scenario: Success leaves the inbox
 
 - **WHEN** processing is confirmed
-- **THEN** the note is written with the chosen metadata and moved out of `inbox/`
+- **THEN** the capture is written with the chosen classification and moved out of `inbox/`
+
+#### Scenario: Append writes then trashes
+
+- **WHEN** an Append step plan is confirmed
+- **THEN** the step is written to the project and the capture is moved to `trash/`
 
 #### Scenario: Changed source aborts
 
-- **WHEN** the source note changed after the plan was created
+- **WHEN** the capture changed after the plan was created
 - **THEN** processing aborts and reports that the note changed
+
+#### Scenario: Changed target aborts the append
+
+- **WHEN** the target project changed after the plan was created
+- **THEN** the append aborts and the project is unchanged
 
 #### Scenario: Write failure leaves the source
 
 - **WHEN** the atomic write fails
-- **THEN** the note remains in `inbox/` and no destination note is created
+- **THEN** the capture remains in `inbox/` and no destination note is created
 
 #### Scenario: Failed move is retryable
 
 - **WHEN** the write succeeds but the move fails
-- **THEN** the note remains in `inbox/` with the new metadata and the same plan can be retried
+- **THEN** the capture remains in `inbox/` with the new metadata and the same plan can be retried
 
 ### Requirement: Destination collisions are reported
 
-Processing SHALL abort when the destination filename exists or the target name already identifies another note in the same scheme. It MUST NOT overwrite the destination or add a numeric suffix.
+Processing SHALL abort when the destination filename exists or the target name already identifies another note in the same scheme. It MUST NOT overwrite the destination or add a numeric suffix. Append step SHALL abort when the target project no longer exists or changed after planning.
 
 #### Scenario: Existing destination file
 
-- **WHEN** `actions/Foo.md` already exists and a capture named `Foo` would be filed there
+- **WHEN** `projects/Foo.md` already exists and a capture named `Foo` would be filed there
 - **THEN** processing aborts and the capture remains in `inbox/`
 
 #### Scenario: Existing name in the scheme
@@ -250,9 +270,14 @@ Processing SHALL abort when the destination filename exists or the target name a
 - **WHEN** a destination collision occurs
 - **THEN** the application does not create `Foo 2.md` or overwrite `Foo.md`
 
+#### Scenario: Missing append target
+
+- **WHEN** the target project no longer exists at apply time
+- **THEN** the append aborts and the capture remains in `inbox/`
+
 ### Requirement: Scheme changes are reported
 
-When an outcome changes the note's reference scheme, processing SHALL report the inbound references that will become unresolved and require confirmation. It MUST NOT retarget them automatically.
+When an outcome changes the capture's reference scheme, processing SHALL report the inbound references that will become unresolved and require confirmation. It MUST NOT retarget them automatically.
 
 #### Scenario: Note becomes a project
 
@@ -261,7 +286,7 @@ When an outcome changes the note's reference scheme, processing SHALL report the
 
 #### Scenario: Note stays in the document family
 
-- **WHEN** a capture becomes an action or an uncategorized reference
+- **WHEN** a capture becomes a reference or is deferred to later
 - **THEN** existing `note:` references remain resolved and no scheme warning is shown
 
 #### Scenario: Cancelled scheme change
@@ -290,21 +315,26 @@ The Trash outcome SHALL report how many references point to the note before conf
 
 ### Requirement: Processing preserves content
 
-Processing SHALL preserve the body, newline style, and unknown frontmatter keys of the capture. It SHALL modify only the keys owned by the chosen outcome and MUST NOT modify any other note.
+Processing SHALL preserve the body, newline style, and unknown frontmatter keys of the capture. It SHALL modify only the keys owned by the outcome. Append step SHALL modify only the capture and the target project body.
 
 #### Scenario: Body is preserved
 
 - **WHEN** a capture is processed
-- **THEN** its Markdown body is unchanged
+- **THEN** its Markdown body is unchanged, apart from the classification
 
 #### Scenario: Unknown keys are preserved
 
 - **WHEN** the capture has an unknown frontmatter key
 - **THEN** the key and value are written back unchanged
 
+#### Scenario: Append preserves the target project
+
+- **WHEN** a step is appended to a project
+- **THEN** the rest of the project's frontmatter and body are unchanged
+
 #### Scenario: Other notes are untouched
 
-- **WHEN** a capture is processed
+- **WHEN** a capture is processed without Append step
 - **THEN** every other note's content is unchanged
 
 ### Requirement: Failure is reported and retryable

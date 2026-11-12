@@ -8,40 +8,60 @@ Defines the Review entry and guided session that walks pending Inbox items and o
 
 ### Requirement: Review shows the pending count
 
-The workspace SHALL provide a Review entry whose count is the number of pending Inbox notes plus open projects with no open action. The count SHALL update after every capture, processing apply, page save, or trash.
+The workspace SHALL provide a Review entry whose count is the number of pending Inbox notes, due or overdue own steps, waiting steps, and open projects with no open step. The count SHALL update after every capture, step toggle, processing apply, page save, or trash.
 
 #### Scenario: Count combines Inbox and stalled projects
 
-- **WHEN** the vault has three Inbox notes and two projects with no open action
+- **WHEN** the vault has three Inbox notes and two projects with no open step
 - **THEN** Review shows five pending items
-
-#### Scenario: Healthy project is not counted
-
-- **WHEN** an open project has at least one open action
-- **THEN** it does not contribute to the Review count
 
 #### Scenario: Processing reduces the count
 
 - **WHEN** an Inbox item is processed
 - **THEN** the Review count decreases by one
 
+#### Scenario: Healthy project is not counted
+
+- **WHEN** an open project has at least one unchecked own step
+- **THEN** it does not contribute to the Review count
+
+#### Scenario: Due step is counted
+
+- **WHEN** an own step's plan date is today or earlier and it is unchecked
+- **THEN** it contributes to the count
+
+#### Scenario: Waiting step is counted
+
+- **WHEN** a step has an owner
+- **THEN** it contributes to the count
+
 #### Scenario: Zero pending is shown
 
-- **WHEN** there are no Inbox notes and no stalled projects
+- **WHEN** there are no pending items
 - **THEN** Review shows zero pending items and starts no session
 
 ### Requirement: A review session uses a snapshot queue
 
-Starting Review SHALL snapshot a queue ordered as pending Inbox notes, then projects with no next action, then open projects with a next action for confirmation. Closed projects SHALL be excluded. Notes created during the session SHALL NOT be added to the current queue.
+Starting Review SHALL snapshot a queue ordered as pending Inbox notes, then due or overdue own steps, then waiting steps, then projects with no open step, then open projects with a next step. Closed projects SHALL be excluded. Notes created during the session SHALL NOT be added.
 
 #### Scenario: Inbox items come first
 
-- **WHEN** a review session starts with Inbox notes and projects
-- **THEN** every Inbox item precedes every project
+- **WHEN** a session starts with Inbox notes, due steps, and projects
+- **THEN** every Inbox item precedes every step and project
+
+#### Scenario: Due steps precede waiting steps
+
+- **WHEN** the queue contains a due step and a waiting step
+- **THEN** the due step comes first
+
+#### Scenario: Waiting steps precede stalled projects
+
+- **WHEN** the queue contains a waiting step and a stalled project
+- **THEN** the waiting step comes first
 
 #### Scenario: Stalled projects precede healthy projects
 
-- **WHEN** the session includes a project with no next action and a project with one
+- **WHEN** the session includes a project with no open step and a project with one
 - **THEN** the stalled project is reviewed first
 
 #### Scenario: Closed projects are excluded
@@ -51,8 +71,8 @@ Starting Review SHALL snapshot a queue ordered as pending Inbox notes, then proj
 
 #### Scenario: New work waits for the next session
 
-- **WHEN** an Inbox item is processed into a new project during a session
-- **THEN** that project is not appended to the current queue
+- **WHEN** a step is added during a session
+- **THEN** it is not appended to the current queue
 
 ### Requirement: Inbox review reuses explicit processing
 
@@ -75,17 +95,17 @@ Each Inbox item in a review session SHALL open the existing processing flow. App
 
 ### Requirement: A project review card shows its next step
 
-Each project in a review session SHALL show the project title, status, optional due date, its next action, and any other open actions. The user SHALL be able to open the project or the next action.
+Each project in a review session SHALL show the project title, status, optional due date, its next step, and any other open steps. The user SHALL be able to open the project or the next step.
 
 #### Scenario: Project with a next action
 
-- **WHEN** a project has an open action
-- **THEN** the card shows that action as the next step
+- **WHEN** a project has an open step
+- **THEN** the card shows that step as the next step
 
 #### Scenario: Other open actions are listed
 
-- **WHEN** a project has more than one open action
-- **THEN** the card lists the remaining open actions separately
+- **WHEN** a project has more than one open step
+- **THEN** the card lists the remaining open steps separately
 
 #### Scenario: Project can be opened from the card
 
@@ -94,27 +114,27 @@ Each project in a review session SHALL show the project title, status, optional 
 
 #### Scenario: Next action can be opened from the card
 
-- **WHEN** the user chooses the next action
-- **THEN** the page pane shows that action page
+- **WHEN** the user chooses the next step
+- **THEN** the page pane shows that project page at the step
 
-### Requirement: A stalled project can gain a next action
+### Requirement: A stalled project can gain a next step
 
-When a project has no open action, the review card SHALL offer creating a next action, marking the project done, deferring it to `later`, or skipping. Creating an action SHALL require a title and SHALL write an action with the project reference, then refresh the project's next step.
+When a project has no open step, the review card SHALL offer adding a step, marking the project done, deferring it to `later`, or skipping. Adding a step SHALL require text and SHALL append a task list item to the project body, then refresh the project's next step.
 
-#### Scenario: Create a next action
+#### Scenario: Add a next step
 
-- **WHEN** the user supplies a title for a stalled project's next action
-- **THEN** an action is created under `actions/` with `project:` pointing at the project and the project card shows it as the next step
+- **WHEN** the user supplies text for a stalled project's next step
+- **THEN** a task list item is appended to the project body and the card shows it as the next step
 
-#### Scenario: Cancel creation changes nothing
+#### Scenario: Cancel adding changes nothing
 
-- **WHEN** the user cancels the next-action form
-- **THEN** no action file is created and the project is unchanged
+- **WHEN** the user cancels the next-step form
+- **THEN** the project body is unchanged
 
-#### Scenario: Blank title is rejected
+#### Scenario: Blank text is rejected
 
-- **WHEN** the user confirms an empty next-action title
-- **THEN** no action is created and the form reports that a title is required
+- **WHEN** the user confirms an empty next-step text
+- **THEN** no step is added and the form reports that text is required
 
 #### Scenario: Mark the project done
 
@@ -129,7 +149,7 @@ When a project has no open action, the review card SHALL offer creating a next a
 #### Scenario: Skip leaves the project stalled
 
 - **WHEN** the user skips a stalled project
-- **THEN** the project keeps its status and remains in the next review session's pending count
+- **THEN** the project keeps its status and remains in the next review's pending count
 
 ### Requirement: Review advances, skips, and completes
 
@@ -157,14 +177,96 @@ The session SHALL provide Next and Skip for every item. Skip SHALL move to the n
 
 ### Requirement: Review never changes work by inference
 
-The review SHALL NOT classify captures, change project status, complete actions, or create notes without an explicit user choice and confirmation.
+The review SHALL NOT classify captures, change project status, check a step, or create a note without an explicit user choice and confirmation.
 
 #### Scenario: Browsing a review card writes nothing
 
-- **WHEN** a project card is shown without an action
-- **THEN** no project or action file changes
+- **WHEN** a project card is shown without a choice
+- **THEN** no project or step changes
 
 #### Scenario: Closing a project is explicit
 
-- **WHEN** a project has no open actions
+- **WHEN** a project has no open steps
 - **THEN** the review asks the user to choose an outcome and does not close the project automatically
+
+#### Scenario: Checking a step is explicit
+
+- **WHEN** a due step is shown
+- **THEN** it is not checked until the user chooses do it now
+
+### Requirement: A due step can be done, postponed, or delegated
+
+Each due or overdue own step SHALL offer do it now, postpone, delegate, open project, and skip. Do it now SHALL check the step and record the actual date. Postpone SHALL replace or add the plan date. Delegate SHALL add an owner and move the step to waiting.
+
+#### Scenario: Do it now checks the step
+
+- **WHEN** the user chooses do it now for a due step
+- **THEN** the step is checked and its metadata records the current date as `actual`
+
+#### Scenario: Postpone changes the plan
+
+- **WHEN** the user postpones a due step to a later date
+- **THEN** the step's `plan` becomes the new date and `actual` is absent
+
+#### Scenario: Delegate moves the step to waiting
+
+- **WHEN** the user delegates a due step to a person
+- **THEN** the step's `owners` gains that name and the step leaves the user's own list
+
+#### Scenario: Open project keeps the session
+
+- **WHEN** the user chooses open project for a step
+- **THEN** the project page opens and the session position is unchanged
+
+#### Scenario: Skip changes nothing
+
+- **WHEN** the user skips a due step
+- **THEN** the step is unchanged
+
+### Requirement: Waiting steps are reviewed
+
+Each waiting step SHALL show its owners and offer reassign, open project, and skip. Reassign SHALL replace the owners. The review MUST NOT change a waiting step without an explicit choice.
+
+#### Scenario: Waiting card shows its owners
+
+- **WHEN** a waiting step declares `owners: [Ada]`
+- **THEN** the card names Ada
+
+#### Scenario: Reassign replaces the owners
+
+- **WHEN** the user reassigns a waiting step to Grace
+- **THEN** the metadata's owners become `[Grace]`
+
+#### Scenario: Skip leaves the wait unchanged
+
+- **WHEN** the user skips a waiting step
+- **THEN** the owners and dates are unchanged
+
+#### Scenario: Open project from a waiting step
+
+- **WHEN** the user opens the project of a waiting step
+- **THEN** the project page is shown
+
+### Requirement: The launch digest reports due work
+
+At launch the application SHALL show a digest of due and overdue own steps. Activating the digest SHALL start the guided review. The digest MUST NOT write to the vault.
+
+#### Scenario: Digest reports the count
+
+- **WHEN** three own steps are due or overdue
+- **THEN** the digest reports three
+
+#### Scenario: Activating the digest starts review
+
+- **WHEN** the user activates the digest
+- **THEN** the guided session starts
+
+#### Scenario: No due work hides the digest
+
+- **WHEN** no own step is due or overdue
+- **THEN** no digest is shown
+
+#### Scenario: The digest writes nothing
+
+- **WHEN** the digest is shown at launch
+- **THEN** no note file is created, changed, or removed

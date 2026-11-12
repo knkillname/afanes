@@ -17,8 +17,9 @@ from afanes.core.errors import ConfigurationError, VaultError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import ProcessingOutcome
 from afanes.core.settings import Settings, SettingsStore
+from afanes.core.steps import StepDocument
 from afanes.models.link import ReferenceScheme
-from afanes.models.note import NoteType, Status
+from afanes.models.note import CategoryLabel, NoteType, Status
 
 OLD_NS = 1_700_000_000_000_000_000
 NEW_NS = 1_700_000_001_000_000_000
@@ -154,13 +155,13 @@ class TestProcessingState:
             capture = await state.capture("Buy milk")
             assert capture is not None
             await state.begin_processing(capture)
-            plan = await state.plan_processing(ProcessingOutcome.ACTION)
+            plan = await state.plan_processing(ProcessingOutcome.PROJECT)
             assert plan is not None
             assert state.processing_plan is plan
 
         asyncio.run(scenario())
 
-        assert not (vault / "actions" / "Buy milk.md").exists()
+        assert not (vault / "projects" / "Buy milk.md").exists()
 
     def test_plan_processing_failure_sets_a_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -196,14 +197,14 @@ class TestProcessingState:
             capture = await state.capture("Buy milk")
             assert capture is not None
             await state.begin_processing(capture)
-            await state.plan_processing(ProcessingOutcome.ACTION)
+            await state.plan_processing(ProcessingOutcome.PROJECT)
             target = await state.apply_processing()
             assert target is not None
             return target
 
         target = asyncio.run(scenario())
 
-        assert target == vault / "actions" / "Buy milk.md"
+        assert target == vault / "projects" / "Buy milk.md"
         assert target.exists()
         assert state.processing_result == target
         assert state.processing_note is None
@@ -223,7 +224,7 @@ class TestProcessingState:
             capture_path = await state.capture("Buy milk")
             assert capture_path is not None
             await state.begin_processing(capture_path)
-            await state.plan_processing(ProcessingOutcome.ACTION)
+            await state.plan_processing(ProcessingOutcome.PROJECT)
 
         asyncio.run(scenario())
 
@@ -251,7 +252,7 @@ class TestProcessingState:
             capture = await state.capture("Buy milk")
             assert capture is not None
             await state.begin_processing(capture)
-            await state.plan_processing(ProcessingOutcome.ACTION)
+            await state.plan_processing(ProcessingOutcome.PROJECT)
             state.cancel_processing()
 
         asyncio.run(scenario())
@@ -273,7 +274,7 @@ class TestProcessingState:
             capture = await state.capture("Buy milk")
             assert capture is not None
             await state.begin_processing(capture)
-            await state.plan_processing(ProcessingOutcome.ACTION)
+            await state.plan_processing(ProcessingOutcome.PROJECT)
             await state.apply_processing()
             state.finish_processing()
 
@@ -287,14 +288,14 @@ class TestAssignmentCandidates:
     def test_returns_candidates_from_the_last_scan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _write_note(
-            vault / "reference/people/Ada.md",
-            "---\ntype: reference\ncategory: person\n---\n# Ada, Countess of Lovelace\n",
+            vault / "projects/Ada.md",
+            "---\ntype: project\nstatus: active\n---\n# Ada, Countess of Lovelace\n",
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
         asyncio.run(state.choose_vault(vault))
-        candidates = state.assignment_candidates(ReferenceScheme.PERSON, "countess")
+        candidates = state.assignment_candidates(ReferenceScheme.PROJECT, "countess")
 
         assert [note.name for note in candidates] == ["Ada"]
         assert candidates[0].title == "Ada, Countess of Lovelace"
@@ -302,7 +303,7 @@ class TestAssignmentCandidates:
     def test_returns_nothing_without_a_vault(self) -> None:
         state = afanes.ui.state.app_state
 
-        assert state.assignment_candidates(ReferenceScheme.PERSON, "ada") == ()
+        assert state.assignment_candidates(ReferenceScheme.PROJECT, "ada") == ()
 
     def test_candidates_follow_a_refresh(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -655,7 +656,8 @@ class TestCapture:
         assert path is not None
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
         assert document.raw == {"type": "note"}
-        assert document.references == ()
+        assert document.due_date is None
+        assert document.category is None
 
     def test_capture_does_not_modify_other_notes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -1003,7 +1005,7 @@ class TestPageLabels:
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
         )
-        referrer = _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<person:Ada>)\n"))
+        referrer = _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<note:Ada>)\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1015,7 +1017,7 @@ class TestPageLabels:
             page = state.page
             assert page is not None
             assert page.labels is not None
-            assert page.labels.scheme is ReferenceScheme.PERSON
+            assert page.labels.scheme is ReferenceScheme.NOTE
             assert state.pending_labels is not None
             assert state.pending_labels.scheme is ReferenceScheme.PROJECT
             assert len(state.type_change_sites) == 1
@@ -1039,7 +1041,7 @@ class TestPageLabels:
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
         )
-        _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<person:Ada>)\n"))
+        _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<note:Ada>)\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
@@ -1051,7 +1053,7 @@ class TestPageLabels:
             page = state.page
             assert page is not None
             assert page.labels is not None
-            assert page.labels.scheme is ReferenceScheme.PERSON
+            assert page.labels.scheme is ReferenceScheme.NOTE
             assert state.pending_labels is None
             assert state.type_change_sites == ()
 
@@ -1060,13 +1062,13 @@ class TestPageLabels:
     def test_same_scheme_type_change_applies_immediately(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
-        action = _write_note(vault / "actions" / "Call.md", _typed_note("action", "# Call\n"))
+        reference = _write_note(vault / "reference" / "Call.md", _typed_note("reference", "# Call\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            await state.open_page(action)
+            await state.open_page(reference)
             assert await state.set_page_type(NoteType.NOTE) is True
             page = state.page
             assert page is not None
@@ -1086,8 +1088,8 @@ class TestPageLabels:
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            await state.follow_link("person:New person")
-            assert await state.set_page_category(None) is True
+            await state.follow_link("note:New person")
+            assert await state.set_page_category(CategoryLabel("person")) is True
             page = state.page
             assert page is not None
             assert page.labels is not None
@@ -1115,32 +1117,26 @@ class TestPageLabels:
 
         asyncio.run(scenario())
 
-    def test_due_date_people_and_project_update_the_labels(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_due_date_updates_the_labels(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
-        action = _write_note(vault / "actions" / "Call.md", _typed_note("action", "# Call\n"))
+        project = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            await state.open_page(action)
+            await state.open_page(project)
             await state.set_page_due_date("January")
             page = state.page
             assert page is not None
             assert page.labels is not None
             assert page.labels.due_date_error is not None
             await state.set_page_due_date("2027-01-02")
-            await state.set_page_people(("  Ada  ", "", "Grace "))
-            await state.set_page_project("  Release 1.0  ")
             page = state.page
             assert page is not None
             assert page.labels is not None
             assert page.labels.due_date == datetime.date(2027, 1, 2)
-            assert page.labels.people == ("Ada", "Grace")
-            assert page.labels.project == "Release 1.0"
 
         asyncio.run(scenario())
 
@@ -1148,15 +1144,15 @@ class TestPageLabels:
         vault = tmp_path / "vault"
         vault.mkdir()
         person = _write_note(
-            vault / "reference" / "people" / "Ada.md",
-            _typed_note("reference", "# Ada, Countess of Lovelace\n", category="person"),
+            vault / "projects" / "Ada.md",
+            _typed_note("project", "# Ada, Countess of Lovelace\n"),
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            candidates = state.assignment_candidates(ReferenceScheme.PERSON, "countess")
+            candidates = state.assignment_candidates(ReferenceScheme.PROJECT, "countess")
             assert [candidate.path for candidate in candidates] == [person.resolve()]
 
         asyncio.run(scenario())
@@ -1480,7 +1476,7 @@ class TestPageLinks:
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            await state.follow_link("person:Ada")
+            await state.follow_link("note:Ada")
 
         asyncio.run(scenario())
 
@@ -1501,7 +1497,7 @@ class TestPageLinks:
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            await state.follow_link("person:Ada")
+            await state.follow_link("note:Ada")
 
         asyncio.run(scenario())
 
@@ -1521,7 +1517,7 @@ class TestPageLinks:
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            await state.follow_link("person:Ada")
+            await state.follow_link("note:Ada")
             await state.choose_candidate(first)
 
         asyncio.run(scenario())
@@ -1545,10 +1541,6 @@ class TestPageLinks:
             assert note_page.labels.note_type is NoteType.REFERENCE
             assert note_page.labels.category is None
             assert note_page.identity == "Quarterly budget"
-            await state.follow_link("person:Ada")
-            assert state.page is not None
-            assert state.page.labels is not None
-            assert state.page.labels.scheme is ReferenceScheme.PERSON
             await state.follow_link("project:Release 1.0")
             assert state.page is not None
             assert state.page.labels is not None
@@ -1557,7 +1549,7 @@ class TestPageLinks:
         asyncio.run(scenario())
 
         assert not (vault / "reference" / "Quarterly budget.md").exists()
-        assert not (vault / "reference" / "people" / "Ada.md").exists()
+
         assert not (vault / "projects" / "Release 1.0.md").exists()
 
     def test_broken_link_opens_raw_rescue(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1715,7 +1707,7 @@ class TestPageRenameTrash:
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
         )
-        referrer = _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<person:Ada>)\n"))
+        referrer = _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<note:Ada>)\n"))
         first = _write_note(vault / "notes" / "First.md", _note_text("# First\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -1741,7 +1733,7 @@ class TestPageRenameTrash:
         assert state.page.path == target
         assert state.page_title == "Ada King"
         assert state.history == (target, first.resolve())
-        assert "person:Ada King" in referrer.read_text(encoding="utf-8")
+        assert "note:Ada King" in referrer.read_text(encoding="utf-8")
 
     def test_cancelling_a_rename_changes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -1968,12 +1960,11 @@ class TestReviewState:
         vault = tmp_path / "vault"
         capture = _write_note(vault / "inbox" / "Buy milk.md", _note_text("# Buy milk"))
         _write_typed_note(vault / "projects" / "Stalled.md", "project", status="active")
-        _write_typed_note(vault / "projects" / "Healthy.md", "project", status="active")
         _write_typed_note(
-            vault / "actions" / "Build.md",
-            "action",
+            vault / "projects" / "Healthy.md",
+            "project",
             status="active",
-            project="project:Healthy",
+            body="# Healthy\n\n- [ ] Build\n",
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -2025,7 +2016,7 @@ class TestReviewState:
         asyncio.run(scenario())
 
         assert capture.is_file()
-        assert not (vault / "actions").exists()
+        assert not (vault / "projects" / "Call Ada tomorrow.md").exists()
         assert state.processing_plan is None
         assert state.review_session is not None
         assert state.review_session.current is not None
@@ -2040,19 +2031,19 @@ class TestReviewState:
         async def scenario() -> Path | None:
             await state.choose_vault(vault)
             await state.start_review()
-            plan = await state.plan_processing(ProcessingOutcome.ACTION)
+            plan = await state.plan_processing(ProcessingOutcome.PROJECT)
             assert plan is not None
             return await state.apply_processing()
 
         target = asyncio.run(scenario())
 
-        assert target == vault / "actions" / "Buy milk.md"
+        assert target == vault / "projects" / "Buy milk.md"
         assert state.review_session is not None
         assert state.review_session.reviewed_count == 1
         assert state.review_session.current is not None
         assert state.review_session.current.kind is afanes.core.search.ReviewItemKind.PROJECT
         assert state.processing_note is None
-        assert state.review_pending_count == 1
+        assert state.review_pending_count == TWO_PENDING
 
     def test_skip_leaves_the_capture_and_advances(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -2153,9 +2144,31 @@ class TestReviewState:
         assert document.status is Status.LATER
         assert state.review_pending_count == 1
 
-    def test_create_review_action_refreshes_the_project_card(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_add_review_step_refreshes_the_project_card(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        project = _write_typed_note(vault / "projects" / "Launch.md", "project", status="active")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> Path | None:
+            await state.choose_vault(vault)
+            await state.start_review()
+            return await state.add_review_step("Build the prototype")
+
+        path = asyncio.run(scenario())
+
+        assert path == project
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+        assert "- [ ] Build the prototype" in document.body
+        assert state.review_session is not None
+        current = state.review_session.current
+        assert current is not None
+        assert current.project is not None
+        assert current.project.next_step is not None
+        assert current.project.next_step.text == "Build the prototype"
+        assert state.review_session.reviewed_count == 0
+
+    def test_add_review_step_rejects_blank_text(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         project = _write_typed_note(vault / "projects" / "Launch.md", "project", status="active")
         before = project.read_bytes()
@@ -2165,44 +2178,17 @@ class TestReviewState:
         async def scenario() -> Path | None:
             await state.choose_vault(vault)
             await state.start_review()
-            return await state.create_review_action("Build the prototype")
-
-        path = asyncio.run(scenario())
-
-        assert path == vault / "actions" / "Build the prototype.md"
-        assert project.read_bytes() == before
-        assert path is not None
-        assert path.is_file()
-        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
-        assert document.raw["project"] == "project:Launch"
-        assert state.review_session is not None
-        current = state.review_session.current
-        assert current is not None
-        assert current.project is not None
-        assert current.project.next_action is not None
-        assert current.project.next_action.name == "Build the prototype"
-        assert state.review_session.reviewed_count == 0
-
-    def test_create_review_action_rejects_a_blank_title(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        vault = tmp_path / "vault"
-        _write_typed_note(vault / "projects" / "Launch.md", "project", status="active")
-        _use_settings_file(monkeypatch, tmp_path / "settings.json")
-        state = afanes.ui.state.app_state
-
-        async def scenario() -> Path | None:
-            await state.choose_vault(vault)
-            await state.start_review()
-            return await state.create_review_action("   ")
+            return await state.add_review_step("   ")
 
         path = asyncio.run(scenario())
 
         assert path is None
-        assert not (vault / "actions").exists()
+        assert project.read_bytes() == before
         assert state.review_session is not None
         current = state.review_session.current
         assert current is not None
         assert current.project is not None
-        assert current.project.next_action is None
+        assert current.project.next_step is None
 
     def test_finish_review_returns_to_the_browser(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -2369,7 +2355,10 @@ class TestCreateVault:
         assert opened is True
         assert state.vault_root == target.resolve()
         assert (target / "inbox").is_dir()
-        assert (target / "reference" / "people").is_dir()
+        assert (target / "trash").is_dir()
+        assert (target / "reference").is_dir()
+        assert (target / "projects").is_dir()
+        assert not (target / "reference" / "people").exists()
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
 
     def test_refuses_a_non_empty_directory(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2469,3 +2458,74 @@ class TestSessionGuard:
         state.reset()
 
         assert state.session_active is False
+
+
+class TestReviewStepCommands:
+    def _due_project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, afanes.ui.state.AppState]:
+        today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+        vault = tmp_path / "vault"
+        project = _write_typed_note(
+            vault / "projects" / "Home.md",
+            "project",
+            status="active",
+            body=f"# Home\n\n- [ ] Call <!-- {{plan: {today.isoformat()}}} -->\n",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            await state.start_review()
+
+        asyncio.run(scenario())
+        return project, state
+
+    def test_do_it_now_checks_the_step(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        project, state = self._due_project(tmp_path, monkeypatch)
+
+        assert asyncio.run(state.review_do_now()) is True
+
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+        step = StepDocument(document.body).steps[0]
+        assert step.checked is True
+        assert step.actual == datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+
+    def test_postpone_replaces_the_plan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        project, state = self._due_project(tmp_path, monkeypatch)
+        new_plan = datetime.date(2026, 12, 1)
+
+        assert asyncio.run(state.review_postpone(new_plan)) is True
+
+        step = StepDocument(NoteDocument.from_text(project.read_text(encoding="utf-8")).body).steps[0]
+        assert step.plan == new_plan
+        assert step.actual is None
+
+    def test_delegate_adds_an_owner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        project, state = self._due_project(tmp_path, monkeypatch)
+
+        assert asyncio.run(state.review_delegate("Ada")) is True
+
+        step = StepDocument(NoteDocument.from_text(project.read_text(encoding="utf-8")).body).steps[0]
+        assert step.owners == ("Ada",)
+
+    def test_reassign_replaces_the_owners(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        project = _write_typed_note(
+            vault / "projects" / "Home.md",
+            "project",
+            status="active",
+            body="# Home\n\n- [ ] Call <!-- {owners: [Ada]} -->\n",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            await state.start_review()
+
+        asyncio.run(scenario())
+
+        assert asyncio.run(state.review_reassign("Grace")) is True
+
+        step = StepDocument(NoteDocument.from_text(project.read_text(encoding="utf-8")).body).steps[0]
+        assert step.owners == ("Grace",)

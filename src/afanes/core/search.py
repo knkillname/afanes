@@ -10,17 +10,16 @@ the interface layer.
 """
 
 import dataclasses
+import datetime
 from collections.abc import Iterable
 from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
-import afanes.core.links
 import afanes.core.names
-from afanes.core.links import ResolutionOutcome
 from afanes.core.vault import NoteOrder, VaultFailure, VaultNote, VaultSnapshot
-from afanes.models.link import ReferenceScheme
-from afanes.models.note import NoteType, ReferenceCategory, Status
+from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.step import ProjectStep
 
 
 class BrowserSection(StrEnum):
@@ -32,22 +31,16 @@ class BrowserSection(StrEnum):
         Captures stored under the vault's inbox directory.
     PROJECTS : str
         Notes of type ``project``.
-    ACTIONS : str
-        Notes of type ``action``.
-    PEOPLE : str
-        Reference notes with ``category: person``.
     REFERENCES : str
-        Uncategorized reference notes.
-    NOTES : str
-        Free-form notes outside the inbox.
+        Reference notes, grouped by their free-form category label.
+    NEEDS_ATTENTION : str
+        Unclarified notes found outside the inbox.
     """
 
     INBOX = "inbox"
     PROJECTS = "projects"
-    ACTIONS = "actions"
-    PEOPLE = "people"
     REFERENCES = "references"
-    NOTES = "notes"
+    NEEDS_ATTENTION = "needs_attention"
 
 
 class ProjectStage(StrEnum):
@@ -78,11 +71,17 @@ class ReviewItemKind(StrEnum):
     ----------
     INBOX : str
         A capture that still needs an explicit processing outcome.
+    DUE_STEP : str
+        An own, unchecked step whose plan date is today or earlier.
+    WAITING_STEP : str
+        An unchecked step with at least one owner.
     PROJECT : str
-        An open project whose next step should be confirmed or created.
+        An open project reviewed through its next step or its missing step.
     """
 
     INBOX = "inbox"
+    DUE_STEP = "due_step"
+    WAITING_STEP = "waiting_step"
     PROJECT = "project"
 
 
@@ -95,12 +94,33 @@ class BrowserGroup:
     section : BrowserSection
         Section that owns the notes.
     notes : tuple[VaultNote, ...]
-        Notes in presentation order. The inbox is newest first; other
-        sections are ordered by display title, identity, and path.
+        Notes in presentation order. The inbox is newest first; other sections
+        are ordered by display title, identity, and path.
+    label : CategoryLabel | None
+        Category label for a references group, or ``None`` for every other
+        group and for uncategorized references.
     """
 
     section: BrowserSection
     notes: tuple[VaultNote, ...]
+    label: CategoryLabel | None = None
+
+    @property
+    def title(self) -> str:
+        """Return the display heading for this group.
+
+        Returns
+        -------
+        str
+            ``References`` for the uncategorized group, the written label for a
+            categorized references group, and a neutral section name for the
+            other groups.
+        """
+        if self.section is not BrowserSection.REFERENCES:
+            return self.section.value.replace("_", " ").title()
+        if self.label is None:
+            return "References"
+        return self.label.value
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -110,7 +130,8 @@ class BrowserListing:
     Attributes
     ----------
     groups : tuple[BrowserGroup, ...]
-        One group per browser section, always in section order.
+        Groups in section order. References contribute one group per category
+        label.
     failures : tuple[VaultFailure, ...]
         Notes the scan could not parse, in scan order.
     """
@@ -119,7 +140,7 @@ class BrowserListing:
     failures: tuple[VaultFailure, ...]
 
     def group(self, section: BrowserSection) -> BrowserGroup:
-        """Return one browser group.
+        """Return the first browser group for a section.
 
         Parameters
         ----------
@@ -129,12 +150,28 @@ class BrowserListing:
         Returns
         -------
         BrowserGroup
-            Group for the requested section.
+            First group for the requested section. For references this is the
+            uncategorized group when it exists, otherwise the first label.
         """
         return next(group for group in self.groups if group.section is section)
 
+    def groups_for(self, section: BrowserSection) -> tuple[BrowserGroup, ...]:
+        """Return every group for one section.
+
+        Parameters
+        ----------
+        section : BrowserSection
+            Section to return.
+
+        Returns
+        -------
+        tuple[BrowserGroup, ...]
+            Groups for the requested section. References may produce several.
+        """
+        return tuple(group for group in self.groups if group.section is section)
+
     def filtered(self, query: str) -> Self:
-        """Return a listing whose groups match a title or identity query.
+        """Return a listing whose groups match a full-text query.
 
         Parameters
         ----------
@@ -146,12 +183,16 @@ class BrowserListing:
         Returns
         -------
         BrowserListing
-            Listing with the same sections and failures. Search never reads a
-            note body, so body-only terms match nothing.
+            Listing with the same groups and failures. Matching reads the
+            snapshot's search text, which excludes step metadata comments.
         """
         return BrowserListing(
             groups=tuple(
-                BrowserGroup(section=group.section, notes=Browser.filter_notes(group.notes, query))
+                BrowserGroup(
+                    section=group.section,
+                    notes=Browser.filter_notes(group.notes, query),
+                    label=group.label,
+                )
                 for group in self.groups
             ),
             failures=self.failures,
@@ -160,33 +201,32 @@ class BrowserListing:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ProjectSummary:
-    """One project and the actions attributed to it.
+    """One project and the steps that advance it.
 
     Attributes
     ----------
     note : VaultNote
         Parsed project note.
-    open_actions : tuple[VaultNote, ...]
-        Actions attributed to the project that are open, ordered by the next
-        action policy.
-    next_action : VaultNote | None
-        First open action, or ``None`` when the project has no open action.
+    open_steps : tuple[ProjectStep, ...]
+        Unchecked steps in document order.
+    next_step : ProjectStep | None
+        First unchecked step, or ``None`` when the project has no open step.
     """
 
     note: VaultNote
-    open_actions: tuple[VaultNote, ...]
-    next_action: VaultNote | None
+    open_steps: tuple[ProjectStep, ...]
+    next_step: ProjectStep | None
 
     @property
     def open_count(self) -> int:
-        """Return the number of open actions.
+        """Return the number of open steps.
 
         Returns
         -------
         int
-            Length of :attr:`open_actions`.
+            Length of :attr:`open_steps`.
         """
-        return len(self.open_actions)
+        return len(self.open_steps)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -212,20 +252,23 @@ class ReviewItem:
     Attributes
     ----------
     kind : ReviewItemKind
-        Whether the item is an inbox capture or a project.
+        Whether the item is an inbox capture, a step, or a project.
     path : Path
         Absolute path of the capture or project note.
     project : ProjectSummary | None
-        Project data for a project item; ``None`` for an inbox item.
+        Project data for a step or project item; ``None`` for an inbox item.
+    step : ProjectStep | None
+        Step under review, or ``None`` for inbox and project items.
     """
 
     kind: ReviewItemKind
     path: Path
     project: ProjectSummary | None = None
+    step: ProjectStep | None = None
 
 
 class Browser:
-    """Browser groups and title filtering over one snapshot.
+    """Browser groups and full-text filtering over one snapshot.
 
     Parameters
     ----------
@@ -249,35 +292,49 @@ class Browser:
         Returns
         -------
         BrowserListing
-            Six section groups in fixed order plus parse failures. A note
-            appears in exactly one group; captures under the inbox appear only
-            under ``Inbox``. Notes under ``trash/`` are already excluded by the
-            scan.
+            Section groups in fixed order plus parse failures. A note appears
+            in exactly one group. Captures under the inbox appear only under
+            ``Inbox``; references contribute one group per category label.
+            Notes under ``trash/`` are already excluded by the scan.
 
         Notes
         -----
         This method performs no file I/O and never changes a note.
         """
-        groups: dict[BrowserSection, list[VaultNote]] = {section: [] for section in BrowserSection}
-        for note in self._snapshot.inbox_notes():
-            groups[BrowserSection.INBOX].append(note)
+        inbox = list(self._snapshot.inbox_notes())
+        projects: list[VaultNote] = []
+        misplaced: list[VaultNote] = []
+        references: dict[CategoryLabel | None, list[VaultNote]] = {}
         for note in self._snapshot.notes:
             if note.is_inbox:
                 continue
-            groups[self._section_for(note)].append(note)
-        return BrowserListing(
-            groups=tuple(
-                BrowserGroup(
-                    section=section,
-                    notes=tuple(groups[section]) if section is BrowserSection.INBOX else self._sorted(groups[section]),
-                )
-                for section in BrowserSection
-            ),
-            failures=self._snapshot.failures,
+            if note.note_type is NoteType.PROJECT:
+                projects.append(note)
+            elif note.note_type is NoteType.REFERENCE:
+                references.setdefault(note.category, []).append(note)
+            elif note.is_misplaced:
+                misplaced.append(note)
+        groups: list[BrowserGroup] = [
+            BrowserGroup(section=BrowserSection.INBOX, notes=tuple(inbox)),
+            BrowserGroup(section=BrowserSection.PROJECTS, notes=self._sorted(projects)),
+        ]
+        groups.extend(
+            BrowserGroup(
+                section=BrowserSection.REFERENCES,
+                notes=self._sorted(references[label]),
+                label=label,
+            )
+            for label in sorted(references, key=Browser._label_order)
         )
+        if not references:
+            groups.append(BrowserGroup(section=BrowserSection.REFERENCES, notes=()))
+        groups.append(
+            BrowserGroup(section=BrowserSection.NEEDS_ATTENTION, notes=self._sorted(misplaced)),
+        )
+        return BrowserListing(groups=tuple(groups), failures=self._snapshot.failures)
 
     def filter(self, query: str) -> BrowserListing:
-        """Return browser groups filtered by a title or identity query.
+        """Return browser groups filtered by a full-text query.
 
         Parameters
         ----------
@@ -293,7 +350,7 @@ class Browser:
 
     @classmethod
     def filter_notes(cls, notes: Iterable[VaultNote], query: str) -> tuple[VaultNote, ...]:
-        """Filter notes by display title or identity.
+        """Filter notes by display title, identity, or search text.
 
         Parameters
         ----------
@@ -308,13 +365,13 @@ class Browser:
         Returns
         -------
         tuple[VaultNote, ...]
-            Matching notes in the input order. The body is never inspected.
+            Matching notes in the input order.
         """
         return tuple(note for note in notes if cls.matches(note, query))
 
     @staticmethod
     def matches(note: VaultNote, query: str) -> bool:
-        """Return whether a note matches a title or identity query.
+        """Return whether a note matches a full-text query.
 
         Parameters
         ----------
@@ -327,25 +384,21 @@ class Browser:
         -------
         bool
             ``True`` when the normalized query is contained in the normalized
-            display title or identity.
+            display title, identity, or search text. Step metadata comments are
+            absent from the search text.
         """
         normalized_query = afanes.core.names.normalize_name(query)
         if not normalized_query:
             return True
-        return normalized_query in afanes.core.names.normalize_name(
-            note.title
-        ) or normalized_query in afanes.core.names.normalize_name(note.name)
+        candidates = (note.title, note.name, note.search_text)
+        return any(normalized_query in afanes.core.names.normalize_name(value) for value in candidates)
 
     @staticmethod
-    def _section_for(note: VaultNote) -> BrowserSection:
-        """Return the browser section for a non-inbox note."""
-        if note.note_type is NoteType.PROJECT:
-            return BrowserSection.PROJECTS
-        if note.note_type is NoteType.ACTION:
-            return BrowserSection.ACTIONS
-        if note.note_type is NoteType.REFERENCE:
-            return BrowserSection.PEOPLE if note.category is ReferenceCategory.PERSON else BrowserSection.REFERENCES
-        return BrowserSection.NOTES
+    def _label_order(label: CategoryLabel | None) -> tuple[int, str]:
+        """Order uncategorized references first, then labels by folded value."""
+        if label is None:
+            return (0, "")
+        return (1, label.key)
 
     @staticmethod
     def _sorted(notes: Iterable[VaultNote]) -> tuple[VaultNote, ...]:
@@ -379,24 +432,15 @@ class ProjectBoard:
         -------
         tuple[ProjectSummary, ...]
             Summaries ordered by due date, then display title, identity, and
-            path.
+            path. Open steps keep document order; checked steps are excluded.
 
         Notes
         -----
-        An action belongs to a project only when its ``project`` frontmatter
-        reference resolves uniquely to that project. Body links, unresolved
-        references, and ambiguous references are ignored. Only actions that
-        are open contribute to :attr:`ProjectSummary.open_actions`.
+        Membership is containment: a step belongs to the project whose body
+        holds it. No reference or frontmatter key participates.
         """
         projects = [note for note in self._snapshot.notes if note.note_type is NoteType.PROJECT]
-        actions_by_project: dict[Path, list[VaultNote]] = {project.path: [] for project in projects}
-        for note in self._snapshot.notes:
-            if note.note_type is not NoteType.ACTION or not note.is_open_action:
-                continue
-            for path in self._attributed(note):
-                actions_by_project[path].append(note)
-
-        summaries = [self._summary(project, tuple(actions_by_project[project.path])) for project in projects]
+        summaries = [ProjectBoard._summary(project) for project in projects]
         return tuple(sorted(summaries, key=ProjectBoard._project_order))
 
     def groups(self) -> tuple[ProjectGroup, ...]:
@@ -418,25 +462,14 @@ class ProjectBoard:
             for stage in ProjectStage
         )
 
-    def _attributed(self, action: VaultNote) -> tuple[Path, ...]:
-        """Return project paths that uniquely resolve from one action's reference."""
-        paths: list[Path] = []
-        for reference in action.frontmatter_references:
-            if reference.scheme is not ReferenceScheme.PROJECT:
-                continue
-            resolution = self._snapshot.catalog.resolve(reference)
-            if resolution.outcome is ResolutionOutcome.RESOLVED:
-                paths.append(resolution.targets[0])
-        return tuple(paths)
-
     @staticmethod
-    def _summary(project: VaultNote, actions: tuple[VaultNote, ...]) -> ProjectSummary:
-        """Build one project summary and compute its next action."""
-        ordered = tuple(sorted(actions, key=lambda note: note.action_order))
+    def _summary(project: VaultNote) -> ProjectSummary:
+        """Build one project summary from its body steps."""
+        open_steps = project.open_steps
         return ProjectSummary(
             note=project,
-            open_actions=ordered,
-            next_action=ordered[0] if ordered else None,
+            open_steps=open_steps,
+            next_step=open_steps[0] if open_steps else None,
         )
 
     @staticmethod
@@ -463,17 +496,23 @@ class ReviewPlanner:
     ----------
     snapshot : VaultSnapshot
         Read-only scan result captured when the session starts.
+    today : datetime.date | None
+        Calendar date used to decide which own steps are due. ``None`` uses
+        the current local date.
     """
 
-    def __init__(self, snapshot: VaultSnapshot) -> None:
-        """Store the snapshot this planner queries.
+    def __init__(self, snapshot: VaultSnapshot, today: datetime.date | None = None) -> None:
+        """Store the snapshot and reference date this planner queries.
 
         Parameters
         ----------
         snapshot : VaultSnapshot
             Read-only scan result.
+        today : datetime.date | None
+            Calendar date used to decide which own steps are due.
         """
         self._snapshot = snapshot
+        self._today = today or datetime.datetime.now(tz=datetime.UTC).astimezone().date()
 
     def queue(self) -> tuple[ReviewItem, ...]:
         """Build the ordered queue for one review session.
@@ -481,16 +520,22 @@ class ReviewPlanner:
         Returns
         -------
         tuple[ReviewItem, ...]
-            Pending inbox captures first, newest first; then open projects
-            with no open action; then healthy open projects for confirmation.
-            Closed projects are excluded.
+            Pending inbox captures first, newest first; then due or overdue own
+            steps; then waiting steps; then open projects with no open step;
+            then healthy open projects. Closed projects are excluded.
 
         Notes
         -----
         The result is a snapshot. Work created or changed after this call is
         not appended to an existing queue; start a new session to include it.
         """
-        return (*self._inbox_items(), *self._project_items())
+        return (
+            *self._inbox_items(),
+            *self._step_items(ReviewItemKind.DUE_STEP),
+            *self._step_items(ReviewItemKind.WAITING_STEP),
+            *self._project_items(stalled=True),
+            *self._project_items(stalled=False),
+        )
 
     def pending_count(self) -> int:
         """Count the work that needs attention before a review.
@@ -498,37 +543,69 @@ class ReviewPlanner:
         Returns
         -------
         int
-            Number of pending inbox captures plus open projects with no open
-            action. Healthy open projects do not contribute to the count.
+            Pending inbox captures, due or overdue own steps, waiting steps,
+            and open projects with no open step. Healthy open projects do not
+            contribute to the count.
 
         Notes
         -----
         This method performs no file I/O and never changes a note.
         """
-        summaries = ProjectBoard(self._snapshot).summaries()
-        stalled = sum(1 for summary in summaries if summary.note.is_open_project and summary.next_action is None)
-        return len(self._inbox_items()) + stalled
+        due = self.due_count()
+        waiting = len(self._step_items(ReviewItemKind.WAITING_STEP))
+        stalled = len(self._project_items(stalled=True))
+        return len(self._inbox_items()) + due + waiting + stalled
+
+    def due_count(self) -> int:
+        """Count due or overdue own steps.
+
+        Returns
+        -------
+        int
+            Own, unchecked steps whose plan date is today or earlier.
+        """
+        return len(self._step_items(ReviewItemKind.DUE_STEP))
 
     def _inbox_items(self) -> tuple[ReviewItem, ...]:
         """Return pending inbox captures in newest-first order."""
         return tuple(ReviewItem(kind=ReviewItemKind.INBOX, path=note.path) for note in self._snapshot.inbox_notes())
 
-    def _project_items(self) -> tuple[ReviewItem, ...]:
-        """Return stalled and healthy open projects in review order."""
-        open_projects = [
+    def _step_items(self, kind: ReviewItemKind) -> tuple[ReviewItem, ...]:
+        """Return due own steps or waiting steps in project and document order."""
+        items: list[ReviewItem] = []
+        for summary in self._open_summaries():
+            for step in summary.note.steps:
+                if step.checked:
+                    continue
+                matches = (
+                    not step.is_waiting and step.plan is not None and step.plan <= self._today
+                    if kind is ReviewItemKind.DUE_STEP
+                    else step.is_waiting
+                )
+                if matches:
+                    items.append(
+                        ReviewItem(
+                            kind=kind,
+                            path=summary.note.path,
+                            project=summary,
+                            step=step,
+                        )
+                    )
+        return tuple(items)
+
+    def _project_items(self, *, stalled: bool) -> tuple[ReviewItem, ...]:
+        """Return stalled or healthy open projects in review order."""
+        return tuple(
+            ReviewItem(kind=ReviewItemKind.PROJECT, path=summary.note.path, project=summary)
+            for summary in self._open_summaries()
+            if (summary.next_step is None) is stalled
+        )
+
+    def _open_summaries(self) -> tuple[ProjectSummary, ...]:
+        """Return open project summaries in board order."""
+        return tuple(
             summary
             for group in ProjectBoard(self._snapshot).groups()
             if group.stage is not ProjectStage.CLOSED
             for summary in group.projects
-        ]
-        stalled = tuple(
-            ReviewItem(kind=ReviewItemKind.PROJECT, path=summary.note.path, project=summary)
-            for summary in open_projects
-            if summary.next_action is None
         )
-        healthy = tuple(
-            ReviewItem(kind=ReviewItemKind.PROJECT, path=summary.note.path, project=summary)
-            for summary in open_projects
-            if summary.next_action is not None
-        )
-        return (*stalled, *healthy)

@@ -11,7 +11,7 @@ import flet as ft
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
-from afanes.core.processing import ProcessingOutcome, ProcessingPlan
+from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
 from afanes.core.vault import VaultNote
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import Status
@@ -94,8 +94,9 @@ class ProcessingView:
         )
 
         outcome_order = (
-            ProcessingOutcome.ACTION,
             ProcessingOutcome.PROJECT,
+            ProcessingOutcome.DONE_NOW,
+            ProcessingOutcome.APPEND_STEP,
             ProcessingOutcome.REFERENCE,
             ProcessingOutcome.LATER,
             ProcessingOutcome.TRASH,
@@ -137,13 +138,6 @@ class ProcessingView:
             width=260,
             visible=False,
         )
-        self.people = ft.TextField(
-            label=afanes.ui.strings.PROCESSING_PEOPLE_LABEL,
-            hint_text="Ada, Grace",
-            on_change=self._invalidate_plan,
-            width=420,
-            visible=False,
-        )
         self.project = ft.TextField(
             label=afanes.ui.strings.PROCESSING_PROJECT_LABEL,
             hint_text="Launch",
@@ -151,7 +145,6 @@ class ProcessingView:
             width=420,
             visible=False,
         )
-        self.people_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.project_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.preview_button = ft.FilledButton(
             content=afanes.ui.strings.PROCESSING_PREVIEW_ACTION,
@@ -180,8 +173,6 @@ class ProcessingView:
                     wrap=True,
                 ),
                 self.project_suggestions,
-                self.people,
-                self.people_suggestions,
                 self.form_error,
                 self.preview_button,
             ],
@@ -308,11 +299,10 @@ class ProcessingView:
 
         status: Status | None = None
         due_date: datetime.date | None = None
-        people: tuple[str, ...] = ()
         project: str | None = None
 
-        if outcome in (ProcessingOutcome.ACTION, ProcessingOutcome.PROJECT):
-            if self.status.value is not None:
+        if outcome in (ProcessingOutcome.PROJECT, ProcessingOutcome.DONE_NOW):
+            if outcome is ProcessingOutcome.PROJECT and self.status.value is not None:
                 status = Status(self.status.value)
             due_text = (self.due_date.value or "").strip()
             if due_text:
@@ -321,9 +311,7 @@ class ProcessingView:
                 except ValueError:
                     self._show_form_error(afanes.ui.strings.PROCESSING_INVALID_DATE)
                     return
-        if outcome is not ProcessingOutcome.TRASH:
-            people = tuple(part.strip() for part in (self.people.value or "").split(",") if part.strip())
-        if outcome is ProcessingOutcome.ACTION:
+        if outcome is ProcessingOutcome.APPEND_STEP:
             project = (self.project.value or "").strip() or None
 
         self.form_error.visible = False
@@ -333,7 +321,6 @@ class ProcessingView:
                 outcome,
                 status=status,
                 due_date=due_date,
-                people=people,
                 project=project,
             )
         finally:
@@ -366,9 +353,8 @@ class ProcessingView:
         self.outcome.disabled = working
         self.status.disabled = working
         self.due_date.disabled = working
-        self.people.disabled = working
         self.project.disabled = working
-        for control in (*self.people_suggestions.controls, *self.project_suggestions.controls):
+        for control in self.project_suggestions.controls:
             if isinstance(control, ft.ListTile):
                 control.disabled = working
         self.preview_button.disabled = working
@@ -385,11 +371,9 @@ class ProcessingView:
         self.capture_body.value = state.processing_body or ""
 
         outcome = self._selected_outcome()
-        actionable = outcome in (ProcessingOutcome.ACTION, ProcessingOutcome.PROJECT)
-        self.status.visible = actionable
-        self.due_date.visible = actionable
-        self.project.visible = outcome is ProcessingOutcome.ACTION
-        self.people.visible = outcome is not None and outcome is not ProcessingOutcome.TRASH
+        self.status.visible = outcome is ProcessingOutcome.PROJECT
+        self.due_date.visible = outcome is ProcessingOutcome.PROJECT
+        self.project.visible = outcome is ProcessingOutcome.APPEND_STEP
         self._refresh_suggestions()
 
         success = state.processing_result is not None
@@ -413,18 +397,25 @@ class ProcessingView:
         self.banners.visible = bool(banners)
         self.progress.visible = self._working or state.busy
 
-    def _populate_plan(self, plan: ProcessingPlan) -> None:
+    def _populate_plan(self, plan: ProcessingPlan | AppendStepPlan) -> None:
         """Fill the preview panel from a validated plan."""
+        if isinstance(plan, AppendStepPlan):
+            self.plan_destination.value = afanes.ui.strings.PROCESSING_DESTINATION.format(path=plan.project_path)
+            self.plan_details.value = "\n".join(
+                [
+                    afanes.ui.strings.PROCESSING_OUTCOME_LABELS[ProcessingOutcome.APPEND_STEP.value],
+                    f"Step: {plan.step_text}",
+                ]
+            )
+            self.plan_warnings.controls = []
+            self.plan_warnings.visible = False
+            return
         self.plan_destination.value = afanes.ui.strings.PROCESSING_DESTINATION.format(path=plan.target_path)
         details = [afanes.ui.strings.PROCESSING_OUTCOME_LABELS[plan.outcome.value]]
         if plan.target_status is not None:
             details.append(f"Status: {plan.target_status.value}")
         if plan.due_date is not None:
             details.append(f"Due: {plan.due_date.isoformat()}")
-        if plan.people:
-            details.append("People: " + ", ".join(reference.name for reference in plan.people))
-        if plan.project is not None:
-            details.append(f"Project: {plan.project.name}")
         self.plan_details.value = "\n".join(details)
 
         warnings: list[ft.Control] = []
@@ -444,31 +435,14 @@ class ProcessingView:
                     selectable=True,
                 )
             )
-        if plan.unresolved_references:
-            names = ", ".join(reference.name for reference in plan.unresolved_references)
-            warnings.append(
-                ft.Text(
-                    afanes.ui.strings.PROCESSING_UNRESOLVED.format(names=names),
-                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
-                    selectable=True,
-                )
-            )
         self.plan_warnings.controls = warnings
         self.plan_warnings.visible = bool(warnings)
 
     def _refresh_suggestions(self) -> None:
-        """Refresh assignment suggestions from the retained vault snapshot."""
+        """Refresh the append-target suggestions from the retained snapshot."""
         if self._suppress_suggestions:
-            self._clear_suggestions(self.people_suggestions)
             self._clear_suggestions(self.project_suggestions)
             return
-        self._render_suggestions(
-            self.people_suggestions,
-            ReferenceScheme.PERSON,
-            self._active_people_token(),
-            visible=self.people.visible,
-            apply=self._apply_people_suggestion,
-        )
         self._render_suggestions(
             self.project_suggestions,
             ReferenceScheme.PROJECT,
@@ -501,7 +475,7 @@ class ProcessingView:
         column.visible = False
 
     def _suggestion_tile(self, note: VaultNote, apply: Callable[[str], None]) -> ft.Control:
-        """Build one selectable assignment suggestion."""
+        """Build one selectable project suggestion."""
         subtitle = note.name if note.name != note.title else None
         return ft.ListTile(
             title=note.title,
@@ -526,16 +500,6 @@ class ProcessingView:
                 self._suppress_suggestions = False
 
         return handle
-
-    def _active_people_token(self) -> str:
-        """Return the token after the last comma in the people field."""
-        return (self.people.value or "").rsplit(",", 1)[-1].strip()
-
-    def _apply_people_suggestion(self, identity: str) -> None:
-        """Replace the active people token with a page identity."""
-        value = self.people.value or ""
-        head, separator, _ = value.rpartition(",")
-        self.people.value = f"{head.rstrip()}, {identity}" if separator else identity
 
     def _apply_project_suggestion(self, identity: str) -> None:
         """Replace the project field with a page identity."""

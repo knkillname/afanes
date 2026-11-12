@@ -17,9 +17,8 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.editing import DraftMode, PageDraft
-from afanes.core.vault import VaultNote
-from afanes.models.link import ReferenceScheme
-from afanes.models.note import NoteType, ReferenceCategory, Status
+from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.step import ProjectStep
 from afanes.ui.components.banner import Banner
 from afanes.ui.components.panel import Panel
 
@@ -134,6 +133,16 @@ class PageView:
             auto_follow_links=False,
             on_tap_link=self.handle_link,
         )
+        self.steps_title = ft.Text(
+            afanes.ui.strings.PAGE_STEPS_TITLE,
+            theme_style=ft.TextThemeStyle.TITLE_MEDIUM,
+        )
+        self.steps_column = ft.Column(controls=[], spacing=0)
+        self.steps_panel = ft.Column(
+            controls=[self.steps_title, self.steps_column],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            visible=False,
+        )
 
         self.identity_text = ft.Text("", selectable=True, size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
         self.body_field = ft.TextField(
@@ -152,18 +161,10 @@ class PageView:
             on_select=self.change_type,
             width=afanes.ui.theme.PAGE_FIELD_WIDTH,
         )
-        self.category_dropdown = ft.Dropdown(
+        self.category_field = ft.TextField(
             label=afanes.ui.strings.PAGE_CATEGORY_LABEL,
-            options=[
-                ft.dropdown.Option(key="", text=afanes.ui.strings.PAGE_NONE),
-                *[
-                    ft.dropdown.Option(key=category.value, text=label)
-                    for category, label in (
-                        (ReferenceCategory.PERSON, afanes.ui.strings.PAGE_CATEGORY_LABELS["person"]),
-                    )
-                ],
-            ],
-            on_select=self.change_category,
+            hint_text=afanes.ui.strings.PAGE_CATEGORY_HINT,
+            on_change=self.change_category,
             width=afanes.ui.theme.PAGE_FIELD_WIDTH,
         )
         self.status_dropdown = ft.Dropdown(
@@ -185,34 +186,16 @@ class PageView:
             visible=False,
             selectable=True,
         )
-        self.people_field = ft.TextField(
-            label=afanes.ui.strings.PAGE_PEOPLE_LABEL,
-            hint_text="Ada, Grace",
-            on_change=self.change_people,
-            width=afanes.ui.theme.PAGE_NAME_WIDTH,
-        )
-        self.people_suggestions = ft.Column(controls=[], spacing=0, visible=False)
-        self.project_field = ft.TextField(
-            label=afanes.ui.strings.PAGE_PROJECT_LABEL,
-            hint_text="Release 1.0",
-            on_change=self.change_project,
-            width=afanes.ui.theme.PAGE_NAME_WIDTH,
-        )
-        self.project_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.edit_form = ft.Column(
             controls=[
                 self.identity_text,
                 ft.Row(
-                    controls=[self.type_dropdown, self.category_dropdown, self.status_dropdown],
+                    controls=[self.type_dropdown, self.category_field, self.status_dropdown],
                     spacing=afanes.ui.theme.ITEM_GAP,
                     wrap=True,
                 ),
                 ft.Row(controls=[self.due_field], spacing=afanes.ui.theme.ITEM_GAP, wrap=True),
                 self.due_error,
-                self.people_field,
-                self.people_suggestions,
-                self.project_field,
-                self.project_suggestions,
                 self.body_field,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
@@ -325,6 +308,23 @@ class PageView:
         ).build()
         self.type_change_panel.visible = False
 
+        self.category_move_text = ft.Text("", selectable=True)
+        self.category_move_confirm_button = ft.FilledButton(
+            content=afanes.ui.strings.PAGE_CATEGORY_MOVE_CONFIRM,
+            icon=ft.Icons.DRIVE_FILE_MOVE_OUTLINE,
+            on_click=self.confirm_category_move,
+        )
+        self.category_move_cancel_button = ft.TextButton(
+            content=afanes.ui.strings.PAGE_CANCEL,
+            on_click=self.cancel_category_move,
+        )
+        self.category_move_panel = Panel(
+            afanes.ui.strings.PAGE_CATEGORY_MOVE_TITLE,
+            self.category_move_text,
+            [self.category_move_confirm_button, self.category_move_cancel_button],
+        ).build()
+        self.category_move_panel.visible = False
+
         self.rename_field = ft.TextField(
             label=afanes.ui.strings.PAGE_RENAME_LABEL,
             width=afanes.ui.theme.PAGE_RENAME_WIDTH,
@@ -387,13 +387,14 @@ class PageView:
                 self.ambiguous_panel,
                 self.repair_panel,
                 self.type_change_panel,
+                self.category_move_panel,
                 self.rename_panel,
                 self.trash_panel,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
         )
         self.content = ft.Column(
-            controls=[self.empty_text, self.read_body, self.edit_form, self.raw_panel],
+            controls=[self.empty_text, self.steps_panel, self.read_body, self.edit_form, self.raw_panel],
             spacing=afanes.ui.theme.ITEM_GAP,
             scroll=ft.ScrollMode.AUTO,
             expand=True,
@@ -458,6 +459,7 @@ class PageView:
         self._refresh_ambiguity()
         self._refresh_repair()
         self._refresh_type_change()
+        self._refresh_category_move()
         self._refresh_rename()
         self._refresh_trash()
 
@@ -481,13 +483,14 @@ class PageView:
             self.status_text.value = ""
 
     def _refresh_read(self, page: PageDraft | None, *, editing: bool) -> None:
-        """Refresh the rendered read mode."""
+        """Refresh the rendered read mode and the project step rows."""
         state = self._state
         visible = page is not None and not editing
         self.empty_text.visible = page is None
         self.read_body.visible = visible
         if visible and page is not None:
-            self.read_body.value = state.page_body
+            self.read_body.value = state.page_read_text
+        self._refresh_steps(page, visible=visible)
 
     def _refresh_edit(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the body field and label form."""
@@ -496,8 +499,6 @@ class PageView:
         visible = page is not None and editing and state.page_mode is DraftMode.NORMAL and labels is not None
         self.edit_form.visible = visible
         if not visible or page is None or labels is None:
-            self._clear_suggestions(self.people_suggestions)
-            self._clear_suggestions(self.project_suggestions)
             return
 
         body = state.page_body
@@ -505,8 +506,10 @@ class PageView:
             self.body_field.value = body
         self.identity_text.value = f"{afanes.ui.strings.PAGE_IDENTITY_LABEL}: {page.identity}"
         self.type_dropdown.value = labels.note_type.value
-        self.category_dropdown.visible = labels.note_type is NoteType.REFERENCE
-        self.category_dropdown.value = labels.category.value if labels.category is not None else ""
+        self.category_field.visible = labels.note_type is NoteType.REFERENCE
+        category_value = labels.category.value if labels.category is not None else ""
+        if self.category_field.value != category_value:
+            self.category_field.value = category_value
         allowed = labels.note_type.allowed_statuses
         self.status_dropdown.options = [
             ft.dropdown.Option(key="", text=afanes.ui.strings.PAGE_NONE),
@@ -521,17 +524,11 @@ class PageView:
         ]
         self.status_dropdown.visible = bool(allowed)
         self.status_dropdown.value = labels.status.value if labels.status is not None else ""
+        self.due_field.visible = labels.note_type is NoteType.PROJECT
         if self.due_field.value != labels.due_date_text:
             self.due_field.value = labels.due_date_text
         self.due_error.value = labels.due_date_error or ""
         self.due_error.visible = labels.due_date_error is not None
-        people_text = ", ".join(labels.people)
-        if self.people_field.value != people_text:
-            self.people_field.value = people_text
-        project_text = labels.project or ""
-        if self.project_field.value != project_text:
-            self.project_field.value = project_text
-        self._refresh_suggestions()
 
     def _refresh_raw(self, page: PageDraft | None) -> None:
         """Refresh raw rescue mode."""
@@ -627,110 +624,87 @@ class PageView:
             detail=afanes.ui.strings.reference_count(preview.reference_count, len(preview.affected_notes)),
         )
 
-    def _refresh_suggestions(self) -> None:
-        """Refresh assignment suggestions from the retained vault snapshot."""
-        if self._suppress_suggestions:
-            self._clear_suggestions(self.people_suggestions)
-            self._clear_suggestions(self.project_suggestions)
-            return
-        self._render_suggestions(
-            self.people_suggestions,
-            ReferenceScheme.PERSON,
-            self._active_people_token(),
-            apply_text=self._apply_people_suggestion,
-            apply_state=self._apply_people_state,
+    def _refresh_steps(self, page: PageDraft | None, *, visible: bool) -> None:
+        """Render the current project's steps as read-mode rows."""
+        steps = self._state.page_steps if visible and page is not None else ()
+        self.steps_panel.visible = bool(steps)
+        self.steps_column.controls = [self._step_row(step) for step in steps]
+
+    def _step_row(self, step: ProjectStep) -> ft.Control:
+        """Build one step row with its metadata labels and toggle action."""
+        details: list[ft.Control] = []
+        if step.owners:
+            details.append(
+                ft.Text(
+                    afanes.ui.strings.PAGE_STEP_OWNERS.format(owners=", ".join(step.owners)),
+                    size=12,
+                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                )
+            )
+        if step.is_waiting:
+            details.append(
+                ft.Text(
+                    afanes.ui.strings.PAGE_STEP_WAITING,
+                    size=12,
+                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                )
+            )
+        if step.plan is not None:
+            details.append(
+                ft.Text(
+                    afanes.ui.strings.PAGE_STEP_PLAN.format(date=step.plan.isoformat()),
+                    size=12,
+                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                )
+            )
+        if step.actual is not None:
+            details.append(
+                ft.Text(
+                    afanes.ui.strings.PAGE_STEP_ACTUAL.format(date=step.actual.isoformat()),
+                    size=12,
+                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                )
+            )
+        if step.tags:
+            details.append(
+                ft.Text(
+                    afanes.ui.strings.PAGE_STEP_TAGS.format(tags=", ".join(step.tags)),
+                    size=12,
+                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                )
+            )
+        return ft.Row(
+            controls=[
+                ft.Checkbox(
+                    value=step.checked,
+                    label=step.text,
+                    on_change=self._toggle_step_handler(step),
+                ),
+                ft.Column(controls=details, spacing=0, expand=True),
+            ],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
-        self._render_suggestions(
-            self.project_suggestions,
-            ReferenceScheme.PROJECT,
-            (self.project_field.value or "").strip(),
-            apply_text=self._apply_project_suggestion,
-            apply_state=self._apply_project_state,
-        )
 
-    def _render_suggestions(
-        self,
-        column: ft.Column,
-        scheme: ReferenceScheme,
-        query: str,
-        *,
-        apply_text: Callable[[str], None],
-        apply_state: Callable[[str], Awaitable[None]],
-    ) -> None:
-        """Fill one suggestion list from the active field text."""
-        if not query:
-            self._clear_suggestions(column)
-            return
-        candidates = self._state.assignment_candidates(scheme, query)
-        column.controls = [self._suggestion_tile(note, apply_text, apply_state) for note in candidates]
-        column.visible = bool(column.controls)
+    def _toggle_step_handler(self, step: ProjectStep) -> Callable[[ft.Event[ft.Checkbox]], Awaitable[None]]:
+        """Bind a checkbox event to the step line rewrite."""
 
-    @staticmethod
-    def _clear_suggestions(column: ft.Column) -> None:
-        """Empty one suggestion list and hide it."""
-        column.controls = []
-        column.visible = False
-
-    def _suggestion_tile(
-        self,
-        note: VaultNote,
-        apply_text: Callable[[str], None],
-        apply_state: Callable[[str], Awaitable[None]],
-    ) -> ft.Control:
-        """Build one selectable assignment suggestion."""
-        subtitle = note.name if note.name != note.title else None
-        return ft.ListTile(
-            title=note.title,
-            subtitle=subtitle,
-            dense=True,
-            on_click=self._suggestion_handler(note.name, apply_text, apply_state),
-        )
-
-    def _suggestion_handler(
-        self,
-        identity: str,
-        apply_text: Callable[[str], None],
-        apply_state: Callable[[str], Awaitable[None]],
-    ) -> Callable[[], Awaitable[None]]:
-        """Bind a no-argument async selection handler to one page identity."""
-
-        async def handle() -> None:
-            self._suppress_suggestions = True
-            try:
-                apply_text(identity)
-                await apply_state(identity)
-            finally:
-                self._suppress_suggestions = False
+        async def handle(event: ft.Event[ft.Checkbox]) -> None:
+            await self._state.toggle_page_step(step.line_index, checked=bool(event.control.value))
             self.refresh()
             self._update()
 
         return handle
 
-    def _active_people_token(self) -> str:
-        """Return the token after the last comma in the people field."""
-        return (self.people_field.value or "").rsplit(",", 1)[-1].strip()
-
-    def _apply_people_suggestion(self, identity: str) -> None:
-        """Replace the active people token with a page identity."""
-        value = self.people_field.value or ""
-        head, separator, _ = value.rpartition(",")
-        self.people_field.value = f"{head.rstrip()}, {identity}" if separator else identity
-
-    async def _apply_people_state(self, _identity: str) -> None:
-        """Forward the people field after a suggestion selection."""
-        await self._state.set_page_people(self._people_values())
-
-    def _apply_project_suggestion(self, identity: str) -> None:
-        """Replace the project field with a page identity."""
-        self.project_field.value = identity
-
-    async def _apply_project_state(self, identity: str) -> None:
-        """Forward the project field after a suggestion selection."""
-        await self._state.set_page_project(identity)
-
-    def _people_values(self) -> tuple[str, ...]:
-        """Split the people field into trimmed identities."""
-        return tuple(part.strip() for part in (self.people_field.value or "").split(",") if part.strip())
+    def _refresh_category_move(self) -> None:
+        """Refresh the category move confirmation panel."""
+        preview = self._state.category_move
+        self.category_move_panel.visible = preview is not None
+        if preview is None:
+            return
+        self.category_move_text.value = afanes.ui.strings.PAGE_CATEGORY_MOVE_BODY.format(
+            path=preview.target_path,
+        )
 
     def _is_inbox_page(self, page: PageDraft) -> bool:
         """Return whether the open page is an Inbox capture."""
@@ -783,9 +757,15 @@ class PageView:
         self._update()
 
     async def change_category(self) -> None:
-        """Forward the selected reference category."""
-        value = self.category_dropdown.value
-        category = ReferenceCategory(value) if value else None
+        """Forward the category label, using a new label only when valid."""
+        value = (self.category_field.value or "").strip()
+        try:
+            category = CategoryLabel(value) if value else None
+        except ValueError:
+            self._state.message = afanes.ui.strings.PAGE_CATEGORY_INVALID
+            self.refresh()
+            self._update()
+            return
         await self._state.set_page_category(category)
         self.refresh()
         self._update()
@@ -801,18 +781,6 @@ class PageView:
     async def change_due_date(self) -> None:
         """Forward the due-date text."""
         await self._state.set_page_due_date(self.due_field.value or "")
-        self.refresh()
-        self._update()
-
-    async def change_people(self) -> None:
-        """Forward the people field."""
-        await self._state.set_page_people(self._people_values())
-        self.refresh()
-        self._update()
-
-    async def change_project(self) -> None:
-        """Forward the project field."""
-        await self._state.set_page_project(self.project_field.value or "")
         self.refresh()
         self._update()
 
@@ -895,6 +863,18 @@ class PageView:
     async def cancel_type_change(self) -> None:
         """Revert the pending type or category change."""
         await self._state.cancel_type_change()
+        self.refresh()
+        self._update()
+
+    async def confirm_category_move(self) -> None:
+        """Apply the pending category change and move the file."""
+        await self._state.apply_category_move()
+        self.refresh()
+        self._update()
+
+    async def cancel_category_move(self) -> None:
+        """Keep the category and the file location unchanged."""
+        await self._state.cancel_category_move()
         self.refresh()
         self._update()
 

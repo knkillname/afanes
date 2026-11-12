@@ -20,6 +20,9 @@ class TestExceptionHierarchy:
             "InvalidReferenceError",
             "NameCollisionError",
             "ReferenceRewriteError",
+            "RetiredValueError",
+            "RetiredReferenceSchemeError",
+            "StepMetadataError",
         ]
         for name in names:
             error_type = getattr(afanes.core.errors, name)
@@ -31,6 +34,16 @@ class TestExceptionHierarchy:
         assert issubclass(afanes.core.errors.VaultNotDirectoryError, afanes.core.errors.VaultError)
         assert issubclass(afanes.core.errors.VaultUnreadableError, afanes.core.errors.VaultError)
         assert issubclass(afanes.core.errors.VaultNotEmptyError, afanes.core.errors.VaultError)
+        assert issubclass(afanes.core.errors.RetiredValueError, afanes.core.errors.NoteParseError)
+        assert issubclass(afanes.core.errors.RetiredReferenceSchemeError, afanes.core.errors.InvalidReferenceError)
+
+    def test_retired_value_message_names_the_replacement(self) -> None:
+        error = afanes.core.errors.RetiredValueError("The 'action' note type was retired; make a one-step project")
+        assert "one-step project" in str(error)
+
+    def test_retired_scheme_message_names_the_replacement(self) -> None:
+        error = afanes.core.errors.RetiredReferenceSchemeError("link people as note:Name instead")
+        assert "note:Name" in str(error)
 
     def test_no_error_reuses_a_builtin_name(self) -> None:
         public_names = [

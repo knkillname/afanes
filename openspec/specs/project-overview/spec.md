@@ -40,38 +40,28 @@ The Projects workspace SHALL list every parsed project note under Active, Waitin
 - **WHEN** the Projects workspace opens
 - **THEN** the Closed group is collapsed and closed projects are not listed until expanded
 
-### Requirement: Project membership comes from the project reference
+### Requirement: Steps belong to their project by containment
 
-An action SHALL belong to a project only when its `project` frontmatter reference resolves uniquely to that project. Body links to the project SHALL NOT count as steps. An action with no project, an unresolved project, or an ambiguous project reference SHALL NOT be attributed to any project.
+A step SHALL belong to the project whose body contains it. Membership MUST NOT depend on a reference, a directory, or a frontmatter key. A project with no task list items has no steps.
 
-#### Scenario: Action with a project reference counts
+#### Scenario: A checkbox is a step of its project
 
-- **WHEN** an action declares `project: "project:Turing Machine"` and exactly one project named `Turing Machine` exists
-- **THEN** the action counts as a step of that project
+- **WHEN** a project body contains `- [ ] Call the plumber`
+- **THEN** the step belongs to that project
 
-#### Scenario: Body link does not count
+#### Scenario: A body link is not a step
 
 - **WHEN** a note links to a project only in its body
-- **THEN** it does not appear in the project's action counts
+- **THEN** the link does not create a step in that project
 
-#### Scenario: Ambiguous project reference is not attributed
+#### Scenario: A project may have no steps
 
-- **WHEN** two projects share the referenced identity
-- **THEN** the action is not attributed to either project
+- **WHEN** a project body has no task list item
+- **THEN** the project reports zero steps
 
-#### Scenario: Unresolved project reference is not attributed
+### Requirement: A project row reports status, due date, open steps, and next step
 
-- **WHEN** an action references a project that has no page
-- **THEN** the action is not attributed to any project
-
-#### Scenario: Action without a project is unassigned
-
-- **WHEN** an action has no `project` key
-- **THEN** it is not attributed to any project
-
-### Requirement: A project row reports status, due date, open actions, and next action
-
-Each project row SHALL show its status, optional due date, count of open actions, and next action. An open action SHALL be an action with no status or with `active` or `waiting`; `done`, `cancelled`, `archived`, and `later` actions SHALL NOT count as open.
+Each project row SHALL show its status, optional due date, count of open steps, and next step. An open step SHALL be an unchecked task list item. Checked steps SHALL NOT count as open.
 
 #### Scenario: Row shows the project due date
 
@@ -83,72 +73,72 @@ Each project row SHALL show its status, optional due date, count of open actions
 - **WHEN** a project has no due date
 - **THEN** the row shows no due date
 
-#### Scenario: Open count excludes completed actions
+#### Scenario: Open count excludes checked steps
 
-- **WHEN** a project has two active actions and one done action
-- **THEN** the row reports two open actions
+- **WHEN** a project has two unchecked steps and one checked step
+- **THEN** the row reports two open steps
 
-#### Scenario: Waiting action counts as open
+#### Scenario: A project with no steps reports zero
 
-- **WHEN** a project has one waiting action
-- **THEN** the row reports one open action
+- **WHEN** a project has no task list item
+- **THEN** the row reports zero open steps
 
-#### Scenario: Later action is not open
+#### Scenario: The row shows the next step
 
-- **WHEN** a project has one later action and no active or waiting actions
-- **THEN** the row reports zero open actions
+- **WHEN** a project has at least one unchecked step
+- **THEN** the row names the first one as the next step
 
-### Requirement: The next action is computed from open actions
+### Requirement: The next step is the first unchecked step
 
-A project's next action SHALL be the open action with the earliest due date. When no open action has a due date, `active` SHALL rank before `waiting`, then the display title SHALL break ties. A project with no open action SHALL have no next action.
+A project's next step SHALL be its first unchecked task list item in document order. A project with no unchecked step SHALL have no next step. Dates and owners MUST NOT reorder the steps.
 
-#### Scenario: Earliest due date wins
+#### Scenario: First unchecked wins
 
-- **WHEN** a project has open actions due on different dates
-- **THEN** the next action is the earliest due action
+- **WHEN** a project's second step is unchecked and its first is checked
+- **THEN** the second step is the next step
 
-#### Scenario: Active ranks before waiting without dates
+#### Scenario: No unchecked step means no next step
 
-- **WHEN** a project's open actions have no due dates
-- **THEN** an active action is chosen before a waiting action
+- **WHEN** every step of a project is checked
+- **THEN** the row reports no next step
 
-#### Scenario: Title breaks a tie
+#### Scenario: A date does not reorder
 
-- **WHEN** open actions share a due date and status
-- **THEN** the alphabetically first display title is chosen
+- **WHEN** an earlier step has a later plan date than a later step
+- **THEN** the earlier step is still the next step
 
-#### Scenario: No open action means no next action
+#### Scenario: An owned step can be next
 
-- **WHEN** a project has no open actions
-- **THEN** the row reports no next action
+- **WHEN** the first unchecked step declares an owner
+- **THEN** it is still the next step and the row marks it as waiting
 
-### Requirement: Project status is never changed automatically
+### Requirement: Project status is not changed by steps
 
-The Projects workspace SHALL NOT change a project's status when its actions change. Completing all actions SHALL NOT close the project, and closing a project SHALL NOT change its actions.
+The Projects workspace SHALL NOT change a project's status when its steps change. Checking every step SHALL NOT close the project, and closing a project SHALL NOT change its steps.
 
-#### Scenario: Completed actions leave the project open
+#### Scenario: Completed steps leave the project open
 
-- **WHEN** every action of an active project becomes done
-- **THEN** the project remains active and reports zero open actions
+- **WHEN** every step of an active project becomes checked
+- **THEN** the project remains active and reports zero open steps
 
-#### Scenario: Closing a project leaves actions unchanged
+#### Scenario: Closing a project leaves steps unchanged
 
 - **WHEN** the user changes a project to `done`
-- **THEN** its action notes keep their current statuses
+- **THEN** its steps keep their checked state and metadata
 
-### Requirement: The Projects workspace reflects vault changes
+### Requirement: The Projects workspace reflects step changes
 
-After a scan, page save, action creation, status change, rename, or trash, the Projects workspace SHALL reflect the latest project and action state.
+After a scan, page save, step toggle, step creation, status change, rename, or trash, the Projects workspace SHALL reflect the latest project and step state.
 
-#### Scenario: Completing an action updates the count
+#### Scenario: Checking a step updates the count
 
-- **WHEN** an open action becomes done
+- **WHEN** an open step is checked
 - **THEN** the project's open count decreases
 
-#### Scenario: Adding an action updates the next action
+#### Scenario: Adding a step updates the next step
 
-- **WHEN** a new open action is linked to a project
-- **THEN** the project row includes it and the next action is recomputed
+- **WHEN** a new unchecked step is added before the current next step
+- **THEN** the row's next step becomes the new step
 
 #### Scenario: Trashing a project removes it
 

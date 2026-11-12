@@ -12,22 +12,19 @@ class ReferenceScheme(StrEnum):
 
     Attributes
     ----------
-    PERSON : str
-        Namespace for notes of type ``person``.
     PROJECT : str
         Namespace for notes of type ``project``.
     NOTE : str
-        Namespace for the document family: ``note``, ``action``, and
-        ``reference``.
+        Namespace for the document family: ``note`` and ``reference`` notes in
+        any category.
     """
 
-    PERSON = "person"
     PROJECT = "project"
     NOTE = "note"
 
     @classmethod
-    def for_note(cls, note_type: str, category: str | None = None) -> "ReferenceScheme":
-        """Map a note type and optional category to the scheme that addresses it.
+    def for_note(cls, note_type: str) -> "ReferenceScheme":
+        """Map a note type to the scheme that addresses it.
 
         Parameters
         ----------
@@ -36,25 +33,20 @@ class ReferenceScheme(StrEnum):
             member. Accepting the plain value keeps ``models.link`` independent
             of ``models.note``, so the model package stays a standard-library
             leaf.
-        category : str | None
-            Reference category value when the note is a reference. ``None``
-            means an uncategorized reference or a non-reference note.
 
         Returns
         -------
         ReferenceScheme
-            ``person`` for a reference with category ``person``, ``project``
-            for a project note, and ``note`` for the document family.
+            ``project`` for a project note and ``note`` for every other note
+            type.
 
         Notes
         -----
-        A note belongs to exactly one scheme. A categorized reference is not
-        also addressable through the ``note`` scheme.
+        A note belongs to exactly one scheme. Categories never select a
+        namespace, so every reference shares the ``note`` scheme.
         """
         if note_type == "project":
             return cls.PROJECT
-        if note_type == "reference" and category == "person":
-            return cls.PERSON
         return cls.NOTE
 
 

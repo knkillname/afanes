@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026-present Mario Abarca <knkillname@gmail.com>
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Processing outcomes and the plan that describes one clarification step."""
+"""Processing outcomes and the plans that describe one clarification step."""
 
 import dataclasses
 import datetime
@@ -11,8 +11,7 @@ from typing import Self
 
 from afanes.core.errors import ProcessingError
 from afanes.core.frontmatter import NoteDocument
-from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType, ReferenceCategory, Status
+from afanes.models.note import NoteType, Status
 
 
 class ProcessingOutcome(StrEnum):
@@ -26,17 +25,20 @@ class ProcessingOutcome(StrEnum):
         Keep the capture as a reference deferred for later attention.
     REFERENCE : str
         Keep the capture as an available reference.
-    ACTION : str
-        Turn the capture into a single action.
     PROJECT : str
-        Turn the capture into a project outcome.
+        Turn the capture into a project whose body holds the steps.
+    APPEND_STEP : str
+        Add the capture as a step of an existing project and trash it.
+    DONE_NOW : str
+        Write a completed one-step project.
     """
 
     TRASH = "trash"
     LATER = "later"
     REFERENCE = "reference"
-    ACTION = "action"
     PROJECT = "project"
+    APPEND_STEP = "append_step"
+    DONE_NOW = "done_now"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -73,8 +75,8 @@ class ProcessingTarget:
         Raises
         ------
         ProcessingError
-            If the outcome does not accept the requested status or the status
-            is not valid for the target type.
+            If the outcome does not produce a note, does not accept the
+            requested status, or the status is not valid for the target type.
         """
         if outcome is ProcessingOutcome.LATER:
             if status not in (None, Status.LATER):
@@ -86,25 +88,24 @@ class ProcessingTarget:
                 message = "Reference outcomes do not accept a status"
                 raise ProcessingError(message)
             return cls(note_type=NoteType.REFERENCE, status=None)
-        if outcome is ProcessingOutcome.ACTION:
-            target_status = status or Status.ACTIVE
-            if target_status not in NoteType.ACTION.allowed_statuses:
-                message = "Status is not valid for an action"
+        if outcome is ProcessingOutcome.DONE_NOW:
+            if status not in (None, Status.DONE):
+                message = "Done now uses the done status"
                 raise ProcessingError(message)
-            return cls(note_type=NoteType.ACTION, status=target_status)
+            return cls(note_type=NoteType.PROJECT, status=Status.DONE)
         if outcome is ProcessingOutcome.PROJECT:
             target_status = status or Status.ACTIVE
             if target_status not in NoteType.PROJECT.allowed_statuses:
                 message = "Status is not valid for a project"
                 raise ProcessingError(message)
             return cls(note_type=NoteType.PROJECT, status=target_status)
-        message = f"Unsupported processing outcome: {outcome!r}"
+        message = f"Outcome {outcome.value!r} does not target a note"
         raise ProcessingError(message)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ProcessingPlan:
-    """One validated clarification step for an inbox capture.
+    """One validated clarification step that writes a single note.
 
     Attributes
     ----------
@@ -116,17 +117,12 @@ class ProcessingPlan:
         Selected clarification outcome.
     target_type : NoteType
         Type the note will have after applying the plan.
-    target_category : ReferenceCategory | None
-        Reference category for the target, always ``None`` for processing
-        outcomes in this change.
     target_status : Status | None
         Status the target will carry, or ``None`` when the key is removed.
     due_date : datetime.date | None
-        Optional calendar due date for an action or project.
-    people : tuple[NoteReference, ...]
-        Person references assigned by the plan.
-    project : NoteReference | None
-        Project reference assigned to an action.
+        Optional calendar due date for a project.
+    body_override : str | None
+        Complete replacement body, or ``None`` to preserve the capture body.
     source_hash : str
         SHA-256 of the source bytes captured while planning.
     processed_hash : str
@@ -137,31 +133,26 @@ class ProcessingPlan:
         Notes containing at least one inbound reference.
     changes_scheme : bool
         Whether the outcome moves the note to a different reference scheme.
-    unresolved_references : tuple[NoteReference, ...]
-        Planned person or project references that do not resolve yet.
 
     Notes
     -----
     Build plans through ``Vault.plan_processing``. Direct construction is
     validated for local invariants so a malformed plan cannot reach the apply
-    step.
+    step. Append step uses :class:`AppendStepPlan` instead.
     """
 
     source_path: Path
     target_path: Path
     outcome: ProcessingOutcome
     target_type: NoteType
-    target_category: ReferenceCategory | None
     target_status: Status | None
     due_date: datetime.date | None
-    people: tuple[NoteReference, ...]
-    project: NoteReference | None
+    body_override: str | None
     source_hash: str
     processed_hash: str
     reference_count: int
     affected_notes: tuple[Path, ...]
     changes_scheme: bool
-    unresolved_references: tuple[NoteReference, ...]
 
     def __post_init__(self) -> None:
         """Validate the plan's local invariants.
@@ -169,9 +160,8 @@ class ProcessingPlan:
         Raises
         ------
         ProcessingError
-            If a path is not absolute, a hash is empty, a reference has the
-            wrong scheme, the destination equals the source, or the metadata
-            does not match the selected outcome.
+            If a path is not absolute, a hash is empty, the destination equals
+            the source, or the metadata does not match the selected outcome.
         """
         self._validate_common()
         self._validate_outcome()
@@ -182,8 +172,8 @@ class ProcessingPlan:
         Parameters
         ----------
         document : NoteDocument
-            Current capture document. Its unknown keys, body, and newline style
-            are preserved.
+            Current capture document. Its unknown keys and newline style are
+            preserved.
 
         Returns
         -------
@@ -196,10 +186,6 @@ class ProcessingPlan:
 
         raw = dict(document.raw)
         raw["type"] = self.target_type.value
-        if self.target_category is None:
-            raw.pop("category", None)
-        else:
-            raw["category"] = self.target_category.value
         if self.target_status is None:
             raw.pop("status", None)
         else:
@@ -207,19 +193,12 @@ class ProcessingPlan:
         if self.due_date is None:
             raw.pop("due_date", None)
         else:
-            raw["due_date"] = self.due_date.isoformat()
-        if self.people:
-            raw["people"] = [f"{reference.scheme.value}:{reference.name}" for reference in self.people]
-        else:
-            raw.pop("people", None)
-        if self.project is None:
-            raw.pop("project", None)
-        else:
-            raw["project"] = f"{self.project.scheme.value}:{self.project.name}"
-        return document.with_metadata(raw).to_text()
+            raw["due_date"] = self.due_date
+        body = document.body if self.body_override is None else self.body_override
+        return document.with_body(body).with_metadata(raw).to_text()
 
     def _validate_common(self) -> None:
-        """Validate path, hash, count, and reference invariants."""
+        """Validate path, hash, and count invariants."""
         if not self.source_path.is_absolute() or not self.target_path.is_absolute():
             message = "Processing plan paths must be absolute"
             raise ProcessingError(message)
@@ -232,58 +211,98 @@ class ProcessingPlan:
         if self.reference_count < 0:
             message = "Processing reference count must not be negative"
             raise ProcessingError(message)
-        if any(reference.scheme is not ReferenceScheme.PERSON for reference in self.people):
-            message = "Processing people must be person references"
-            raise ProcessingError(message)
-        if self.project is not None and self.project.scheme is not ReferenceScheme.PROJECT:
-            message = "Processing project must be a project reference"
-            raise ProcessingError(message)
 
     def _validate_outcome(self) -> None:
         """Validate metadata against the selected outcome."""
+        if self.outcome is ProcessingOutcome.APPEND_STEP:
+            message = "Append step uses an append plan"
+            raise ProcessingError(message)
         if self.outcome is ProcessingOutcome.TRASH:
-            if self.people or self.project is not None or self.due_date is not None:
+            if self.due_date is not None:
                 message = "Trash does not accept assignment metadata"
                 raise ProcessingError(message)
             return
         if self.outcome in (ProcessingOutcome.LATER, ProcessingOutcome.REFERENCE):
             self._validate_reference_outcome()
             return
-        if self.outcome in (ProcessingOutcome.ACTION, ProcessingOutcome.PROJECT):
-            self._validate_actionable_outcome()
-            return
-        message = f"Unsupported processing outcome: {self.outcome!r}"
-        raise ProcessingError(message)
+        self._validate_project_outcome()
 
     def _validate_reference_outcome(self) -> None:
         """Validate Later and Reference metadata."""
-        if self.target_type is not NoteType.REFERENCE or self.target_category is not None:
-            message = "Reference outcomes must be uncategorized references"
+        if self.target_type is not NoteType.REFERENCE:
+            message = "Reference outcomes must target a reference note"
             raise ProcessingError(message)
-        if self.due_date is not None or self.project is not None:
-            message = "Reference outcomes do not accept a due date or project"
+        if self.due_date is not None:
+            message = "Reference outcomes do not accept a due date"
             raise ProcessingError(message)
         expected_status = Status.LATER if self.outcome is ProcessingOutcome.LATER else None
         if self.target_status is not expected_status:
             message = "Reference outcome status does not match the outcome"
             raise ProcessingError(message)
 
-    def _validate_actionable_outcome(self) -> None:
-        """Validate Action and Project metadata."""
-        if self.target_category is not None:
-            message = "Processing outcomes do not assign a category"
+    def _validate_project_outcome(self) -> None:
+        """Validate Project and Done now metadata."""
+        if self.target_type is not NoteType.PROJECT:
+            message = "Project outcomes must target a project note"
             raise ProcessingError(message)
         if self.target_status is None or self.target_status not in self.target_type.allowed_statuses:
             message = "Processing status is not valid for the target type"
             raise ProcessingError(message)
-        if self.outcome is ProcessingOutcome.ACTION:
-            if self.target_type is not NoteType.ACTION:
-                message = "Action outcome must target an action note"
-                raise ProcessingError(message)
-            return
-        if self.target_type is not NoteType.PROJECT:
-            message = "Project outcome must target a project note"
+        if self.outcome is ProcessingOutcome.DONE_NOW and self.target_status is not Status.DONE:
+            message = "Done now must complete the project"
             raise ProcessingError(message)
-        if self.project is not None:
-            message = "Project outcome must not declare a project reference"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class AppendStepPlan:
+    """One validated append of an inbox capture into an existing project.
+
+    Attributes
+    ----------
+    capture_path : Path
+        Absolute path to the capture in ``inbox/``.
+    project_path : Path
+        Absolute path to the target project note.
+    step_text : str
+        First non-blank capture line, written as the step text.
+    detail : str
+        Remaining capture body, written indented beneath the step.
+    capture_hash : str
+        SHA-256 of the capture bytes captured while planning.
+    project_hash : str
+        SHA-256 of the project bytes captured while planning.
+
+    Notes
+    -----
+    Build plans through ``Vault.plan_append_step``. Apply writes the project
+    first and trashes the capture second, so a failure never loses the step.
+    """
+
+    capture_path: Path
+    project_path: Path
+    step_text: str
+    detail: str
+    capture_hash: str
+    project_hash: str
+
+    def __post_init__(self) -> None:
+        """Validate the append plan's local invariants.
+
+        Raises
+        ------
+        ProcessingError
+            If a path is not absolute, a hash is empty, the step is blank, or
+            the capture and project are the same file.
+        """
+        if not self.capture_path.is_absolute() or not self.project_path.is_absolute():
+            message = "Append plan paths must be absolute"
+            raise ProcessingError(message)
+        if self.capture_path == self.project_path:
+            message = "Append plan capture and project must differ"
+            raise ProcessingError(message)
+        if not self.step_text.strip():
+            message = "An appended step needs text"
+            raise ProcessingError(message)
+        if not self.capture_hash or not self.project_hash:
+            message = "Append plan hashes must not be empty"
             raise ProcessingError(message)

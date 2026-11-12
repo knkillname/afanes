@@ -7,15 +7,15 @@ import dataclasses
 import datetime
 import hashlib
 import os
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable
 from enum import StrEnum
 from pathlib import Path
-from types import MappingProxyType
 from typing import Self
 
 import afanes.core.atomic
 import afanes.core.links
 import afanes.core.names
+import afanes.core.steps
 from afanes.core.errors import (
     AfanesError,
     ContentChangedError,
@@ -34,9 +34,10 @@ from afanes.core.errors import (
 )
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import CatalogEntry, NameCatalog, ReferenceKey, ResolutionOutcome
-from afanes.core.processing import ProcessingOutcome, ProcessingPlan, ProcessingTarget
+from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan, ProcessingTarget
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType, ReferenceCategory, Status
+from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.step import ProjectStep
 
 # Public canonical note extension.
 NOTE_SUFFIX = ".md"
@@ -46,8 +47,6 @@ INBOX_DIRECTORY = Path("inbox")
 TRASH_DIRECTORY = Path("trash")
 REFERENCE_DIRECTORY = Path("reference")
 PROJECTS_DIRECTORY = Path("projects")
-ACTIONS_DIRECTORY = Path("actions")
-CATEGORY_DIRECTORIES: Mapping[ReferenceCategory, Path] = MappingProxyType({ReferenceCategory.PERSON: Path("people")})
 
 _MIN_INBOX_PART_COUNT = 2
 
@@ -260,15 +259,13 @@ class VaultNote:
         and does not participate in identity or reference resolution.
     note_type : NoteType
         Declared type from frontmatter.
-    category : ReferenceCategory | None
+    category : CategoryLabel | None
         Declared reference category, or ``None`` for an uncategorized
         reference or a non-reference note.
     status : Status | None
         Validated workflow status, or ``None`` when absent.
     due_date : datetime.date | None
-        Calendar due date read from frontmatter, or ``None`` when the key is
-        absent, null, or not a valid date. An invalid value is kept in the
-        file; only the derived scan value is ``None``.
+        Calendar due date read from frontmatter, or ``None`` when absent.
     content_hash : str
         SHA-256 digest of the file bytes, used as an optimistic write guard.
     modified_ns : int
@@ -276,8 +273,11 @@ class VaultNote:
         display ordering. It is filesystem metadata, not durable vault data.
     body_references : tuple[NoteReference, ...]
         References extracted from the Markdown body.
-    frontmatter_references : tuple[NoteReference, ...]
-        References declared by ``people`` and ``project`` values.
+    steps : tuple[ProjectStep, ...]
+        Task list items derived from the body of a project note. Empty for every
+        other note type.
+    search_text : str
+        Body text used by browser search, with step metadata comments removed.
     """
 
     path: Path
@@ -285,24 +285,25 @@ class VaultNote:
     name: str
     title: str
     note_type: NoteType
-    category: ReferenceCategory | None
+    category: CategoryLabel | None
     status: Status | None
     due_date: datetime.date | None
     content_hash: str
     modified_ns: int
     body_references: tuple[NoteReference, ...]
-    frontmatter_references: tuple[NoteReference, ...]
+    steps: tuple[ProjectStep, ...]
+    search_text: str
 
     @property
     def references(self) -> tuple[NoteReference, ...]:
-        """Return body and frontmatter references in that order.
+        """Return the body references of this note.
 
         Returns
         -------
         tuple[NoteReference, ...]
-            Body references followed by frontmatter references.
+            References extracted from the Markdown body.
         """
-        return self.body_references + self.frontmatter_references
+        return self.body_references
 
     @property
     def order(self) -> NoteOrder:
@@ -314,19 +315,6 @@ class VaultNote:
             Key used for project and general due-date ordering.
         """
         return NoteOrder.for_due(self)
-
-    @property
-    def action_order(self) -> NoteOrder:
-        """Return the action ordering key for this note.
-
-        Returns
-        -------
-        NoteOrder
-            Due-date-first key that places active actions before waiting ones
-            when earlier fields tie.
-        """
-        status_rank = 0 if self.status in (None, Status.ACTIVE) else 1
-        return NoteOrder.for_due(self, status_rank=status_rank)
 
     @property
     def alphabetical_order(self) -> NoteOrder:
@@ -377,19 +365,40 @@ class VaultNote:
         return self.status not in (Status.DONE, Status.CANCELLED, Status.ARCHIVED)
 
     @property
-    def is_open_action(self) -> bool:
-        """Return whether this note is an open action.
+    def is_misplaced(self) -> bool:
+        """Return whether an unclarified note sits outside the inbox.
 
         Returns
         -------
         bool
-            ``True`` when the note is an action whose status is absent,
-            ``active``, or ``waiting``. A ``later`` action is deferred and not
-            open.
+            ``True`` when the note declares ``type: note`` and is not inside
+            the vault's inbox directory.
         """
-        if self.note_type is not NoteType.ACTION:
-            return False
-        return self.status in (None, Status.ACTIVE, Status.WAITING)
+        return self.note_type is NoteType.NOTE and not self.is_inbox
+
+    @property
+    def open_steps(self) -> tuple[ProjectStep, ...]:
+        """Return the unchecked steps of this project in document order.
+
+        Returns
+        -------
+        tuple[ProjectStep, ...]
+            Unchecked steps, or an empty tuple for a non-project note.
+        """
+        return tuple(step for step in self.steps if not step.checked)
+
+    @property
+    def next_step(self) -> ProjectStep | None:
+        """Return the first unchecked step of this project.
+
+        Returns
+        -------
+        ProjectStep | None
+            First unchecked step in document order, or ``None`` when the note
+            is not a project or has no unchecked step.
+        """
+        open_steps = self.open_steps
+        return open_steps[0] if open_steps else None
 
     @staticmethod
     def due_date_from_raw(value: object) -> datetime.date | None:
@@ -644,7 +653,7 @@ class VaultSnapshot:
         Parameters
         ----------
         scheme : ReferenceScheme
-            Namespace to search, normally ``person`` or ``project``.
+            Namespace to search, normally ``project``.
         query : str
             Free text typed by the user. Matching ignores case, Unicode form,
             and repeated whitespace. An empty query matches every note in the
@@ -667,7 +676,7 @@ class VaultSnapshot:
         matches = [
             note
             for note in self.notes
-            if ReferenceScheme.for_note(note.note_type, note.category) is scheme
+            if ReferenceScheme.for_note(note.note_type) is scheme
             and (
                 normalized_query in afanes.core.names.normalize_name(note.name)
                 or normalized_query in afanes.core.names.normalize_name(note.title)
@@ -968,6 +977,25 @@ class TrashPreview:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class CategoryMovePreview:
+    """A reference note's category change and its destination.
+
+    Attributes
+    ----------
+    note_path : Path
+        Absolute path to the reference before the change.
+    target_path : Path
+        Absolute destination inside ``reference/<label>/`` or ``reference/``.
+    category : CategoryLabel | None
+        Category to write, or ``None`` to remove it.
+    """
+
+    note_path: Path
+    target_path: Path
+    category: CategoryLabel | None
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class Vault:
     """A resolved vault root and the operations scoped to it.
 
@@ -1053,9 +1081,7 @@ class Vault:
             INBOX_DIRECTORY,
             TRASH_DIRECTORY,
             REFERENCE_DIRECTORY,
-            *(REFERENCE_DIRECTORY / folder for folder in CATEGORY_DIRECTORIES.values()),
             PROJECTS_DIRECTORY,
-            ACTIONS_DIRECTORY,
         )
 
     @classmethod
@@ -1129,9 +1155,7 @@ class Vault:
             self.directory_for(NoteType.NOTE),
             self._existing_directory(self.root, TRASH_DIRECTORY),
             self.directory_for(NoteType.REFERENCE),
-            *(self.directory_for(NoteType.REFERENCE, category) for category in CATEGORY_DIRECTORIES),
             self.directory_for(NoteType.PROJECT),
-            self.directory_for(NoteType.ACTION),
         ]
         created: list[Path] = []
         for destination in destinations:
@@ -1194,9 +1218,7 @@ class Vault:
             except (OSError, UnicodeDecodeError, AfanesError) as exc:
                 failures.append(VaultFailure(path=note_path.relative_path, message=str(exc)))
 
-        catalog = NameCatalog.from_entries(
-            CatalogEntry(path=note.path, note_type=note.note_type, category=note.category) for note in notes
-        )
+        catalog = NameCatalog.from_entries(CatalogEntry(path=note.path, note_type=note.note_type) for note in notes)
         return VaultSnapshot(root=self.root, notes=tuple(notes), failures=tuple(failures), catalog=catalog)
 
     def _note_paths(self) -> list[NotePath]:
@@ -1234,6 +1256,12 @@ class Vault:
             message = "Note has no type"
             raise NoteParseError(message)
         body_references = tuple(reader.extract(document.body))
+        steps: tuple[ProjectStep, ...] = ()
+        search_text = document.body
+        if document.note_type is NoteType.PROJECT:
+            step_document = afanes.core.steps.StepDocument(document.body)
+            steps = step_document.steps
+            search_text = step_document.search_text
         return VaultNote(
             path=note_path.path,
             relative_path=note_path.relative_path,
@@ -1242,52 +1270,50 @@ class Vault:
             note_type=document.note_type,
             category=document.category,
             status=document.status,
-            due_date=VaultNote.due_date_from_raw(document.raw.get("due_date")),
+            due_date=document.due_date,
             content_hash=hashlib.sha256(data).hexdigest(),
             modified_ns=stat.st_mtime_ns,
             body_references=body_references,
-            frontmatter_references=document.references,
+            steps=steps,
+            search_text=search_text,
         )
 
-    def directory_for(self, note_type: NoteType, category: ReferenceCategory | None = None) -> Path:
+    def directory_for(self, note_type: NoteType, category: CategoryLabel | None = None) -> Path:
         """Return the default destination directory for a note kind.
 
         Parameters
         ----------
         note_type : NoteType
             Type of the note to file.
-        category : ReferenceCategory | None
+        category : CategoryLabel | None
             Reference category. Only valid when ``note_type`` is
-            :attr:`NoteType.REFERENCE`.
+            :attr:`NoteType.REFERENCE`; ``None`` files directly under
+            ``reference/``.
 
         Returns
         -------
         Path
-            Absolute default directory inside the vault. An existing directory
-            whose name differs only by case is reused. The directory is not
-            created by this method.
+            Absolute default directory inside the vault. A categorized
+            reference uses ``reference/<category-folder>/``, where the folder is
+            derived through the cross-platform name policy. An existing
+            directory whose name differs only by case is reused. The directory
+            is not created by this method.
 
         Raises
         ------
         VaultError
-            If a category is supplied for a non-reference note or the category
-            has no default directory.
+            If a category is supplied for a non-reference note.
         """
         if category is not None and note_type is not NoteType.REFERENCE:
             message = "Only reference notes can declare a category"
             raise VaultError(message)
-        if note_type is NoteType.ACTION:
-            return self._existing_directory(self.root, ACTIONS_DIRECTORY)
         if note_type is NoteType.PROJECT:
             return self._existing_directory(self.root, PROJECTS_DIRECTORY)
         if note_type is NoteType.REFERENCE:
             reference_root = self._existing_directory(self.root, REFERENCE_DIRECTORY)
             if category is None:
                 return reference_root
-            folder = CATEGORY_DIRECTORIES.get(category)
-            if folder is None:
-                message = f"Unknown reference category: {category}"
-                raise VaultError(message)
+            folder = Path(afanes.core.names.safe_filename(category.value))
             return self._existing_directory(reference_root, folder)
         return self._existing_directory(self.root, INBOX_DIRECTORY)
 
@@ -1298,10 +1324,10 @@ class Vault:
         *,
         status: Status | None = None,
         due_date: datetime.date | None = None,
-        people: Iterable[str] = (),
         project: str | None = None,
+        today: datetime.date | None = None,
         snapshot: VaultSnapshot | None = None,
-    ) -> ProcessingPlan:
+    ) -> ProcessingPlan | AppendStepPlan:
         """Plan one clarification step for an inbox capture.
 
         Parameters
@@ -1311,30 +1337,34 @@ class Vault:
         outcome : ProcessingOutcome
             Selected clarification outcome.
         status : Status | None
-            Requested target status. Actions and projects default to
-            ``active``; Later is always ``later``; Reference has no status.
+            Requested target status. Projects default to ``active``; Later is
+            always ``later``; Reference has no status; Done now is ``done``.
         due_date : datetime.date | None
-            Optional calendar due date for an action or project.
-        people : Iterable[str]
-            Person names assigned to the target. Names may be unresolved.
+            Optional calendar due date for a new project or a done-now project.
         project : str | None
-            Project name assigned to an action. The project may be unresolved.
+            Target project identity for Append step. Text that matches no
+            project is rejected.
+        today : datetime.date | None
+            Calendar date recorded as ``actual`` by Done now. ``None`` uses the
+            current local date.
         snapshot : VaultSnapshot | None
             Pre-built scan to avoid rescanning, or ``None`` to scan the vault.
 
         Returns
         -------
-        ProcessingPlan
-            Destination, target metadata, inbound reference report, content
-            hashes, scheme-change flag, and unresolved assignments.
+        ProcessingPlan | AppendStepPlan
+            A single-note plan, or an append plan when the outcome is Append
+            step.
 
         Raises
         ------
         ProcessingError
-            If the note is outside ``inbox/``, is missing from the vault, or
-            the requested metadata is not valid for the outcome.
+            If the note is outside ``inbox/``, is missing from the vault, the
+            requested metadata is not valid for the outcome, or an append
+            target matches no project.
         NameCollisionError
-            If the destination filename or target scheme name already exists.
+            If the destination filename, target scheme name, or append target
+            is ambiguous.
         NoteParseError
             If the capture cannot be parsed.
         VaultPathError
@@ -1354,42 +1384,26 @@ class Vault:
             message = f"Note is not part of the vault: {note_path}"
             raise ProcessingError(message)
 
-        people_references = tuple(self._person_reference(name) for name in people)
-        project_reference = self._project_reference(project) if project is not None else None
-        source_scheme = ReferenceScheme.for_note(note.note_type, note.category)
         source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
-
-        if outcome is ProcessingOutcome.TRASH:
-            if status is not None or due_date is not None or people_references or project_reference is not None:
-                message = "Trash does not accept assignment metadata"
-                raise ProcessingError(message)
-            trash_preview = self.plan_trash(source, snapshot=vault)
-            return ProcessingPlan(
-                source_path=source,
-                target_path=trash_preview.trash_path,
-                outcome=outcome,
-                target_type=note.note_type,
-                target_category=note.category,
-                target_status=note.status,
-                due_date=None,
-                people=(),
-                project=None,
-                source_hash=source_hash,
-                processed_hash=source_hash,
-                reference_count=trash_preview.reference_count,
-                affected_notes=trash_preview.affected_notes,
-                changes_scheme=False,
-                unresolved_references=(),
-            )
+        source_scheme = ReferenceScheme.for_note(note.note_type)
+        non_note = self._plan_non_note(
+            source,
+            vault,
+            note,
+            outcome,
+            status=status,
+            due_date=due_date,
+            project=project,
+            source_hash=source_hash,
+        )
+        if non_note is not None:
+            return non_note
 
         target = ProcessingTarget.from_outcome(outcome, status)
         target_type = target.note_type
         target_status = target.status
-        if due_date is not None and outcome not in (ProcessingOutcome.ACTION, ProcessingOutcome.PROJECT):
-            message = "Only actions and projects accept a due date"
-            raise ProcessingError(message)
-        if project_reference is not None and outcome is not ProcessingOutcome.ACTION:
-            message = "Only actions accept a project reference"
+        if due_date is not None and outcome not in (ProcessingOutcome.PROJECT, ProcessingOutcome.DONE_NOW):
+            message = "Only projects accept a due date"
             raise ProcessingError(message)
 
         target_path = self.directory_for(target_type) / f"{source.stem}{NOTE_SUFFIX}"
@@ -1403,27 +1417,20 @@ class Vault:
             raise NameCollisionError(message)
 
         affected = vault.affected_sites(source)
-        unresolved = tuple(
-            reference
-            for reference in (*people_references, project_reference)
-            if reference is not None and vault.catalog.resolve(reference).outcome is not ResolutionOutcome.RESOLVED
-        )
+        body_override = self._done_now_override(source, outcome, today=today)
         plan = ProcessingPlan(
             source_path=source,
             target_path=target_path,
             outcome=outcome,
             target_type=target_type,
-            target_category=None,
             target_status=target_status,
             due_date=due_date,
-            people=people_references,
-            project=project_reference,
+            body_override=body_override,
             source_hash=source_hash,
             processed_hash=source_hash,
             reference_count=sum(site.reference_count for site in affected),
             affected_notes=tuple(site.path for site in affected),
             changes_scheme=source_scheme is not target_scheme,
-            unresolved_references=unresolved,
         )
         document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
         processed_text = plan.processed_text(document)
@@ -1432,9 +1439,131 @@ class Vault:
             processed_hash=hashlib.sha256(processed_text.encode("utf-8")).hexdigest(),
         )
 
+    def _plan_non_note(
+        self,
+        source: Path,
+        vault: VaultSnapshot,
+        note: VaultNote,
+        outcome: ProcessingOutcome,
+        *,
+        status: Status | None,
+        due_date: datetime.date | None,
+        project: str | None,
+        source_hash: str,
+    ) -> ProcessingPlan | AppendStepPlan | None:
+        """Plan Append step or Trash, or return ``None`` for a note outcome."""
+        if outcome is ProcessingOutcome.APPEND_STEP:
+            if status is not None or due_date is not None:
+                message = "Append step does not accept status or due date metadata"
+                raise ProcessingError(message)
+            if project is None:
+                message = "Append step needs a target project"
+                raise ProcessingError(message)
+            return self.plan_append_step(source, project, snapshot=vault)
+        if outcome is ProcessingOutcome.TRASH:
+            if status is not None or due_date is not None:
+                message = "Trash does not accept assignment metadata"
+                raise ProcessingError(message)
+            trash_preview = self.plan_trash(source, snapshot=vault)
+            return ProcessingPlan(
+                source_path=source,
+                target_path=trash_preview.trash_path,
+                outcome=outcome,
+                target_type=note.note_type,
+                target_status=note.status,
+                due_date=None,
+                body_override=None,
+                source_hash=source_hash,
+                processed_hash=source_hash,
+                reference_count=trash_preview.reference_count,
+                affected_notes=trash_preview.affected_notes,
+                changes_scheme=False,
+            )
+        return None
+
+    def _done_now_override(
+        self,
+        source: Path,
+        outcome: ProcessingOutcome,
+        *,
+        today: datetime.date | None,
+    ) -> str | None:
+        """Return the completed body for Done now, or ``None`` otherwise."""
+        if outcome is not ProcessingOutcome.DONE_NOW:
+            return None
+        document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
+        completed_on = today or datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+        return self._done_now_body(document, source.stem, completed_on)
+
+    def plan_append_step(
+        self,
+        capture_path: Path,
+        project_name: str,
+        *,
+        snapshot: VaultSnapshot | None = None,
+    ) -> AppendStepPlan:
+        """Plan appending one inbox capture to an existing project.
+
+        Parameters
+        ----------
+        capture_path : Path
+            Capture path, relative or absolute, under the vault's ``inbox/``.
+        project_name : str
+            Project identity. Matching is case-insensitive and ignores repeated
+            whitespace, following reference resolution.
+        snapshot : VaultSnapshot | None
+            Pre-built scan to avoid rescanning, or ``None`` to scan the vault.
+
+        Returns
+        -------
+        AppendStepPlan
+            Capture, target project, step text, detail, and both content hashes.
+
+        Raises
+        ------
+        ProcessingError
+            If the capture is outside the inbox, is missing, or the name matches
+            no project.
+        NameCollisionError
+            If the name matches more than one project.
+        VaultPathError
+            If a path escapes the vault.
+        """
+        source = self.contained(capture_path)
+        self._require_inbox_note(source)
+        vault = snapshot or self.scan()
+        if vault.find_note(source) is None:
+            message = f"Note is not part of the vault: {capture_path}"
+            raise ProcessingError(message)
+        target_name = project_name.strip()
+        if not target_name:
+            message = "Append step needs a target project"
+            raise ProcessingError(message)
+        candidates = vault.catalog.candidates(ReferenceScheme.PROJECT, target_name)
+        if not candidates:
+            message = f"No project is named {target_name!r}"
+            raise ProcessingError(message)
+        if len(candidates) > 1:
+            message = f"More than one project is named {target_name!r}"
+            raise NameCollisionError(message)
+
+        project_path = candidates[0]
+        capture_data = source.read_bytes()
+        project_data = project_path.read_bytes()
+        document = NoteDocument.from_text(capture_data.decode("utf-8"))
+        step_text, detail = self._capture_step(document.body, source.stem)
+        return AppendStepPlan(
+            capture_path=source,
+            project_path=project_path,
+            step_text=step_text,
+            detail=detail,
+            capture_hash=hashlib.sha256(capture_data).hexdigest(),
+            project_hash=hashlib.sha256(project_data).hexdigest(),
+        )
+
     def apply_processing(
         self,
-        plan: ProcessingPlan,
+        plan: ProcessingPlan | AppendStepPlan,
         *,
         confirm: bool = False,
     ) -> Path:
@@ -1442,8 +1571,9 @@ class Vault:
 
         Parameters
         ----------
-        plan : ProcessingPlan
-            Plan produced by :meth:`plan_processing`.
+        plan : ProcessingPlan | AppendStepPlan
+            Plan produced by :meth:`plan_processing` or
+            :meth:`plan_append_step`.
         confirm : bool
             Explicit confirmation gate. The operation raises unless this is
             ``True``.
@@ -1451,14 +1581,15 @@ class Vault:
         Returns
         -------
         Path
-            Absolute destination path after the move.
+            Absolute destination path after the move, or the target project
+            path for an append.
 
         Raises
         ------
         ProcessingError
             If confirmation is missing, the source is no longer an inbox
-            capture, the source changed after planning, the processed text
-            does not match the plan, or the move fails.
+            capture, the source or target changed after planning, the processed
+            text does not match the plan, or a move fails.
         NameCollisionError
             If the destination appears after planning.
         VaultPathError
@@ -1466,14 +1597,16 @@ class Vault:
 
         Notes
         -----
-        The classified frontmatter is written atomically to the source before
-        the rename. A failed move therefore leaves a processed-looking note in
-        ``inbox/``, and the same plan can be retried. Trash plans move the file
-        without rewriting it.
+        A single-note plan writes the classified frontmatter atomically to the
+        source before the rename. Append writes the target project first and
+        trashes the capture second, so a failure never loses the step. A failed
+        move leaves the capture in ``inbox/`` and the same plan can be retried.
         """
         if not confirm:
             message = "Processing requires explicit confirmation"
             raise ProcessingError(message)
+        if isinstance(plan, AppendStepPlan):
+            return self._apply_append_step(plan)
 
         source = self.contained(plan.source_path)
         self._require_inbox_note(source)
@@ -1484,6 +1617,63 @@ class Vault:
         target = self._processing_destination(plan)
         self._write_processing(plan, source)
         return self._move_processing(source, target)
+
+    def _apply_append_step(self, plan: AppendStepPlan) -> Path:
+        """Write the step to the project, then trash the capture."""
+        capture = self.contained(plan.capture_path)
+        project = self.contained(plan.project_path)
+        self._require_inbox_note(capture)
+        if not capture.is_file():
+            message = f"Capture no longer exists: {plan.capture_path}"
+            raise ProcessingError(message)
+        capture_data = capture.read_bytes()
+        if hashlib.sha256(capture_data).hexdigest() != plan.capture_hash:
+            message = "Source note changed after planning"
+            raise ProcessingError(message)
+        if not project.is_file():
+            message = f"Target project no longer exists: {plan.project_path}"
+            raise ProcessingError(message)
+
+        project_data = project.read_bytes()
+        document = NoteDocument.from_text(project_data.decode("utf-8"))
+        step_document = afanes.core.steps.StepDocument(document.body)
+        already_present = any(step.text == plan.step_text for step in step_document.steps)
+        if not already_present:
+            if hashlib.sha256(project_data).hexdigest() != plan.project_hash:
+                message = "Target project changed after planning"
+                raise ProcessingError(message)
+            body = step_document.append(plan.step_text, plan.detail)
+            afanes.core.atomic.write_text_atomic(project, document.with_body(body).to_text())
+        try:
+            self.trash(capture, confirm=True)
+        except (AfanesError, OSError) as exc:
+            message = "The step was written, but the capture could not be moved to trash; retry the same plan"
+            raise ProcessingError(message) from exc
+        return project
+
+    @staticmethod
+    def _done_now_body(document: NoteDocument, fallback_title: str, completed_on: datetime.date) -> str:
+        """Return a project body whose step is completed today."""
+        step_document = afanes.core.steps.StepDocument(document.body)
+        steps = step_document.steps
+        if steps:
+            target = next((step for step in steps if not step.checked), steps[0])
+            return step_document.tick(target, completed_on)
+        title = document.title or fallback_title
+        appended = step_document.append(title)
+        completed = afanes.core.steps.StepDocument(appended)
+        return completed.tick(completed.steps[-1], completed_on)
+
+    @staticmethod
+    def _capture_step(body: str, fallback_title: str) -> tuple[str, str]:
+        """Split a capture body into a step text and indented detail."""
+        lines = body.splitlines()
+        first = next((index for index, line in enumerate(lines) if line.strip()), None)
+        if first is None:
+            return fallback_title, ""
+        text = lines[first].strip().lstrip("#").strip() or fallback_title
+        detail = "\n".join(lines[first + 1 :]).strip("\n")
+        return text, detail
 
     def _processing_destination(self, plan: ProcessingPlan) -> Path:
         """Resolve and validate the destination path for a plan."""
@@ -1668,7 +1858,7 @@ class Vault:
         title: str,
         note_type: NoteType,
         *,
-        category: ReferenceCategory | None = None,
+        category: CategoryLabel | None = None,
         directory: Path | None = None,
         body: str = "",
         status: Status | None = None,
@@ -1682,7 +1872,7 @@ class Vault:
             title is derived separately from its body.
         note_type : NoteType
             Declared type for the new note.
-        category : ReferenceCategory | None
+        category : CategoryLabel | None
             Reference category. Only valid when ``note_type`` is
             :attr:`NoteType.REFERENCE`; ``None`` creates an uncategorized
             reference.
@@ -1722,10 +1912,8 @@ class Vault:
         target_directory.mkdir(parents=True, exist_ok=True)
 
         snapshot = self.scan()
-        scheme = ReferenceScheme.for_note(note_type, category)
-        taken = {
-            note.name for note in snapshot.notes if ReferenceScheme.for_note(note.note_type, note.category) is scheme
-        }
+        scheme = ReferenceScheme.for_note(note_type)
+        taken = {note.name for note in snapshot.notes if ReferenceScheme.for_note(note.note_type) is scheme}
         taken.update(entry.stem for entry in target_directory.iterdir())
         taken.update(entry.name for entry in target_directory.iterdir())
         name = afanes.core.names.unique_name(afanes.core.names.safe_filename(title), taken)
@@ -1739,7 +1927,7 @@ class Vault:
         self,
         reference_name: str,
         note_type: NoteType,
-        category: ReferenceCategory | None = None,
+        category: CategoryLabel | None = None,
         *,
         body: str = "",
         text: str | None = None,
@@ -1753,7 +1941,7 @@ class Vault:
             into the identity filename.
         note_type : NoteType
             Declared type for the new note.
-        category : ReferenceCategory | None
+        category : CategoryLabel | None
             Reference category. Only valid when ``note_type`` is
             :attr:`NoteType.REFERENCE`; ``None`` creates an uncategorized
             reference.
@@ -1798,7 +1986,7 @@ class Vault:
             content = self._new_note_document(note_type, category, None, body).to_text()
         else:
             parsed = NoteDocument.from_text(text)
-            if parsed.note_type is not note_type or parsed.category is not category:
+            if parsed.note_type is not note_type or parsed.category != category:
                 message = "Note text does not match the requested type and category"
                 raise NoteParseError(message)
             content = text
@@ -1809,7 +1997,7 @@ class Vault:
             raise VaultError(message)
 
         name = afanes.core.names.safe_filename(reference_name)
-        scheme = ReferenceScheme.for_note(note_type, category)
+        scheme = ReferenceScheme.for_note(note_type)
         snapshot = self.scan()
         if snapshot.catalog.candidates(scheme, name):
             message = f"A {scheme.value} note named {name!r} already exists"
@@ -1826,106 +2014,6 @@ class Vault:
         target_directory.mkdir(parents=True, exist_ok=True)
         afanes.core.atomic.write_text_atomic(target, content)
         return target
-
-    def create_project_action(
-        self,
-        title: str,
-        project: NoteReference,
-        *,
-        status: Status | None = Status.ACTIVE,
-        due_date: datetime.date | None = None,
-        people: Iterable[str] = (),
-    ) -> Path:
-        """Create an action linked to a resolved project.
-
-        Parameters
-        ----------
-        title : str
-            Human title for the action. The first line becomes the note's
-            heading and the sanitized title becomes its identity.
-        project : NoteReference
-            Project reference to write into the action's ``project``
-            frontmatter. It must use the ``project`` scheme and resolve
-            uniquely in the current vault.
-        status : Status | None
-            Initial action status. ``None`` omits the key entirely. Defaults
-            to ``active``.
-        due_date : datetime.date | None
-            Optional calendar due date.
-        people : Iterable[str]
-            Person names assigned to the action. Names may be unresolved.
-
-        Returns
-        -------
-        Path
-            Absolute path to the created action.
-
-        Raises
-        ------
-        VaultError
-            If the title is blank, the project reference does not resolve, or
-            the destination is not a directory.
-        InvalidReferenceError
-            If ``project`` is not a project-scheme reference or a person name
-            is invalid.
-        NoteParseError
-            If the status is not valid for an action.
-        VaultPathError
-            If the action directory escapes the vault.
-        NameCollisionError
-            If the generated filename cannot be made unique.
-
-        Notes
-        -----
-        Existing action identities are preserved: a collision receives the
-        smallest available numeric suffix. Only the new action is written; the
-        project note is never changed. The write is atomic.
-        """
-        trimmed = title.strip()
-        if not trimmed:
-            message = "An action needs a title"
-            raise VaultError(message)
-        if project.scheme is not ReferenceScheme.PROJECT or not project.name.strip():
-            message = "An action needs a project reference"
-            raise InvalidReferenceError(message)
-        if status is not None and status not in NoteType.ACTION.allowed_statuses:
-            message = "Status is not valid for an action"
-            raise NoteParseError(message)
-
-        snapshot = self.scan()
-        resolution = snapshot.catalog.resolve(project)
-        if resolution.outcome is not ResolutionOutcome.RESOLVED:
-            message = f"Project reference does not resolve: {project.name}"
-            raise VaultError(message)
-
-        people_references = tuple(self._person_reference(name) for name in people)
-        target_directory = self.contained(self.directory_for(NoteType.ACTION))
-        if target_directory.exists() and not target_directory.is_dir():
-            message = f"Note directory is not a directory: {target_directory}"
-            raise VaultError(message)
-        target_directory.mkdir(parents=True, exist_ok=True)
-
-        taken = {
-            note.name
-            for note in snapshot.notes
-            if ReferenceScheme.for_note(note.note_type, note.category) is ReferenceScheme.NOTE
-        }
-        taken.update(entry.stem for entry in target_directory.iterdir())
-        taken.update(entry.name for entry in target_directory.iterdir())
-        name = afanes.core.names.unique_name(afanes.core.names.safe_filename(trimmed), taken)
-
-        document = self._new_note_document(NoteType.ACTION, None, status, f"# {trimmed}\n")
-        raw = dict(document.raw)
-        if due_date is not None:
-            raw["due_date"] = due_date.isoformat()
-        if people_references:
-            raw["people"] = [f"{reference.scheme.value}:{reference.name}" for reference in people_references]
-        raw["project"] = f"{project.scheme.value}:{project.name}"
-        document = document.with_metadata(raw)
-
-        path = target_directory / f"{name}{NOTE_SUFFIX}"
-        afanes.core.atomic.write_text_atomic(path, document.to_text())
-        return path
 
     def set_status(
         self,
@@ -2040,6 +2128,357 @@ class Vault:
             raise VaultError(message)
         afanes.core.atomic.write_text_atomic(source, text)
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    def plan_category_move(
+        self,
+        note_path: Path,
+        category: CategoryLabel | None,
+        *,
+        snapshot: VaultSnapshot | None = None,
+    ) -> "CategoryMovePreview":
+        """Plan moving a reference to its category folder without writing.
+
+        Parameters
+        ----------
+        note_path : Path
+            Path to an existing reference note, relative or absolute.
+        category : CategoryLabel | None
+            New category, or ``None`` to return the note to ``reference/``.
+        snapshot : VaultSnapshot | None
+            Pre-built scan to avoid rescanning, or ``None`` to scan the vault.
+
+        Returns
+        -------
+        CategoryMovePreview
+            Current path, destination path, and the category to write.
+
+        Raises
+        ------
+        VaultError
+            If the note is missing from the snapshot or is not a reference.
+        NameCollisionError
+            If the destination already contains a file with the same name.
+        VaultPathError
+            If a path escapes the vault.
+        """
+        source = self.contained(note_path)
+        vault = snapshot or self.scan()
+        note = vault.find_note(source)
+        if note is None:
+            message = f"Note is not part of the vault: {note_path}"
+            raise VaultError(message)
+        if note.note_type is not NoteType.REFERENCE:
+            message = "Only reference notes use a category folder"
+            raise VaultError(message)
+        target_directory = self.directory_for(NoteType.REFERENCE, category)
+        target = target_directory / source.name
+        if not VaultPath.same(target, source) and target.exists():
+            message = f"Destination already exists: {target}"
+            raise NameCollisionError(message)
+        return CategoryMovePreview(note_path=source, target_path=target, category=category)
+
+    def apply_category_move(
+        self,
+        preview: "CategoryMovePreview",
+        *,
+        confirm: bool = False,
+    ) -> Path:
+        """Write a new category and move the reference to its folder.
+
+        Parameters
+        ----------
+        preview : CategoryMovePreview
+            Plan produced by :meth:`plan_category_move`.
+        confirm : bool
+            Explicit confirmation gate. The operation raises unless this is
+            ``True``.
+
+        Returns
+        -------
+        Path
+            Absolute path after the move.
+
+        Raises
+        ------
+        VaultError
+            If confirmation is missing or the move fails.
+        NameCollisionError
+            If the destination appeared after planning.
+        NoteParseError
+            If the note cannot be parsed.
+        VaultPathError
+            If a path escapes the vault.
+
+        Notes
+        -----
+        The new frontmatter is written atomically before the file moves. If the
+        move fails, the note keeps the new category in its old folder; grouping
+        uses the label, so the drift is invisible and retryable.
+        """
+        if not confirm:
+            message = "Moving a category requires explicit confirmation"
+            raise VaultError(message)
+        source = self.contained(preview.note_path)
+        target = self.contained(preview.target_path)
+        document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
+        raw = dict(document.raw)
+        if preview.category is None:
+            raw.pop("category", None)
+        else:
+            raw["category"] = preview.category.value
+        afanes.core.atomic.write_text_atomic(source, document.with_metadata(raw).to_text())
+        if VaultPath.same(source, target):
+            return source
+        if target.exists():
+            message = f"Destination already exists: {target}"
+            raise NameCollisionError(message)
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            source.replace(target)
+        except OSError as exc:
+            message = f"Could not move the note to its category folder: {source}"
+            raise VaultError(message) from exc
+        return target
+
+    def tick_step(
+        self,
+        note_path: Path,
+        line_index: int,
+        completed_on: datetime.date,
+        *,
+        confirm: bool = False,
+    ) -> str:
+        """Check one project step and record its actual date.
+
+        Parameters
+        ----------
+        note_path : Path
+            Path to an existing project note.
+        line_index : int
+            Zero-based body line of the step.
+        completed_on : datetime.date
+            Calendar date written as ``actual``.
+        confirm : bool
+            Explicit confirmation gate.
+
+        Returns
+        -------
+        str
+            SHA-256 digest of the written bytes.
+
+        Raises
+        ------
+        VaultError
+            If confirmation is missing, the note is not a project, or the line
+            is not a step.
+        StepEditError
+            If the step cannot be rewritten safely.
+        StepMetadataError
+            If the metadata cannot be written as one valid comment.
+        """
+        return self._write_step(
+            note_path,
+            line_index,
+            lambda document, step: document.tick(step, completed_on),
+            confirm=confirm,
+        )
+
+    def untick_step(self, note_path: Path, line_index: int, *, confirm: bool = False) -> str:
+        """Reopen one project step and remove its actual date.
+
+        Parameters
+        ----------
+        note_path : Path
+            Path to an existing project note.
+        line_index : int
+            Zero-based body line of the step.
+        confirm : bool
+            Explicit confirmation gate.
+
+        Returns
+        -------
+        str
+            SHA-256 digest of the written bytes.
+
+        Raises
+        ------
+        VaultError
+            If confirmation is missing, the note is not a project, or the line
+            is not a step.
+        StepEditError
+            If the step cannot be rewritten safely.
+        StepMetadataError
+            If the metadata cannot be written as one valid comment.
+        """
+        return self._write_step(
+            note_path,
+            line_index,
+            lambda document, step: document.untick(step),
+            confirm=confirm,
+        )
+
+    def plan_step(
+        self,
+        note_path: Path,
+        line_index: int,
+        plan: datetime.date | None,
+        *,
+        confirm: bool = False,
+    ) -> str:
+        """Replace one project step's plan date.
+
+        Parameters
+        ----------
+        note_path : Path
+            Path to an existing project note.
+        line_index : int
+            Zero-based body line of the step.
+        plan : datetime.date | None
+            New plan date, or ``None`` to remove it.
+        confirm : bool
+            Explicit confirmation gate.
+
+        Returns
+        -------
+        str
+            SHA-256 digest of the written bytes.
+
+        Raises
+        ------
+        VaultError
+            If confirmation is missing, the note is not a project, or the line
+            is not a step.
+        StepEditError
+            If the step cannot be rewritten safely.
+        StepMetadataError
+            If the metadata cannot be written as one valid comment.
+        """
+        return self._write_step(
+            note_path,
+            line_index,
+            lambda document, step: document.with_plan(step, plan),
+            confirm=confirm,
+        )
+
+    def set_step_owners(
+        self,
+        note_path: Path,
+        line_index: int,
+        owners: Iterable[str],
+        *,
+        confirm: bool = False,
+    ) -> str:
+        """Replace one project step's owner list.
+
+        Parameters
+        ----------
+        note_path : Path
+            Path to an existing project note.
+        line_index : int
+            Zero-based body line of the step.
+        owners : Iterable[str]
+            New owner names. An empty result makes the step the user's own
+            work again.
+        confirm : bool
+            Explicit confirmation gate.
+
+        Returns
+        -------
+        str
+            SHA-256 digest of the written bytes.
+
+        Raises
+        ------
+        VaultError
+            If confirmation is missing, the note is not a project, or the line
+            is not a step.
+        StepEditError
+            If the step cannot be rewritten safely.
+        StepMetadataError
+            If the metadata cannot be written as one valid comment.
+        """
+        return self._write_step(
+            note_path,
+            line_index,
+            lambda document, step: document.with_owners(step, owners),
+            confirm=confirm,
+        )
+
+    def append_step(
+        self,
+        note_path: Path,
+        text: str,
+        detail: str = "",
+        *,
+        confirm: bool = False,
+    ) -> str:
+        """Append one unchecked step to a project body.
+
+        Parameters
+        ----------
+        note_path : Path
+            Path to an existing project note.
+        text : str
+            Step text. It must contain a non-blank line.
+        detail : str
+            Optional prose written indented beneath the step.
+        confirm : bool
+            Explicit confirmation gate.
+
+        Returns
+        -------
+        str
+            SHA-256 digest of the written bytes.
+
+        Raises
+        ------
+        VaultError
+            If confirmation is missing or the note is not a project.
+        StepEditError
+            If the step text is blank.
+        StepMetadataError
+            If metadata cannot be written as one valid comment.
+        """
+        if not confirm:
+            message = "Changing a step requires explicit confirmation"
+            raise VaultError(message)
+        source = self.contained(note_path)
+        document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
+        if document.note_type is not NoteType.PROJECT:
+            message = "Only project notes contain steps"
+            raise VaultError(message)
+        step_document = afanes.core.steps.StepDocument(document.body)
+        body = step_document.append(text, detail)
+        text_out = document.with_body(body).to_text()
+        afanes.core.atomic.write_text_atomic(source, text_out)
+        return hashlib.sha256(text_out.encode("utf-8")).hexdigest()
+
+    def _write_step(
+        self,
+        note_path: Path,
+        line_index: int,
+        transform: "Callable[[afanes.core.steps.StepDocument, ProjectStep], str]",
+        *,
+        confirm: bool,
+    ) -> str:
+        """Apply one line-level step transformation atomically."""
+        if not confirm:
+            message = "Changing a step requires explicit confirmation"
+            raise VaultError(message)
+        source = self.contained(note_path)
+        document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
+        if document.note_type is not NoteType.PROJECT:
+            message = "Only project notes contain steps"
+            raise VaultError(message)
+        step_document = afanes.core.steps.StepDocument(document.body)
+        step = next((value for value in step_document.steps if value.line_index == line_index), None)
+        if step is None:
+            message = "The step line no longer exists in this project"
+            raise VaultError(message)
+        body = transform(step_document, step)
+        text_out = document.with_body(body).to_text()
+        afanes.core.atomic.write_text_atomic(source, text_out)
+        return hashlib.sha256(text_out.encode("utf-8")).hexdigest()
 
     def capture(self, text: str) -> Path:
         """Capture raw text as an unclassified note in this vault's inbox.
@@ -2188,7 +2627,7 @@ class Vault:
             raise VaultError(message)
 
         new_name = afanes.core.names.safe_filename(new_title)
-        scheme = ReferenceScheme.for_note(note.note_type, note.category)
+        scheme = ReferenceScheme.for_note(note.note_type)
         target = source.with_name(f"{new_name}{NOTE_SUFFIX}")
         same_name = afanes.core.names.normalize_name(new_name) == afanes.core.names.normalize_name(note.name)
 
@@ -2546,27 +2985,9 @@ class Vault:
         )
 
     @staticmethod
-    def _person_reference(name: str) -> NoteReference:
-        """Build a person reference from a name supplied by the user."""
-        trimmed = name.strip()
-        if not trimmed:
-            message = "A person reference needs a name"
-            raise ProcessingError(message)
-        return NoteReference(scheme=ReferenceScheme.PERSON, name=trimmed)
-
-    @staticmethod
-    def _project_reference(name: str) -> NoteReference:
-        """Build a project reference from a name supplied by the user."""
-        trimmed = name.strip()
-        if not trimmed:
-            message = "A project reference needs a name"
-            raise ProcessingError(message)
-        return NoteReference(scheme=ReferenceScheme.PROJECT, name=trimmed)
-
-    @staticmethod
     def _new_note_document(
         note_type: NoteType,
-        category: ReferenceCategory | None,
+        category: CategoryLabel | None,
         status: Status | None,
         body: str,
     ) -> NoteDocument:
@@ -2583,7 +3004,6 @@ class Vault:
             newline="\n",
             has_frontmatter=True,
             note_type=note_type,
-            references=(),
             category=category,
             status=status,
         )
@@ -2618,14 +3038,13 @@ class Vault:
         old: NoteReference,
         new: NoteReference,
     ) -> bool:
-        """Rewrite body and frontmatter references in one note atomically."""
+        """Rewrite body references in one note atomically."""
         document = NoteDocument.from_text(data.decode("utf-8"))
         rewrite = afanes.core.links.MarkdownBody(document.body).rewrite_references(old, new)
-        rewritten, frontmatter_count = document.rewrite_references(old, new)
-        if rewrite.count + frontmatter_count == 0:
+        if rewrite.count == 0:
             return False
 
-        final = rewritten.with_body(rewrite.text)
+        final = document.with_body(rewrite.text)
         text = final.to_text()
         reader = afanes.core.links.ReferenceReader()
         Vault._verify_rewrite(text, old, reader)
@@ -2640,12 +3059,11 @@ class Vault:
         new: NoteReference,
         new_title: str,
     ) -> bool:
-        """Rewrite a renamed note's heading and references atomically."""
+        """Rewrite a renamed note's heading and body references atomically."""
         current = data.decode("utf-8")
         document = NoteDocument.from_text(current)
         rewrite = afanes.core.links.MarkdownBody(document.body).rewrite_references(old, new)
-        rewritten, _ = document.rewrite_references(old, new)
-        final = rewritten.with_body(rewrite.text).with_heading(new_title)
+        final = document.with_body(rewrite.text).with_heading(new_title)
         text = final.to_text()
         if text == current:
             return False
@@ -2663,8 +3081,7 @@ class Vault:
         """Confirm that a rewritten note no longer names the old reference."""
         document = NoteDocument.from_text(text)
         old_key = ReferenceKey.from_reference(old)
-        body_references = reader.extract(document.body)
-        remaining = body_references + list(document.references)
+        remaining = reader.extract(document.body)
         if any(ReferenceKey.from_reference(reference) == old_key for reference in remaining):
             message = "Rewritten note still contains the old reference"
             raise ReferenceRewriteError(message)

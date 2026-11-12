@@ -16,7 +16,7 @@ import afanes.ui.views.workspace
 from afanes.core.editing import DraftMode
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
-SIX_SECTIONS = 6
+FOUR_SECTIONS = 4
 
 
 @pytest.fixture(autouse=True)
@@ -84,7 +84,7 @@ class TestWorkspaceShell:
         assert view.root.key == "workspace-view"
         assert isinstance(view.root, ft.Column)
         assert view.capture_field.label == afanes.ui.strings.COMPOSER_LABEL
-        assert len(view.section_tiles) == SIX_SECTIONS
+        assert len(view.section_tiles) == FOUR_SECTIONS
         assert view.review_tile.title == afanes.ui.strings.REVIEW_TITLE
         assert view.page_view.empty_text.visible is True
 
@@ -146,8 +146,8 @@ class TestWorkspaceShell:
 
         assert view.section_counts[afanes.ui.state.WorkspaceSection.INBOX].value == "2"
         assert view.section_counts[afanes.ui.state.WorkspaceSection.PROJECTS].value == "1"
-        assert view.section_counts[afanes.ui.state.WorkspaceSection.PEOPLE].value == "1"
-        assert view.section_counts[afanes.ui.state.WorkspaceSection.ACTIONS].value == "0"
+        assert view.section_counts[afanes.ui.state.WorkspaceSection.REFERENCES].value == "1"
+        assert view.section_counts[afanes.ui.state.WorkspaceSection.NEEDS_ATTENTION].value == "0"
         assert "3 pending" in view.review_count.value
 
     def test_capture_appears_only_under_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -157,9 +157,9 @@ class TestWorkspaceShell:
         state = afanes.ui.state.app_state
 
         assert view.section_counts[afanes.ui.state.WorkspaceSection.INBOX].value == "1"
-        assert view.section_counts[afanes.ui.state.WorkspaceSection.NOTES].value == "0"
+        assert view.section_counts[afanes.ui.state.WorkspaceSection.NEEDS_ATTENTION].value == "0"
 
-        asyncio.run(_handler(view.section_tiles[afanes.ui.state.WorkspaceSection.NOTES])())
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.WorkspaceSection.NEEDS_ATTENTION])())
 
         empty = view.browser_list.controls[0]
         assert isinstance(empty, ft.Container)
@@ -167,7 +167,7 @@ class TestWorkspaceShell:
         assert isinstance(content, ft.Text)
         assert content.value == afanes.ui.strings.BROWSER_EMPTY
         assert state.browser_listing is not None
-        assert state.browser_listing.group(afanes.core.search.BrowserSection.NOTES).notes == ()
+        assert state.browser_listing.group(afanes.core.search.BrowserSection.NEEDS_ATTENTION).notes == ()
         assert note.is_file()
 
     def test_unreadable_note_is_listed_and_opens_in_rescue_mode(
@@ -245,7 +245,7 @@ class TestBrowserSearch:
         titles = [control.title for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
         assert titles == ["A person"]
 
-    def test_body_only_term_lists_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_body_only_term_lists_the_note(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _write_note(vault / "reference" / "Ada.md", note_type="reference", body="# Ada\n\nAnalytical engine")
         view = _open_workspace(tmp_path, monkeypatch)
@@ -254,11 +254,7 @@ class TestBrowserSearch:
         view.search_field.value = "analytical"
         asyncio.run(_change_handler(view.search_field)())
 
-        empty = view.browser_list.controls[0]
-        assert isinstance(empty, ft.Container)
-        content = empty.content
-        assert isinstance(content, ft.Text)
-        assert content.value == afanes.ui.strings.BROWSER_NO_MATCH
+        assert _row_for(view.browser_list, "Ada") is not None
 
 
 class TestBrowserHistory:

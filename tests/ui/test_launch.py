@@ -97,6 +97,7 @@ class TestRuntimeGuards:
     def test_missing_sdk_reports_one_message(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
+        _ = ft.run
         real_import = builtins.__import__
 
         def fake_import(

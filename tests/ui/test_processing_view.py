@@ -13,10 +13,8 @@ import afanes.core.vault
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.views.processing
-from afanes.core.processing import ProcessingOutcome
-from afanes.models.note import NoteType, ReferenceCategory, Status
-
-TWO_WARNINGS = 2
+from afanes.core.processing import ProcessingOutcome, ProcessingPlan
+from afanes.models.note import NoteType, Status
 
 
 @pytest.fixture(autouse=True)
@@ -74,7 +72,14 @@ class TestProcessingView:
 
         assert view.capture_title.value == "Buy milk"
         assert view.capture_body.value == "Buy milk"
-        assert [option.key for option in view.outcome.options] == ["action", "project", "reference", "later", "trash"]
+        assert [option.key for option in view.outcome.options] == [
+            "project",
+            "done_now",
+            "append_step",
+            "reference",
+            "later",
+            "trash",
+        ]
         assert view.plan_panel.visible is False
         assert view.success_panel.visible is False
 
@@ -82,34 +87,35 @@ class TestProcessingView:
         root = tmp_path / "vault"
         root.mkdir()
         capture = afanes.core.vault.Vault(root).capture("Q1: Planning?")
-        monkeypatch.setattr(
-            afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: tmp_path / "settings.json")
-        )
-        state = afanes.ui.state.app_state
-
-        async def scenario() -> None:
-            await state.choose_vault(root)
-            await state.begin_processing(capture)
-
-        asyncio.run(scenario())
+        _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
         assert view.capture_title.value == "Q1: Planning?"
         assert view.capture_body.value == "# Q1: Planning?"
 
-    def test_action_outcome_reveals_metadata(self) -> None:
+    def test_project_outcome_reveals_status_and_due_date(self) -> None:
         _open_capture()
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
-        view.outcome.value = ProcessingOutcome.ACTION.value
+        view.outcome.value = ProcessingOutcome.PROJECT.value
 
         _select_outcome(view)
 
         assert view.status.visible is True
         assert view.due_date.visible is True
-        assert view.project.visible is True
-        assert view.people.visible is True
+        assert view.project.visible is False
 
-    def test_reference_outcome_hides_status_and_project(self) -> None:
+    def test_append_outcome_reveals_the_project_field(self) -> None:
+        _open_capture()
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.APPEND_STEP.value
+
+        _select_outcome(view)
+
+        assert view.status.visible is False
+        assert view.due_date.visible is False
+        assert view.project.visible is True
+
+    def test_reference_outcome_hides_metadata(self) -> None:
         _open_capture()
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
         view.outcome.value = ProcessingOutcome.REFERENCE.value
@@ -119,7 +125,6 @@ class TestProcessingView:
         assert view.status.visible is False
         assert view.due_date.visible is False
         assert view.project.visible is False
-        assert view.people.visible is True
 
     def test_trash_outcome_hides_all_metadata(self) -> None:
         _open_capture()
@@ -131,14 +136,14 @@ class TestProcessingView:
         assert view.status.visible is False
         assert view.due_date.visible is False
         assert view.project.visible is False
-        assert view.people.visible is False
 
     def test_plan_preview_shows_the_destination(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
         vault = afanes.core.vault.Vault(root)
         capture = vault.capture("Buy milk")
-        plan = vault.plan_processing(capture, ProcessingOutcome.ACTION)
+        plan = vault.plan_processing(capture, ProcessingOutcome.PROJECT)
+        assert isinstance(plan, ProcessingPlan)
         state = _open_capture()
 
         state.processing_plan = plan
@@ -146,29 +151,43 @@ class TestProcessingView:
 
         assert view.plan_panel.visible is True
         assert str(plan.target_path) in view.plan_destination.value
-        assert "Action" in view.plan_details.value
+        assert "Project" in view.plan_details.value
 
-    def test_plan_preview_shows_scheme_and_unresolved_warnings(self, tmp_path: Path) -> None:
+    def test_plan_preview_shows_the_scheme_warning(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
         vault = afanes.core.vault.Vault(root)
-        vault.create("Note", NoteType.NOTE, body="[Launch](<note:Launch>)\n")
+        note = vault.create("Note", NoteType.REFERENCE, body="[Launch](<note:Launch>)\n")
         capture = vault.capture("Launch")
-        plan = vault.plan_processing(capture, ProcessingOutcome.PROJECT, people=("Grace",))
+        plan = vault.plan_processing(capture, ProcessingOutcome.PROJECT)
         state = _open_capture("Launch")
+        assert note.is_file()
 
         state.processing_plan = plan
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
         assert view.plan_warnings.visible is True
-        assert len(view.plan_warnings.controls) == TWO_WARNINGS
         texts = [control.value for control in view.plan_warnings.controls if isinstance(control, ft.Text)]
         assert any("changes scheme" in text for text in texts)
-        assert any("Grace" in text for text in texts)
+
+    def test_append_preview_shows_the_project_and_step(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.Vault(root)
+        project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
+        capture = vault.capture("Call the plumber")
+        plan = vault.plan_processing(capture, ProcessingOutcome.APPEND_STEP, project="Home")
+        state = _open_capture("Call the plumber")
+
+        state.processing_plan = plan
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+
+        assert str(project) in view.plan_destination.value
+        assert "Call the plumber" in view.plan_details.value
 
     def test_success_panel_replaces_the_form(self, tmp_path: Path) -> None:
         state = _open_capture()
-        target = tmp_path / "actions" / "Buy milk.md"
+        target = tmp_path / "projects" / "Buy milk.md"
         state.processing_result = target
 
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
@@ -191,7 +210,7 @@ class TestProcessingView:
     def test_invalid_due_date_is_reported_without_planning(self) -> None:
         _open_capture()
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
-        view.outcome.value = ProcessingOutcome.ACTION.value
+        view.outcome.value = ProcessingOutcome.PROJECT.value
         _select_outcome(view)
         view.due_date.value = "not-a-date"
 
@@ -218,12 +237,10 @@ class TestProcessingView:
 
         monkeypatch.setattr(afanes.ui.state.AppState, "plan_processing", fake_plan)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
-        view.outcome.value = ProcessingOutcome.ACTION.value
+        view.outcome.value = ProcessingOutcome.PROJECT.value
         _select_outcome(view)
         view.status.value = "waiting"
         view.due_date.value = "2026-11-20"
-        view.people.value = "Ada, Grace"
-        view.project.value = "Launch"
 
         assert view.preview_button.on_click is not None
         asyncio.run(_click(view.preview_button.on_click))
@@ -232,84 +249,45 @@ class TestProcessingView:
         outcome, kwargs = calls[0]
         status = kwargs["status"]
         assert isinstance(status, Status)
-        assert outcome is ProcessingOutcome.ACTION
+        assert outcome is ProcessingOutcome.PROJECT
         assert status is Status.WAITING
         assert kwargs["due_date"] == datetime.date(2026, 11, 20)
-        assert kwargs["people"] == ("Ada", "Grace")
-        assert kwargs["project"] == "Launch"
+        assert kwargs["project"] is None
 
-    def test_people_suggestions_show_the_title_and_store_the_identity(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    def test_append_preview_passes_the_project_identity(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        root = tmp_path / "vault"
-        root.mkdir()
-        vault = afanes.core.vault.Vault(root)
-        vault.create(
-            "Ada",
-            NoteType.REFERENCE,
-            category=ReferenceCategory.PERSON,
-            body="# Ada, Countess of Lovelace\n",
-        )
-        capture = vault.capture("Plan")
-        _open_vault_capture(root, capture, monkeypatch)
+        _open_capture()
+        calls: list[tuple[ProcessingOutcome, dict[str, object]]] = []
+
+        async def fake_plan(
+            _self: afanes.ui.state.AppState,
+            outcome: ProcessingOutcome,
+            **kwargs: object,
+        ) -> None:
+            calls.append((outcome, kwargs))
+
+        monkeypatch.setattr(afanes.ui.state.AppState, "plan_processing", fake_plan)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
-        view.outcome.value = ProcessingOutcome.ACTION.value
+        view.outcome.value = ProcessingOutcome.APPEND_STEP.value
         _select_outcome(view)
-        view.people.value = "Countess"
+        view.project.value = "Launch"
 
-        _trigger(view.people.on_change)
+        asyncio.run(_click(view.preview_button.on_click))
 
-        assert view.people_suggestions.visible is True
-        tile = view.people_suggestions.controls[0]
-        assert isinstance(tile, ft.ListTile)
-        assert tile.title == "Ada, Countess of Lovelace"
-        assert tile.subtitle == "Ada"
-
-        asyncio.run(_click(tile.on_click))
-
-        assert view.people.value == "Ada"
-        assert view.people_suggestions.visible is False
-
-    def test_selecting_a_people_suggestion_replaces_only_the_active_token(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        root = tmp_path / "vault"
-        root.mkdir()
-        vault = afanes.core.vault.Vault(root)
-        vault.create(
-            "Ada",
-            NoteType.REFERENCE,
-            category=ReferenceCategory.PERSON,
-            body="# Ada, Countess of Lovelace\n",
-        )
-        capture = vault.capture("Plan")
-        _open_vault_capture(root, capture, monkeypatch)
-        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
-        view.outcome.value = ProcessingOutcome.ACTION.value
-        _select_outcome(view)
-        view.people.value = "Grace, Countess"
-
-        _trigger(view.people.on_change)
-        tile = view.people_suggestions.controls[0]
-        assert isinstance(tile, ft.ListTile)
-        asyncio.run(_click(tile.on_click))
-
-        assert view.people.value == "Grace, Ada"
+        assert calls[0][0] is ProcessingOutcome.APPEND_STEP
+        assert calls[0][1]["project"] == "Launch"
 
     def test_project_suggestions_store_the_identity(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"
         root.mkdir()
         vault = afanes.core.vault.Vault(root)
-        vault.create(
-            "Launch",
-            NoteType.PROJECT,
-            status=Status.ACTIVE,
-            body="# Launch the product\n",
-        )
+        vault.create("Launch", NoteType.PROJECT, body="# Launch the product\n")
         capture = vault.capture("Plan")
         _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
-        view.outcome.value = ProcessingOutcome.ACTION.value
+        view.outcome.value = ProcessingOutcome.APPEND_STEP.value
         _select_outcome(view)
         view.project.value = "product"
 
@@ -330,45 +308,20 @@ class TestProcessingView:
         root = tmp_path / "vault"
         root.mkdir()
         vault = afanes.core.vault.Vault(root)
-        vault.create(
-            "Ada",
-            NoteType.REFERENCE,
-            category=ReferenceCategory.PERSON,
-            body="# Ada, Countess of Lovelace\n",
-        )
-        vault.create(
-            "Ada King",
-            NoteType.REFERENCE,
-            category=ReferenceCategory.PERSON,
-            body="# Ada, Countess of Lovelace\n",
-        )
+        vault.create("Home", NoteType.PROJECT, body="# Home improvements\n")
+        vault.create("Cabin", NoteType.PROJECT, body="# Home improvements\n")
         capture = vault.capture("Plan")
         _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
-        view.outcome.value = ProcessingOutcome.ACTION.value
+        view.outcome.value = ProcessingOutcome.APPEND_STEP.value
         _select_outcome(view)
-        view.people.value = "Countess"
+        view.project.value = "improvements"
 
-        _trigger(view.people.on_change)
+        _trigger(view.project.on_change)
 
-        tiles = [control for control in view.people_suggestions.controls if isinstance(control, ft.ListTile)]
-        assert [tile.title for tile in tiles] == ["Ada, Countess of Lovelace", "Ada, Countess of Lovelace"]
-        assert {tile.subtitle for tile in tiles} == {"Ada", "Ada King"}
-
-    def test_unmatched_people_text_stays_free_text(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        root = tmp_path / "vault"
-        root.mkdir()
-        capture = afanes.core.vault.Vault(root).capture("Plan")
-        _open_vault_capture(root, capture, monkeypatch)
-        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
-        view.outcome.value = ProcessingOutcome.ACTION.value
-        _select_outcome(view)
-        view.people.value = "Unknown person"
-
-        _trigger(view.people.on_change)
-
-        assert view.people.value == "Unknown person"
-        assert view.people_suggestions.visible is False
+        tiles = [control for control in view.project_suggestions.controls if isinstance(control, ft.ListTile)]
+        assert [tile.title for tile in tiles] == ["Home improvements", "Home improvements"]
+        assert {tile.subtitle for tile in tiles} == {"Cabin", "Home"}
 
     def test_cancel_invokes_the_callback(self) -> None:
         _open_capture()

@@ -28,10 +28,8 @@ from afanes.ui.components.banner import Banner
 _SECTION_ICONS = {
     afanes.ui.state.WorkspaceSection.INBOX: ft.Icons.INBOX,
     afanes.ui.state.WorkspaceSection.PROJECTS: ft.Icons.FOLDER,
-    afanes.ui.state.WorkspaceSection.ACTIONS: ft.Icons.CHECK_CIRCLE_OUTLINE,
-    afanes.ui.state.WorkspaceSection.PEOPLE: ft.Icons.PEOPLE,
     afanes.ui.state.WorkspaceSection.REFERENCES: ft.Icons.BOOK,
-    afanes.ui.state.WorkspaceSection.NOTES: ft.Icons.DESCRIPTION,
+    afanes.ui.state.WorkspaceSection.NEEDS_ATTENTION: ft.Icons.WARNING_AMBER,
 }
 
 
@@ -367,7 +365,7 @@ class WorkspaceView:
             browser_section = section.browser_section
             count = 0
             if listing is not None and browser_section is not None:
-                count = len(listing.group(browser_section).notes)
+                count = sum(len(group.notes) for group in listing.groups_for(browser_section))
             self.section_counts[section].value = str(count)
             tile.selected = state.active_section is section
         self.review_count.value = afanes.ui.strings.review_pending(state.review_pending_count)
@@ -403,8 +401,29 @@ class WorkspaceView:
         section = state.active_section.browser_section
         if listing is None or section is None:
             return []
-        notes = listing.group(section).notes
-        if not notes:
+        groups = listing.groups_for(section)
+        controls: list[ft.Control] = []
+        if section is afanes.core.search.BrowserSection.REFERENCES:
+            for group in groups:
+                if not group.notes:
+                    continue
+                controls.append(
+                    ft.Container(
+                        padding=afanes.ui.theme.ITEM_GAP,
+                        content=ft.Text(
+                            group.title,
+                            theme_style=ft.TextThemeStyle.LABEL_LARGE,
+                            color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                        ),
+                    )
+                )
+                controls.extend(self._note_row(note) for note in group.notes)
+            groups_empty = not controls
+        else:
+            notes = groups[0].notes if groups else ()
+            controls = [self._note_row(note) for note in notes]
+            groups_empty = not notes
+        if groups_empty:
             message = (
                 afanes.ui.strings.BROWSER_NO_MATCH if state.browser_query.strip() else afanes.ui.strings.BROWSER_EMPTY
             )
@@ -414,7 +433,7 @@ class WorkspaceView:
                     content=ft.Text(message, color=afanes.ui.theme.MUTED_TEXT_COLOR, selectable=True),
                 )
             ]
-        return [self._note_row(note) for note in notes]
+        return controls
 
     def _note_row(self, note: VaultNote) -> ft.Control:
         """Build one clickable browser entry."""

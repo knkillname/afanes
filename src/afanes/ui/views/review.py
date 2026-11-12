@@ -1,13 +1,14 @@
 # SPDX-FileCopyrightText: 2026-present Mario Abarca <knkillname@gmail.com>
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Guided review cards for pending captures and project next steps.
+"""Guided review cards for captures, steps, and projects.
 
 The view reads a snapshotted review session from the shared application state
 and forwards every write to its commands. It never parses Markdown or performs
 file I/O.
 """
 
+import datetime
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -24,7 +25,7 @@ from afanes.ui.components.status import StatusLabel
 
 
 class ReviewView:
-    """Review queue, project cards, and the completion summary.
+    """Review queue, step cards, project cards, and the completion summary.
 
     Parameters
     ----------
@@ -42,8 +43,8 @@ class ReviewView:
         """
         self._state = afanes.ui.state.app_state
         self._update = update
-        self._creating = False
-        self._action_title = ""
+        self._form_mode: str | None = None
+        self._typed = ""
         self._form_error: str | None = None
         self._confirmation: str | None = None
         self.root = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP, expand=True, key="review-view")
@@ -73,10 +74,12 @@ class ReviewView:
             item = session.current
             if item is None:
                 controls.append(self._completion_card(session.reviewed_count, session.skipped_count))
-            elif item.kind is afanes.core.search.ReviewItemKind.PROJECT:
-                controls.append(self._project_card(item))
-            else:
+            elif item.kind is afanes.core.search.ReviewItemKind.INBOX:
                 controls.append(self._capture_card(item))
+            elif item.step is not None:
+                controls.append(self._step_card(item))
+            else:
+                controls.append(self._project_card(item))
         self.root.controls = controls
 
     def _start_card(self) -> ft.Control:
@@ -131,7 +134,7 @@ class ReviewView:
         return Card(body).build()
 
     def _capture_card(self, item: ReviewItem) -> ft.Control:
-        """Build the fallback card for an inbox capture awaiting processing."""
+        """Build the card for an inbox capture awaiting processing."""
         title = self._state.note_title(item.path)
         body = ft.Column(
             controls=[
@@ -159,19 +162,91 @@ class ReviewView:
         )
         return Card(body).build()
 
+    def _step_card(self, item: ReviewItem) -> ft.Control:
+        """Build a due-step or waiting-step card with its actions."""
+        step = item.step
+        summary = item.project
+        if step is None or summary is None:
+            return self._broken_card(item)
+        due = item.kind is afanes.core.search.ReviewItemKind.DUE_STEP
+        title = afanes.ui.strings.REVIEW_DUE_STEP_TITLE if due else afanes.ui.strings.REVIEW_WAITING_STEP_TITLE
+        controls: list[ft.Control] = [
+            ft.Text(title, theme_style=ft.TextThemeStyle.LABEL_LARGE),
+            ft.Text(summary.note.title, theme_style=ft.TextThemeStyle.TITLE_MEDIUM, selectable=True),
+            ft.Text(step.text, theme_style=ft.TextThemeStyle.HEADLINE_SMALL, selectable=True),
+        ]
+        if step.owners:
+            controls.append(
+                ft.Text(
+                    afanes.ui.strings.REVIEW_STEP_OWNERS.format(owners=", ".join(step.owners)),
+                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                )
+            )
+        if step.plan is not None:
+            controls.append(
+                ft.Text(
+                    afanes.ui.strings.PAGE_STEP_PLAN.format(date=step.plan.isoformat()),
+                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                )
+            )
+        controls.append(self._form_controls())
+        controls.append(self._step_actions(due=due))
+        return Card(ft.Column(controls=controls, spacing=afanes.ui.theme.ITEM_GAP)).build()
+
+    def _step_actions(self, *, due: bool) -> ft.Control:
+        """Build the action row for one due or waiting step."""
+        buttons: list[ft.Control] = []
+        if due:
+            buttons.extend(
+                [
+                    ft.FilledButton(
+                        content=afanes.ui.strings.REVIEW_DO_NOW,
+                        icon=ft.Icons.CHECK,
+                        on_click=self._do_now,
+                        key="review-do-now",
+                    ),
+                    ft.OutlinedButton(
+                        content=afanes.ui.strings.REVIEW_POSTPONE,
+                        on_click=self._open_postpone,
+                        key="review-postpone",
+                    ),
+                    ft.OutlinedButton(
+                        content=afanes.ui.strings.REVIEW_DELEGATE,
+                        on_click=self._open_delegate,
+                        key="review-delegate",
+                    ),
+                ]
+            )
+        else:
+            buttons.append(
+                ft.OutlinedButton(
+                    content=afanes.ui.strings.REVIEW_REASSIGN,
+                    on_click=self._open_reassign,
+                    key="review-reassign",
+                )
+            )
+        buttons.extend(
+            [
+                ft.TextButton(
+                    content=afanes.ui.strings.REVIEW_OPEN_PROJECT,
+                    icon=ft.Icons.OPEN_IN_NEW,
+                    on_click=self._open_project,
+                    key="review-open-project",
+                ),
+                ft.TextButton(
+                    content=afanes.ui.strings.REVIEW_SKIP,
+                    on_click=self._skip,
+                    key="review-skip",
+                ),
+            ]
+        )
+        return ft.Row(controls=buttons, spacing=afanes.ui.theme.ITEM_GAP, wrap=True)
+
     def _project_card(self, item: ReviewItem) -> ft.Control:
         """Build the project review card with its next step."""
         summary = item.project
         if summary is None:
-            return Card(
-                ft.Column(
-                    controls=[
-                        ft.Text(afanes.ui.strings.REVIEW_PROJECT_FAILED.format(detail=item.path.as_posix())),
-                        ft.TextButton(content=afanes.ui.strings.REVIEW_SKIP, on_click=self._skip),
-                    ],
-                    spacing=afanes.ui.theme.ITEM_GAP,
-                )
-            ).build()
+            return self._broken_card(item)
         controls: list[ft.Control] = [
             ft.Text(afanes.ui.strings.REVIEW_TITLE, theme_style=ft.TextThemeStyle.LABEL_LARGE),
             ft.Text(summary.note.title, theme_style=ft.TextThemeStyle.HEADLINE_SMALL, selectable=True),
@@ -188,41 +263,16 @@ class ReviewView:
                 )
             )
         controls.extend(self._next_step_controls(summary))
+        controls.append(self._form_controls())
         controls.append(self._confirmation_controls())
-        controls.append(self._creation_controls())
-        controls.append(
-            ft.Row(
-                controls=[
-                    ft.TextButton(
-                        content=afanes.ui.strings.REVIEW_OPEN_PROJECT,
-                        icon=ft.Icons.OPEN_IN_NEW,
-                        on_click=self._open_handler(summary.note.path, afanes.ui.state.WorkspaceSection.PROJECTS),
-                        key="review-open-project",
-                    ),
-                    ft.FilledButton(
-                        content=afanes.ui.strings.REVIEW_NEXT,
-                        icon=ft.Icons.ARROW_FORWARD,
-                        on_click=self._next,
-                        key="review-next",
-                    ),
-                    ft.TextButton(
-                        content=afanes.ui.strings.REVIEW_SKIP,
-                        on_click=self._skip,
-                        key="review-skip",
-                    ),
-                ],
-                spacing=afanes.ui.theme.ITEM_GAP,
-                wrap=True,
-            )
-        )
-        if summary.next_action is None:
+        if summary.next_step is None:
             controls.append(
                 ft.Row(
                     controls=[
                         ft.OutlinedButton(
-                            content=afanes.ui.strings.REVIEW_CREATE_ACTION,
+                            content=afanes.ui.strings.REVIEW_CREATE_STEP,
                             icon=ft.Icons.ADD,
-                            on_click=self._toggle_create,
+                            on_click=self._open_add_step,
                             key="review-create",
                         ),
                         ft.OutlinedButton(
@@ -242,12 +292,37 @@ class ReviewView:
                     wrap=True,
                 )
             )
+        controls.append(
+            ft.Row(
+                controls=[
+                    ft.TextButton(
+                        content=afanes.ui.strings.REVIEW_OPEN_PROJECT,
+                        icon=ft.Icons.OPEN_IN_NEW,
+                        on_click=self._open_project,
+                        key="review-open-project",
+                    ),
+                    ft.FilledButton(
+                        content=afanes.ui.strings.REVIEW_NEXT,
+                        icon=ft.Icons.ARROW_FORWARD,
+                        on_click=self._next,
+                        key="review-next",
+                    ),
+                    ft.TextButton(
+                        content=afanes.ui.strings.REVIEW_SKIP,
+                        on_click=self._skip,
+                        key="review-skip",
+                    ),
+                ],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                wrap=True,
+            )
+        )
         return Card(ft.Column(controls=controls, spacing=afanes.ui.theme.ITEM_GAP)).build()
 
     def _next_step_controls(self, summary: ProjectSummary) -> list[ft.Control]:
-        """Build the next-step and remaining-action controls."""
+        """Build the next-step and remaining-step controls."""
         controls: list[ft.Control] = []
-        if summary.next_action is None:
+        if summary.next_step is None:
             controls.append(
                 ft.Text(
                     afanes.ui.strings.REVIEW_NO_NEXT_STEP,
@@ -257,41 +332,35 @@ class ReviewView:
             )
             return controls
         controls.append(
-            ft.Row(
+            ft.Column(
                 controls=[
-                    ft.Column(
-                        controls=[
-                            ft.Text(afanes.ui.strings.REVIEW_NEXT_STEP, theme_style=ft.TextThemeStyle.LABEL_LARGE),
-                            ft.Text(summary.next_action.title, selectable=True),
-                        ],
-                        spacing=0,
-                        expand=True,
-                    ),
-                    ft.TextButton(
-                        content=afanes.ui.strings.REVIEW_OPEN_ACTION,
-                        on_click=self._open_handler(summary.next_action.path, afanes.ui.state.WorkspaceSection.ACTIONS),
-                        key="review-open-action",
-                    ),
+                    ft.Text(afanes.ui.strings.REVIEW_NEXT_STEP, theme_style=ft.TextThemeStyle.LABEL_LARGE),
+                    ft.Text(summary.next_step.text, selectable=True),
                 ],
-                spacing=afanes.ui.theme.ITEM_GAP,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=0,
             )
         )
-        remaining = summary.open_actions[1:]
+        remaining = summary.open_steps[1:]
         if remaining:
-            controls.append(ft.Text(afanes.ui.strings.REVIEW_OTHER_ACTIONS, theme_style=ft.TextThemeStyle.LABEL_LARGE))
-            controls.extend(
-                ft.TextButton(
-                    content=note.title,
-                    on_click=self._open_handler(note.path, afanes.ui.state.WorkspaceSection.ACTIONS),
-                )
-                for note in remaining
-            )
+            controls.append(ft.Text(afanes.ui.strings.REVIEW_OTHER_STEPS, theme_style=ft.TextThemeStyle.LABEL_LARGE))
+            controls.extend(ft.Text(step.text, selectable=True) for step in remaining)
         return controls
 
-    def _creation_controls(self) -> ft.Control:
-        """Build the next-action form when it is open."""
-        if not self._creating:
+    def _broken_card(self, item: ReviewItem) -> ft.Control:
+        """Build the fallback card for an unreadable review item."""
+        return Card(
+            ft.Column(
+                controls=[
+                    ft.Text(afanes.ui.strings.REVIEW_PROJECT_FAILED.format(detail=item.path.as_posix())),
+                    ft.TextButton(content=afanes.ui.strings.REVIEW_SKIP, on_click=self._skip),
+                ],
+                spacing=afanes.ui.theme.ITEM_GAP,
+            )
+        ).build()
+
+    def _form_controls(self) -> ft.Control:
+        """Build the inline form for the active step action."""
+        if self._form_mode is None:
             return ft.Container(visible=False)
         error = ft.Text(
             self._form_error or "",
@@ -299,12 +368,13 @@ class ReviewView:
             visible=self._form_error is not None,
             selectable=True,
         )
+        label = self._form_label()
         field = ft.TextField(
-            label=afanes.ui.strings.REVIEW_ACTION_TITLE_LABEL,
-            hint_text=afanes.ui.strings.REVIEW_ACTION_TITLE_HINT,
-            value=self._action_title,
-            on_change=self._change_title,
-            key="review-action-title",
+            label=label,
+            hint_text="2026-11-20" if self._form_mode == "postpone" else "Ada",
+            value=self._typed,
+            on_change=self._change_typed,
+            key="review-form-field",
         )
         return ft.Column(
             controls=[
@@ -313,15 +383,15 @@ class ReviewView:
                 ft.Row(
                     controls=[
                         ft.FilledButton(
-                            content=afanes.ui.strings.REVIEW_ACTION_CONFIRM,
-                            icon=ft.Icons.ADD,
-                            on_click=self._create_action,
-                            key="review-action-submit",
+                            content=afanes.ui.strings.REVIEW_CONFIRM,
+                            icon=ft.Icons.CHECK,
+                            on_click=self._submit_form,
+                            key="review-form-submit",
                         ),
                         ft.TextButton(
-                            content=afanes.ui.strings.REVIEW_ACTION_CANCEL,
-                            on_click=self._cancel_create,
-                            key="review-action-cancel",
+                            content=afanes.ui.strings.REVIEW_CANCEL,
+                            on_click=self._cancel_form,
+                            key="review-form-cancel",
                         ),
                     ],
                     spacing=afanes.ui.theme.ITEM_GAP,
@@ -330,6 +400,14 @@ class ReviewView:
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
         )
+
+    def _form_label(self) -> str:
+        """Return the label for the active inline form."""
+        if self._form_mode in {"delegate", "reassign"}:
+            return afanes.ui.strings.REVIEW_OWNER_LABEL
+        if self._form_mode == "postpone":
+            return afanes.ui.strings.REVIEW_POSTPONE_LABEL
+        return afanes.ui.strings.REVIEW_STEP_TITLE_LABEL
 
     def _confirmation_controls(self) -> ft.Control:
         """Build the inline confirmation for closing or deferring."""
@@ -402,89 +480,112 @@ class ReviewView:
         self.refresh()
         self._update()
 
-    async def _open(self, path: Path, section: afanes.ui.state.WorkspaceSection) -> None:
-        """Open a project or action page and switch to its section."""
-        await self._state.open_page(path)
-        await self._state.set_section(section)
+    async def _open_project(self) -> None:
+        """Open the current item's project page."""
+        await self._state.review_open_project()
         self.refresh()
         self._update()
 
-    def _process_handler(self, path: Path) -> Callable[[], Awaitable[None]]:
-        """Bind a no-argument async handler that opens processing."""
+    async def _do_now(self) -> None:
+        """Complete the current due step."""
+        await self._state.review_do_now()
+        self._reset_local_state()
+        self.refresh()
+        self._update()
 
-        async def handle() -> None:
-            await self._process_capture(path)
+    async def _open_postpone(self) -> None:
+        """Open the postpone form."""
+        self._open_form("postpone")
 
-        return handle
+    async def _open_delegate(self) -> None:
+        """Open the delegate form."""
+        self._open_form("delegate")
 
-    def _open_handler(
-        self,
-        path: Path,
-        section: afanes.ui.state.WorkspaceSection,
-    ) -> Callable[[], Awaitable[None]]:
-        """Bind a no-argument async handler that opens one page."""
+    async def _open_reassign(self) -> None:
+        """Open the reassign form."""
+        self._open_form("reassign")
 
-        async def handle() -> None:
-            await self._open(path, section)
+    async def _open_add_step(self) -> None:
+        """Open the next-step form for a stalled project."""
+        self._open_form("add_step")
 
-        return handle
-
-    async def _toggle_create(self) -> None:
-        """Open the next-action form."""
-        self._creating = True
+    def _open_form(self, mode: str) -> None:
+        """Show one inline form and clear any confirmation."""
+        self._form_mode = mode
+        self._typed = ""
+        self._form_error = None
         self._confirmation = None
+        self.refresh()
+        self._update()
+
+    async def _cancel_form(self) -> None:
+        """Close the inline form without writing."""
+        self._form_mode = None
+        self._typed = ""
         self._form_error = None
         self.refresh()
         self._update()
 
-    async def _cancel_create(self) -> None:
-        """Close the next-action form without writing."""
-        self._creating = False
-        self._action_title = ""
-        self._form_error = None
-        self.refresh()
-        self._update()
-
-    async def _change_title(self) -> None:
-        """Keep the typed action title for the next refresh."""
+    async def _change_typed(self) -> None:
+        """Keep the typed form value for the next refresh."""
         field = next(
             (
                 control
                 for control in self._walk(self.root)
-                if isinstance(control, ft.TextField) and control.key == "review-action-title"
+                if isinstance(control, ft.TextField) and control.key == "review-form-field"
             ),
             None,
         )
-        self._action_title = "" if field is None else field.value or ""
+        self._typed = "" if field is None else field.value or ""
 
-    async def _create_action(self) -> None:
-        """Create the typed next action for the current project."""
-        if not self._action_title.strip():
-            self._form_error = afanes.ui.strings.REVIEW_TITLE_REQUIRED
+    async def _submit_form(self) -> None:
+        """Submit the active inline form."""
+        value = self._typed.strip()
+        if not value:
+            self._form_error = (
+                afanes.ui.strings.REVIEW_INVALID_DATE
+                if self._form_mode == "postpone"
+                else afanes.ui.strings.REVIEW_TITLE_REQUIRED
+            )
             self.refresh()
             self._update()
             return
-        path = await self._state.create_review_action(self._action_title)
-        if path is None:
-            self._form_error = self._state.message
-        else:
-            self._creating = False
-            self._action_title = ""
+        changed = False
+        if self._form_mode == "postpone":
+            try:
+                plan = datetime.date.fromisoformat(value)
+            except ValueError:
+                self._form_error = afanes.ui.strings.REVIEW_INVALID_DATE
+                self.refresh()
+                self._update()
+                return
+            changed = await self._state.review_postpone(plan)
+        elif self._form_mode == "delegate":
+            changed = await self._state.review_delegate(value)
+        elif self._form_mode == "reassign":
+            changed = await self._state.review_reassign(value)
+        elif self._form_mode == "add_step":
+            changed = await self._state.add_review_step(value) is not None
+        if changed:
+            self._form_mode = None
+            self._typed = ""
             self._form_error = None
+        else:
+            self._form_error = self._state.message
         self.refresh()
         self._update()
 
     async def _confirm_done(self) -> None:
         """Ask for confirmation before marking the project done."""
         self._confirmation = "done"
-        self._creating = False
+        self._form_mode = None
         self.refresh()
         self._update()
 
     async def _confirm_defer(self) -> None:
         """Ask for confirmation before deferring the project."""
         self._confirmation = "later"
-        self._creating = False
+        self._form_mode = None
         self.refresh()
         self._update()
 
@@ -507,10 +608,18 @@ class ReviewView:
         self.refresh()
         self._update()
 
+    def _process_handler(self, path: Path) -> Callable[[], Awaitable[None]]:
+        """Bind a no-argument async handler that opens processing."""
+
+        async def handle() -> None:
+            await self._process_capture(path)
+
+        return handle
+
     def _reset_local_state(self) -> None:
         """Clear form and confirmation state between review items."""
-        self._creating = False
-        self._action_title = ""
+        self._form_mode = None
+        self._typed = ""
         self._form_error = None
         self._confirmation = None
 

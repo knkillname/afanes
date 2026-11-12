@@ -1,6 +1,7 @@
 """Tests for the read, edit, raw rescue, and confirmation page controls."""
 
 import asyncio
+import datetime
 import typing
 from pathlib import Path
 
@@ -10,6 +11,8 @@ import pytest
 import afanes.core.settings
 import afanes.ui.state
 from afanes.core.editing import DraftMode
+from afanes.core.frontmatter import NoteDocument
+from afanes.core.steps import StepDocument
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import NoteType
 from afanes.ui.views.page import PageView
@@ -91,7 +94,7 @@ class TestReadMode:
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            event = ft.Event(name="tap", control=ft.Markdown(), data="person:Ada")
+            event = ft.Event(name="tap", control=ft.Markdown(), data="note:Ada")
             await view.handle_link(event)
 
         asyncio.run(scenario())
@@ -148,11 +151,11 @@ class TestEditMode:
         vault = tmp_path / "vault"
         vault.mkdir()
         path = _write_note(
-            vault / "actions" / "Call.md",
+            vault / "projects" / "Call.md",
             _typed_note(
-                "action",
+                "project",
                 "# Call Ada\nBody.\n",
-                extra='status: waiting\ndue_date: 2026-01-02\npeople:\n  - "person:Ada"\nproject: "project:Release 1.0"',
+                extra="status: waiting\ndue_date: 2026-01-02",
             ),
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -168,13 +171,12 @@ class TestEditMode:
         asyncio.run(scenario())
 
         assert view.body_field.value == "# Call Ada\nBody.\n"
-        assert view.type_dropdown.value == "action"
-        assert view.category_dropdown.visible is False
+        assert view.type_dropdown.value == "project"
+        assert view.category_field.visible is False
         assert view.status_dropdown.visible is True
         assert view.status_dropdown.value == "waiting"
+        assert view.due_field.visible is True
         assert view.due_field.value == "2026-01-02"
-        assert view.people_field.value == "Ada"
-        assert view.project_field.value == "Release 1.0"
         assert "Call" in view.identity_text.value
 
     def test_status_options_follow_the_type(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -224,7 +226,7 @@ class TestEditMode:
     def test_invalid_due_date_is_shown_inline(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
-        path = _write_note(vault / "actions" / "Call.md", _typed_note("action", "# Call\n"))
+        path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         view = PageView(lambda: None)
@@ -242,16 +244,13 @@ class TestEditMode:
         assert view.due_error.visible is True
         assert view.due_error.value
 
-    def test_people_suggestion_selection_stores_the_identity(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_category_change_previews_and_moves_the_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
-        _write_note(
-            vault / "reference" / "people" / "Ada.md",
-            _typed_note("reference", "# Ada, Countess of Lovelace\n", category="person"),
+        path = _write_note(
+            vault / "reference" / "Ada.md",
+            _typed_note("reference", "# Ada\n"),
         )
-        path = _write_note(vault / "actions" / "Call.md", _typed_note("action", "# Call\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         view = PageView(lambda: None)
@@ -261,20 +260,21 @@ class TestEditMode:
             await state.open_page(path)
             view.refresh()
             await view.start_edit()
-            view.people_field.value = "Countess"
-            await view.change_people()
-            assert view.people_suggestions.visible is True
-            tile = view.people_suggestions.controls[0]
-            assert isinstance(tile, ft.ListTile)
-            assert tile.on_click is not None
-            handler = typing.cast("typing.Any", tile.on_click)
-            await handler()
+            view.category_field.value = "person"
+            await view.change_category()
+            assert view.category_move_panel.visible is True
+            assert "reference/person" in view.category_move_text.value
+            await view.confirm_category_move()
 
         asyncio.run(scenario())
 
+        moved = vault / "reference" / "person" / "Ada.md"
+        assert moved.is_file()
+        assert not path.exists()
         assert state.page is not None
         assert state.page.labels is not None
-        assert state.page.labels.people == ("Ada",)
+        assert state.page.labels.category is not None
+        assert state.page.labels.category.value == "person"
 
     def test_type_change_opens_the_confirmation_panel(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -283,7 +283,7 @@ class TestEditMode:
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
         )
-        _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<person:Ada>)\n"))
+        _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<note:Ada>)\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         view = PageView(lambda: None)
@@ -313,7 +313,7 @@ class TestEditMode:
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
         )
-        _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<person:Ada>)\n"))
+        _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<note:Ada>)\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         view = PageView(lambda: None)
@@ -331,7 +331,7 @@ class TestEditMode:
 
         assert state.page is not None
         assert state.page.labels is not None
-        assert state.page.labels.scheme is ReferenceScheme.PERSON
+        assert state.page.labels.scheme is ReferenceScheme.NOTE
         assert view.type_change_panel.visible is False
 
 
@@ -455,7 +455,7 @@ class TestPanels:
 
         async def scenario() -> None:
             await state.choose_vault(vault)
-            await state.follow_link("person:Ada")
+            await state.follow_link("note:Ada")
             view.refresh()
             assert view.ambiguous_panel.visible is True
             assert len(view.ambiguous_list.controls) == TWO_CANDIDATES
@@ -544,3 +544,106 @@ class TestPanels:
         assert (vault / "trash" / "Ada.md").exists()
         assert state.page is None
         assert view.trash_panel.visible is False
+
+
+class TestSteps:
+    def _project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, afanes.ui.state.AppState]:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "projects" / "Home.md",
+            _typed_note(
+                "project",
+                "# Home\n\n- [ ] Call <!-- {owners: [Ada], plan: 2026-11-20, actual: 2026-11-14, tags: [phone]} -->\n",
+            ),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(vault)
+            await state.open_page(path)
+
+        asyncio.run(scenario())
+        return path, state
+
+    def test_steps_render_as_rows_and_hide_the_comment(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._project(tmp_path, monkeypatch)
+
+        view = PageView(lambda: None)
+        texts = _texts(view.steps_column)
+
+        assert view.steps_panel.visible is True
+        assert "Call" in texts
+        assert afanes.ui.strings.PAGE_STEP_OWNERS.format(owners="Ada") in texts
+        assert afanes.ui.strings.PAGE_STEP_PLAN.format(date="2026-11-20") in texts
+        assert afanes.ui.strings.PAGE_STEP_ACTUAL.format(date="2026-11-14") in texts
+        assert afanes.ui.strings.PAGE_STEP_TAGS.format(tags="phone") in texts
+        assert "<!--" not in view.read_body.value
+
+    def test_ticking_a_step_rewrites_only_its_line(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        path, _state = self._project(tmp_path, monkeypatch)
+        view = PageView(lambda: None)
+        checkbox = _find_checkbox(view.steps_column)
+        assert isinstance(checkbox, ft.Checkbox)
+        checkbox.value = True
+
+        asyncio.run(typing.cast("typing.Any", checkbox.on_change)(ft.Event(name="change", control=checkbox)))
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        step = StepDocument(document.body).steps[0]
+        assert step.checked is True
+        assert step.actual == datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+        assert step.plan == datetime.date(2026, 11, 20)
+        assert step.owners == ("Ada",)
+
+    def test_unticking_removes_the_actual_date(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        path = _write_note(
+            tmp_path / "vault" / "projects" / "Home.md",
+            _typed_note("project", "# Home\n\n- [x] Call <!-- {plan: 2026-11-20, actual: 2026-11-14} -->\n"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.choose_vault(tmp_path / "vault")
+            await state.open_page(path)
+
+        asyncio.run(scenario())
+        view = PageView(lambda: None)
+        checkbox = _find_checkbox(view.steps_column)
+        assert isinstance(checkbox, ft.Checkbox)
+        checkbox.value = False
+
+        asyncio.run(typing.cast("typing.Any", checkbox.on_change)(ft.Event(name="change", control=checkbox)))
+
+        step = StepDocument(NoteDocument.from_text(path.read_text(encoding="utf-8")).body).steps[0]
+        assert step.checked is False
+        assert step.actual is None
+        assert step.plan == datetime.date(2026, 11, 20)
+
+
+def _texts(control: ft.Control) -> list[str]:
+    values: list[str] = []
+    if isinstance(control, ft.Text):
+        values.append(str(control.value))
+    if isinstance(control, ft.Checkbox):
+        values.append(str(control.label))
+    for child in getattr(control, "controls", []) or []:
+        values.extend(_texts(child))
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        values.extend(_texts(content))
+    return values
+
+
+def _find_checkbox(control: ft.Control) -> ft.Control | None:
+    if isinstance(control, ft.Checkbox):
+        return control
+    for child in getattr(control, "controls", []) or []:
+        found = _find_checkbox(child)
+        if found is not None:
+            return found
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        return _find_checkbox(content)
+    return None

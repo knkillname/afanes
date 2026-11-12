@@ -100,14 +100,70 @@ class _Shell:
                     ).build(),
                 )
         else:
-            self.page.add(
-                afanes.ui.views.workspace.WorkspaceView(
-                    self.page.update,
-                    self.choose_vault,
-                    self.create_vault,
-                ).build(),
-            )
+            workspace = afanes.ui.views.workspace.WorkspaceView(
+                self.page.update,
+                self.choose_vault,
+                self.create_vault,
+            ).build()
+            digest = self._due_digest()
+            if digest is None:
+                self.page.add(workspace)
+            else:
+                self.page.add(
+                    ft.Column(
+                        controls=[digest, workspace],
+                        spacing=afanes.ui.theme.SECTION_GAP,
+                        expand=True,
+                    )
+                )
         self.page.update()
+
+    def _due_digest(self) -> ft.Control | None:
+        """Build the launch digest of due work, or ``None`` when there is none.
+
+        Returns
+        -------
+        ft.Control | None
+            Digest card with a review action, or ``None`` when no own step is
+            due or overdue.
+
+        Notes
+        -----
+        Building the digest reads the latest scan only. It never creates,
+        changes, or removes a note.
+        """
+        count = self.state.review_due_count
+        if count == 0 or self.state.review_session is not None:
+            return None
+        message = (
+            afanes.ui.strings.REVIEW_LAUNCH_DIGEST_ONE
+            if count == 1
+            else afanes.ui.strings.REVIEW_LAUNCH_DIGEST_MANY.format(count=count)
+        )
+        return ft.Container(
+            key="launch-digest",
+            bgcolor=afanes.ui.theme.SURFACE_CONTAINER_COLOR,
+            border_radius=afanes.ui.theme.CARD_RADIUS,
+            padding=afanes.ui.theme.ITEM_GAP,
+            content=ft.Row(
+                controls=[
+                    ft.Text(message, expand=True, selectable=True),
+                    ft.FilledButton(
+                        content=afanes.ui.strings.REVIEW_LAUNCH_DIGEST_ACTION,
+                        icon=ft.Icons.PLAY_ARROW,
+                        on_click=self.start_launch_review,
+                        key="launch-digest-start",
+                    ),
+                ],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+        )
+
+    async def start_launch_review(self) -> None:
+        """Start the guided review from the launch digest and repaint."""
+        await self.state.start_review()
+        await self.render()
 
     async def open_path(self, text: str) -> None:
         """Open the vault named by typed text and repaint."""

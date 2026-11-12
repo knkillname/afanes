@@ -455,7 +455,8 @@ class TestCreation:
 
         assert state.vault_root == target.resolve()
         assert (target / "inbox").is_dir()
-        assert (target / "reference" / "people").is_dir()
+        assert (target / "reference").is_dir()
+        assert (target / "projects").is_dir()
         assert page.dialogs == []
         assert isinstance(page.controls[0], ft.Column)
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
@@ -524,7 +525,8 @@ class TestCreation:
             await typing.cast("Handler", create.on_click)()
             preview = _typed(_find_by_key(page.dialogs[0], "create-vault-preview"), ft.Text)
             assert "inbox/" in (preview.value or "")
-            assert "reference/people/" in (preview.value or "")
+            assert "projects/" in (preview.value or "")
+            assert "actions/" not in (preview.value or "")
             await _submit_creation(page, target)
 
         asyncio.run(scenario())
@@ -613,3 +615,60 @@ class TestCreation:
         assert (second / "inbox").is_dir()
         assert not (first / "inbox").exists()
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(second.resolve())
+
+
+class TestLaunchDigest:
+    def _vault_with_due_step(self, tmp_path: Path) -> Path:
+        vault = tmp_path / "vault"
+        path = vault / "projects" / "Home.md"
+        path.parent.mkdir(parents=True)
+        path.write_text(
+            "---\ntype: project\nstatus: active\n---\n"
+            f"# Home\n\n- [ ] Call <!-- {{plan: {__import__('datetime').date.today().isoformat()}}} -->\n",
+            encoding="utf-8",
+        )
+        return vault
+
+    def test_digest_reports_the_count_and_starts_review(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        vault = self._vault_with_due_step(tmp_path)
+        before = {path.relative_to(vault).as_posix(): path.read_bytes() for path in vault.rglob("*") if path.is_file()}
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page), vault)
+            digest = _find_by_key(page.controls[0], "launch-digest")
+            assert isinstance(digest, ft.Container)
+            texts = _all_texts(digest)
+            assert any("1 due step" in text for text in texts)
+            start = _typed(_find_by_key(digest, "launch-digest-start"), ft.FilledButton)
+            await typing.cast("Handler", start.on_click)()
+
+        asyncio.run(scenario())
+
+        after = {path.relative_to(vault).as_posix(): path.read_bytes() for path in vault.rglob("*") if path.is_file()}
+        assert after == before
+        assert state.review_session is not None
+
+    def test_no_digest_without_due_work(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        page = FakePage()
+
+        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page), vault))
+
+        assert _find_by_key(page.controls[0], "launch-digest") is None
+
+
+def _all_texts(control: ft.Control) -> list[str]:
+    values: list[str] = []
+    if isinstance(control, ft.Text):
+        values.append(str(control.value))
+    for child in getattr(control, "controls", []) or []:
+        values.extend(_all_texts(child))
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        values.extend(_all_texts(content))
+    return values
