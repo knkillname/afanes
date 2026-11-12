@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how an inbox capture becomes a trash, later, reference, action, or project note, including the decisions, metadata, confirmation, and safe apply behavior.
+Defines how an inbox capture becomes Trash, Later, Reference, Project, an appended step, or Done now, including the decisions, metadata, confirmation, and safe apply behavior.
 
 ## Requirements
 
@@ -42,7 +42,7 @@ A processed capture SHALL become exactly one of Trash, Later, Reference, Project
 #### Scenario: A single action is a project
 
 - **WHEN** the user treats one step as the whole commitment
-- **THEN** the outcome is a one-step project, not an action note
+- **THEN** the outcome is a one-step project
 
 ### Requirement: Actionable captures become projects or steps
 

@@ -214,6 +214,7 @@ afanes/
 │   ├── commands/                  # opsx-* slash commands
 │   └── skills/                    # OpenSpec workflow skills
 ├── src/
+│   ├── main.py                     # packaged-desktop launcher for flet build
 │   └── afanes/
 │       ├── __init__.py
 │       ├── __about__.py
@@ -225,16 +226,18 @@ afanes/
 │       │   ├── frontmatter.py     # parse / serialize Markdown + YAML
 │       │   ├── names.py           # name normalization and filename sanitization
 │       │   ├── links.py           # scheme reference extraction and resolution
+│       │   ├── steps.py           # project step parsing and step metadata
+│       │   ├── editing.py         # page drafts, labels, and write guards
+│       │   ├── templates.py       # bundled starter content catalog
 │       │   ├── vault.py           # vault discovery, path safety, note operations
 │       │   ├── processing.py      # processing plan, outcomes, and apply
-│       │   ├── indexer.py         # incremental SQLite index
+│       │   ├── indexer.py         # planned: incremental SQLite index, not present
 │       │   ├── search.py          # browser, project, and review queries
 │       │   └── settings.py        # platform paths and app configuration
 │       ├── models/
 │       │   ├── __init__.py
-│       │   ├── note.py            # NoteType, ReferenceCategory, Status
-│       │   ├── action.py          # ActionItem
-│       │   ├── project.py         # Project
+│       │   ├── note.py            # NoteType, CategoryLabel, Status
+│       │   ├── step.py            # ProjectStep and StepMetadata
 │       │   └── link.py            # NoteReference and ReferenceScheme
 │       ├── ui/
 │       │   ├── __init__.py
@@ -244,34 +247,41 @@ afanes/
 │       │   ├── strings.py         # centralized user-facing copy
 │       │   ├── views/
 │       │   │   ├── inbox.py
+│       │   │   ├── page.py
 │       │   │   ├── processing.py
-│       │   │   ├── timeline.py
+│       │   │   ├── projects.py
+│       │   │   ├── review.py
 │       │   │   └── workspace.py
 │       │   └── components/
 │       │       ├── __init__.py
-│       │       ├── note_editor.py
-│       │       └── link_chip.py
+│       │       ├── banner.py
+│       │       ├── panel.py
+│       │       └── status.py
 │       └── cli/
 │           ├── __init__.py
 │           ├── main.py            # argparse parser and dispatch
-│           ├── index.py           # index / rebuild commands
-│           └── doctor.py          # vault and cache diagnostics
+│           ├── strings.py         # command-line output copy
+│           ├── vault.py           # vault option resolution
+│           ├── index.py           # planned: index / rebuild commands, not present
+│           └── doctor.py          # planned: vault and cache diagnostics, not present
 └── tests/
-    ├── conftest.py
+    ├── __init__.py
     ├── core/
     ├── models/
     ├── ui/
     └── cli/
 ```
 
+Entries marked `planned` do not exist yet. Keep them in the layout so the intended direction is visible, and do not describe them as present in specs, documentation, or review notes. The current implementation scans each vault into an in-memory snapshot; there is no SQLite index and no `afanes index` or `afanes doctor` command.
+
 ### 3.2 Package responsibilities
 
 | Path | Owns | Must not contain |
 | --- | --- | --- |
 | `src/afanes/models/` | Domain types, enums, value objects, validation rules | File I/O, SQL, Flet imports, `core/` imports, `ui/` imports, `cli/` imports |
-| `src/afanes/core/` | Markdown/frontmatter parsing, name normalization, scheme reference resolution, vault I/O, SQLite indexing, search, platform paths | Flet imports, `ui/` imports, `cli/` imports, network calls |
+| `src/afanes/core/` | Markdown/frontmatter parsing, name normalization, scheme reference resolution, step parsing, starter templates, vault I/O, search, platform paths (SQLite indexing is planned) | Flet imports, `ui/` imports, `cli/` imports, network calls |
 | `src/afanes/ui/` | Flet app shell, views, components, `AppState`, theme, user-facing strings | Markdown parsing, SQL, direct file I/O, business rules |
-| `src/afanes/cli/` | argparse definitions, headless commands, output formatting | Flet imports, business rules, direct SQL |
+| `src/afanes/cli/` | argparse definitions, headless commands, output formatting (the `index` and `doctor` commands are planned) | Flet imports, business rules, direct SQL |
 | `tests/` | Unit, property, integration, and architecture tests | Real user vaults, network access, committed secrets |
 
 ### 3.3 Import rules
@@ -641,6 +651,8 @@ All vault writes must go through the `Vault` service in `core/vault.py`. UI and 
 12. **Use tests, not the real vault.** All I/O tests use `tmp_path` or a fixture-created vault. Never touch a user's actual notes.
 
 ### 4.10 SQLite cache rules
+
+These rules take effect when the SQLite cache exists. The current implementation scans each vault into an in-memory snapshot and ships no cache, so nothing below is optional or waived: when a cache is added, it must follow every rule in this section.
 
 - Store the cache in a platform-appropriate application-data directory with user-only permissions. Never store it inside the vault or the repository.
 - The cache is derived data. Deleting it must lose only speed, never user facts.

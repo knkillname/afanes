@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the Projects workspace: which projects are open or closed, how actions are attributed through the `project` frontmatter reference, and how due dates, action counts, and the computed next action are presented.
+Defines the Projects workspace: which projects are open or closed, how steps belong to the project whose body contains them, and how status, due dates, open step counts, and the computed next step are presented.
 
 ## Requirements
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how reference notes are grouped into categories such as people and places, how a category selects the reference scheme, and how category changes affect existing references.
+Defines how reference notes are grouped by free-form category labels such as people and places, how each label maps to a reference folder, and how a category change moves the file without changing identity or references.
 
 ## Requirements
 
