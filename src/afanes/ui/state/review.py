@@ -497,22 +497,15 @@ class ReviewState:
                 self.session.selected = None
                 self.session.preview_body = None
                 return
-            vault = self.session.vault
-            if vault is None:
+            if self.session.vault is None:
                 return
             try:
-                body = await asyncio.to_thread(vault.read_body, item.path)
+                await self.processing.load(item.path)
             except (AfanesError, OSError, UnicodeError) as exc:
                 logger.debug("Review capture could not be read", exc_info=True)
                 self.status.show_message(afanes.ui.strings.REVIEW_CAPTURE_READ_FAILED.format(detail=str(exc)))
                 self.review_session = session.record_skipped()
                 continue
-            self.processing.note = item.path
-            self.processing.body = body
-            self.processing.plan = None
-            self.processing.result = None
-            self.session.selected = item.path
-            self.session.preview_body = body
             return
 
     async def _set_review_project_status(self, status: Status) -> bool:
