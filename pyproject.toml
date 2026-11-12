@@ -52,7 +52,7 @@ dev = [
   "coverage-enable-subprocess==1.0",
   "flet[desktop]>=1.0.4,<2",
   "flet[web]>=1.0.4,<2",
-  "pyrefly==1.0.0",
+  "pyrefly==1.4.1",
   "pytest~=9.0",
   "pytest-mock~=3.12",
   "pytest-randomly~=3.15",
@@ -92,6 +92,7 @@ matrix.deps.extra-dependencies = [
 
 [tool.hatch.envs.hatch-check-types]
 dependency-groups = ["test"]
+dependencies = ["pyrefly==1.4.1"]
 
 [tool.ruff]
 line-length = 120
@@ -112,6 +113,12 @@ search-path = ["src"]
 python-version = "3.13"
 preset = "strict"
 disable-search-path-heuristics = true
+
+# Newer Pyrefly releases infer an implicit Any for untyped lambda parameters.
+# Tests use these lambdas for monkeypatch shims; keep the diagnostic visible as
+# a warning instead of failing the type gate.
+[tool.pyrefly.errors]
+implicit-any-lambda = "warn"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

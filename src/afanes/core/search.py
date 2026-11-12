@@ -186,7 +186,8 @@ class BrowserListing:
             Listing with the same groups and failures. Matching reads the
             snapshot's search text, which excludes step metadata comments.
         """
-        return BrowserListing(
+        return dataclasses.replace(
+            self,
             groups=tuple(
                 BrowserGroup(
                     section=group.section,
@@ -195,7 +196,6 @@ class BrowserListing:
                 )
                 for group in self.groups
             ),
-            failures=self.failures,
         )
 
 
