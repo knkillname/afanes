@@ -4,7 +4,7 @@
 
 - [x] 1.1 Add `ProcessingState.load(path)` to read the capture body and template card catalog into the wizard fields, and make `begin()` use it; verify the existing begin tests pass with `hatch test tests/ui/test_state.py -k "begin_processing"`.
 - [x] 1.2 Replace the duplicated capture setup in `ReviewState._enter_current_review_item()` with `ProcessingState.load()` while keeping the skip-on-failure behavior; verify `hatch test tests/ui/test_state.py -k "review"` passes.
-- [ ] 1.3 Add state tests for review start and review advance that assert the valid template cards are loaded; verify `hatch test tests/ui/test_state.py` passes.
+- [x] 1.3 Add state tests for review start and review advance that assert the valid template cards are loaded; verify `hatch test tests/ui/test_state.py` passes.
 
 ## 2. Template picker refresh
 

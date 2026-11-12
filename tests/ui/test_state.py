@@ -2777,6 +2777,57 @@ class TestReviewState:
         assert state.processing.note == capture
         assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW
 
+    def test_review_start_loads_template_cards(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        card = vault / "templates" / "person.md"
+        card.parent.mkdir(parents=True)
+        card.write_text(
+            "---\ntype: reference\ncategory: person\ntitle: Person\n---\n\n## Contact\n",
+            encoding="utf-8",
+        )
+        _write_note(vault / "inbox" / "Buy milk.md", _note_text("# Buy milk"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.review.start()
+
+        started = asyncio.run(scenario())
+
+        assert started is True
+        assert [item.title for item in state.processing.cards] == ["Person"]
+        assert state.processing.card_issues == ()
+
+    def test_review_advance_loads_template_cards(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        card = vault / "templates" / "person.md"
+        card.parent.mkdir(parents=True)
+        card.write_text(
+            "---\ntype: reference\ncategory: person\ntitle: Person\n---\n\n## Contact\n",
+            encoding="utf-8",
+        )
+        _write_note(vault / "inbox" / "Buy milk.md", _note_text("# Buy milk"))
+        _write_note(vault / "inbox" / "Call Ada.md", _note_text("# Call Ada"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[bool, Path | None, Path | None]:
+            await state.workspace.choose_vault(vault)
+            await state.review.start()
+            first = state.processing.note
+            skipped = await state.review.skip()
+            return skipped, first, state.processing.note
+
+        skipped, first, second = asyncio.run(scenario())
+
+        assert skipped is True
+        assert first is not None
+        assert second is not None
+        assert second != first
+        assert [item.title for item in state.processing.cards] == ["Person"]
+        assert state.processing.card_issues == ()
+
     def test_zero_pending_starts_no_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
