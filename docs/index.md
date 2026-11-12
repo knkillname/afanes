@@ -18,8 +18,8 @@ a review queue for due work. Nothing leaves your machine.
 
 ## 🧭 Start here
 
-The documentation is being assembled around the user journey: install Afanes, open a vault, capture a
-thought, clarify it, and review what is due. The full guide and reference pages follow in this change.
+The documentation follows the user journey: run Afanes from a source checkout, open a vault, capture a
+thought, clarify it, and review what is due.
 
 ```{toctree}
 :maxdepth: 2

@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - `README.md` is now a landing page; the user manual, vault format, build guide, and contributor material moved into `docs/`. Documentation headings in `README.md` and `docs/` use a curated emoji palette, with `tl;dr`, Tip, Warning, and Remember admonitions.
 - Development dependencies gain Sphinx 9.2.0, MyST-Parser 5.2.0, Furo 2025.12.19, sphinx-design 0.8.0, sphinx-copybutton 0.5.2, and sphinx-autobuild 2025.8.25. They are dev-only; the runtime dependency set is unchanged.
 
+### Fixed
+
+- The README, run guide, browser mode, and troubleshooting pages now start Afanes from a source checkout with Hatch instead of showing package-index install commands and badges. Distribution is documented as local packaged builds for now. This implements the `document-local-install` OpenSpec change.
+
 ## [0.5.2] - 2026-11-12
 
 ### Added

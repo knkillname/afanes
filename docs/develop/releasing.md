@@ -29,8 +29,9 @@ version number. The launcher is `src/main.py`, and `[tool.flet.app]` points the 
 directory. Build-time dependency resolution is the only network activity; the packaged application
 makes no request at startup.
 
-Artifacts are unsigned local builds. Code signing, notarization, auto-update, and a publishing pipeline
-are not part of this project yet.
+Artifacts are unsigned local builds. Distribution is limited to local builds for now; code signing,
+notarization, auto-update, package-index publication, and GitHub release publishing are not part of
+this project yet.
 
 ## 🔌 Check the offline start
 
@@ -62,7 +63,7 @@ also reviews `README.md` and `docs/` and records when neither changed.
 
 ## 🧭 See also
 
-- [Install Afanes](../getting-started/install.md)
+- [Run Afanes](../getting-started/install.md)
 - [Browser mode](../guide/browser-mode.md)
 - [Development setup](setup.md)
 - [RELEASE.md](https://github.com/knkillname/afanes/blob/main/RELEASE.md)

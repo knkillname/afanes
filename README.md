@@ -1,39 +1,32 @@
 # 🗂️ afanes
 
-[![PyPI - Version](https://img.shields.io/pypi/v/afanes.svg)](https://pypi.org/project/afanes)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/afanes.svg)](https://pypi.org/project/afanes)
-
 Afanes is an offline, local-first Markdown vault: a personal wiki and project engine that keeps every
 note as an ordinary `.md` file you own.
 
 ![The Afanes workspace with browser groups on the left and a capture open in the page pane](https://raw.githubusercontent.com/knkillname/afanes/main/docs/_static/screenshots/workspace.png)
 
-## 📦 Install
+## 📦 Run from a source checkout
 
-For the desktop window:
+Afanes runs from a source checkout with Hatch. You need Python 3.13 or newer, Git, and
+[Hatch](https://hatch.pypa.io/).
 
 ```console
-pip install "afanes[desktop]"
-afanes
+git clone https://github.com/knkillname/afanes.git
+cd afanes
+hatch env create
+hatch run afanes
 ```
 
 For the browser presentation:
 
 ```console
-pip install "afanes[web]"
-afanes --web
+hatch run afanes --web
 ```
 
 The first desktop run downloads and caches the Flet client once under `~/.flet/client/`. The running
-application makes no network request. A packaged build bundles the client; see the
-[release guide](https://github.com/knkillname/afanes/blob/main/docs/develop/releasing.md).
-
-From a source checkout, use Hatch:
-
-```console
-hatch env create
-hatch run afanes
-```
+application makes no network request. To build a local desktop artifact instead, follow the
+[release guide](https://github.com/knkillname/afanes/blob/main/docs/develop/releasing.md); a packaged
+build bundles the client.
 
 ## 🚀 First five minutes
 
@@ -52,7 +45,7 @@ The full walkthrough is in
 
 ## 📚 Documentation
 
-- [Install and run](https://github.com/knkillname/afanes/blob/main/docs/getting-started/install.md)
+- [Run Afanes](https://github.com/knkillname/afanes/blob/main/docs/getting-started/install.md)
 - [Workspace and browser](https://github.com/knkillname/afanes/blob/main/docs/guide/workspace.md)
 - [Inbox](https://github.com/knkillname/afanes/blob/main/docs/guide/inbox.md) and
   [projects](https://github.com/knkillname/afanes/blob/main/docs/guide/projects-and-steps.md)

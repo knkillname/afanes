@@ -7,19 +7,19 @@ own.
 :::{admonition} tl;dr
 :class: note
 
-Run `afanes --web` after installing `afanes[web]`. The server binds loopback only, serves local assets,
-and allows one browser session at a time.
+Run `hatch run afanes --web` from a source checkout. The server binds loopback only, serves local
+assets, and allows one browser session at a time.
 :::
 
 ## 🚀 Start the server
 
 ```console
-pip install "afanes[web]"
-afanes --web
+hatch env create
+hatch run afanes --web
 ```
 
-The module form, `python -m afanes --web`, works the same. Every interface asset comes from the local
-installation, so a session works with no network access after installation.
+The module form, `hatch run python -m afanes --web`, works the same. Every interface asset comes from
+the local environment, so a session works with no network access after the environment is created.
 
 ## ⚙️ Options
 
@@ -61,6 +61,6 @@ resolve.
 
 ## 🧭 See also
 
-- [Install Afanes](../getting-started/install.md)
+- [Run Afanes](../getting-started/install.md)
 - [Create or open your first vault](../getting-started/first-vault.md)
 - [Command line](command-line.md)

@@ -11,15 +11,16 @@ note whose frontmatter cannot be parsed, or an external program changing a file 
 
 ## 🔌 The desktop window does not start
 
-Afanes reports the missing runtime and exits instead of switching presentations silently. Install the
-desktop runtime:
+Afanes reports the missing runtime and exits instead of switching presentations silently. Recreate
+the environment from the source checkout:
 
 ```console
-pip install "afanes[desktop]"
+hatch env create
+hatch run afanes
 ```
 
-If the native window still cannot start, run `afanes --web` to use the browser presentation. The app
-never downloads a runtime while starting.
+If the native window still cannot start, run `hatch run afanes --web` to use the browser presentation.
+The app never downloads a runtime while starting.
 
 ## 🌐 A browser tab shows "Working…"
 

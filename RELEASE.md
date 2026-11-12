@@ -39,8 +39,9 @@ assumption.
 
 ## Constraints (not gaps)
 
-- Artifacts are unsigned local builds. Code signing, notarization, auto-update,
-  and a publishing pipeline are out of scope.
+- Artifacts are unsigned local builds. Distribution is limited to local builds
+  for now; package-index publication and GitHub release publishing are later
+  decisions. Code signing, notarization, and auto-update remain out of scope.
 - The first development desktop run may fetch the Flet client once as
   provisioning; a packaged build bundles the client and starts offline.
 - There is no cloud sync, account, telemetry, or hidden network call.
