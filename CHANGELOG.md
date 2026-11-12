@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - The workspace sidebar recovers from a stale presentation freeze marker, so switching browser sections no longer
   raises `Frozen controls cannot be updated`. This implements the `fix-frozen-sidebar-controls` OpenSpec change.
+- Guided review opens the Processing Wizard with the same reference template cards as processing from the Inbox:
+  choosing Reference or Later lists every valid card and Empty, and the choices refresh when the wizard reopens.
+  This implements the `fix-review-template-picker` OpenSpec change.
 
 ## [0.6.0] - 2026-11-12
 

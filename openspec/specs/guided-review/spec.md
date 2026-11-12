@@ -76,7 +76,10 @@ Starting Review SHALL snapshot a queue ordered as pending Inbox notes, then due 
 
 ### Requirement: Inbox review reuses explicit processing
 
-Each Inbox item in a review session SHALL open the existing processing flow. Applying an outcome SHALL advance the session; cancelling SHALL leave the capture unchanged and keep the item pending.
+Each Inbox item in a review session SHALL open the existing processing flow, including the same
+capture content, template card choices, and metadata inputs as processing from the Inbox. Applying an
+outcome SHALL advance the session; cancelling SHALL leave the capture unchanged and keep the item
+pending.
 
 #### Scenario: Apply advances the session
 
@@ -92,6 +95,11 @@ Each Inbox item in a review session SHALL open the existing processing flow. App
 
 - **WHEN** the capture text resembles an action, project, person, or date
 - **THEN** the review does not choose an outcome or metadata from that text
+
+#### Scenario: Template cards are available
+
+- **WHEN** an Inbox item in a review session opens the Processing Wizard and the user chooses Reference or Later
+- **THEN** the Template field lists every valid reference card and Empty
 
 ### Requirement: A project review card shows its next step
 
