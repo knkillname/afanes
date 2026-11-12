@@ -12,11 +12,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - A Sphinx documentation site under `docs/` with MyST Markdown, the Furo theme, getting-started, guide, reference, contributor, and API pages, four screenshots, a docs-style test, and local `hatch run docs:build` / `hatch run docs:serve` commands. The API reference covers all public `models/` and `core/` modules. This implements the `add-documentation-site` OpenSpec change.
 - A per-change documentation review rule in `AGENTS.md` and the OpenSpec archive guidance: every change updates the affected docs page or records why no user-facing documentation changed.
 - Project read mode now renders prose and accent-tinted step cards as one surface. Each step row shows checked state, text, owners, plan and actual dates, and tags, with always-visible calendar and person actions that set or clear the plan date and manage the owner list. A project meta row shows status and the optional due date, with a calendar action that sets or clears it from read mode. Step edits rewrite only the affected line and preserve completion, tags, unknown metadata, and frontmatter bytes. This implements the `step-aware-project-page` OpenSpec change.
+- The documentation architecture page now renders its package-layer diagram from a Mermaid `flowchart` instead of ASCII box art, with `accTitle` and `accDescr` accessibility metadata, and `docs/develop/documentation.md` explains when to use a diagram, when to keep literal text, and the accessibility and offline rules. The Mermaid 11.12.1 ES module runtime is vendored under `docs/_static/vendor/mermaid/`, so `hatch run docs:build` and `hatch run docs:serve` stay local and need no Node.js or Chromium. The docs style test rejects ASCII box art, requires diagram accessibility metadata, and checks the vendored runtime. This implements the `render-docs-diagrams-with-mermaid` OpenSpec change. `README.md` needs no change.
 
 ### Changed
 
 - `README.md` is now a landing page; the user manual, vault format, build guide, and contributor material moved into `docs/`. Documentation headings in `README.md` and `docs/` use a curated emoji palette, with `tl;dr`, Tip, Warning, and Remember admonitions.
-- Development dependencies gain Sphinx 9.2.0, MyST-Parser 5.2.0, Furo 2025.12.19, sphinx-design 0.8.0, sphinx-copybutton 0.5.2, and sphinx-autobuild 2025.8.25. They are dev-only; the runtime dependency set is unchanged.
+- Development dependencies gain Sphinx 9.2.0, MyST-Parser 5.2.0, Furo 2025.12.19, sphinx-design 0.8.0, sphinx-copybutton 0.5.2, sphinx-autobuild 2025.8.25, and sphinxcontrib-mermaid 2.1.1. They are dev-only; the runtime dependency set is unchanged.
 
 ### Fixed
 

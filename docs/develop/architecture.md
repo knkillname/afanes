@@ -13,20 +13,19 @@ other, `core` never imports Flet, and `models` imports only the standard library
 
 ## 🧱 Layers
 
-```text
-                 +------------------+
-                 |      models      |  value objects, standard library only
-                 +--------+---------+
-                          |
-                 +--------v---------+
-                 |       core       |  parsing, names, links, steps, vault I/O,
-                 |                  |  search, settings, templates
-                 +---+----------+---+
-                     |          |
-            +--------v--+    +--v--------+
-            |    ui     |    |    cli    |
-            | Flet app  |    | argparse  |
-            +-----------+    +-----------+
+```mermaid
+flowchart TD
+    accTitle: Afanes package layers
+    accDescr: models is used by core. core is used by ui and cli. ui and cli never import each other.
+
+    models["models<br/>value objects, standard library only"]
+    core["core<br/>parsing, names, links, steps,<br/>vault I/O, search, settings, templates"]
+    ui["ui<br/>Flet app"]
+    cli["cli<br/>argparse"]
+
+    models -->|used by| core
+    core -->|used by| ui
+    core -->|used by| cli
 ```
 
 - `models/` holds immutable value objects: note vocabulary, references, and steps.

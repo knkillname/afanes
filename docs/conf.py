@@ -20,6 +20,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx_copybutton",
     "sphinx_design",
+    "sphinxcontrib.mermaid",
 ]
 
 source_suffix = {
@@ -32,6 +33,14 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 myst_enable_extensions = ["colon_fence", "deflist", "tasklist"]
 myst_heading_anchors = 3
+myst_fence_as_directive = ["mermaid"]
+
+# Render Mermaid in the browser with the runtime vendored under _static/, so a
+# local build and preview never fetch a script from the network.
+mermaid_output_format = "raw"
+mermaid_use_local = "vendor/mermaid/mermaid.esm.min.mjs"
+mermaid_version = "11.12.1"
+mermaid_height = "auto"
 
 autodoc_default_options = {
     "members": True,

@@ -70,6 +70,36 @@ Use the built-in MyST admonitions. Do not add custom CSS or a new admonition typ
 Keep them restrained: one `tl;dr` per page, warnings only for real risk, and `Remember` for rules that
 readers should carry into other pages.
 
+## 📊 Diagrams
+
+Use a Mermaid diagram when a page explains relationships or a flow that a reader should grasp as a
+whole: package layers, call order, state changes. Keep a literal `text` block when the reader needs to
+copy the content verbatim: directory trees, file contents, command output. A diagram replaces
+spelling; it must not replace text that has to stay exact.
+
+Write a plain `mermaid` fence. `docs/conf.py` maps it to the Sphinx directive, and GitHub renders the
+same fence, so the source does not need a second syntax:
+
+```mermaid
+flowchart LR
+    accTitle: Documentation flow
+    accDescr: Markdown source becomes the built documentation site.
+
+    source["Markdown source"] --> build["Sphinx build"] --> site["HTML site"]
+```
+
+Every diagram starts with `accTitle:` (a short name) and `accDescr:` (one sentence that explains the
+diagram). Mermaid turns them into the SVG title and description, and the docs style test rejects a
+fence without them.
+
+The Mermaid runtime is vendored under `docs/_static/vendor/mermaid/`, and `docs/conf.py` points at
+that copy. Do not replace it with a CDN URL: `docs:build` and `docs:serve` must stay fully local. To
+upgrade the runtime, follow `docs/_static/vendor/mermaid/README.md`.
+
+`docs:build` does not parse Mermaid syntax. A malformed diagram still builds, and the error appears in
+the browser. After editing a diagram, open the page with `hatch run docs:serve` and check it in both
+themes.
+
 ## 🎨 Emoji palette
 
 Use one meaningful emoji at the start of every heading in `README.md` and `docs/`. Reuse this palette
@@ -89,6 +119,7 @@ so the same idea looks the same everywhere.
 | Review | ✅ | Releasing | 🚢 |
 | Browser mode | 🌐 | API | 🧩 |
 | Command line | 💻 | Documentation | 📝 |
+| Diagrams | 📊 | | |
 
 Do not use emoji headings in machine-read Markdown: `AGENTS.md`, `CHANGELOG.md`, `RELEASE.md`, and
 `openspec/specs/**` keep their current heading formats.
@@ -139,7 +170,7 @@ references. `docs:serve` starts a live-reloading preview on `127.0.0.1` using on
 | Check | Command | What it proves |
 | --- | --- | --- |
 | Site build | `hatch run docs:build` | Internal references resolve and Sphinx reports no warnings |
-| Docs style | `hatch test tests/docs/test_style.py` | Headings start with emoji and long pages carry a `tl;dr` |
+| Docs style | `hatch test tests/docs/test_style.py` | Headings start with emoji, long pages carry a `tl;dr`, diagrams carry accessibility metadata, and the Mermaid runtime is local |
 | Examples | `hatch test tests/core/test_integration.py::TestDocumentedExamples` | Documented examples still parse |
 | Repository gates | `hatch check` and `hatch test --cover` | The rest of the project still passes |
 
