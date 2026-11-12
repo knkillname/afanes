@@ -67,13 +67,9 @@ def _reset_state() -> None:
     afanes.ui.state.app_state.reset()
 
 
-def _welcome_button(control: ft.Control) -> ft.FilledButton:
+def _welcome_button(control: ft.Control, key: str = "welcome-choose") -> ft.FilledButton:
     assert isinstance(control, ft.Container)
-    content = control.content
-    assert isinstance(content, ft.Column)
-    buttons = [item for item in content.controls if isinstance(item, ft.FilledButton)]
-    assert len(buttons) == 1
-    return buttons[0]
+    return _typed(_find_by_key(control, key), ft.FilledButton)
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
@@ -91,22 +87,13 @@ def _find_by_key(control: ft.Control, key: str) -> ft.Control | None:
         found = _find_by_key(child, key)
         if found is not None:
             return found
-    content = getattr(control, "content", None)
-    if isinstance(content, ft.Control):
-        return _find_by_key(content, key)
-    return None
-
-
-def _find_by_content(control: ft.Control, text: str) -> ft.Control | None:
-    if getattr(control, "content", None) == text and getattr(control, "on_click", None) is not None:
-        return control
-    for child in getattr(control, "controls", []) or []:
-        found = _find_by_content(child, text)
+    for child in getattr(control, "items", []) or []:
+        found = _find_by_key(child, key)
         if found is not None:
             return found
     content = getattr(control, "content", None)
     if isinstance(content, ft.Control):
-        return _find_by_content(content, text)
+        return _find_by_key(content, key)
     return None
 
 
@@ -232,6 +219,8 @@ class TestDesktopPresentation:
 
         assert _find_by_key(page.controls[0], "welcome-path") is None
         assert _welcome_button(page.controls[0]).content == afanes.ui.strings.WELCOME_CHOOSE
+        create = _welcome_button(page.controls[0], "welcome-create")
+        assert create.content == afanes.ui.strings.NEW_VAULT_ACTION
 
 
 class TestWebPresentation:
@@ -253,7 +242,8 @@ class TestWebPresentation:
 
         field = _typed(_find_by_key(page.controls[0], "welcome-path"), ft.TextField)
         assert field.label == afanes.ui.strings.WELCOME_PATH_LABEL
-        assert _welcome_button(page.controls[0]).content == afanes.ui.strings.WELCOME_OPEN
+        assert _welcome_button(page.controls[0], "welcome-open").content == afanes.ui.strings.WELCOME_OPEN
+        assert _welcome_button(page.controls[0], "welcome-create").content == afanes.ui.strings.NEW_VAULT_ACTION
 
     def test_entering_a_path_opens_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -313,7 +303,7 @@ class TestWebPresentation:
 
         async def scenario() -> None:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
-            change = _typed(_find_by_content(page.controls[0], afanes.ui.strings.CHANGE_VAULT_ACTION), ft.TextButton)
+            change = _typed(_find_by_key(page.controls[0], "workspace-change-open"), ft.PopupMenuItem)
             change_handler = typing.cast("Handler", change.on_click)
             await change_handler()
 
@@ -340,7 +330,7 @@ class TestWebPresentation:
 
         async def scenario() -> None:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
-            change = _typed(_find_by_content(page.controls[0], afanes.ui.strings.CHANGE_VAULT_ACTION), ft.TextButton)
+            change = _typed(_find_by_key(page.controls[0], "workspace-change-open"), ft.PopupMenuItem)
             change_handler = typing.cast("Handler", change.on_click)
             await change_handler()
             cancel = _typed(_find_by_key(page.dialogs[0], "change-vault-cancel"), ft.TextButton)
@@ -416,3 +406,210 @@ class TestSessionGuard:
         assert state.session_active is True
         assert _find_by_key(second.controls[0], "session-retry") is None
         assert isinstance(second.controls[0], ft.Container)
+
+
+async def _submit_creation(page: FakePage, path_text: Path) -> None:
+    dialog = page.dialogs[-1]
+    field = _typed(_find_by_key(dialog, "create-vault-path"), ft.TextField)
+    field.value = str(path_text)
+    submit = _typed(_find_by_key(dialog, "create-vault-submit"), ft.FilledButton)
+    await typing.cast("Handler", submit.on_click)()
+
+
+class TestCreation:
+    def test_desktop_welcome_offers_creation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        page = FakePage()
+
+        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+
+        assert _welcome_button(page.controls[0], "welcome-create").content == afanes.ui.strings.NEW_VAULT_ACTION
+
+    def test_web_welcome_offers_creation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        page = FakePage(web=True)
+
+        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+
+        assert _welcome_button(page.controls[0], "welcome-create").content == afanes.ui.strings.NEW_VAULT_ACTION
+
+    def test_desktop_creation_uses_the_directory_picker(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        target = tmp_path / "vault"
+        target.mkdir()
+        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: FakePicker(str(target)))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+
+        asyncio.run(scenario())
+
+        assert state.vault_root == target.resolve()
+        assert (target / "inbox").is_dir()
+        assert (target / "reference" / "people").is_dir()
+        assert page.dialogs == []
+        assert isinstance(page.controls[0], ft.Column)
+        assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
+
+    def test_cancelling_the_creation_picker_writes_nothing(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: FakePicker(None))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+
+        asyncio.run(scenario())
+
+        assert state.vault_root is None
+        assert not settings.exists()
+        assert isinstance(page.controls[0], ft.Container)
+
+    def test_desktop_creation_error_returns_to_the_welcome(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        occupied = tmp_path / "occupied"
+        occupied.mkdir()
+        (occupied / "photo.jpg").write_text("data", encoding="utf-8")
+        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: FakePicker(str(occupied)))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+
+        asyncio.run(scenario())
+
+        assert state.vault_root is None
+        assert state.message == afanes.ui.strings.VAULT_NOT_EMPTY
+        assert not settings.exists()
+
+    def test_web_creation_dialog_previews_and_creates_the_vault(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        target = tmp_path / "notes" / "vault"
+        page = FakePage(web=True)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+            preview = _typed(_find_by_key(page.dialogs[0], "create-vault-preview"), ft.Text)
+            assert "inbox/" in (preview.value or "")
+            assert "reference/people/" in (preview.value or "")
+            await _submit_creation(page, target)
+
+        asyncio.run(scenario())
+
+        assert state.vault_root == target.resolve()
+        assert (target / "inbox").is_dir()
+        assert page.dialogs == []
+        assert isinstance(page.controls[0], ft.Column)
+        assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
+
+    def test_web_creation_error_stays_in_the_dialog(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        occupied = tmp_path / "occupied"
+        occupied.mkdir()
+        (occupied / "photo.jpg").write_text("data", encoding="utf-8")
+        page = FakePage(web=True)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+            await _submit_creation(page, occupied)
+
+        asyncio.run(scenario())
+
+        assert state.vault_root is None
+        assert len(page.dialogs) == 1
+        error = _typed(_find_by_key(page.dialogs[0], "create-vault-error"), ft.Text)
+        assert error.visible is True
+        assert error.value == afanes.ui.strings.VAULT_NOT_EMPTY
+        assert not settings.exists()
+
+    def test_web_cancelling_creation_writes_nothing(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        page = FakePage(web=True)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+            cancel = _typed(_find_by_key(page.dialogs[0], "create-vault-cancel"), ft.TextButton)
+            await typing.cast("Handler", cancel.on_click)()
+
+        asyncio.run(scenario())
+
+        assert page.dialogs == []
+        assert state.vault_root is None
+        assert not settings.exists()
+
+    def test_creating_a_second_vault_from_the_change_action(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        first = tmp_path / "first"
+        first.mkdir()
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=first))
+        second = tmp_path / "second"
+        second.mkdir()
+        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: FakePicker(str(second)))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _typed(_find_by_key(page.controls[0], "workspace-change-create"), ft.PopupMenuItem)
+            await typing.cast("Handler", create.on_click)()
+
+        asyncio.run(scenario())
+
+        assert state.vault_root == second.resolve()
+        assert (second / "inbox").is_dir()
+        assert not (first / "inbox").exists()
+        assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(second.resolve())

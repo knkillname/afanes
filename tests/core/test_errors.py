@@ -11,6 +11,10 @@ class TestExceptionHierarchy:
             "ConfigurationError",
             "VaultError",
             "VaultPathError",
+            "VaultMissingError",
+            "VaultNotDirectoryError",
+            "VaultUnreadableError",
+            "VaultNotEmptyError",
             "NoteParseError",
             "EmptyCaptureError",
             "InvalidReferenceError",
@@ -23,6 +27,10 @@ class TestExceptionHierarchy:
 
     def test_specific_errors_keep_their_parent(self) -> None:
         assert issubclass(afanes.core.errors.VaultPathError, afanes.core.errors.VaultError)
+        assert issubclass(afanes.core.errors.VaultMissingError, afanes.core.errors.VaultError)
+        assert issubclass(afanes.core.errors.VaultNotDirectoryError, afanes.core.errors.VaultError)
+        assert issubclass(afanes.core.errors.VaultUnreadableError, afanes.core.errors.VaultError)
+        assert issubclass(afanes.core.errors.VaultNotEmptyError, afanes.core.errors.VaultError)
 
     def test_no_error_reuses_a_builtin_name(self) -> None:
         public_names = [

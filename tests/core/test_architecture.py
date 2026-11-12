@@ -24,6 +24,7 @@ from pathlib import Path
 SOURCE_ROOT = Path(__file__).resolve().parents[2] / "src" / "afanes"
 MODEL_ROOT = SOURCE_ROOT / "models"
 CORE_ROOT = SOURCE_ROOT / "core"
+CLI_ROOT = SOURCE_ROOT / "cli"
 UI_ROOT = SOURCE_ROOT / "ui"
 VIEW_ROOT = UI_ROOT / "views"
 
@@ -33,6 +34,7 @@ FINAL_FUNCTION_ALLOWLIST: dict[str, frozenset[str] | None] = {
     "core/atomic.py": None,
     "ui/strings.py": None,
     "ui/app.py": frozenset({"main"}),
+    "cli/main.py": frozenset({"main"}),
     "__main__.py": frozenset({"main", "_port_number"}),
 }
 
@@ -185,6 +187,19 @@ class TestImportBoundaries:
 
 
 class TestUiLayering:
+    def test_cli_does_not_import_ui_or_the_toolkit(self) -> None:
+        offenders: list[str] = []
+        for path in _python_files(CLI_ROOT):
+            offenders.extend(
+                f"{path.name}: {module}" for module in _first_party_imports(path) if module.startswith("afanes.ui")
+            )
+            offenders.extend(
+                f"{path.name}: {module}"
+                for module, level in _imports(path)
+                if level == 0 and (module == "flet" or module.startswith("flet."))
+            )
+        assert offenders == []
+
     def test_ui_does_not_import_cli(self) -> None:
         offenders: list[str] = []
         for path in _python_files(UI_ROOT):
@@ -219,6 +234,7 @@ class TestObjectOwnership:
             "core/atomic.py": None,
             "ui/strings.py": None,
             "ui/app.py": frozenset({"main"}),
+            "cli/main.py": frozenset({"main"}),
             "__main__.py": frozenset({"main", "_port_number"}),
         } == FINAL_FUNCTION_ALLOWLIST
 

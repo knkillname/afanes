@@ -8,6 +8,7 @@
 ## Table of Contents
 
 - [Development](#development)
+- [Command line](#command-line)
 - [Running in a browser](#running-in-a-browser)
 - [Vault format](#vault-format)
 - [Workspace browser](#workspace-browser)
@@ -53,6 +54,32 @@ supported interpreter and against the oldest supported dependency versions. The 
 environment installs both interface runtimes, so `hatch run afanes --web` works from a clean
 checkout.
 
+## Command line
+
+The installed `afanes` command starts the application when it is given no subcommand. It also runs
+headless commands, which never open a window and never import the interface:
+
+```console
+afanes vault create ~/Notes/Afanes
+```
+
+`vault create` creates the directory, seeds the default folders, prints what it created, and makes
+the new vault the one Afanes opens next launch. Missing folders in the path are created too, and the
+report names them:
+
+```text
+Created vault /home/you/Notes/Afanes
+Parent folders created: /home/you/Notes
+Seeded: inbox/, trash/, reference/, reference/people/, projects/, actions/
+Remembered as the vault to open next launch.
+```
+
+- `--no-remember` creates the vault without changing which vault Afanes opens next launch.
+- The command refuses a folder that is not empty, a path that is a file, and a vault that cannot
+  be created. Every created folder is named, so a mistyped path is visible immediately.
+- Exit codes: `0` success, `1` expected failure, `2` usage error. Reports go to standard output and
+  failures to standard error.
+
 ## Running in a browser
 
 Machines that block the native Flet client can serve the same interface to a browser instead:
@@ -84,9 +111,18 @@ If a browser tab shows a spinner with "Working…", the tab has lost its Python 
 because the server process exited. Start the server again and reload the tab. Closing a tab releases
 its session, so Afanes can be reopened in a new one.
 
-On first launch, choose a vault folder. Afanes remembers it in the platform configuration
-directory and reopens it next time. The [workspace browser](#workspace-browser) then lists every
-note in the vault and opens on the [Inbox](#inbox) group.
+On first launch, choose an existing folder or create a new vault. **New vault** opens the system
+folder chooser on desktop, where you can create the folder you want, or asks for a folder path in a
+browser session. It then seeds `inbox/`, `trash/`, `reference/`, `reference/people/`, `projects/`,
+and `actions/`, and remembers the result in the platform configuration directory.
+Afanes reopens that vault next time, and the [workspace browser](#workspace-browser) lists every note
+in it, opening on the [Inbox](#inbox) group.
+
+The same choice is available from the **Change vault** action while a vault is open, so a second
+vault can be created without closing the application. Only the New vault action seeds the default
+folders: opening an existing empty folder through Choose vault leaves it unseeded, and Afanes creates
+each folder only when a write needs it. Opening or scanning a vault never creates a folder or a
+file.
 
 ## Vault format
 

@@ -43,13 +43,17 @@ class WorkspaceView:
     update : Callable[[], None]
         Requests a repaint of the page. Tests pass a no-op or a counter.
     on_change_vault : Callable[[], Awaitable[None]]
-        Command that opens the folder picker and switches the vault.
+        Command that opens an existing vault through the folder picker or the
+        typed-path dialog.
+    on_create_vault : Callable[[], Awaitable[None]]
+        Command that asks for a new vault path and creates it.
     """
 
     def __init__(
         self,
         update: Callable[[], None],
         on_change_vault: Callable[[], Awaitable[None]],
+        on_create_vault: Callable[[], Awaitable[None]],
     ) -> None:
         """Build the workspace controls against the shared application state.
 
@@ -58,11 +62,14 @@ class WorkspaceView:
         update : Callable[[], None]
             Requests a repaint of the page.
         on_change_vault : Callable[[], Awaitable[None]]
-            Command that opens the folder picker and switches the vault.
+            Command that opens an existing vault.
+        on_create_vault : Callable[[], Awaitable[None]]
+            Command that creates a new vault.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
         self._on_change_vault = on_change_vault
+        self._on_create_vault = on_create_vault
         self._processing_view: afanes.ui.views.processing.ProcessingView | None = None
         self._processing_key: tuple[Path | None, Path | None] | None = None
         self._projects_view: afanes.ui.views.projects.ProjectsView | None = None
@@ -86,10 +93,23 @@ class WorkspaceView:
             on_click=self._refresh,
             key="workspace-refresh",
         )
-        self.change_button = ft.TextButton(
-            content=afanes.ui.strings.CHANGE_VAULT_ACTION,
+        self.change_button = ft.PopupMenuButton(
+            content=ft.Text(afanes.ui.strings.CHANGE_VAULT_ACTION),
             icon=ft.Icons.FOLDER_OPEN,
-            on_click=self._change_vault,
+            tooltip=afanes.ui.strings.CHANGE_VAULT_ACTION,
+            items=[
+                ft.PopupMenuItem(
+                    content=afanes.ui.strings.CHANGE_VAULT_OPEN,
+                    on_click=self._change_vault,
+                    key="workspace-change-open",
+                ),
+                ft.PopupMenuItem(
+                    content=afanes.ui.strings.CHANGE_VAULT_CREATE,
+                    on_click=self._create_vault,
+                    key="workspace-change-create",
+                ),
+            ],
+            key="workspace-change",
         )
         self.capture_field = ft.TextField(
             label=afanes.ui.strings.COMPOSER_LABEL,
@@ -249,6 +269,14 @@ class WorkspaceView:
         self._set_working(working=True)
         try:
             await self._on_change_vault()
+        finally:
+            self._set_working(working=False)
+
+    async def _create_vault(self) -> None:
+        """Delegate new-vault creation to the application shell."""
+        self._set_working(working=True)
+        try:
+            await self._on_create_vault()
         finally:
             self._set_working(working=False)
 

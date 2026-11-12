@@ -442,7 +442,7 @@ The only allowlisted free functions are:
 - `src/afanes/core/names.py`: name normalization and filename policy.
 - `src/afanes/core/atomic.py`: the atomic write primitive.
 - `src/afanes/ui/strings.py`: user-facing copy.
-- Entry-point callbacks: `main` in `src/afanes/ui/app.py` and `src/afanes/__main__.py`, plus the `argparse` type callback `_port_number` in `src/afanes/__main__.py`.
+- Entry-point callbacks: `main` in `src/afanes/ui/app.py`, `src/afanes/__main__.py`, and `src/afanes/cli/main.py`, plus the `argparse` type callback `_port_number` in `src/afanes/__main__.py`.
 
 Callbacks passed to a framework, test functions, and private helpers used by exactly one method are not free functions in this sense; the first two are exempt by contract and the third must be a method.
 
@@ -453,6 +453,7 @@ A hard architecture gate in `tests/core/test_architecture.py` enforces the end s
 - `ui/` has no module-level functions outside `strings.py` and the `ui/app.py` entry point.
 - `ui/views/` and `ui/state.py` have no module-level functions.
 - `__main__.py` has no module-level functions outside `main` and `_port_number`.
+- `cli/` has no module-level functions outside the `cli/main.py` entry point.
 - No view module defines `_banner`, `_status_label`, `_panel`, or `_card`; those live in `ui/components/`.
 - `AppState` has at most ten instance fields: its collaborators, the shared lock, and the global status flags.
 

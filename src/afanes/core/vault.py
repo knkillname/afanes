@@ -6,10 +6,12 @@
 import dataclasses
 import datetime
 import hashlib
+import os
 from collections.abc import Iterable, Mapping
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
+from typing import Self
 
 import afanes.core.atomic
 import afanes.core.links
@@ -24,7 +26,11 @@ from afanes.core.errors import (
     ProcessingError,
     ReferenceRewriteError,
     VaultError,
+    VaultMissingError,
+    VaultNotDirectoryError,
+    VaultNotEmptyError,
     VaultPathError,
+    VaultUnreadableError,
 )
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import CatalogEntry, NameCatalog, ReferenceKey, ResolutionOutcome
@@ -978,14 +984,162 @@ class Vault:
 
         Raises
         ------
-        VaultError
-            If the path does not exist or is not a directory.
+        VaultMissingError
+            If the path does not exist.
+        VaultNotDirectoryError
+            If the path exists and is not a directory.
         """
         resolved = self.root.expanduser().resolve()
+        if not resolved.exists():
+            message = f"Vault root does not exist: {self.root}"
+            raise VaultMissingError(message)
         if not resolved.is_dir():
             message = f"Vault root is not a directory: {self.root}"
-            raise VaultError(message)
+            raise VaultNotDirectoryError(message)
         object.__setattr__(self, "root", resolved)
+
+    @classmethod
+    def open(cls, path: Path) -> Self:
+        """Open an existing directory as a vault.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+            Candidate vault directory. A relative path is resolved against the
+            current working directory.
+
+        Returns
+        -------
+        Vault
+            Validated vault service for ``path``.
+
+        Raises
+        ------
+        VaultMissingError
+            If the path does not exist.
+        VaultNotDirectoryError
+            If the path exists and is not a directory.
+        VaultUnreadableError
+            If the directory cannot be read.
+
+        Notes
+        -----
+        This method performs blocking filesystem checks and never writes. It is
+        the single validation path shared by the interface and the command
+        line.
+        """
+        vault = cls(path)
+        if not os.access(vault.root, os.R_OK):
+            message = f"Vault root cannot be read: {path}"
+            raise VaultUnreadableError(message)
+        return vault
+
+    @classmethod
+    def default_layout(cls) -> tuple[Path, ...]:
+        """Return the default folders relative to a vault root.
+
+        Returns
+        -------
+        tuple[pathlib.Path, ...]
+            Canonical relative folders seeded when a vault is created, in the
+            order a created vault reports them.
+
+        Notes
+        -----
+        This method is a pure lookup. It reads no filesystem and creates
+        nothing.
+        """
+        return (
+            INBOX_DIRECTORY,
+            TRASH_DIRECTORY,
+            REFERENCE_DIRECTORY,
+            *(REFERENCE_DIRECTORY / folder for folder in CATEGORY_DIRECTORIES.values()),
+            PROJECTS_DIRECTORY,
+            ACTIONS_DIRECTORY,
+        )
+
+    @classmethod
+    def create_directory(cls, path: Path) -> "VaultCreation":
+        """Create and seed a vault directory.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+            Directory to create or seed. It must be missing or empty.
+
+        Returns
+        -------
+        VaultCreation
+            Created vault, the intermediate directories made for it, and the
+            default folders created inside it.
+
+        Raises
+        ------
+        VaultNotDirectoryError
+            If the path exists and is not a directory.
+        VaultNotEmptyError
+            If the directory exists and already contains entries.
+        VaultError
+            If a directory cannot be created or seeded.
+
+        Notes
+        -----
+        Missing intermediate folders are created. The path is resolved before
+        it is inspected, so a symlink cannot smuggle a populated directory past
+        the emptiness check. Nothing is rolled back when seeding fails partway:
+        the directories already created stay in place.
+        """
+        target = path.expanduser().resolve()
+        try:
+            if target.exists() and not target.is_dir():
+                message = f"Vault path is not a directory: {path}"
+                raise VaultNotDirectoryError(message)
+            if target.is_dir() and any(target.iterdir()):
+                message = f"Vault path is not empty: {path}"
+                raise VaultNotEmptyError(message)
+            created = cls._missing_directories(target.parent)
+            target.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            message = f"Could not create the vault directory: {path}"
+            raise VaultError(message) from exc
+        vault = cls(target)
+        try:
+            seeded = vault._seed_layout()
+        except OSError as exc:
+            message = f"Could not seed the vault directory: {path}"
+            raise VaultError(message) from exc
+        return VaultCreation(vault=vault, created_directories=created, seeded_directories=seeded)
+
+    @staticmethod
+    def _missing_directories(start: Path) -> tuple[Path, ...]:
+        """Return the missing ancestor directories of ``start``, outermost first."""
+        missing: list[Path] = []
+        current = start
+        while not current.exists():
+            missing.append(current)
+            parent = current.parent
+            if parent == current:
+                break
+            current = parent
+        return tuple(reversed(missing))
+
+    def _seed_layout(self) -> tuple[Path, ...]:
+        """Create the default folders and return the ones that were made."""
+        destinations = [
+            self.directory_for(NoteType.NOTE),
+            self._existing_directory(self.root, TRASH_DIRECTORY),
+            self.directory_for(NoteType.REFERENCE),
+            *(self.directory_for(NoteType.REFERENCE, category) for category in CATEGORY_DIRECTORIES),
+            self.directory_for(NoteType.PROJECT),
+            self.directory_for(NoteType.ACTION),
+        ]
+        created: list[Path] = []
+        for destination in destinations:
+            if destination.is_dir():
+                continue
+            destination.mkdir(parents=True, exist_ok=True)
+            created.append(destination)
+        return tuple(created)
 
     def contained(self, candidate: Path) -> Path:
         """Resolve a path and verify that it stays inside this vault.
@@ -2563,3 +2717,23 @@ class Vault:
             message = f"Could not move the note to trash: {preview.note_path}"
             raise VaultError(message) from exc
         return preview.reference_count
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class VaultCreation:
+    """Directories produced by one vault creation.
+
+    Attributes
+    ----------
+    vault : Vault
+        The created and seeded vault.
+    created_directories : tuple[pathlib.Path, ...]
+        Intermediate directories created for the vault path, outermost first.
+        The vault root itself is not included.
+    seeded_directories : tuple[pathlib.Path, ...]
+        Default folders created inside the vault, in layout order.
+    """
+
+    vault: Vault
+    created_directories: tuple[Path, ...]
+    seeded_directories: tuple[Path, ...]

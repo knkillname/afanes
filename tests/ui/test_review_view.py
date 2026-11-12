@@ -33,6 +33,10 @@ async def _change_vault() -> None:
     return None
 
 
+async def _create_vault() -> None:
+    return None
+
+
 def _write_typed_note(
     path: Path,
     note_type: str,
@@ -385,7 +389,7 @@ class TestReviewProcessing:
         state = _choose_vault(tmp_path, monkeypatch)
         asyncio.run(state.start_review())
 
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault)
 
         assert state.processing_note is not None
         assert _find_by_key(view.main_host, "processing-view") is not None
@@ -397,7 +401,7 @@ class TestReviewProcessing:
         capture = _write_typed_note(vault / "inbox" / "Buy milk.md", "note", body="# Buy milk")
         state = _choose_vault(tmp_path, monkeypatch)
         asyncio.run(state.start_review())
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault)
 
         cancel = _find_by_key(view.main_host, "processing-cancel")
         assert isinstance(cancel, ft.TextButton)
@@ -414,7 +418,7 @@ class TestReviewProcessing:
         _write_typed_note(vault / "inbox" / "Buy milk.md", "note", body="# Buy milk")
         state = _choose_vault(tmp_path, monkeypatch)
         asyncio.run(state.start_review())
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault)
 
         cancel = _find_by_key(view.main_host, "processing-cancel")
         assert isinstance(cancel, ft.TextButton)

@@ -403,3 +403,42 @@ class TestReviewWorkspaceWorkflow:
         assert summaries["Office move"].next_action is not None
         assert summaries["Office move"].next_action.name == "Send the supplier the address"
         assert set(summaries) == {"Release 1.0", "Office move", "Finished"}
+
+
+class TestCreatedVaultWorkflow:
+    def test_create_capture_process_and_read_back(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            afanes.core.settings.SettingsStore,
+            "settings_path",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
+        )
+        target = tmp_path / "notes" / "vault"
+        state = afanes.ui.state.app_state
+        state.reset()
+
+        async def scenario() -> Path:
+            assert await state.create_vault(target) is True
+            captured = await state.capture("Call the printer")
+            assert captured is not None
+            assert captured.parent == target.resolve() / "inbox"
+            assert await state.begin_processing(captured) is True
+            assert await state.plan_processing(ProcessingOutcome.ACTION) is not None
+            processed = await state.apply_processing()
+            assert processed is not None
+            return processed
+
+        try:
+            action = asyncio.run(scenario())
+        finally:
+            state.reset()
+
+        assert action == target.resolve() / "actions" / "Call the printer.md"
+        document = NoteDocument.from_text(action.read_text(encoding="utf-8"))
+        assert document.note_type is NoteType.ACTION
+        snapshot = afanes.core.vault.Vault.open(target).scan()
+        assert snapshot.inbox_notes() == ()
+        assert [note.path for note in snapshot.notes] == [action]

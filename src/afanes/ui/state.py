@@ -14,7 +14,6 @@ import dataclasses
 import datetime
 import hashlib
 import logging
-import os
 from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
@@ -34,7 +33,11 @@ from afanes.core.errors import (
     InvalidReferenceError,
     NoteParseError,
     VaultError,
+    VaultMissingError,
+    VaultNotDirectoryError,
+    VaultNotEmptyError,
     VaultPathError,
+    VaultUnreadableError,
 )
 from afanes.core.links import DestinationKind, ReferenceParser
 from afanes.core.processing import ProcessingOutcome, ProcessingPlan
@@ -54,6 +57,7 @@ from afanes.core.vault import (
     RenamePreview,
     TrashPreview,
     Vault,
+    VaultCreation,
     VaultFailure,
     VaultNote,
     VaultSnapshot,
@@ -68,14 +72,14 @@ AUTOSAVE_SECONDS = 30
 
 
 class VaultOpener:
-    """Validate and open a vault directory for the interface.
+    """Translate vault path failures into interface messages.
 
     Notes
     -----
-    This is the single validation path shared by the folder picker, the typed
-    path field, and the command-line vault option. It performs blocking
-    filesystem checks; call it from a worker thread when a command is
-    responding to a UI event.
+    This is the interface's translation point for the folder picker, the typed
+    path field, the creation action, and the command-line vault option. All
+    filesystem validation lives in :class:`afanes.core.vault.Vault`; this class
+    only maps domain errors to user-facing copy.
     """
 
     @staticmethod
@@ -99,15 +103,44 @@ class VaultOpener:
             If the path is missing, is not a directory, cannot be read, or
             cannot be resolved.
         """
-        if not path.exists():
-            raise VaultError(afanes.ui.strings.VAULT_MISSING)
-        if not path.is_dir():
-            raise VaultError(afanes.ui.strings.VAULT_NOT_DIRECTORY)
-        if not os.access(path, os.R_OK):
-            raise VaultError(afanes.ui.strings.VAULT_UNREADABLE)
         try:
-            return Vault(path)
-        except OSError as exc:
+            return Vault.open(path)
+        except VaultMissingError as exc:
+            raise VaultError(afanes.ui.strings.VAULT_MISSING) from exc
+        except VaultNotDirectoryError as exc:
+            raise VaultError(afanes.ui.strings.VAULT_NOT_DIRECTORY) from exc
+        except VaultUnreadableError as exc:
+            raise VaultError(afanes.ui.strings.VAULT_UNREADABLE) from exc
+
+    @staticmethod
+    def create(path: Path) -> VaultCreation:
+        """Create a new vault and translate refusals into interface messages.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+            Directory to create or seed. It must be missing or empty.
+
+        Returns
+        -------
+        VaultCreation
+            Created vault, the intermediate directories made for it, and the
+            default folders created inside it.
+
+        Raises
+        ------
+        VaultError
+            If the path is not a directory, is not empty, or cannot be created.
+        """
+        try:
+            return Vault.create_directory(path)
+        except VaultNotEmptyError as exc:
+            raise VaultError(afanes.ui.strings.VAULT_NOT_EMPTY) from exc
+        except VaultNotDirectoryError as exc:
+            raise VaultError(afanes.ui.strings.VAULT_NOT_DIRECTORY) from exc
+        except VaultMissingError as exc:
+            raise VaultError(afanes.ui.strings.VAULT_MISSING) from exc
+        except VaultUnreadableError as exc:
             raise VaultError(afanes.ui.strings.VAULT_UNREADABLE) from exc
 
 
@@ -1289,18 +1322,77 @@ class AppState:
                     logger.debug("Vault selection could not be saved", exc_info=True)
                     self.message = afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail=str(exc))
                     return
-            self.vault = vault
-            self._clear_processing()
-            self.active_section = WorkspaceSection.INBOX
-            self.browser_query = ""
-            self.review_session = None
-            self.selected = None
-            self.preview_body = None
-            self.history = ()
-            self._clear_page()
-            self._apply_snapshot(snapshot)
+            self._enter_vault(vault, snapshot)
         finally:
             self.busy = False
+
+    async def create_vault(self, path: Path) -> bool:
+        """Create a new vault, seed it, and open it.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+            Directory to create or seed. Missing intermediate folders are
+            created.
+
+        Returns
+        -------
+        bool
+            ``True`` when the new vault opened, ``False`` when creation was
+            refused or the current draft could not be saved.
+
+        Notes
+        -----
+        The vault is created and scanned before its path is saved. When the
+        preferences write fails, the created vault still opens for this session
+        and :attr:`message` explains that it will not be remembered. Blocking
+        file I/O runs in a worker thread.
+        """
+        async with self._lock:
+            return await self._create_vault_state(path)
+
+    async def _create_vault_state(self, path: Path) -> bool:
+        """Create a vault while the command lock is held."""
+        if not await self._commit_current():
+            return False
+        self.busy = True
+        self.message = None
+        try:
+            try:
+                creation = await asyncio.to_thread(VaultOpener.create, path)
+                snapshot = await asyncio.to_thread(creation.vault.scan)
+            except (VaultError, OSError) as exc:
+                logger.debug("New vault could not be created", exc_info=True)
+                self.message = str(exc)
+                return False
+            remember_failure: str | None = None
+            try:
+                await asyncio.to_thread(
+                    SettingsStore.default().save,
+                    Settings(vault=creation.vault.root),
+                )
+            except ConfigurationError as exc:
+                logger.debug("New vault could not be remembered", exc_info=True)
+                remember_failure = afanes.ui.strings.VAULT_CREATED_NOT_REMEMBERED.format(detail=str(exc))
+            self._enter_vault(creation.vault, snapshot)
+            if remember_failure is not None:
+                self.message = remember_failure
+            return True
+        finally:
+            self.busy = False
+
+    def _enter_vault(self, vault: Vault, snapshot: VaultSnapshot) -> None:
+        """Reset per-vault state and apply a freshly scanned snapshot."""
+        self.vault = vault
+        self._clear_processing()
+        self.active_section = WorkspaceSection.INBOX
+        self.browser_query = ""
+        self.review_session = None
+        self.selected = None
+        self.preview_body = None
+        self.history = ()
+        self._clear_page()
+        self._apply_snapshot(snapshot)
 
     async def change_vault(self, path: Path) -> None:
         """Switch to a different vault without restarting the application.

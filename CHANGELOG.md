@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-11-11
+
+### Added
+
+- **New vault** action on the welcome state and in Change vault, so a first run can provision a vault instead of requiring an existing folder. It creates missing folders in the path, seeds the default layout, remembers the vault, and opens it; a folder that already contains entries or a path that names a file is refused without writing anything.
+- `afanes vault create DIR` creates and seeds a vault headlessly, prints the created vault, parent folders, seeded folders, and whether the vault was remembered, and supports `--no-remember`. The installed `afanes` command now dispatches a recognized subcommand and starts the interface otherwise, and the command surface keeps the documented exit codes and display-free guarantees. This release implements the `add-vault-creation` OpenSpec change.
+
+### Changed
+
+- Vault path validation lives in the core layer, so the interface and the command line share one rule instead of duplicating it.
+
 ## [0.4.2] - 2026-11-11
 
 ### Changed

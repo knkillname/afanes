@@ -32,6 +32,10 @@ async def _change_vault() -> None:
     return None
 
 
+async def _create_vault() -> None:
+    return None
+
+
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
     monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
 
@@ -58,7 +62,7 @@ def _write_note(
 def _open_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.views.workspace.WorkspaceView:
     _use_settings_file(monkeypatch, tmp_path / "settings.json")
     asyncio.run(afanes.ui.state.app_state.choose_vault(tmp_path / "vault"))
-    return afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault)
+    return afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault)
 
 
 def _handler(control: ft.Control) -> Handler:
@@ -75,7 +79,7 @@ class TestWorkspaceShell:
         vault.mkdir()
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         asyncio.run(afanes.ui.state.app_state.choose_vault(vault))
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault)
 
         assert view.root.key == "workspace-view"
         assert isinstance(view.root, ft.Column)
@@ -95,7 +99,7 @@ class TestWorkspaceShell:
             await state.open_page(note)
 
         asyncio.run(scenario())
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault)
 
         assert view.sidebar.visible is True
         assert view.page_view.title.value == "Buy milk"
@@ -113,7 +117,7 @@ class TestWorkspaceShell:
             await state.open_page(note)
 
         asyncio.run(scenario())
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault)
         handler = _handler(view.section_tiles[afanes.ui.state.WorkspaceSection.PROJECTS])
 
         asyncio.run(handler())

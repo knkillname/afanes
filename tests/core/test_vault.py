@@ -3,8 +3,11 @@
 import datetime
 import hashlib
 import os
+import tempfile
 from pathlib import Path
 
+import hypothesis
+import hypothesis.strategies
 import pytest
 
 import afanes.core.atomic
@@ -16,7 +19,11 @@ from afanes.core.errors import (
     NameCollisionError,
     NoteParseError,
     VaultError,
+    VaultMissingError,
+    VaultNotDirectoryError,
+    VaultNotEmptyError,
     VaultPathError,
+    VaultUnreadableError,
 )
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import ResolutionOutcome
@@ -141,11 +148,11 @@ class TestVaultService:
         file_path = tmp_path / "note.md"
         file_path.write_text("body", encoding="utf-8")
 
-        with pytest.raises(VaultError):
+        with pytest.raises(VaultNotDirectoryError):
             afanes.core.vault.Vault(file_path)
 
     def test_rejects_a_missing_directory(self, tmp_path: Path) -> None:
-        with pytest.raises(VaultError):
+        with pytest.raises(VaultMissingError):
             afanes.core.vault.Vault(tmp_path / "missing")
 
     def test_accepts_a_relative_path_inside_the_vault(self, tmp_path: Path) -> None:
@@ -177,6 +184,44 @@ class TestVaultService:
 
         with pytest.raises(VaultPathError):
             vault.contained(link)
+
+
+class TestVaultOpen:
+    def test_opens_an_existing_directory(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        vault = afanes.core.vault.Vault.open(root)
+
+        assert vault.root == root.resolve()
+
+    def test_rejects_a_missing_directory(self, tmp_path: Path) -> None:
+        with pytest.raises(VaultMissingError):
+            afanes.core.vault.Vault.open(tmp_path / "missing")
+
+    def test_rejects_a_file(self, tmp_path: Path) -> None:
+        file_path = tmp_path / "note.md"
+        file_path.write_text("body", encoding="utf-8")
+
+        with pytest.raises(VaultNotDirectoryError):
+            afanes.core.vault.Vault.open(file_path)
+
+    def test_rejects_an_unreadable_directory(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        monkeypatch.setattr(afanes.core.vault.os, "access", lambda _path, _mode: False)
+
+        with pytest.raises(VaultUnreadableError):
+            afanes.core.vault.Vault.open(root)
+
+    def test_resolves_a_relative_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        monkeypatch.chdir(tmp_path)
+
+        vault = afanes.core.vault.Vault.open(Path("vault"))
+
+        assert vault.root == root.resolve()
 
 
 class TestDirectoryFor:
@@ -239,6 +284,115 @@ class TestDirectoryFor:
 
         with pytest.raises(VaultError):
             afanes.core.vault.Vault(root).directory_for(NoteType.ACTION, ReferenceCategory.PERSON)
+
+
+class TestVaultCreation:
+    def test_creates_a_missing_directory(self, tmp_path: Path) -> None:
+        target = tmp_path / "vault"
+
+        creation = afanes.core.vault.Vault.create_directory(target)
+
+        assert creation.vault.root == target.resolve()
+        assert target.is_dir()
+
+    def test_creates_missing_intermediate_folders(self, tmp_path: Path) -> None:
+        target = tmp_path / "notes" / "personal" / "vault"
+
+        creation = afanes.core.vault.Vault.create_directory(target)
+
+        assert creation.created_directories == (tmp_path / "notes", tmp_path / "notes" / "personal")
+        assert target.is_dir()
+
+    def test_seeds_an_empty_directory(self, tmp_path: Path) -> None:
+        target = tmp_path / "vault"
+        target.mkdir()
+
+        creation = afanes.core.vault.Vault.create_directory(target)
+
+        assert creation.created_directories == ()
+        assert creation.vault.root == target.resolve()
+
+    def test_refuses_a_non_empty_directory(self, tmp_path: Path) -> None:
+        target = tmp_path / "vault"
+        target.mkdir()
+        (target / "photo.jpg").write_text("data", encoding="utf-8")
+
+        with pytest.raises(VaultNotEmptyError):
+            afanes.core.vault.Vault.create_directory(target)
+
+        assert sorted(path.name for path in target.iterdir()) == ["photo.jpg"]
+
+    def test_refuses_a_file(self, tmp_path: Path) -> None:
+        target = tmp_path / "note.md"
+        target.write_text("body", encoding="utf-8")
+
+        with pytest.raises(VaultNotDirectoryError):
+            afanes.core.vault.Vault.create_directory(target)
+
+        assert target.read_text(encoding="utf-8") == "body"
+
+    def test_refuses_a_symlink_to_a_populated_directory(self, tmp_path: Path) -> None:
+        populated = tmp_path / "populated"
+        populated.mkdir()
+        (populated / "note.md").write_text("body", encoding="utf-8")
+        link = tmp_path / "link"
+        try:
+            link.symlink_to(populated, target_is_directory=True)
+        except OSError:
+            pytest.skip("symlinks are unavailable on this platform")
+
+        with pytest.raises(VaultNotEmptyError):
+            afanes.core.vault.Vault.create_directory(link)
+
+    def test_seeds_every_default_folder(self, tmp_path: Path) -> None:
+        layout = afanes.core.vault.Vault.default_layout()
+
+        creation = afanes.core.vault.Vault.create_directory(tmp_path / "vault")
+
+        root = creation.vault.root
+        assert [path.relative_to(root) for path in creation.seeded_directories] == list(layout)
+        assert all((root / relative).is_dir() for relative in layout)
+
+    def test_seeded_paths_match_directory_for(self, tmp_path: Path) -> None:
+        creation = afanes.core.vault.Vault.create_directory(tmp_path / "vault")
+        vault = creation.vault
+        expected = [
+            vault.directory_for(NoteType.NOTE),
+            vault.root / "trash",
+            vault.directory_for(NoteType.REFERENCE),
+            vault.directory_for(NoteType.REFERENCE, ReferenceCategory.PERSON),
+            vault.directory_for(NoteType.PROJECT),
+            vault.directory_for(NoteType.ACTION),
+        ]
+
+        assert list(creation.seeded_directories) == expected
+
+    def test_seeding_creates_no_files(self, tmp_path: Path) -> None:
+        creation = afanes.core.vault.Vault.create_directory(tmp_path / "vault")
+
+        assert [path for path in creation.vault.root.rglob("*") if path.is_file()] == []
+
+    def test_refusal_writes_nothing(self, tmp_path: Path) -> None:
+        target = tmp_path / "vault"
+        target.mkdir()
+        (target / "existing.md").write_text("body", encoding="utf-8")
+
+        with pytest.raises(VaultNotEmptyError):
+            afanes.core.vault.Vault.create_directory(target)
+
+        assert sorted(path.name for path in target.iterdir()) == ["existing.md"]
+        assert [path.name for path in tmp_path.iterdir()] == ["vault"]
+
+    @hypothesis.given(hypothesis.strategies.text(alphabet="abcdefghijklmnopqrstuvwxyz", min_size=1, max_size=6))
+    def test_seeded_paths_stay_inside_the_created_root(self, name: str) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / f"vault-{name}"
+
+            creation = afanes.core.vault.Vault.create_directory(target)
+
+            root = creation.vault.root
+            assert root == target.resolve()
+            assert all(path.is_relative_to(root) for path in creation.seeded_directories)
 
 
 class TestScanVault:

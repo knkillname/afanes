@@ -11,6 +11,7 @@ import flet as ft
 import pytest
 
 import afanes.__main__
+import afanes.core.settings
 import afanes.ui.strings
 
 USAGE_EXIT_CODE = 2
@@ -176,6 +177,39 @@ class TestLaunchDispatch:
         assert excinfo.value.code == 1
         assert str(missing) in capsys.readouterr().err
         assert calls == []
+
+
+class TestSubcommandDispatch:
+    def test_launch_options_are_not_subcommands(self, tmp_path: Path) -> None:
+        assert afanes.__main__.Launcher.dispatch([]) is None
+        assert afanes.__main__.Launcher.dispatch(["--web"]) is None
+        assert afanes.__main__.Launcher.dispatch(["--vault", str(tmp_path / "vault")]) is None
+
+    def test_subcommand_creates_a_vault_without_the_runtime_check(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+
+        def unexpected(*_args: object, **_kwargs: object) -> None:
+            message = "the runtime check must not run for a subcommand"
+            raise AssertionError(message)
+
+        monkeypatch.setattr(afanes.__main__.Launcher, "require_runtime", unexpected)
+        target = tmp_path / "vault"
+
+        with pytest.raises(SystemExit) as excinfo:
+            afanes.__main__.main(["vault", "create", str(target)])
+
+        assert excinfo.value.code == 0
+        assert (target / "inbox").is_dir()
+        assert "Created vault" in capsys.readouterr().out
+
+
+def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
+    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
 
 
 def _project_scripts() -> dict[str, str]:

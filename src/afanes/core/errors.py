@@ -34,6 +34,22 @@ class VaultError(AfanesError):
     """Base class for vault discovery, containment, and write failures."""
 
 
+class VaultMissingError(VaultError):
+    """Raised when a vault path does not exist."""
+
+
+class VaultNotDirectoryError(VaultError):
+    """Raised when a vault path exists but is not a directory."""
+
+
+class VaultUnreadableError(VaultError):
+    """Raised when a vault directory cannot be read."""
+
+
+class VaultNotEmptyError(VaultError):
+    """Raised when vault creation targets a directory that is not empty."""
+
+
 class VaultPathError(VaultError):
     """Raised when a path escapes the vault root or is not a regular note."""
 

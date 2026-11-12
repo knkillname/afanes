@@ -2348,13 +2348,75 @@ class TestOpenVaultPath:
         def deny_access(*_args: object, **_kwargs: object) -> bool:
             return False
 
-        monkeypatch.setattr(afanes.ui.state.os, "access", deny_access)
+        monkeypatch.setattr(afanes.core.vault.os, "access", deny_access)
         state = afanes.ui.state.app_state
 
         asyncio.run(state.open_vault_path(str(vault)))
 
         assert state.vault_root is None
         assert state.message == afanes.ui.strings.VAULT_UNREADABLE
+
+
+class TestCreateVault:
+    def test_creates_seeds_and_remembers_a_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        target = tmp_path / "notes" / "vault"
+        state = afanes.ui.state.app_state
+
+        opened = asyncio.run(state.create_vault(target))
+
+        assert opened is True
+        assert state.vault_root == target.resolve()
+        assert (target / "inbox").is_dir()
+        assert (target / "reference" / "people").is_dir()
+        assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
+
+    def test_refuses_a_non_empty_directory(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        target = tmp_path / "vault"
+        target.mkdir()
+        (target / "photo.jpg").write_text("data", encoding="utf-8")
+        state = afanes.ui.state.app_state
+
+        opened = asyncio.run(state.create_vault(target))
+
+        assert opened is False
+        assert state.vault_root is None
+        assert state.message == afanes.ui.strings.VAULT_NOT_EMPTY
+        assert sorted(path.name for path in target.iterdir()) == ["photo.jpg"]
+
+    def test_refuses_a_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        target = tmp_path / "note.md"
+        target.write_text("body", encoding="utf-8")
+        state = afanes.ui.state.app_state
+
+        opened = asyncio.run(state.create_vault(target))
+
+        assert opened is False
+        assert state.message == afanes.ui.strings.VAULT_NOT_DIRECTORY
+
+    def test_opens_when_preferences_cannot_be_saved(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+
+        def fail_save(_self: SettingsStore, _settings: Settings) -> None:
+            message = "read only"
+            raise ConfigurationError(message)
+
+        monkeypatch.setattr(afanes.core.settings.SettingsStore, "save", fail_save)
+        target = tmp_path / "vault"
+        state = afanes.ui.state.app_state
+
+        opened = asyncio.run(state.create_vault(target))
+
+        assert opened is True
+        assert state.vault_root == target.resolve()
+        assert state.message == afanes.ui.strings.VAULT_CREATED_NOT_REMEMBERED.format(detail="read only")
 
 
 class TestOpenVaultForRun:

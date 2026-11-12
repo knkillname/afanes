@@ -33,18 +33,23 @@ class WelcomeView:
     on_open_path : Callable[[str], Awaitable[None]] | None
         Command that opens the vault named by a typed path. Supplied by the
         browser presentation, which has no native directory dialog.
+    on_create : Callable[[], Awaitable[None]] | None
+        Command that opens the new-vault dialog. Supplied by both
+        presentations, because no native dialog can name a folder that does not
+        exist yet.
 
     Raises
     ------
     ValueError
         If neither selection command is supplied. Each presentation must offer
-        exactly one way to choose a vault.
+        exactly one way to choose an existing vault.
     """
 
     def __init__(
         self,
         on_choose: Callable[[], Awaitable[None]] | None = None,
         on_open_path: Callable[[str], Awaitable[None]] | None = None,
+        on_create: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         """Store the vault selection actions for this presentation."""
         if on_choose is None and on_open_path is None:
@@ -52,6 +57,7 @@ class WelcomeView:
             raise ValueError(message)
         self._on_choose = on_choose
         self._on_open_path = on_open_path
+        self._on_create = on_create
 
     def build(self) -> ft.Control:
         """Build the welcome layout.
@@ -77,10 +83,20 @@ class WelcomeView:
                     icon=ft.Icons.FOLDER_OPEN,
                     on_click=self._on_choose,
                     autofocus=True,
+                    key="welcome-choose",
                 ),
             )
         if self._on_open_path is not None:
             controls.extend(self._vault_path_entry(self._on_open_path))
+        if self._on_create is not None:
+            controls.append(
+                ft.FilledButton(
+                    content=afanes.ui.strings.NEW_VAULT_ACTION,
+                    icon=ft.Icons.CREATE_NEW_FOLDER,
+                    on_click=self._on_create,
+                    key="welcome-create",
+                ),
+            )
         controls.append(
             ft.Text(
                 afanes.ui.strings.WELCOME_NOTE,

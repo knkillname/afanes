@@ -19,7 +19,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import NoReturn
 
-import afanes.ui.state
+import afanes.cli.main
+import afanes.core.vault
 import afanes.ui.strings
 from afanes.core.errors import VaultError
 
@@ -27,6 +28,7 @@ WEB_RUNTIME_MODULE = "flet_web"
 DESKTOP_RUNTIME_MODULE = "flet_desktop"
 LOOPBACK_HOST = "127.0.0.1"
 PORT_LIMIT = 65535
+SUBCOMMANDS = ("vault",)
 
 # Read before the interface import so the missing-SDK message is available even
 # when the import of ``afanes.ui.app`` fails.
@@ -97,6 +99,31 @@ class Launcher:
     """Process-level launch guards for the graphical entry point."""
 
     @staticmethod
+    def dispatch(argv: Sequence[str]) -> int | None:
+        """Run a headless subcommand when the first argument names one.
+
+        Parameters
+        ----------
+        argv : collections.abc.Sequence[str]
+            Arguments after the program name.
+
+        Returns
+        -------
+        int | None
+            Exit status of the subcommand, or ``None`` when the arguments
+            describe a graphical launch.
+
+        Notes
+        -----
+        Dispatch runs before the runtime check and before any toolkit import,
+        so a headless command works on a machine with no graphical runtime
+        installed.
+        """
+        if not argv or argv[0] not in SUBCOMMANDS:
+            return None
+        return afanes.cli.main.main(argv)
+
+    @staticmethod
     def fail(message: str) -> NoReturn:
         """Write an actionable message to standard error and exit.
 
@@ -163,7 +190,7 @@ class Launcher:
         if path is None:
             return None
         try:
-            return afanes.ui.state.VaultOpener.open(path).root
+            return afanes.core.vault.Vault.open(path).root
         except (VaultError, OSError) as exc:
             Launcher.fail(afanes.ui.strings.LAUNCH_VAULT_INVALID.format(path=path, detail=exc))
 
@@ -218,7 +245,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     import is a deliberate runtime check, not an attempt to hide a dependency
     cycle.
     """
-    options = LaunchOptions.parse(sys.argv[1:] if argv is None else argv)
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    status = Launcher.dispatch(arguments)
+    if status is not None:
+        raise SystemExit(status)
+    options = LaunchOptions.parse(arguments)
     logging.basicConfig(level=logging.INFO)
     Launcher.require_runtime(web=options.web)
     launch_vault = Launcher.checked_vault(options.vault)

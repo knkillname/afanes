@@ -116,9 +116,36 @@ The application SHALL match default folder names case-insensitively and SHALL re
 - **WHEN** the vault contains `Trash/`
 - **THEN** its notes are excluded from the catalog
 
+### Requirement: Creating a vault seeds the default folders
+
+Creating a vault SHALL seed `inbox/`, `trash/`, `reference/`, `reference/people/`, `projects/`, and
+`actions/` inside the new vault. Seeding SHALL create those folders and no files. The seeded layout
+MUST remain a convenience: its absence on a later open SHALL NOT be an error, and it SHALL NOT
+become a marker or a validation requirement.
+
+#### Scenario: All default folders are created
+
+- **WHEN** a vault is created
+- **THEN** all six default folders exist inside the new vault
+
+#### Scenario: Seeding creates no files
+
+- **WHEN** a vault is created
+- **THEN** it contains no note, marker, or placeholder file
+
+#### Scenario: Seeded layout is not required afterwards
+
+- **WHEN** a default folder is removed from a created vault and the vault is reopened
+- **THEN** it opens and scans as an ordinary vault
+
+#### Scenario: Creating inside an empty directory seeds it
+
+- **WHEN** an empty existing directory is chosen for a new vault
+- **THEN** the default folders are created inside it
+
 ### Requirement: Layout is created lazily
 
-Opening or scanning a vault MUST NOT create default folders. A folder SHALL be created only when a write needs it, and only inside the vault.
+Opening or scanning a vault MUST NOT create default folders. Apart from an explicit vault creation, a folder SHALL be created only when a write needs it, and only inside the vault.
 
 #### Scenario: Opening an empty vault creates nothing
 

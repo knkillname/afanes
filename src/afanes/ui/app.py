@@ -7,6 +7,7 @@ from pathlib import Path
 
 import flet as ft
 
+import afanes.core.vault
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
@@ -85,11 +86,27 @@ class _Shell:
         self.page.controls.clear()
         if self.state.vault_root is None:
             if self.is_desktop:
-                self.page.add(afanes.ui.views.inbox.WelcomeView(on_choose=self.choose_vault).build())
+                self.page.add(
+                    afanes.ui.views.inbox.WelcomeView(
+                        on_choose=self.choose_vault,
+                        on_create=self.create_vault,
+                    ).build(),
+                )
             else:
-                self.page.add(afanes.ui.views.inbox.WelcomeView(on_open_path=self.open_path).build())
+                self.page.add(
+                    afanes.ui.views.inbox.WelcomeView(
+                        on_open_path=self.open_path,
+                        on_create=self.create_vault,
+                    ).build(),
+                )
         else:
-            self.page.add(afanes.ui.views.workspace.WorkspaceView(self.page.update, self.choose_vault).build())
+            self.page.add(
+                afanes.ui.views.workspace.WorkspaceView(
+                    self.page.update,
+                    self.choose_vault,
+                    self.create_vault,
+                ).build(),
+            )
         self.page.update()
 
     async def open_path(self, text: str) -> None:
@@ -113,6 +130,100 @@ class _Shell:
         else:
             await self.state.change_vault(path)
         await self.render()
+
+    async def create_vault(self) -> None:
+        """Open the creation action for this presentation.
+
+        Notes
+        -----
+        A desktop session uses the native directory dialog, whose New Folder
+        action names the folder that does not exist yet. A browser session has
+        no such dialog, so it asks for an absolute path instead.
+        """
+        if not self.is_desktop:
+            self.show_create_dialog()
+            return
+        if self.picker is None:
+            return
+        selected = await self.picker.get_directory_path(dialog_title=afanes.ui.strings.NEW_VAULT_ACTION)
+        if selected is None:
+            return
+        await self.state.create_vault(Path(selected))
+        await self.render()
+
+    def show_create_dialog(self) -> None:
+        """Ask for a new vault path in a browser session and create it."""
+        field = ft.TextField(
+            label=afanes.ui.strings.NEW_VAULT_PATH_LABEL,
+            hint_text=afanes.ui.strings.WELCOME_PATH_HINT,
+            value="",
+            autofocus=True,
+            key="create-vault-path",
+        )
+        error = ft.Text(
+            "",
+            color=afanes.ui.theme.ERROR_COLOR,
+            visible=False,
+            key="create-vault-error",
+        )
+        folders = ", ".join(f"{path.as_posix()}/" for path in afanes.core.vault.Vault.default_layout())
+        preview = ft.Text(
+            afanes.ui.strings.NEW_VAULT_PREVIEW.format(folders=folders),
+            size=12,
+            color=afanes.ui.theme.MUTED_TEXT_COLOR,
+            selectable=True,
+            key="create-vault-preview",
+        )
+
+        async def submit() -> None:
+            text = (field.value or "").strip()
+            if not text:
+                self._show_create_error(error, afanes.ui.strings.VAULT_PATH_REQUIRED)
+                return
+            if not await self.state.create_vault(Path(text)):
+                self._show_create_error(error, self.state.message or afanes.ui.strings.VAULT_PATH_REQUIRED)
+                return
+            self.page.pop_dialog()
+            await self.render()
+
+        async def cancel() -> None:
+            self.page.pop_dialog()
+            self.page.update()
+
+        field.on_submit = submit
+        self.page.show_dialog(
+            ft.AlertDialog(
+                title=ft.Text(afanes.ui.strings.NEW_VAULT_DIALOG_TITLE),
+                content=ft.Column(
+                    controls=[
+                        ft.Text(afanes.ui.strings.NEW_VAULT_DIALOG_BODY),
+                        field,
+                        preview,
+                        error,
+                    ],
+                    tight=True,
+                ),
+                actions=[
+                    ft.TextButton(
+                        content=afanes.ui.strings.CANCEL_ACTION,
+                        on_click=cancel,
+                        key="create-vault-cancel",
+                    ),
+                    ft.FilledButton(
+                        content=afanes.ui.strings.NEW_VAULT_CREATE,
+                        on_click=submit,
+                        key="create-vault-submit",
+                    ),
+                ],
+            ),
+        )
+        self.page.update()
+
+    def _show_create_error(self, error: ft.Text, message: str) -> None:
+        """Show an inline creation error without closing the dialog."""
+        error.value = message
+        error.visible = True
+        self.page.update()
 
     def show_vault_dialog(self) -> None:
         """Ask for a vault path in a dialog, for a browser session."""
