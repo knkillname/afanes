@@ -34,6 +34,7 @@ See `proposal.md` — Why. The relevant current state:
 - Detecting the operating-system locale, localizing the interface, or translating content.
 - Applying templates to an existing vault, or exporting a vault as a template.
 - Recording which notes came from a template.
+- A template engine, arbitrary expressions, or any new dependency.
 - Any change to frontmatter keys, the reference syntax, or the index schema.
 
 ## Decisions
@@ -78,14 +79,39 @@ render that metadata; neither owns it. This is the same reasoning that keeps nam
 *Alternative:* labels in `ui/strings.py` and again in `cli/strings.py` — the interface cannot import
 the command line, so the copy would be duplicated and drift.
 
+### Dates come from a two-token placeholder syntax, not a template engine
+
+Bundled notes write `{{ date:+14d }}` or `{{ date:-2d }}` where a calendar date belongs. Creation
+renders every match with `datetime.timedelta` before the note is parsed, so the written file contains
+a concrete ISO date and nothing else. Any brace expression left after rendering is a content error,
+which catches a typo before it reaches a user's vault. The syntax is deliberately limited to a sign
+and a day count; it is not an expression language.
+
+*Alternatives:* Jinja2 (a new runtime dependency, a license and packaging review, and a full
+expression language for what is date arithmetic); static dates written into the bundle (they age
+badly and look stale a year later); a sidecar manifest with offsets (keeps placeholders out of the
+note, but splits one note's metadata across two files and adds a second format to validate).
+
+### Dates are validated against the creation date
+
+`TemplateCatalog.today()` is the single time source. It returns the local calendar date and is the
+only place tests patch to make creation deterministic. Rendering and validation receive the same
+date. A project due date or an unchecked step plan date on or before that date is refused, and an
+actual date is accepted only on a checked step and only when it is not after that date. The review
+count therefore stays zero when the vault is created, while the starter content still shows real
+dates.
+
+*Alternative:* validating only in the test suite (a broken bundled tree would reach a user's vault
+before the suite noticed); injecting a clock object (the project passes plain dates instead).
+
 ### Validation runs before anything is written
 
-Creation order becomes: validate the target path → resolve and validate the bundled tree (template
-plus guide) → create missing parents → seed folders → write notes → report. Validation covers
-parsing, unique stems across template and guide, the filename policy, reference resolution inside the
-tree, folder/type/category agreement, absence of `inbox/` and `trash/` notes, and identical shape
-across locale trees. Because it runs before the first `mkdir`, a refused template leaves the
-filesystem exactly as it was.
+Creation order becomes: validate the target path → resolve, render, and validate the bundled tree
+(template plus guide) → create missing parents → seed folders → write notes → report. Validation
+covers parsing, unique stems across template and guide, the filename policy, reference resolution
+inside the tree, folder/type/category agreement, absence of `inbox/` and `trash/` notes, unresolved
+date placeholders, the future/past date rules, and identical shape across locale trees. Because it
+runs before the first `mkdir`, a refused template leaves the filesystem exactly as it was.
 
 ### Notes are written through the vault, one atomic write each
 
@@ -128,8 +154,16 @@ it and offers the no-template creation rather than failing to open.
 - **Wheel omits non-Python data** → the catalog is read through `importlib.resources` in a test, and
   packaging is verified once against a built wheel; a missing tree fails the test rather than
   producing an empty vault.
-- **Starter content mistaken for real obligations** → the inert-content rules (no dates, no owners,
-  no captures, every open project has a step) are enforced by tests, keeping the review count at zero.
+- **Starter content mistaken for real obligations** → the inert-content rules (no dates in the
+  past, no owners, no captures, every open project has a step) are enforced by tests and by creation
+  validation, keeping the review count at zero.
+- **Starter dates age** → every date is relative to creation, and validation refuses a plan or due
+  date on or before the creation date, so content written today stays coherent whenever it is
+  created.
+- **A placeholder typo reaches a vault** → rendering runs before parsing, and any brace expression
+  left afterwards refuses the tree before the first directory is created.
+- **Midnight boundary** → offsets are at least one day, and the zero-pending guarantee is asserted
+  at creation, not on later calendar days.
 - **Translation drift across locales** → the shape rule requires each locale tree to match the base
   tree's projects, references, and step counts, so a half-finished translation is refused.
 - **Every creation now writes a file, changing an existing guarantee** → the `vault-layout` delta

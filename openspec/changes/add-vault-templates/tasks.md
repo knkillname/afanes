@@ -51,6 +51,16 @@
 - [x] 7.2 Verify the bundled trees ship in the wheel and resolve through `importlib.resources`; verify by building the wheel and asserting every catalog entry resolves with at least one note
 - [x] 7.3 Run the full gate set and record the exact commands: `hatch check`, `hatch test --cover` with at least 85% coverage, `openspec validate --all --strict`, and the prohibited-vocabulary check
 
+## 8. Date-relative starter content
+
+- [x] 8.1 Add `TemplateCatalog.today()` and render `{{ date:+Nd }}` / `{{ date:-Nd }}` before parsing, refusing any brace expression left after rendering; verify tests for both signs, a malformed placeholder, and no placeholder in a created note
+- [x] 8.2 Validate project due dates and open-step plan dates as strictly after the creation date, accept an actual date only on a checked step and not after it, and refuse an actual date on an unchecked step; verify one synthetic fixture per rule
+- [x] 8.3 Expand the personal template (home improvements, monthly budget, weekly shop, chores, extra people and places) with relative dates; verify the validation suite and a zero review count
+- [x] 8.4 Expand the work template (hiring, incident follow-up, runbook, extra team and process notes) with relative dates; verify the validation suite and a zero review count
+- [x] 8.5 Expand the study template (seminar talk, extra topics and sources) with relative dates; verify the validation suite and a zero review count
+- [x] 8.6 Rewrite the inert-content suite added in 3.5 for the future/past date rules and assert that no written note contains a placeholder; verify it detects a past due date, a past plan date, a future actual date, and an actual date on an unchecked step
+- [x] 8.7 Derive the count-dependent interface assertion from the catalog instead of a fixed number, then run `hatch check`, `hatch test --cover`, `openspec validate --all --strict`, and the prohibited-vocabulary check
+
 ## Workflow follow-up
 
 - Archive the change once review requirements are satisfied.

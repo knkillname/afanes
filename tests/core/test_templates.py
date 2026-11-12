@@ -23,6 +23,17 @@ CATALOG_SIZE = 3
 PERSONAL_NOTE_COUNT = 3
 FAILING_WRITE_CALL = 4
 CLOSED_STATUSES = frozenset({Status.DONE, Status.CANCELLED, Status.ARCHIVED})
+TODAY = datetime.date(2026, 1, 1)
+
+
+@pytest.fixture
+def fixed_today(monkeypatch: pytest.MonkeyPatch) -> datetime.date:
+    monkeypatch.setattr(
+        afanes.core.templates.TemplateCatalog,
+        "today",
+        classmethod(lambda _cls: TODAY),
+    )
+    return TODAY
 
 
 def _write(root: Path, relative: Path, text: str) -> None:
@@ -48,6 +59,10 @@ def _catalog(root: Path) -> afanes.core.templates.TemplateCatalog:
     return afanes.core.templates.TemplateCatalog.from_root(root)
 
 
+def _project_text(*, frontmatter: str = "", step: str = "- [ ] Call") -> str:
+    return f"---\ntype: project\nstatus: active\n{frontmatter}---\n\n# Home\n\n{step}\n"
+
+
 def _bundle_categories(bundle: afanes.core.templates.TemplateBundle) -> set[str]:
     return {note.category.value.casefold() for note in bundle.notes if note.category is not None}
 
@@ -59,40 +74,48 @@ def _shape(notes: tuple[afanes.core.templates.TemplateNote, ...]) -> tuple[int, 
     return (len(projects), len(references), steps)
 
 
-def _note_violations(note: afanes.core.templates.TemplateNote) -> list[str]:
+def _note_violations(note: afanes.core.templates.TemplateNote, today: datetime.date) -> list[str]:
     violations: list[str] = []
     if note.note_type is NoteType.NOTE:
         violations.append(f"{note.stem}: capture")
     if note.relative_path.parts[0].casefold() == "inbox":
         violations.append(f"{note.stem}: stored in inbox")
-    if note.document.due_date is not None:
-        violations.append(f"{note.stem}: due date")
+    due_date = note.document.due_date
+    if due_date is not None and due_date <= today:
+        violations.append(f"{note.stem}: due date not in the future")
     return violations
 
 
-def _step_violations(note: afanes.core.templates.TemplateNote) -> list[str]:
+def _step_violations(note: afanes.core.templates.TemplateNote, today: datetime.date) -> list[str]:
     if note.note_type is not NoteType.PROJECT:
         return []
     steps = afanes.core.steps.StepDocument(note.document.body).steps
     violations: list[str] = []
     for step in steps:
-        if step.plan is not None:
-            violations.append(f"{note.stem}: plan date")
-        if step.actual is not None:
-            violations.append(f"{note.stem}: actual date")
         if step.owners:
             violations.append(f"{note.stem}: owners")
+        if step.checked:
+            if step.actual is not None and step.actual > today:
+                violations.append(f"{note.stem}: actual date not in the past")
+            continue
+        if step.actual is not None:
+            violations.append(f"{note.stem}: actual date on an open step")
+        if step.plan is not None and step.plan <= today:
+            violations.append(f"{note.stem}: plan date not in the future")
     status = note.document.status
     if status not in CLOSED_STATUSES and not any(not step.checked for step in steps):
         violations.append(f"{note.stem}: no open step")
     return violations
 
 
-def _inert_violations(notes: tuple[afanes.core.templates.TemplateNote, ...]) -> list[str]:
+def _inert_violations(
+    notes: tuple[afanes.core.templates.TemplateNote, ...],
+    today: datetime.date,
+) -> list[str]:
     violations: list[str] = []
     for note in notes:
-        violations.extend(_note_violations(note))
-        violations.extend(_step_violations(note))
+        violations.extend(_note_violations(note, today))
+        violations.extend(_step_violations(note, today))
     return violations
 
 
@@ -380,26 +403,33 @@ class TestBundledContent:
     @pytest.mark.parametrize(
         "note_text",
         [
-            "---\ntype: project\nstatus: active\n---\n\n# Home\n\n- [ ] Call <!-- {plan: 2026-01-05} -->\n",
-            "---\ntype: project\nstatus: active\n---\n\n# Home\n\n- [ ] Call <!-- {owners: [Ada]} -->\n",
-            "---\ntype: project\nstatus: active\ndue_date: 2026-01-05\n---\n\n# Home\n\n- [ ] Call\n",
+            _project_text(frontmatter=f"due_date: {(TODAY - datetime.timedelta(days=1)).isoformat()}\n"),
+            _project_text(step=f"- [ ] Call <!-- {{plan: {(TODAY - datetime.timedelta(days=1)).isoformat()}}} -->"),
+            _project_text(step=f"- [x] Call <!-- {{actual: {(TODAY + datetime.timedelta(days=1)).isoformat()}}} -->"),
+            _project_text(step=f"- [ ] Call <!-- {{actual: {TODAY.isoformat()}}} -->"),
+            _project_text(step="- [ ] Call <!-- {owners: [Ada]} -->"),
         ],
     )
-    def test_inert_helper_detects_a_date_or_an_owner(self, note_text: str) -> None:
+    def test_inert_helper_detects_a_violation(self, note_text: str) -> None:
         note = afanes.core.templates.TemplateNote(
             relative_path=Path("projects/Home.md"),
             text=note_text,
             document=afanes.core.frontmatter.NoteDocument.from_text(note_text),
         )
 
-        assert _inert_violations((note,)) != []
+        assert _inert_violations((note,), TODAY) != []
 
     @pytest.mark.parametrize("identifier", ["personal", "work", "study"])
-    def test_starter_content_creates_no_pending_work(self, identifier: str, tmp_path: Path) -> None:
+    def test_starter_content_creates_no_pending_work(
+        self,
+        identifier: str,
+        tmp_path: Path,
+        fixed_today: datetime.date,
+    ) -> None:
         creation = afanes.core.vault.Vault.create_directory(tmp_path / "vault", template=identifier)
         snapshot = creation.vault.scan()
 
-        planner = afanes.core.search.ReviewPlanner(snapshot, today=datetime.date(2026, 1, 1))
+        planner = afanes.core.search.ReviewPlanner(snapshot, today=fixed_today)
         assert snapshot.failures == ()
         assert planner.pending_count() == 0
 
@@ -412,8 +442,174 @@ class TestBundledContent:
             locales = (afanes.core.templates.BASE_LOCALE,)
 
         for locale in locales:
-            bundle = catalog.bundle(identifier, locale)
-            assert _inert_violations(bundle.ordered_notes) == []
+            bundle = catalog.bundle(identifier, locale, today=TODAY)
+            assert _inert_violations(bundle.ordered_notes, TODAY) == []
+
+    @pytest.mark.parametrize("identifier", ["personal", "work", "study"])
+    def test_created_notes_contain_no_placeholder(
+        self,
+        identifier: str,
+        tmp_path: Path,
+        fixed_today: datetime.date,
+    ) -> None:
+        assert fixed_today == TODAY
+        root = tmp_path / "vault"
+
+        afanes.core.vault.Vault.create_directory(root, template=identifier)
+
+        for path in root.rglob("*.md"):
+            assert "{{" not in path.read_text(encoding="utf-8"), path
+
+    def test_created_dates_are_concrete_and_future(
+        self,
+        tmp_path: Path,
+        fixed_today: datetime.date,
+    ) -> None:
+        root = tmp_path / "vault"
+
+        afanes.core.vault.Vault.create_directory(root, template="personal")
+
+        document = afanes.core.frontmatter.NoteDocument.from_text(
+            (root / "projects" / "Home insurance.md").read_text(encoding="utf-8"),
+        )
+        assert document.due_date == fixed_today + datetime.timedelta(days=21)
+        steps = afanes.core.steps.StepDocument(document.body).steps
+        assert steps[1].plan == fixed_today + datetime.timedelta(days=7)
+        assert steps[0].actual == fixed_today - datetime.timedelta(days=14)
+
+
+class TestDateRendering:
+    def test_positive_offset_is_applied(self, tmp_path: Path) -> None:
+        root = tmp_path / "templates"
+        _guide(root)
+        _write(
+            root,
+            Path("personal/en/projects/Home.md"),
+            _project_text(
+                frontmatter='due_date: "{{ date:+14d }}"\n',
+                step='- [ ] Call <!-- {plan: "{{ date:+2d }}"} -->',
+            ),
+        )
+        catalog = afanes.core.templates.TemplateCatalog.from_root(root)
+
+        bundle = catalog.bundle("personal", today=TODAY)
+
+        note = next(note for note in bundle.notes if note.stem == "Home")
+        assert note.document.due_date == TODAY + datetime.timedelta(days=14)
+        assert afanes.core.steps.StepDocument(note.document.body).steps[0].plan == TODAY + datetime.timedelta(days=2)
+
+    def test_negative_offset_is_applied(self, tmp_path: Path) -> None:
+        root = tmp_path / "templates"
+        _guide(root)
+        _write(
+            root,
+            Path("personal/en/projects/Home.md"),
+            _project_text(step='- [x] Call <!-- {actual: "{{ date:-2d }}"} -->'),
+        )
+        catalog = afanes.core.templates.TemplateCatalog.from_root(root)
+
+        bundle = catalog.bundle("personal", today=TODAY)
+
+        note = next(note for note in bundle.notes if note.stem == "Home")
+        steps = afanes.core.steps.StepDocument(note.document.body).steps
+        assert steps[0].actual == TODAY - datetime.timedelta(days=2)
+
+    def test_malformed_placeholder_is_refused(self, tmp_path: Path) -> None:
+        root = tmp_path / "templates"
+        _guide(root)
+        _write(
+            root,
+            Path("personal/en/projects/Home.md"),
+            _project_text(frontmatter='due_date: "{{ date:soon }}"\n'),
+        )
+        catalog = afanes.core.templates.TemplateCatalog.from_root(root)
+
+        with pytest.raises(TemplateContentError) as info:
+            catalog.bundle("personal", today=TODAY)
+
+        assert "brace expression" in str(info.value)
+
+    def test_placeholder_without_a_sign_is_refused(self, tmp_path: Path) -> None:
+        root = tmp_path / "templates"
+        _guide(root)
+        _write(
+            root,
+            Path("personal/en/projects/Home.md"),
+            _project_text(step='- [ ] Call <!-- {plan: "{{ date:2d }}"} -->'),
+        )
+        catalog = afanes.core.templates.TemplateCatalog.from_root(root)
+
+        with pytest.raises(TemplateContentError) as info:
+            catalog.bundle("personal", today=TODAY)
+
+        assert "brace expression" in str(info.value)
+
+
+class TestDateRules:
+    def _catalog_with(
+        self, tmp_path: Path, *, frontmatter: str = "", step: str = "- [ ] Call"
+    ) -> afanes.core.templates.TemplateCatalog:
+        root = tmp_path / "templates"
+        _guide(root)
+        _write(root, Path("personal/en/projects/Home.md"), _project_text(frontmatter=frontmatter, step=step))
+        return afanes.core.templates.TemplateCatalog.from_root(root)
+
+    def test_past_due_date_is_refused(self, tmp_path: Path) -> None:
+        yesterday = (TODAY - datetime.timedelta(days=1)).isoformat()
+        catalog = self._catalog_with(tmp_path, frontmatter=f"due_date: {yesterday}\n")
+
+        with pytest.raises(TemplateContentError) as info:
+            catalog.bundle("personal", today=TODAY)
+
+        assert "due date on or before" in str(info.value)
+
+    def test_due_date_today_is_refused(self, tmp_path: Path) -> None:
+        catalog = self._catalog_with(tmp_path, frontmatter=f"due_date: {TODAY.isoformat()}\n")
+
+        with pytest.raises(TemplateContentError) as info:
+            catalog.bundle("personal", today=TODAY)
+
+        assert "due date on or before" in str(info.value)
+
+    def test_past_plan_date_is_refused(self, tmp_path: Path) -> None:
+        yesterday = (TODAY - datetime.timedelta(days=1)).isoformat()
+        catalog = self._catalog_with(tmp_path, step=f"- [ ] Call <!-- {{plan: {yesterday}}} -->")
+
+        with pytest.raises(TemplateContentError) as info:
+            catalog.bundle("personal", today=TODAY)
+
+        assert "planned on or before" in str(info.value)
+
+    def test_future_actual_date_is_refused(self, tmp_path: Path) -> None:
+        tomorrow = (TODAY + datetime.timedelta(days=1)).isoformat()
+        catalog = self._catalog_with(tmp_path, step=f"- [x] Call <!-- {{actual: {tomorrow}}} -->")
+
+        with pytest.raises(TemplateContentError) as info:
+            catalog.bundle("personal", today=TODAY)
+
+        assert "actual date after" in str(info.value)
+
+    def test_actual_date_on_an_unchecked_step_is_refused(self, tmp_path: Path) -> None:
+        yesterday = (TODAY - datetime.timedelta(days=1)).isoformat()
+        catalog = self._catalog_with(tmp_path, step=f"- [ ] Call <!-- {{actual: {yesterday}}} -->")
+
+        with pytest.raises(TemplateContentError) as info:
+            catalog.bundle("personal", today=TODAY)
+
+        assert "unchecked step with an actual date" in str(info.value)
+
+    def test_future_dates_are_accepted(self, tmp_path: Path) -> None:
+        tomorrow = (TODAY + datetime.timedelta(days=1)).isoformat()
+        catalog = self._catalog_with(
+            tmp_path,
+            frontmatter=f"due_date: {tomorrow}\n",
+            step=f"- [x] Call <!-- {{actual: {TODAY.isoformat()}}} -->\n- [ ] Done <!-- {{plan: {tomorrow}}} -->",
+        )
+
+        bundle = catalog.bundle("personal", today=TODAY)
+
+        note = next(note for note in bundle.notes if note.stem == "Home")
+        assert note.document.due_date == TODAY + datetime.timedelta(days=1)
 
 
 class TestCreationWritesBundledContent:
@@ -525,9 +721,9 @@ class TestCreationWritesBundledContent:
             afanes.core.vault.Vault.create_directory(root, template="personal")
 
         message = str(info.value)
-        assert calls[3].name == "Tax documents.md"
-        assert "Tax documents.md" in message
+        assert calls[3].name == "Monthly budget.md"
+        assert "Monthly budget.md" in message
         assert "reference/Getting started.md" in message
         assert (root / "reference" / "Getting started.md").is_file()
         assert (root / "projects" / "Car service.md").is_file()
-        assert not (root / "projects" / "Tax documents.md").exists()
+        assert not (root / "projects" / "Monthly budget.md").exists()

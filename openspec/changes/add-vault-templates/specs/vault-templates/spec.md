@@ -124,8 +124,9 @@ selectable as a template, and SHALL be an ordinary note afterwards.
 ### Requirement: Starter content never creates pending work
 
 Bundled starter content MUST NOT introduce work the user did not write. Templates SHALL contain no
-due dates, no plan or actual dates, no step owners, and no captures under `inbox/`. Every open
-project in a template SHALL carry at least one unchecked step.
+captures under `inbox/` and no step owners. A project due date and an unchecked step plan date SHALL
+be after the creation date. An actual date SHALL appear only on a checked step and SHALL NOT be after
+the creation date. Every open project in a template SHALL carry at least one unchecked step.
 
 #### Scenario: New vault reports zero pending work
 
@@ -137,10 +138,25 @@ project in a template SHALL carry at least one unchecked step.
 - **WHEN** a templated vault is created
 - **THEN** `inbox/` contains no note
 
-#### Scenario: No dates are seeded
+#### Scenario: Due dates are in the future
 
-- **WHEN** a template note is parsed
-- **THEN** no project has a due date and no step declares a plan or actual date
+- **WHEN** a template project declares a due date
+- **THEN** the written date is after the creation date
+
+#### Scenario: Open steps are planned in the future
+
+- **WHEN** a template step is unchecked and declares a plan date
+- **THEN** the written date is after the creation date
+
+#### Scenario: Completed steps carry a past actual date
+
+- **WHEN** a template step is checked and declares an actual date
+- **THEN** the written date is not after the creation date
+
+#### Scenario: Unchecked steps carry no actual date
+
+- **WHEN** a template step is unchecked
+- **THEN** it declares no actual date
 
 #### Scenario: No owners are seeded
 
@@ -151,6 +167,34 @@ project in a template SHALL carry at least one unchecked step.
 
 - **WHEN** a template declares a project without a status or with an open status
 - **THEN** that project contains at least one unchecked step
+
+### Requirement: Creation resolves date placeholders
+
+Bundled notes MAY write a date placeholder where a calendar date belongs, using the form
+`{{ date:+Nd }}` or `{{ date:-Nd }}`, where `N` is a whole number of up to three digits and
+surrounding whitespace is ignored. Creation SHALL replace each placeholder with the creation date
+offset by that many days, written as `YYYY-MM-DD`. A written note MUST contain no placeholder, and a
+note with a placeholder that cannot be resolved SHALL be refused before anything is written.
+
+#### Scenario: Positive offset is applied
+
+- **WHEN** a bundled note declares `{{ date:+14d }}`
+- **THEN** the written note contains the date fourteen days after creation
+
+#### Scenario: Negative offset is applied
+
+- **WHEN** a bundled note declares `{{ date:-2d }}`
+- **THEN** the written note contains the date two days before creation
+
+#### Scenario: No placeholder is written
+
+- **WHEN** any templated vault is created
+- **THEN** no written note contains `{{`
+
+#### Scenario: Malformed placeholder is refused
+
+- **WHEN** a bundled note declares a placeholder that is not the supported form
+- **THEN** the template is refused and creation writes nothing
 
 ### Requirement: Bundled trees satisfy the vault validity rules
 

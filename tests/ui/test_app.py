@@ -652,7 +652,12 @@ class TestCreation:
             preview = _typed(_find_by_key(page.dialogs[0], "create-vault-preview"), ft.Text)
             assert "guide note" in (preview.value or "")
             _select_template(page, "personal")
-            assert "5 notes" in (preview.value or "")
+            summary = next(
+                summary
+                for summary in afanes.core.templates.TemplateCatalog.bundled().summaries()
+                if summary.identifier == "personal"
+            )
+            assert f"{summary.note_count} notes" in (preview.value or "")
             assert "guide note" in (preview.value or "")
             await _submit_creation(page, target)
 

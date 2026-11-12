@@ -16,10 +16,13 @@ network access.
 
 - Add a **template catalog** of bundled Markdown trees shipped inside the package. Each template is
   a partial vault — folders and notes only — copied into a newly created vault.
-- Ship three templates: **Personal** (life administration, with `person` and `place` reference
-  labels), **Work** (shared outcomes, with `team` and `process` labels), and **Study** (course and
-  research work, with `topic` and `source` labels). Each differs by reference labels, project count,
-  and step granularity, so no two are interchangeable.
+- Ship three substantial templates, each with 8-12 notes. **Personal** covers life administration
+  with `person` and `place` labels: insurance, car service, taxes, a hallway repaint, a monthly
+  budget, the weekly shop, and household chores. **Work** covers shared outcomes with `team` and
+  `process` labels: quarterly planning, hiring, incident follow-up, and a runbook. **Study** covers
+  course and research work with `topic` and `source` labels: reading, a research essay, exam prep,
+  and a seminar talk. Each differs by reference labels, project count, and step granularity, so no
+  two are interchangeable.
 - Store each template as `templates/<template-id>/<locale>/` and resolve a locale with a fallback to
   the base language. Ship `en/` only; adding a translation is content work, not a redesign.
 - Add a **guide note** written into every created vault, from `templates/_guide/<locale>/`, so the
@@ -29,17 +32,23 @@ network access.
   always. The creation dialog keeps its preview line and extends it to name what will be written.
 - Add `--template ID` to `afanes vault create` and a `afanes vault templates` command that lists the
   catalog, so a templated vault is reproducible without a dialog.
-- Keep starter content deliberately inert: no due dates, no plan or actual dates, no step owners,
-  no captures, and every open project carries at least one unchecked step. A freshly created vault
-  reports zero pending review work.
+- Make dates relative to creation. Bundled notes MAY write `{{ date:+14d }}` or `{{ date:-2d }}`
+  where a calendar date belongs; creation renders each placeholder into a concrete ISO date, so the
+  content never goes stale. Due and plan dates are always after the creation date, actual dates
+  appear only on completed steps, and no step owners or inbox captures are seeded. Every open
+  project carries at least one unchecked step, so a freshly created vault still reports zero
+  pending review work.
+- Resolve dates with the standard library. The placeholder syntax is deliberately two tokens, not a
+  template engine, so this change adds no runtime dependency and no expression language.
 - Keep starter notes ordinary notes. No provenance is recorded, no marker key is added, and no
   special removal action exists: the notes are renamed, edited, and trashed with the actions that
   already exist.
 
 Non-goals: applying a template to an existing vault, "use this folder as a template", "save this
 vault as a template", user-authored template storage, translated template content beyond the layout
-that accepts it, localization of the interface, README or screenshot updates, and any change to the
-note format itself.
+that accepts it, localization of the interface, a template engine or new dependency, arbitrary
+expressions in bundled content, README or screenshot updates, and any change to the note format
+itself.
 
 ## Capabilities
 
@@ -69,8 +78,9 @@ note format itself.
   stream conventions; unknown identifiers are expected failures, not usage errors.
 - **Interface**: a template selector in the new-vault dialog of the welcome state and of the
   change-vault action, a preview line that names both folders and notes, and new centralized copy.
-- **Tests**: one parametrized validity suite over `(template, locale)` pairs, creation cases for
-  blank and templated vaults, locale fallback, partial-write reporting, command exit codes, and the
+- **Tests**: one parametrized validity suite over `(template, locale)` pairs, rendering cases for
+  both date offsets and malformed placeholders, future/past date rules, creation cases for blank and
+  templated vaults, locale fallback, partial-write reporting, command exit codes, and the
   package-data check.
 - **Compatibility**: no note-format change, no new dependency, no network access, and existing
   vaults are never touched. Vault creation without a template keeps its current meaning apart from

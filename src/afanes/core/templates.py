@@ -10,7 +10,9 @@ and never writes.
 """
 
 import dataclasses
+import datetime
 import importlib.resources
+import re
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
@@ -42,6 +44,11 @@ INBOX_DIRECTORY = Path("inbox")
 TRASH_DIRECTORY = Path("trash")
 REFERENCE_DIRECTORY = Path("reference")
 PROJECTS_DIRECTORY = Path("projects")
+
+# Implementation detail: one supported date placeholder and any brace expression
+# left after rendering, which is a refused typo.
+_DATE_PATTERN = re.compile(r"\{\{\s*date:\s*([+-])(\d{1,3})d\s*\}\}")
+_BRACE_PATTERN = re.compile(r"\{\{.*?\}\}", re.DOTALL)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -114,7 +121,7 @@ class TemplateNote:
     relative_path : pathlib.Path
         Path the note takes inside a created vault, relative to the vault root.
     text : str
-        Complete note text, written as read.
+        Rendered note text, with date placeholders resolved, written as read.
     document : NoteDocument
         Parsed metadata and body used by validation.
 
@@ -262,6 +269,54 @@ class TemplateCatalog:
         """
         return tuple(template.identifier for template in self.templates)
 
+    @classmethod
+    def today(cls) -> datetime.date:
+        """Return the calendar date creation resolves bundled content against.
+
+        Returns
+        -------
+        datetime.date
+            Current local calendar date.
+
+        Notes
+        -----
+        This class method is the single time source for rendering and date
+        validation. Tests patch it to make a creation deterministic; application
+        code never passes a clock object around.
+        """
+        return datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+
+    @classmethod
+    def _render_dates(cls, text: str, today: datetime.date) -> str:
+        """Replace every supported date placeholder with an ISO calendar date.
+
+        Parameters
+        ----------
+        text : str
+            Bundled note text as read from the package.
+        today : datetime.date
+            Calendar date the offsets are measured from.
+
+        Returns
+        -------
+        str
+            Text with each ``{{ date:+Nd }}`` or ``{{ date:-Nd }}`` replaced by
+            the corresponding ``YYYY-MM-DD`` date. Other text is unchanged.
+
+        Notes
+        -----
+        The syntax is intentionally two tokens, not an expression language.
+        Callers refuse any brace expression left after this method runs.
+        """
+
+        def replace(match: re.Match[str]) -> str:
+            sign = match.group(1)
+            days = int(match.group(2))
+            offset = days if sign == "+" else -days
+            return (today + datetime.timedelta(days=offset)).isoformat()
+
+        return _DATE_PATTERN.sub(replace, text)
+
     def find(self, identifier: str) -> VaultTemplate:
         """Return one catalog entry by identifier.
 
@@ -320,8 +375,14 @@ class TemplateCatalog:
             )
         return tuple(summaries)
 
-    def bundle(self, identifier: str | None, locale: str | None = None) -> TemplateBundle:
-        """Resolve and validate the content one creation writes.
+    def bundle(
+        self,
+        identifier: str | None,
+        locale: str | None = None,
+        *,
+        today: datetime.date | None = None,
+    ) -> TemplateBundle:
+        """Resolve, render, and validate the content one creation writes.
 
         Parameters
         ----------
@@ -330,35 +391,41 @@ class TemplateCatalog:
         locale : str | None
             Requested locale. ``None`` uses :data:`BASE_LOCALE`. A locale
             without a tree falls back to the base locale.
+        today : datetime.date | None
+            Calendar date date placeholders and the date rules are measured
+            against. ``None`` uses :meth:`today`.
 
         Returns
         -------
         TemplateBundle
-            Guide notes plus the template's notes, ready to write.
+            Guide notes plus the template's notes, ready to write, with date
+            placeholders already resolved.
 
         Raises
         ------
         UnknownTemplateError
             If ``identifier`` names no catalog entry.
         TemplateContentError
-            If the guide or the template tree is missing, does not parse, or
-            violates a vault validity rule.
+            If the guide or the template tree is missing, does not parse,
+            contains an unresolvable placeholder, or violates a vault validity
+            rule.
         """
+        creation_date = self.today() if today is None else today
         requested = locale or BASE_LOCALE
         guide_root, resolved_locale = self._locale_root(GUIDE_IDENTIFIER, requested)
-        guide = self._read_notes(guide_root)
+        guide = self._read_notes(guide_root, creation_date)
         self._validate_guide(guide)
         if identifier is None:
-            self._validate_tree("the guide note", guide)
+            self._validate_tree("the guide note", guide, creation_date)
             return TemplateBundle(template=None, locale=resolved_locale, guide=guide, notes=())
 
         template = self.find(identifier)
         template_root, template_locale = self._locale_root(template.identifier, requested)
-        notes = self._read_notes(template_root)
+        notes = self._read_notes(template_root, creation_date)
         subject = f"template {template.identifier!r}"
         self._validate_reserved_name(subject, notes)
-        self._validate_tree(subject, (*guide, *notes))
-        self._validate_locales(template.identifier)
+        self._validate_tree(subject, (*guide, *notes), creation_date)
+        self._validate_locales(template.identifier, creation_date)
         return TemplateBundle(
             template=template.identifier,
             locale=template_locale,
@@ -400,42 +467,54 @@ class TemplateCatalog:
     def _read_notes(
         cls,
         root: Traversable,
+        today: datetime.date,
         prefix: tuple[str, ...] = (),
     ) -> tuple[TemplateNote, ...]:
-        """Read every Markdown note under one tree in deterministic path order.
+        """Read and render every Markdown note under one tree.
 
         Parameters
         ----------
         root : importlib.resources.abc.Traversable
             Folder to walk.
+        today : datetime.date
+            Calendar date every date placeholder is measured from.
         prefix : tuple[str, ...]
             Relative path segments accumulated by the recursion.
 
         Returns
         -------
         tuple[TemplateNote, ...]
-            Parsed notes ordered by relative path.
+            Parsed notes ordered by relative path, with placeholders resolved.
 
         Raises
         ------
         TemplateContentError
-            If a note cannot be read or parsed.
+            If a note cannot be read or parsed, or still contains a brace
+            expression after rendering.
         """
         notes: list[TemplateNote] = []
         for child in sorted(root.iterdir(), key=lambda item: item.name):
             relative = Path(*prefix, child.name)
             if child.is_dir():
-                notes.extend(cls._read_notes(child, (*prefix, child.name)))
+                notes.extend(cls._read_notes(child, today, (*prefix, child.name)))
                 continue
             if relative.suffix.casefold() != NOTE_SUFFIX:
                 continue
             try:
                 text = child.read_text(encoding="utf-8")
-                document = NoteDocument.from_text(text)
-            except (OSError, UnicodeDecodeError, AfanesError) as exc:
+            except (OSError, UnicodeDecodeError) as exc:
                 message = f"Bundled note {relative.as_posix()!r} cannot be read: {exc}"
                 raise TemplateContentError(message) from exc
-            notes.append(TemplateNote(relative_path=relative, text=text, document=document))
+            rendered = cls._render_dates(text, today)
+            if _BRACE_PATTERN.search(rendered):
+                message = f"Bundled note {relative.as_posix()!r} has a brace expression that cannot be resolved"
+                raise TemplateContentError(message)
+            try:
+                document = NoteDocument.from_text(rendered)
+            except AfanesError as exc:
+                message = f"Bundled note {relative.as_posix()!r} cannot be parsed: {exc}"
+                raise TemplateContentError(message) from exc
+            notes.append(TemplateNote(relative_path=relative, text=rendered, document=document))
         return tuple(notes)
 
     def _validate_guide(self, guide: tuple[TemplateNote, ...]) -> None:
@@ -490,7 +569,12 @@ class TemplateCatalog:
                     f"note {note.relative_path.as_posix()!r} uses the reserved guide name {GUIDE_STEM!r}",
                 )
 
-    def _validate_tree(self, subject: str, notes: tuple[TemplateNote, ...]) -> None:
+    def _validate_tree(
+        self,
+        subject: str,
+        notes: tuple[TemplateNote, ...],
+        today: datetime.date,
+    ) -> None:
         """Verify that one bundled tree is a valid vault fragment.
 
         Parameters
@@ -499,17 +583,21 @@ class TemplateCatalog:
             Human-readable subject used in failure messages.
         notes : tuple[TemplateNote, ...]
             Notes to validate, including the guide.
+        today : datetime.date
+            Calendar date the date rules are measured against.
 
         Raises
         ------
         TemplateContentError
             If a note lacks a type, is a capture, sits under ``inbox/`` or
             ``trash/``, has an unsafe or duplicate name, is in the wrong folder,
-            or references a name the tree does not contain.
+            references a name the tree does not contain, or carries a date that
+            would create pending work.
         """
         self._validate_notes(subject, notes)
         self._validate_placement(subject, notes)
         self._validate_references(subject, notes)
+        self._validate_dates(subject, notes, today)
 
     def _validate_notes(self, subject: str, notes: tuple[TemplateNote, ...]) -> None:
         """Verify note types, names, and uniqueness.
@@ -628,13 +716,70 @@ class TemplateCatalog:
                         "which does not resolve to exactly one note in the tree",
                     )
 
-    def _validate_locales(self, identifier: str) -> None:
+    def _validate_dates(
+        self,
+        subject: str,
+        notes: tuple[TemplateNote, ...],
+        today: datetime.date,
+    ) -> None:
+        """Verify that bundled dates cannot create pending work at creation.
+
+        Parameters
+        ----------
+        subject : str
+            Human-readable subject used in failure messages.
+        notes : tuple[TemplateNote, ...]
+            Notes to validate, including the guide.
+        today : datetime.date
+            Creation date the rules are measured against.
+
+        Raises
+        ------
+        TemplateContentError
+            If a project due date or an unchecked step plan date is on or before
+            ``today``, if an unchecked step declares an actual date, or if a
+            checked step's actual date is after ``today``.
+        """
+        for note in notes:
+            due_date = note.document.due_date
+            if due_date is not None and due_date <= today:
+                self._refuse(
+                    subject,
+                    f"note {note.relative_path.as_posix()!r} has a due date on or before {today.isoformat()}",
+                )
+            if note.note_type is not NoteType.PROJECT:
+                continue
+            steps = afanes.core.steps.StepDocument(note.document.body).steps
+            for step in steps:
+                if step.checked:
+                    if step.actual is not None and step.actual > today:
+                        self._refuse(
+                            subject,
+                            f"note {note.relative_path.as_posix()!r} has a completed step "
+                            f"with an actual date after {today.isoformat()}",
+                        )
+                    continue
+                if step.actual is not None:
+                    self._refuse(
+                        subject,
+                        f"note {note.relative_path.as_posix()!r} has an unchecked step with an actual date",
+                    )
+                if step.plan is not None and step.plan <= today:
+                    self._refuse(
+                        subject,
+                        f"note {note.relative_path.as_posix()!r} has an open step "
+                        f"planned on or before {today.isoformat()}",
+                    )
+
+    def _validate_locales(self, identifier: str, today: datetime.date) -> None:
         """Verify every locale tree of one template has the same shape.
 
         Parameters
         ----------
         identifier : str
             Template identifier.
+        today : datetime.date
+            Calendar date every date placeholder is measured from.
 
         Raises
         ------
@@ -648,11 +793,11 @@ class TemplateCatalog:
             message = f"Bundled template {identifier!r} has no locale folder"
             raise TemplateContentError(message)
         reference_root = next((child for child in locales if child.name == BASE_LOCALE), locales[0])
-        reference_shape = self._shape(self._read_notes(reference_root))
+        reference_shape = self._shape(self._read_notes(reference_root, today))
         for locale_root in locales:
             if locale_root is reference_root:
                 continue
-            shape = self._shape(self._read_notes(locale_root))
+            shape = self._shape(self._read_notes(locale_root, today))
             if shape != reference_shape:
                 message = (
                     f"Bundled template {identifier!r} locale {locale_root.name!r} "
