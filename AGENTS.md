@@ -773,7 +773,7 @@ Code and tests do not override a spec. If the implementation and the spec disagr
 | Apply | Implement tasks only | `/opsx-apply <change-name>` | Code, tests, checked tasks |
 | Validate | Verify behavior and quality | `hatch check`, `hatch test --cover`, `openspec validate --all --strict`, `openspec doctor` | Passing checks |
 | Archive | Merge the change into main specs | `/opsx-archive <change-name>` or `openspec archive "<change-name>"` | Updated main specs, archived change |
-| Release | Bump version, update changelog and README, commit | `hatch version <part>` (see 5.8) | New version, `CHANGELOG.md`, release commit |
+| Release | Bump the version only when a milestone completes, update changelog and README, commit | `hatch version <part>` (see 5.8) | New version, `CHANGELOG.md`, release commit |
 
 The planning boundary is strict: a propose workflow stops after presenting artifacts. Do not start implementation in the same response, even if the original request asked for it.
 
@@ -827,11 +827,13 @@ Create it when the change affects architecture, data format, indexing, concurren
 3. Run `openspec instructions apply --change "<change-name>" --json` and read every context file it returns.
 4. Work one task at a time. Keep the diff scoped to that task.
 5. After implementing a task, run the narrowest relevant tests, then mark the checkbox at its exact source path and line.
-6. Before claiming completion, run the full quality gates.
-7. If a task is ambiguous, stop and ask.
-8. If implementation reveals a design issue or missing behavior, pause and propose an artifact update. Do not absorb scope silently.
-9. If a task needs behavior beyond the spec, stop and ask for a spec change.
-10. Never mark a task complete when it is partially done, deferred, or narrowed.
+6. Commit the task or coherent unit as soon as it is green. The subject names the behavior, not the version: `feat(processing): add append-step outcome`. Checkbox edits in `tasks.md` travel with the commit they belong to.
+7. Never accumulate implementation work in the working tree for a later release commit. A history where the only commits are `chore(release)` hides all of the work and is a blocking review finding.
+8. Before claiming completion, run the full quality gates.
+9. If a task is ambiguous, stop and ask.
+10. If implementation reveals a design issue or missing behavior, pause and propose an artifact update. Do not absorb scope silently.
+11. If a task needs behavior beyond the spec, stop and ask for a spec change.
+12. Never mark a task complete when it is partially done, deferred, or narrowed.
 
 ### 5.6 Validation and archive
 
@@ -855,13 +857,14 @@ Create it when the change affects architecture, data format, indexing, concurren
 
 ### 5.8 Post-archive release
 
-Every successful archive, including `--skip-specs` infrastructure changes, ends with a release commit. Do not report an archive as complete until this workflow finishes.
+Every successful archive, including `--skip-specs` infrastructure changes, ends with a release commit that names the change it delivered. Do not report an archive as complete until this workflow finishes.
 
 1. **Choose the bump.** Derive it from the archived change, not from the size of the diff.
-   - **MAJOR** for an incompatible change to a public Python API, the vault or frontmatter contract, a CLI command or flag, or a spec-defined behavior that requires user migration.
-   - **MINOR** for backward-compatible new behavior: a new capability, view, command, option, frontmatter field, or user-visible workflow.
-   - **PATCH** for backward-compatible fixes, documentation, refactors, performance work, tests, and tooling or process changes with no behavior delta.
-   - Pre-1.0 releases follow the same rules. Do not treat `0.x` as permission to break users silently.
+   - **MAJOR** is reserved for the first MVP at `1.0.0`: a user can open a vault, capture, clarify, browse, and review without hand-editing files. Do not ship `1.0.0` before that.
+   - **MINOR** marks a coherent pre-MVP milestone, such as the processing model or the three-note model. A milestone groups related capabilities; it is not one version per change.
+   - **PATCH** covers every change within a milestone: fixes, refactors, documentation, tests, tooling, and new capabilities that complete the current milestone.
+   - Semantic Versioning places no compatibility guarantee on `0.x`, so an incompatible change to an unreleased public Python API is a MINOR or PATCH bump, never MAJOR. Record the migration note in `Changed` anyway.
+   - An archive that does not complete a milestone keeps its entry under `Unreleased` and does not bump the version. Commit the archive itself; skip steps 2 and 7.
 2. **Bump the version.** Run `hatch version patch`, `hatch version minor`, or `hatch version major`. Use `hatch version "<exact>"` only when the maintainer specifies the version, and `hatch version release` only to graduate a prerelease. An explicit downgrade requires `--force` and maintainer approval. Never edit `src/afanes/__about__.py` by hand. Confirm the new version with `hatch version`.
 3. **Update `CHANGELOG.md`.** Follow Keep a Changelog 1.1.0 and Semantic Versioning.
    - Add a concise entry for the archived change to `Unreleased` when one is not already present.
@@ -875,10 +878,10 @@ Every successful archive, including `--skip-specs` infrastructure changes, ends 
    - Never rewrite an entry for a version that was already released or tagged. Ship a new patch release instead.
 4. **Review `README.md`.** Update it when the change affects installation, quick start, features, supported platforms, configuration, CLI usage, or any statement that is now stale. If nothing needs to change, record `README: no change required` in the archive summary.
 5. **Run the gates.** Run `hatch check`, `hatch test --cover`, `openspec validate --all --strict`, `openspec doctor`, and the compliance check in 6.6. Do not commit while any gate fails.
-6. **Commit.** Create one commit for the archive and its release artifacts: `chore(release): vX.Y.Z`. The body must contain `Archived OpenSpec change: <change-name>`. Include the archived change directory, synced main specs, `src/afanes/__about__.py`, `CHANGELOG.md`, and `README.md` when it changed. Do not tag, push, or publish unless the maintainer asks.
-7. **Report.** State the previous and new versions, the bump rationale, the changelog section, whether `README.md` changed, and the commit hash.
+6. **Commit.** Commit the archive move, the synced main specs, and the release artifacts together. Title the commit for the behavior the change delivered, not for the version alone: `feat(note): adopt the three-note model and project steps`. The body must contain `Archived OpenSpec change: <change-name>` and, when the version changed, `Release: vX.Y.Z`. Include `src/afanes/__about__.py` and `CHANGELOG.md` when they changed, and `README.md` when it changed. Never squash implementation work into this commit; that work is already in history per 5.5. Do not tag, push, or publish unless the maintainer asks.
+7. **Report.** State the previous and new versions when the version changed, the bump rationale, the changelog section, whether `README.md` changed, and the commit hash.
 
-If the archive succeeds but the release workflow fails, leave the archive and version changes in the working tree, report the failure, and do not create a partial or misleading release commit. Multiple archives on the same day each get their own bump and release commit.
+If the archive succeeds but the release workflow fails, leave the archive and version changes in the working tree, report the failure, and do not create a partial or misleading release commit. Multiple archives on the same day each get their own commit; only an archive that completes a milestone bumps the version.
 
 ---
 

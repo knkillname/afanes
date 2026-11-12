@@ -18,8 +18,8 @@ operations:
   archive:
     guidance:
       - "After the archive succeeds, run the post-archive release workflow in AGENTS.md section 5.8 before reporting completion."
-      - "Choose the semver bump from the archived change, then run hatch version patch, hatch version minor, or hatch version major. Never edit src/afanes/__about__.py by hand."
-      - "Update CHANGELOG.md following Keep a Changelog: move Unreleased entries under the new version and date, add a fresh Unreleased section, and update comparison links."
+      - "Bump the version only when the archive completes a coherent milestone: 1.0.0 is reserved for the first MVP, and incompatible changes to unreleased APIs are MINOR or PATCH bumps. Use hatch version patch, hatch version minor, or hatch version major; never edit src/afanes/__about__.py by hand."
+      - "Update CHANGELOG.md following Keep a Changelog: move Unreleased entries under the new version and date, add a fresh Unreleased section, and omit comparison links unless release tags exist."
       - "Review README.md and update it when the change affects installation, usage, features, platforms, configuration, or documented behavior. Record when no update is required."
       - "Run hatch check, hatch test --cover, openspec validate --all --strict, openspec doctor, and the vocabulary compliance check before committing."
-      - "Create one release commit titled chore(release): vX.Y.Z with the archived change name in the body. Do not tag, push, or publish unless the maintainer asks."
+      - "Commit the archive with a subject that names the behavior it delivered, for example feat(note): adopt the three-note model and project steps, plus a body line Archived OpenSpec change: <change-name>. Implementation work is committed task by task during apply, so never squash it into the release commit and never title the commit only chore(release). Do not tag, push, or publish unless the maintainer asks."
