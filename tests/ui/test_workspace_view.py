@@ -36,6 +36,10 @@ async def _create_vault() -> None:
     return None
 
 
+async def _close_vault() -> None:
+    return None
+
+
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
     monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
 
@@ -62,7 +66,7 @@ def _write_note(
 def _open_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.views.workspace.WorkspaceView:
     _use_settings_file(monkeypatch, tmp_path / "settings.json")
     asyncio.run(afanes.ui.state.app_state.choose_vault(tmp_path / "vault"))
-    return afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault)
+    return afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
 
 
 def _handler(control: ft.Control) -> Handler:
@@ -79,7 +83,7 @@ class TestWorkspaceShell:
         vault.mkdir()
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         asyncio.run(afanes.ui.state.app_state.choose_vault(vault))
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
 
         assert view.root.key == "workspace-view"
         assert isinstance(view.root, ft.Column)
@@ -87,6 +91,35 @@ class TestWorkspaceShell:
         assert len(view.section_tiles) == FOUR_SECTIONS
         assert view.review_tile.title == afanes.ui.strings.REVIEW_TITLE
         assert view.page_view.empty_text.visible is True
+
+    def test_change_menu_offers_open_create_and_close(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.choose_vault(vault))
+        calls: list[str] = []
+
+        async def close() -> None:
+            calls.append("close")
+
+        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, close)
+
+        assert [item.key for item in view.change_button.items] == [
+            "workspace-change-open",
+            "workspace-change-create",
+            "workspace-close-vault",
+        ]
+        assert view.change_button.items[0].content == afanes.ui.strings.CHANGE_VAULT_OPEN
+        assert view.change_button.items[1].content == afanes.ui.strings.CHANGE_VAULT_CREATE
+        assert view.change_button.items[2].content == afanes.ui.strings.CLOSE_VAULT_ACTION
+
+        asyncio.run(_handler(view.change_button.items[2])())
+
+        assert calls == ["close"]
 
     def test_browser_and_page_are_visible_together(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -99,7 +132,7 @@ class TestWorkspaceShell:
             await state.open_page(note)
 
         asyncio.run(scenario())
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
 
         assert view.sidebar.visible is True
         assert view.page_view.title.value == "Buy milk"
@@ -117,7 +150,7 @@ class TestWorkspaceShell:
             await state.open_page(note)
 
         asyncio.run(scenario())
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
         handler = _handler(view.section_tiles[afanes.ui.state.WorkspaceSection.PROJECTS])
 
         asyncio.run(handler())

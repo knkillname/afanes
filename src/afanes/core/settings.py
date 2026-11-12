@@ -222,3 +222,23 @@ class SettingsStore:
         except (OSError, VaultError) as exc:
             message = f"Could not write settings: {self.path}"
             raise ConfigurationError(message) from exc
+
+    def clear(self) -> None:
+        """Forget the remembered vault by removing the settings file.
+
+        Raises
+        ------
+        ConfigurationError
+            If the settings file exists and cannot be removed.
+
+        Notes
+        -----
+        A missing file is a success, so clearing an already forgotten vault is
+        idempotent. This method never reads or writes a vault; it removes only
+        the application-owned preferences file and performs blocking file I/O.
+        """
+        try:
+            self.path.unlink(missing_ok=True)
+        except OSError as exc:
+            message = f"Could not remove settings: {self.path}"
+            raise ConfigurationError(message) from exc

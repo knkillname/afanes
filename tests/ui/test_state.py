@@ -2471,6 +2471,192 @@ class TestCreateVault:
         assert state.message == afanes.ui.strings.VAULT_CREATED_NOT_REMEMBERED.format(detail="read only")
 
 
+class TestCloseVault:
+    def test_close_returns_to_welcome_and_forgets_the_vault(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        state = afanes.ui.state.app_state
+        assert state.begin_session() is True
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            return await state.close_vault()
+
+        closed = asyncio.run(scenario())
+
+        assert closed is True
+        assert state.vault_root is None
+        assert state.session_active is True
+        assert state.message is None
+        assert not settings.exists()
+
+    def test_close_saves_a_dirty_page(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "notes" / "Note.md", _typed_note("reference", "# Note\n\nOld.\n"))
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            await state.open_page(path)
+            assert state.edit_page() is True
+            await state.set_page_body("# Note\n\nNew.\n")
+            return await state.close_vault()
+
+        closed = asyncio.run(scenario())
+
+        assert closed is True
+        assert state.vault_root is None
+        assert NoteDocument.from_text(path.read_text(encoding="utf-8")).body == "# Note\n\nNew.\n"
+
+    def test_close_is_blocked_by_a_disk_conflict(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "notes" / "Note.md", _typed_note("reference", "# Note\n\nOld.\n"))
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            await state.open_page(path)
+            assert state.edit_page() is True
+            await state.set_page_body("# Note\n\nMine.\n")
+            path.write_text(_typed_note("reference", "# Note\n\nTheirs.\n"), encoding="utf-8")
+            return await state.close_vault()
+
+        closed = asyncio.run(scenario())
+
+        assert closed is False
+        assert state.vault_root == vault.resolve()
+        assert state.conflict is not None
+        assert settings.exists()
+
+    def test_close_reports_when_preferences_cannot_be_removed(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        state = afanes.ui.state.app_state
+
+        def fail_clear(_self: SettingsStore) -> None:
+            message = "read only"
+            raise ConfigurationError(message)
+
+        monkeypatch.setattr(afanes.core.settings.SettingsStore, "clear", fail_clear)
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            return await state.close_vault()
+
+        closed = asyncio.run(scenario())
+
+        assert closed is True
+        assert state.vault_root is None
+        assert state.message == afanes.ui.strings.VAULT_CLOSE_NOT_FORGOTTEN.format(detail="read only")
+        assert settings.exists()
+
+    @pytest.mark.parametrize(
+        ("attribute", "message"),
+        [
+            ("repair_preview", afanes.ui.strings.PAGE_REPAIR_PENDING),
+            ("pending_labels", afanes.ui.strings.PAGE_TYPE_CHANGE_LEAVE),
+            ("rename_preview", afanes.ui.strings.PAGE_PENDING_DIALOG),
+            ("trash_preview", afanes.ui.strings.PAGE_PENDING_DIALOG),
+        ],
+    )
+    def test_pending_page_action_blocks_the_close(
+        self,
+        attribute: str,
+        message: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "notes" / "Note.md", _typed_note("reference", "# Note\n"))
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            await state.open_page(path)
+            monkeypatch.setattr(state, attribute, object())
+            return await state.close_vault()
+
+        closed = asyncio.run(scenario())
+
+        assert closed is False
+        assert state.vault_root == vault.resolve()
+        assert state.message == message
+        assert settings.exists()
+
+    def test_close_succeeds_when_the_settings_file_is_already_gone(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            settings.unlink()
+            return await state.close_vault()
+
+        closed = asyncio.run(scenario())
+
+        assert closed is True
+        assert state.vault_root is None
+
+    def test_close_succeeds_when_the_vault_directory_is_gone(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.choose_vault(vault)
+            vault.rmdir()
+            return await state.close_vault()
+
+        closed = asyncio.run(scenario())
+
+        assert closed is True
+        assert state.vault_root is None
+
+    def test_close_without_a_vault_does_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        assert asyncio.run(state.close_vault()) is False
+        assert state.vault_root is None
+
+
 class TestOpenVaultForRun:
     def test_supplied_vault_leaves_settings_unchanged(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         remembered = tmp_path / "remembered"

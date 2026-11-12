@@ -59,8 +59,10 @@ class FakePage:
 class FakePicker:
     def __init__(self, selected: str | None) -> None:
         self.selected = selected
+        self.calls = 0
 
     async def get_directory_path(self, **_: object) -> str | None:
+        self.calls += 1
         return self.selected
 
 
@@ -419,6 +421,11 @@ async def _submit_creation(page: FakePage, path_text: Path | None = None) -> Non
     await typing.cast("Handler", submit.on_click)()
 
 
+async def _browse_creation(page: FakePage) -> None:
+    browse = _typed(_find_by_key(page.dialogs[-1], "create-vault-browse"), ft.TextButton)
+    await typing.cast("Handler", browse.on_click)()
+
+
 def _select_template(page: FakePage, identifier: str) -> None:
     selector = _typed(_find_by_key(page.dialogs[-1], "create-vault-template"), ft.Dropdown)
     selector.value = identifier
@@ -444,7 +451,33 @@ class TestCreation:
 
         assert _welcome_button(page.controls[0], "welcome-create").content == afanes.ui.strings.NEW_VAULT_ACTION
 
-    def test_desktop_creation_uses_the_directory_picker(
+    def test_desktop_creation_shows_the_template_choice_first(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        target = tmp_path / "vault"
+        target.mkdir()
+        picker = FakePicker(str(target))
+        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: picker)
+        page = FakePage()
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+
+        asyncio.run(scenario())
+
+        assert len(page.dialogs) == 1
+        assert picker.calls == 0
+        selector = _typed(_find_by_key(page.dialogs[0], "create-vault-template"), ft.Dropdown)
+        assert [option.key for option in selector.options] == ["", "personal", "work", "study"]
+        field = _typed(_find_by_key(page.dialogs[0], "create-vault-path"), ft.TextField)
+        assert field.value == ""
+
+    def test_desktop_creation_browse_fills_the_path(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
@@ -453,7 +486,8 @@ class TestCreation:
         _use_settings_file(monkeypatch, settings)
         target = tmp_path / "vault"
         target.mkdir()
-        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: FakePicker(str(target)))
+        picker = FakePicker(str(target))
+        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: picker)
         page = FakePage()
         state = afanes.ui.state.app_state
 
@@ -461,11 +495,14 @@ class TestCreation:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
-            assert _find_by_key(page.dialogs[-1], "create-vault-chosen-path") is not None
+            await _browse_creation(page)
+            field = _typed(_find_by_key(page.dialogs[-1], "create-vault-path"), ft.TextField)
+            assert field.value == str(target)
             await _submit_creation(page)
 
         asyncio.run(scenario())
 
+        assert picker.calls == 1
         assert state.vault_root == target.resolve()
         assert (target / "inbox").is_dir()
         assert (target / "reference").is_dir()
@@ -475,14 +512,15 @@ class TestCreation:
         assert isinstance(page.controls[0], ft.Column)
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
 
-    def test_cancelling_the_creation_picker_writes_nothing(
+    def test_cancelling_the_browse_keeps_the_form_and_writes_nothing(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
-        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: FakePicker(None))
+        picker = FakePicker(None)
+        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: picker)
         page = FakePage()
         state = afanes.ui.state.app_state
 
@@ -490,11 +528,18 @@ class TestCreation:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
+            await _browse_creation(page)
+            field = _typed(_find_by_key(page.dialogs[-1], "create-vault-path"), ft.TextField)
+            assert field.value == ""
+            cancel = _typed(_find_by_key(page.dialogs[-1], "create-vault-cancel"), ft.TextButton)
+            await typing.cast("Handler", cancel.on_click)()
 
         asyncio.run(scenario())
 
+        assert picker.calls == 1
         assert state.vault_root is None
         assert not settings.exists()
+        assert page.dialogs == []
         assert isinstance(page.controls[0], ft.Container)
 
     def test_desktop_creation_error_stays_in_the_dialog(
@@ -507,7 +552,8 @@ class TestCreation:
         occupied = tmp_path / "occupied"
         occupied.mkdir()
         (occupied / "photo.jpg").write_text("data", encoding="utf-8")
-        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: FakePicker(str(occupied)))
+        picker = FakePicker(str(occupied))
+        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: picker)
         page = FakePage()
         state = afanes.ui.state.app_state
 
@@ -515,6 +561,7 @@ class TestCreation:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
+            await _browse_creation(page)
             await _submit_creation(page)
 
         asyncio.run(scenario())
@@ -712,7 +759,8 @@ class TestCreation:
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=first))
         second = tmp_path / "second"
         second.mkdir()
-        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: FakePicker(str(second)))
+        picker = FakePicker(str(second))
+        monkeypatch.setattr(afanes.ui.app.ft, "FilePicker", lambda: picker)
         page = FakePage()
         state = afanes.ui.state.app_state
 
@@ -721,15 +769,42 @@ class TestCreation:
             create = _typed(_find_by_key(page.controls[0], "workspace-change-create"), ft.PopupMenuItem)
             await typing.cast("Handler", create.on_click)()
             _select_template(page, "study")
+            await _browse_creation(page)
             await _submit_creation(page)
 
         asyncio.run(scenario())
 
+        assert picker.calls == 1
         assert state.vault_root == second.resolve()
         assert (second / "inbox").is_dir()
         assert (second / "projects" / "Research essay.md").is_file()
         assert not (first / "inbox").exists()
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(second.resolve())
+
+    def test_closing_the_vault_returns_to_the_welcome(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        first = tmp_path / "first"
+        first.mkdir()
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=first))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            close = _typed(_find_by_key(page.controls[0], "workspace-close-vault"), ft.PopupMenuItem)
+            await typing.cast("Handler", close.on_click)()
+
+        asyncio.run(scenario())
+
+        assert state.vault_root is None
+        assert not settings.exists()
+        assert isinstance(page.controls[0], ft.Container)
+        assert _welcome_button(page.controls[0], "welcome-create") is not None
 
 
 class TestLaunchDigest:

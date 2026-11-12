@@ -134,3 +134,14 @@ change-vault action, and the vault MUST be created exactly as previewed.
 
 - **WHEN** creation runs in a desktop window or in a browser session
 - **THEN** the same templates and the same preselected option are offered
+
+#### Scenario: Desktop shows the choice before the folder dialog
+
+- **WHEN** the desktop user opens the creation action
+- **THEN** the starter-content form is shown with a path field and a browse action, and the folder
+  dialog opens only when the browse action is used
+
+#### Scenario: Desktop browse fills the folder
+
+- **WHEN** the desktop user chooses a folder from the form's browse action
+- **THEN** the path field shows the selected folder and creation uses it

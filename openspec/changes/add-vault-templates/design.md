@@ -146,6 +146,14 @@ no-template option selected. Note counts for the preview come from a single cata
 through `asyncio.to_thread` when the dialog opens; if the bundle cannot be read, the dialog reports
 it and offers the no-template creation rather than failing to open.
 
+The dialog is shown before the folder is chosen, with a path field and a browse action that opens the
+native directory dialog. Showing the starter-content form first removes any dependency on the native
+picker closing before a second modal can appear, which is the failure mode observed when the dialog
+was opened immediately after `get_directory_path` returned.
+
+*Alternative:* keeping the native picker first and deferring the form with a timer — still a race,
+and still hides the starter-content choice behind a folder decision.
+
 ## Risks / Trade-offs
 
 - **Bundle content rots as the format evolves** → one parametrized suite over every `(template,

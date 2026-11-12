@@ -61,6 +61,11 @@
 - [x] 8.6 Rewrite the inert-content suite added in 3.5 for the future/past date rules and assert that no written note contains a placeholder; verify it detects a past due date, a past plan date, a future actual date, and an actual date on an unchecked step
 - [x] 8.7 Derive the count-dependent interface assertion from the catalog instead of a fixed number, then run `hatch check`, `hatch test --cover`, `openspec validate --all --strict`, and the prohibited-vocabulary check
 
+## 9. Desktop creation flow correction
+
+- [x] 9.1 Show the starter-content form before the native folder dialog on desktop, with a browse action that fills the path field, and keep the template choice visible from the first frame; verify a regression test that asserts the choice is visible and the picker has not been called
+- [x] 9.2 Update the desktop creation tests to choose the folder from the form's browse action, including the cancelled-browse and non-empty-folder cases, then run `hatch check`, `hatch test --cover`, and `openspec validate --all --strict`
+
 ## Workflow follow-up
 
 - Archive the change once review requirements are satisfied.

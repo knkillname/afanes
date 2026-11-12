@@ -45,6 +45,8 @@ class WorkspaceView:
         typed-path dialog.
     on_create_vault : Callable[[], Awaitable[None]]
         Command that asks for a new vault path and creates it.
+    on_close_vault : Callable[[], Awaitable[None]]
+        Command that closes the current vault and returns to the welcome state.
     """
 
     def __init__(
@@ -52,6 +54,7 @@ class WorkspaceView:
         update: Callable[[], None],
         on_change_vault: Callable[[], Awaitable[None]],
         on_create_vault: Callable[[], Awaitable[None]],
+        on_close_vault: Callable[[], Awaitable[None]],
     ) -> None:
         """Build the workspace controls against the shared application state.
 
@@ -63,11 +66,14 @@ class WorkspaceView:
             Command that opens an existing vault.
         on_create_vault : Callable[[], Awaitable[None]]
             Command that creates a new vault.
+        on_close_vault : Callable[[], Awaitable[None]]
+            Command that closes the current vault.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
         self._on_change_vault = on_change_vault
         self._on_create_vault = on_create_vault
+        self._on_close_vault = on_close_vault
         self._processing_view: afanes.ui.views.processing.ProcessingView | None = None
         self._processing_key: tuple[Path | None, Path | None] | None = None
         self._projects_view: afanes.ui.views.projects.ProjectsView | None = None
@@ -105,6 +111,11 @@ class WorkspaceView:
                     content=afanes.ui.strings.CHANGE_VAULT_CREATE,
                     on_click=self._create_vault,
                     key="workspace-change-create",
+                ),
+                ft.PopupMenuItem(
+                    content=afanes.ui.strings.CLOSE_VAULT_ACTION,
+                    on_click=self._close_vault,
+                    key="workspace-close-vault",
                 ),
             ],
             key="workspace-change",
@@ -275,6 +286,14 @@ class WorkspaceView:
         self._set_working(working=True)
         try:
             await self._on_create_vault()
+        finally:
+            self._set_working(working=False)
+
+    async def _close_vault(self) -> None:
+        """Delegate closing the current vault to the application shell."""
+        self._set_working(working=True)
+        try:
+            await self._on_close_vault()
         finally:
             self._set_working(working=False)
 

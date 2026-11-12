@@ -1490,6 +1490,41 @@ class AppState:
         async with self._lock:
             return await self._create_vault_state(path, template)
 
+    async def close_vault(self) -> bool:
+        """Close the current vault and return to the welcome state.
+
+        Returns
+        -------
+        bool
+            ``True`` when the vault was closed, ``False`` when no vault was
+            open or the open page could not be committed.
+
+        Notes
+        -----
+        Closing saves a dirty draft and forgets the remembered vault by removing
+        the preferences file. When the preferences cannot be removed, the
+        welcome state is still shown and :attr:`message` explains that the
+        vault may reopen next launch. The single-session guard is not released.
+        Blocking file I/O runs in a worker thread.
+        """
+        async with self._lock:
+            if self.vault is None:
+                return False
+            if not await self._commit_current():
+                return False
+            self.busy = True
+            try:
+                try:
+                    await asyncio.to_thread(SettingsStore.default().clear)
+                except ConfigurationError as exc:
+                    logger.debug("Remembered vault could not be forgotten", exc_info=True)
+                    self._show_welcome(afanes.ui.strings.VAULT_CLOSE_NOT_FORGOTTEN.format(detail=str(exc)))
+                    return True
+                self._show_welcome(None)
+                return True
+            finally:
+                self.busy = False
+
     async def template_summaries(self) -> tuple[TemplateSummary, ...] | None:
         """Read the bundled template catalog without blocking the interface.
 

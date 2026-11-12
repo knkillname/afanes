@@ -299,5 +299,47 @@ class TestSettingsStoreSave:
         assert sorted(entry.name for entry in tmp_path.iterdir()) == ["settings.json", "vault"]
 
 
+class TestSettingsClear:
+    def test_removes_an_existing_settings_file(self, tmp_path: Path) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = tmp_path / "settings.json"
+        store = SettingsStore(path)
+        store.save(Settings(vault=vault))
+
+        store.clear()
+
+        assert not path.exists()
+        assert store.load() is None
+
+    def test_missing_settings_file_is_success(self, tmp_path: Path) -> None:
+        SettingsStore(tmp_path / "settings.json").clear()
+
+        assert not (tmp_path / "settings.json").exists()
+
+    def test_unremovable_path_raises_a_configuration_error(self, tmp_path: Path) -> None:
+        path = tmp_path / "settings.json"
+        path.mkdir()
+
+        with pytest.raises(ConfigurationError) as info:
+            SettingsStore(path).clear()
+
+        assert str(path) in str(info.value)
+
+    def test_clearing_leaves_the_vault_untouched(self, tmp_path: Path) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        note = vault / "note.md"
+        note.write_text("---\ntype: reference\n---\n\n# Note\n", encoding="utf-8")
+        path = tmp_path / "settings.json"
+        store = SettingsStore(path)
+        store.save(Settings(vault=vault))
+        before = note.read_bytes()
+
+        store.clear()
+
+        assert note.read_bytes() == before
+
+
 def _config_directory() -> Path:
     return Path("config") / "afanes"
