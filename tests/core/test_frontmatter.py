@@ -262,6 +262,96 @@ class TestDueDate:
         assert "due_date: 2026-12-01" in document.to_text()
 
 
+class TestAskedBy:
+    def test_project_accepts_a_requester_name(self) -> None:
+        document = NoteDocument.from_text("---\ntype: project\nasked_by: Priya Nair\n---\n")
+
+        assert document.asked_by == "Priya Nair"
+        assert document.raw["asked_by"] == "Priya Nair"
+
+    def test_surrounding_whitespace_is_trimmed(self) -> None:
+        document = NoteDocument.from_text("---\ntype: project\nasked_by: '  Priya Nair  '\n---\n")
+
+        assert document.asked_by == "Priya Nair"
+        assert document.raw["asked_by"] == "Priya Nair"
+
+    def test_absent_requester_is_none(self) -> None:
+        document = NoteDocument.from_text("---\ntype: project\n---\n")
+
+        assert document.asked_by is None
+
+    def test_reference_rejects_a_requester(self) -> None:
+        with pytest.raises(NoteParseError, match="project notes"):
+            NoteDocument.from_text("---\ntype: reference\nasked_by: Priya Nair\n---\n")
+
+    def test_capture_rejects_a_requester(self) -> None:
+        with pytest.raises(NoteParseError, match="project notes"):
+            NoteDocument.from_text("---\ntype: note\nasked_by: Priya Nair\n---\n")
+
+    def test_requester_without_a_type_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\nasked_by: Priya Nair\n---\n")
+
+    def test_empty_requester_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError, match="non-empty"):
+            NoteDocument.from_text("---\ntype: project\nasked_by: ''\n---\n")
+
+    def test_whitespace_only_requester_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError, match="non-empty"):
+            NoteDocument.from_text("---\ntype: project\nasked_by: '   '\n---\n")
+
+    def test_null_requester_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError, match="string"):
+            NoteDocument.from_text("---\ntype: project\nasked_by: null\n---\n")
+
+    def test_list_requester_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError, match="string"):
+            NoteDocument.from_text("---\ntype: project\nasked_by: [Priya Nair]\n---\n")
+
+    def test_number_requester_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError, match="string"):
+            NoteDocument.from_text("---\ntype: project\nasked_by: 3\n---\n")
+
+    def test_requester_survives_a_round_trip(self) -> None:
+        document = NoteDocument.from_text("---\ntype: project\nasked_by: Priya Nair\n---\n")
+
+        reparsed = NoteDocument.from_text(document.to_text())
+
+        assert reparsed.asked_by == "Priya Nair"
+        assert "asked_by: Priya Nair" in document.to_text()
+
+    def test_round_trip_preserves_unknown_keys_and_body(self) -> None:
+        source = "---\ntype: project\nasked_by: Priya Nair\ncustom: 42\n---\nBody\n"
+        document = NoteDocument.from_text(source)
+
+        reparsed = NoteDocument.from_text(document.to_text())
+
+        assert reparsed.raw == document.raw
+        assert reparsed.asked_by == "Priya Nair"
+        assert reparsed.body == document.body
+        assert reparsed.raw["custom"] == CUSTOM_VALUE
+
+    def test_round_trip_preserves_crlf(self) -> None:
+        source = "---\r\ntype: project\r\nasked_by: Priya Nair\r\n---\r\nBody\r\n"
+        document = NoteDocument.from_text(source)
+
+        assert document.to_text() == source
+
+    def test_with_metadata_accepts_a_requester(self) -> None:
+        document = NoteDocument.from_text("---\ntype: project\n---\n")
+
+        updated = document.with_metadata({"type": "project", "asked_by": "Priya Nair"})
+
+        assert updated.asked_by == "Priya Nair"
+        assert updated.raw["asked_by"] == "Priya Nair"
+
+    def test_with_metadata_rejects_a_misplaced_requester(self) -> None:
+        document = NoteDocument.from_text("---\ntype: reference\n---\n")
+
+        with pytest.raises(NoteParseError, match="project notes"):
+            document.with_metadata({"type": "reference", "asked_by": "Priya Nair"})
+
+
 class TestSerializeDocument:
     def test_with_body_replaces_only_the_body(self) -> None:
         document = NoteDocument.from_text(SAMPLE)
@@ -303,6 +393,13 @@ class TestSerializeDocument:
     ),
     status=hypothesis.strategies.one_of(hypothesis.strategies.none(), hypothesis.strategies.sampled_from(list(Status))),
     due_date=hypothesis.strategies.one_of(hypothesis.strategies.none(), hypothesis.strategies.dates()),
+    asked_by=hypothesis.strategies.one_of(
+        hypothesis.strategies.none(),
+        hypothesis.strategies.text(
+            alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-'.",
+            min_size=1,
+        ).filter(lambda value: bool(value.strip())),
+    ),
     unknown=hypothesis.strategies.text(
         alphabet=hypothesis.strategies.characters(blacklist_characters="\x85\u2028\u2029")
     ),
@@ -312,6 +409,7 @@ def test_frontmatter_round_trip_preserves_recognized_and_unknown_values(
     category: str | None,
     status: Status | None,
     due_date: datetime.date | None,
+    asked_by: str | None,
     unknown: str,
 ) -> None:
     hypothesis.assume(status is None or status in note_type.allowed_statuses)
@@ -322,6 +420,8 @@ def test_frontmatter_round_trip_preserves_recognized_and_unknown_values(
         raw["status"] = status.value
     if note_type is NoteType.PROJECT and due_date is not None:
         raw["due_date"] = due_date
+    if note_type is NoteType.PROJECT and asked_by is not None:
+        raw["asked_by"] = asked_by
     document = NoteDocument.from_text("---\ntype: note\n---\n")
     candidate = document.with_metadata(raw)
     reparsed = NoteDocument.from_text(candidate.to_text())
@@ -330,6 +430,7 @@ def test_frontmatter_round_trip_preserves_recognized_and_unknown_values(
     assert reparsed.category == candidate.category
     assert reparsed.status is candidate.status
     assert reparsed.due_date == candidate.due_date
+    assert reparsed.asked_by == candidate.asked_by
 
 
 class TestWithMetadata:

@@ -135,12 +135,15 @@ class PageLabels:
         Workflow status, or ``None`` when the key is absent.
     due_date_text : str
         Due-date field text exactly as shown in the editor.
+    asked_by_text : str
+        Requester field text exactly as shown in the editor.
     """
 
     note_type: NoteType
     category: CategoryLabel | None = None
     status: Status | None = None
     due_date_text: str = ""
+    asked_by_text: str = ""
 
     @classmethod
     def from_document(cls, document: NoteDocument) -> Self:
@@ -154,8 +157,8 @@ class PageLabels:
         Returns
         -------
         PageLabels
-            Labels populated from the document's type, category, status, and
-            due date.
+            Labels populated from the document's type, category, status, due
+            date, and requester.
 
         Raises
         ------
@@ -171,6 +174,7 @@ class PageLabels:
             category=document.category,
             status=document.status,
             due_date_text=DueDateText.from_raw(due_date).text,
+            asked_by_text=document.asked_by or "",
         )
 
     @property
@@ -217,12 +221,13 @@ class PageLabels:
         Returns
         -------
         PageLabels
-            New labels. Category is kept only for references, due-date text is
-            kept only for projects, and a status the new type does not allow is
-            cleared.
+            New labels. Category is kept only for references, due-date and
+            requester text are kept only for projects, and a status the new
+            type does not allow is cleared.
         """
         category = self.category if note_type is NoteType.REFERENCE else None
         due_date_text = self.due_date_text if note_type is NoteType.PROJECT else ""
+        asked_by_text = self.asked_by_text if note_type is NoteType.PROJECT else ""
         status = self.status if self.status in note_type.allowed_statuses else None
         return dataclasses.replace(
             self,
@@ -230,6 +235,7 @@ class PageLabels:
             category=category,
             status=status,
             due_date_text=due_date_text,
+            asked_by_text=asked_by_text,
         )
 
     def with_category(self, category: CategoryLabel | None) -> Self:
@@ -289,6 +295,24 @@ class PageLabels:
         if self.note_type is not NoteType.PROJECT:
             return dataclasses.replace(self, due_date_text="")
         return dataclasses.replace(self, due_date_text=text)
+
+    def with_asked_by_text(self, text: str) -> Self:
+        """Return labels with new requester field text.
+
+        Parameters
+        ----------
+        text : str
+            Text exactly as typed. It is trimmed when the draft is saved.
+
+        Returns
+        -------
+        PageLabels
+            New labels carrying the text, or blank labels for a non-project
+            note.
+        """
+        if self.note_type is not NoteType.PROJECT:
+            return dataclasses.replace(self, asked_by_text="")
+        return dataclasses.replace(self, asked_by_text=text)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -596,6 +620,11 @@ class NormalDraft:
             raw.pop("due_date", None)
         else:
             raw["due_date"] = due_date
+        asked_by = self.labels.asked_by_text.strip()
+        if self.labels.note_type is not NoteType.PROJECT or not asked_by:
+            raw.pop("asked_by", None)
+        else:
+            raw["asked_by"] = asked_by
 
         document = self.source.with_body(self.body).with_metadata(raw)
         return document.to_text()

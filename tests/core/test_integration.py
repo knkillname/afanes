@@ -110,7 +110,7 @@ class TestProcessingLifecycle:
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.REFERENCE)
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
-        assert target == root / "reference" / "Read the manual.md"
+        assert target == root / "reference" / "general" / "Read the manual.md"
         assert NoteDocument.from_text(target.read_text(encoding="utf-8")).note_type is NoteType.REFERENCE
         assert vault.scan().inbox_notes() == ()
 
@@ -257,6 +257,62 @@ class TestPageEditingLifecycle:
         assert document.due_date == datetime.date(2026, 12, 1)
         assert document.body == "# Budget\n\nDraft the budget.\n"
         assert vault.scan().catalog.resolve(NoteReference(ReferenceScheme.PROJECT, "Budget")).targets == (budget,)
+
+    def test_project_requester_round_trip_preserves_the_note(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        root = tmp_path / "vault"
+        path = _write_note(
+            root,
+            "projects/Home.md",
+            "---\r\ntype: project\r\nstatus: active\r\ncustom: keep\r\n---\r\n\r\n# Home\r\n\r\n- [ ] Call\r\n",
+        )
+        body_before = NoteDocument.from_text(path.read_bytes().decode("utf-8")).body
+        monkeypatch.setattr(
+            afanes.core.settings.SettingsStore,
+            "settings_path",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
+        )
+        state = afanes.ui.state.app_state
+        state.reset()
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(root)
+            await state.navigation.open_page(path)
+            assert state.pages.edit_page() is True
+            await state.dialogs.set_page_asked_by("Priya Nair")
+            assert await state.pages.autosave() is True
+
+        try:
+            asyncio.run(scenario())
+        finally:
+            state.reset()
+
+        raw = path.read_bytes().decode("utf-8")
+        written = NoteDocument.from_text(raw)
+        assert written.asked_by == "Priya Nair"
+        assert written.raw["custom"] == "keep"
+        assert written.body == body_before
+        assert written.newline == "\r\n"
+        assert "\n" not in raw.replace("\r\n", "")
+
+        async def clear() -> None:
+            await state.workspace.choose_vault(root)
+            await state.navigation.open_page(path)
+            assert state.pages.edit_page() is True
+            await state.dialogs.set_page_asked_by("")
+            assert await state.pages.autosave() is True
+
+        try:
+            asyncio.run(clear())
+        finally:
+            state.reset()
+
+        cleared = NoteDocument.from_text(path.read_bytes().decode("utf-8"))
+        assert "asked_by" not in cleared.raw
+        assert cleared.raw["custom"] == "keep"
+        assert cleared.body == body_before
+        assert cleared.newline == "\r\n"
 
 
 class TestHardBreak:
@@ -426,7 +482,7 @@ class TestDocumentedExamples:
     def test_project_example_parses(self) -> None:
         page = Path(__file__).resolve().parents[2] / "docs" / "reference" / "vault-format.md"
         text = page.read_text(encoding="utf-8")
-        marker = "---\ntype: project\nstatus: active\ndue_date: 2026-11-30\n---\n"
+        marker = "---\ntype: project\nstatus: active\ndue_date: 2026-11-30\nasked_by: Priya Nair\n---\n"
         start = text.index(marker)
         end = text.index("```", start)
         document = NoteDocument.from_text(text[start:end])
@@ -434,6 +490,7 @@ class TestDocumentedExamples:
 
         assert document.note_type is NoteType.PROJECT
         assert document.due_date == datetime.date(2026, 11, 30)
+        assert document.asked_by == "Priya Nair"
         assert [step.text for step in steps] == [
             "Draft the checklist",
             "Ask [Ada Lovelace](<note:Ada Lovelace>) to review it",

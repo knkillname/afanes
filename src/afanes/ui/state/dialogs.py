@@ -159,6 +159,18 @@ class PageDialogState:
         async with self.command_lock:
             await self._mutate_labels(lambda labels: labels.with_due_date_text(text))
 
+    async def set_page_asked_by(self, text: str) -> None:
+        """Change the draft requester field text.
+
+        Parameters
+        ----------
+        text : str
+            Text exactly as typed. It is trimmed and written when the draft is
+            saved.
+        """
+        async with self.command_lock:
+            await self._mutate_labels(lambda labels: labels.with_asked_by_text(text))
+
     async def save_page_due_date(self, text: str) -> bool:
         """Set or clear a project due date from read mode.
 

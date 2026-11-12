@@ -1474,6 +1474,31 @@ class TestPageLabels:
 
         asyncio.run(scenario())
 
+    def test_requester_updates_the_labels(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        project = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(project)
+            await state.dialogs.set_page_asked_by("Priya Nair")
+            page = state.pages.page
+            assert page is not None
+            assert page.labels is not None
+            assert page.labels.asked_by_text == "Priya Nair"
+            assert page.is_dirty
+            await state.dialogs.set_page_asked_by("")
+            page = state.pages.page
+            assert page is not None
+            assert page.labels is not None
+            assert page.labels.asked_by_text == ""
+            assert not page.is_dirty
+
+        asyncio.run(scenario())
+
     def test_assignment_suggestions_come_from_the_scan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()

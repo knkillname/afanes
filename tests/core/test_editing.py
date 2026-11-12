@@ -157,6 +157,13 @@ class TestLoadDraft:
         assert draft.labels.category == CategoryLabel("person")
         assert draft.labels.status is Status.ARCHIVED
 
+    def test_loads_a_project_requester(self) -> None:
+        draft = _normal("---\ntype: project\nasked_by: Priya Nair\n---\n\nBody\n")
+
+        assert isinstance(draft, NormalDraft)
+        assert draft.labels is not None
+        assert draft.labels.asked_by_text == "Priya Nair"
+
     def test_malformed_note_loads_in_raw_mode(self) -> None:
         draft = PageDraftFactory.from_page(_page("---\ntype: action\n---\n"))
 
@@ -179,6 +186,7 @@ class TestLabelRules:
         assert labels.category is None
         assert labels.status is None
         assert labels.due_date_text == ""
+        assert labels.asked_by_text == ""
 
     def test_switching_to_reference_clears_an_invalid_status_and_due_date(self) -> None:
         draft = _normal(PROJECT_NOTE)
@@ -186,6 +194,7 @@ class TestLabelRules:
 
         assert labels.status is None
         assert labels.due_date_text == ""
+        assert labels.asked_by_text == ""
 
     def test_switching_between_project_and_reference_keeps_a_valid_status(self) -> None:
         draft = _normal(REFERENCE_NOTE)
@@ -219,6 +228,18 @@ class TestLabelRules:
         assert labels.due_date is None
         assert labels.due_date_error is not None
 
+    def test_requester_text_is_kept_for_projects(self) -> None:
+        draft = _normal(PROJECT_NOTE)
+        labels = draft.labels.with_asked_by_text("Priya Nair")
+
+        assert labels.asked_by_text == "Priya Nair"
+
+    def test_requester_is_ignored_for_a_non_project(self) -> None:
+        draft = _normal(REFERENCE_NOTE)
+        labels = draft.labels.with_asked_by_text("Priya Nair")
+
+        assert labels.asked_by_text == ""
+
 
 class TestSerialize:
     def test_preserves_unknown_keys_and_updates_owned_labels(self) -> None:
@@ -239,6 +260,42 @@ class TestSerialize:
         assert "category" not in document.raw
         assert "status" not in document.raw
         assert "due_date" not in document.raw
+
+    def test_writes_and_trims_a_project_requester(self) -> None:
+        draft = _normal(PROJECT_NOTE)
+        labels = draft.labels.with_asked_by_text("  Priya Nair  ")
+        document = NoteDocument.from_text(draft.with_labels(labels).to_text())
+
+        assert document.asked_by == "Priya Nair"
+        assert document.raw["asked_by"] == "Priya Nair"
+        assert document.raw["custom"] == "keep"
+        assert document.body == draft.body
+
+    def test_clearing_the_requester_removes_the_key(self) -> None:
+        draft = _normal("---\ntype: project\nasked_by: Priya Nair\ncustom: keep\n---\n\nBody\n")
+        labels = draft.labels.with_asked_by_text("")
+        document = NoteDocument.from_text(draft.with_labels(labels).to_text())
+
+        assert "asked_by" not in document.raw
+        assert document.raw["custom"] == "keep"
+
+    def test_type_change_removes_the_requester(self) -> None:
+        draft = _normal("---\ntype: project\nasked_by: Priya Nair\n---\n\nBody\n")
+        labels = draft.labels.with_type(NoteType.REFERENCE)
+        document = NoteDocument.from_text(draft.with_labels(labels).to_text())
+
+        assert "asked_by" not in document.raw
+
+    def test_requester_write_preserves_crlf(self) -> None:
+        text = "---\r\ntype: project\r\n---\r\n\r\n# Call\r\n"
+        draft = PageDraftFactory.from_page(_page(text))
+
+        assert isinstance(draft, NormalDraft)
+        labels = draft.labels.with_asked_by_text("Priya Nair")
+        written = draft.with_labels(labels).to_text()
+
+        assert "asked_by: Priya Nair\r\n" in written
+        assert "\n" not in written.replace("\r\n", "")
 
     def test_invalid_due_date_blocks_serialization(self) -> None:
         draft = _normal(PROJECT_NOTE)

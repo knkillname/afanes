@@ -38,6 +38,16 @@ body link to a project does not create a step, and a project may have no steps a
 Steps have no filename, identity, or reference namespace. They live only inside the project body.
 :::
 
+## 🙋 Who asked
+
+A project can record the person or group that requested it. The value lives in the project frontmatter
+as `asked_by` and appears in the header beside the status and due date. Set or clear it in edit mode
+with the **Asked by** field; the field is offered only for projects.
+
+The name is plain text. It is not a reference, so it does not become a link and renaming the named note
+does not rewrite it. If the name changes, edit the project and correct the field. The requester does
+not change the project's status, group, or next step.
+
 ## ✅ Completing steps
 
 Checking every step does not close the project, and closing a project does not change its steps. Adding,

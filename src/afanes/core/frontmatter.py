@@ -4,10 +4,10 @@
 """Frontmatter-aware note documents.
 
 The module exposes one cohesive value object, :class:`NoteDocument`, which
-owns fence parsing, safe YAML loading, serialization, and validation of the four
+owns fence parsing, safe YAML loading, serialization, and validation of the five
 recognized frontmatter keys. Keeping those behaviors together preserves the
 document's invariants: metadata, body, newline style, declared type, category,
-status, and due date always travel as one unit.
+status, due date, and requester always travel as one unit.
 """
 
 import dataclasses
@@ -74,6 +74,9 @@ class NoteDocument:
         Validated workflow status, or ``None`` when the key is absent.
     due_date : datetime.date | None
         Calendar due date for a project, or ``None`` when absent.
+    asked_by : str | None
+        Plain name of the person or group that requested the project, or
+        ``None`` when absent.
 
     Notes
     -----
@@ -90,6 +93,7 @@ class NoteDocument:
     category: CategoryLabel | None = None
     status: Status | None = None
     due_date: datetime.date | None = None
+    asked_by: str | None = None
 
     @classmethod
     def from_text(cls, text: str) -> Self:
@@ -105,7 +109,7 @@ class NoteDocument:
         -------
         NoteDocument
             Raw metadata, body, newline style, declared type, category, status,
-            and due date.
+            due date, and requester.
 
         Raises
         ------
@@ -113,7 +117,8 @@ class NoteDocument:
             If the opening fence is never closed, the YAML is malformed or is
             not a mapping, a key is not a string, the declared type or status
             is unknown, the category is invalid or misplaced, the due date is
-            invalid or misplaced, or the status is not valid for the type.
+            invalid or misplaced, the asked-by name is invalid or misplaced, or
+            the status is not valid for the type.
         RetiredValueError
             If the note declares ``type: action``, ``type: person``, or a
             ``people`` or ``project`` key.
@@ -130,6 +135,7 @@ class NoteDocument:
         category = cls._declared_category(split.raw, note_type)
         status = cls._declared_status(split.raw, note_type)
         due_date = cls._declared_due_date(split.raw, note_type)
+        asked_by = cls._declared_asked_by(split.raw, note_type)
         return cls(
             raw=split.raw,
             body=split.body,
@@ -139,6 +145,7 @@ class NoteDocument:
             category=category,
             status=status,
             due_date=due_date,
+            asked_by=asked_by,
         )
 
     def to_text(self) -> str:
@@ -289,6 +296,7 @@ class NoteDocument:
         category = self._declared_category(new_raw, note_type)
         status = self._declared_status(new_raw, note_type)
         due_date = self._declared_due_date(new_raw, note_type)
+        asked_by = self._declared_asked_by(new_raw, note_type)
         return dataclasses.replace(
             self,
             raw=new_raw,
@@ -296,6 +304,7 @@ class NoteDocument:
             category=category,
             status=status,
             due_date=due_date,
+            asked_by=asked_by,
         )
 
     @staticmethod
@@ -448,6 +457,28 @@ class NoteDocument:
         due_date = NoteDocument._calendar_date(value)
         raw["due_date"] = due_date
         return due_date
+
+    @staticmethod
+    def _declared_asked_by(
+        raw: dict[str, object],
+        note_type: NoteType | None,
+    ) -> str | None:
+        """Return the validated requester name, or ``None`` when absent."""
+        if "asked_by" not in raw:
+            return None
+        value = raw["asked_by"]
+        if not isinstance(value, str):
+            message = "Frontmatter asked_by must be a string"
+            raise NoteParseError(message)
+        name = value.strip()
+        if not name:
+            message = "Frontmatter asked_by must be a non-empty string"
+            raise NoteParseError(message)
+        if note_type is not NoteType.PROJECT:
+            message = "Frontmatter asked_by is only valid on project notes"
+            raise NoteParseError(message)
+        raw["asked_by"] = name
+        return name
 
     @staticmethod
     def _calendar_date(value: object) -> datetime.date:

@@ -71,6 +71,7 @@ class PageView:
             selectable=True,
         )
         self.meta_status = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
+        self.meta_asked = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
         self.meta_due = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
         self.meta_due_button = ft.IconButton(
             icon=ft.Icons.CALENDAR_MONTH,
@@ -97,7 +98,13 @@ class PageView:
             ),
         )
         self.meta_row = ft.Row(
-            controls=[self.meta_status, self.meta_due, self.meta_due_button, self.meta_due_clear],
+            controls=[
+                self.meta_status,
+                self.meta_asked,
+                self.meta_due,
+                self.meta_due_button,
+                self.meta_due_clear,
+            ],
             spacing=afanes.ui.theme.ITEM_GAP,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             visible=False,
@@ -207,6 +214,12 @@ class PageView:
             on_change=self.change_due_date,
             width=afanes.ui.theme.PAGE_DUE_WIDTH,
         )
+        self.asked_by_field = ft.TextField(
+            label=afanes.ui.strings.PAGE_ASKED_BY_LABEL,
+            hint_text=afanes.ui.strings.PAGE_ASKED_BY_HINT,
+            on_change=self.change_asked_by,
+            width=afanes.ui.theme.PAGE_FIELD_WIDTH,
+        )
         self.due_error = ft.Text(
             "",
             size=12,
@@ -222,7 +235,11 @@ class PageView:
                     spacing=afanes.ui.theme.ITEM_GAP,
                     wrap=True,
                 ),
-                ft.Row(controls=[self.due_field], spacing=afanes.ui.theme.ITEM_GAP, wrap=True),
+                ft.Row(
+                    controls=[self.due_field, self.asked_by_field],
+                    spacing=afanes.ui.theme.ITEM_GAP,
+                    wrap=True,
+                ),
                 self.due_error,
                 self.body_field,
             ],
@@ -532,6 +549,7 @@ class PageView:
         visible = page is not None and not editing and labels is not None and labels.note_type is NoteType.PROJECT
         self.meta_row.visible = visible
         if not visible or labels is None:
+            self.meta_asked.visible = False
             return
         status_label = (
             afanes.ui.strings.PROCESSING_STATUS_LABELS[labels.status.value]
@@ -539,6 +557,9 @@ class PageView:
             else afanes.ui.strings.PAGE_PROJECT_NO_STATUS
         )
         self.meta_status.value = afanes.ui.strings.PROJECT_STATUS.format(status=status_label)
+        asked_by = labels.asked_by_text.strip()
+        self.meta_asked.value = afanes.ui.strings.PROJECT_ASKED_BY.format(name=asked_by) if asked_by else ""
+        self.meta_asked.visible = bool(asked_by)
         due_date = labels.due_date
         self.meta_due.value = (
             afanes.ui.strings.PROJECT_DUE.format(date=due_date.isoformat())
@@ -582,6 +603,9 @@ class PageView:
         self.due_field.visible = labels.note_type is NoteType.PROJECT
         if self.due_field.value != labels.due_date_text:
             self.due_field.value = labels.due_date_text
+        self.asked_by_field.visible = labels.note_type is NoteType.PROJECT
+        if self.asked_by_field.value != labels.asked_by_text:
+            self.asked_by_field.value = labels.asked_by_text
         self.due_error.value = labels.due_date_error or ""
         self.due_error.visible = labels.due_date_error is not None
 
@@ -764,6 +788,12 @@ class PageView:
     async def change_due_date(self) -> None:
         """Forward the due-date text."""
         await self._state.dialogs.set_page_due_date(self.due_field.value or "")
+        self.refresh()
+        self._update()
+
+    async def change_asked_by(self) -> None:
+        """Forward the requester text."""
+        await self._state.dialogs.set_page_asked_by(self.asked_by_field.value or "")
         self.refresh()
         self._update()
 

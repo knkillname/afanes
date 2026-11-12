@@ -41,16 +41,19 @@ The recognized keys are:
 | `category` | references only | any non-empty single folder label; case is preserved |
 | `status` | projects and references | projects: `active`, `waiting`, `done`, `cancelled`, `archived`, `later`; references: `later`, `archived`, or absent |
 | `due_date` | projects only | a calendar date written as `YYYY-MM-DD` |
+| `asked_by` | projects only | a single non-empty name; plain text, not a reference |
 
 Unknown keys are preserved. A capture has no status; `status: inbox` is not valid because the folder is
-the queue. A due date is a date, not a timestamp. See [Frontmatter](frontmatter.md) for the full key
-reference.
+the queue. A due date is a date, not a timestamp. `asked_by` records who requested the project and is
+shown in the project meta row; it does not resolve or navigate. See [Frontmatter](frontmatter.md) for
+the full key reference.
 
 ```markdown
 ---
 type: project
 status: active
 due_date: 2026-11-30
+asked_by: Priya Nair
 ---
 
 # Release migration checklist

@@ -179,6 +179,75 @@ class TestEditMode:
         assert view.due_field.value == "2026-01-02"
         assert "Call" in view.identity_text.value
 
+    def test_asked_by_field_renders_for_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = _write_note(
+            vault / "projects" / "Call.md",
+            _typed_note("project", "# Call Ada\nBody.\n", extra="asked_by: Priya Nair"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+
+        asyncio.run(scenario())
+
+        assert view.asked_by_field.visible is True
+        assert view.asked_by_field.value == "Priya Nair"
+
+    @pytest.mark.parametrize("note_type", ["reference", "note"])
+    def test_asked_by_field_is_hidden_for_non_projects(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        note_type: str,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = _write_note(vault / "notes" / "Ada.md", _typed_note(note_type, "# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+
+        asyncio.run(scenario())
+
+        assert view.asked_by_field.visible is False
+
+    def test_asked_by_change_forwards_to_the_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+            view.asked_by_field.value = "Priya Nair"
+            await view.change_asked_by()
+
+        asyncio.run(scenario())
+
+        page = state.pages.page
+        assert page is not None
+        assert page.labels is not None
+        assert page.labels.asked_by_text == "Priya Nair"
+
     def test_status_options_follow_the_type(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
@@ -627,16 +696,20 @@ class TestSteps:
 
 class TestProjectMeta:
     def _project(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, due_date: str | None = "2026-12-01"
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        due_date: str | None = "2026-12-01",
+        asked_by: str | None = None,
     ) -> tuple[Path, afanes.ui.state.controller.AppState]:
         vault = tmp_path / "vault"
+        extra = "status: waiting" + (f"\ndue_date: {due_date}" if due_date else "")
+        if asked_by is not None:
+            extra += f"\nasked_by: {asked_by}"
         path = _write_note(
             vault / "projects" / "Home.md",
-            _typed_note(
-                "project",
-                "# Home\n\n- [ ] Call\n",
-                extra="status: waiting" + (f"\ndue_date: {due_date}" if due_date else ""),
-            ),
+            _typed_note("project", "# Home\n\n- [ ] Call\n", extra=extra),
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -668,6 +741,22 @@ class TestProjectMeta:
         assert view.meta_due.value == afanes.ui.strings.PAGE_PROJECT_NO_DUE
         assert view.meta_due_clear.visible is False
 
+    def test_project_meta_row_shows_the_requester(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._project(tmp_path, monkeypatch, asked_by="Priya Nair")
+
+        view = PageView(lambda: None)
+
+        assert view.meta_asked.visible is True
+        assert view.meta_asked.value == afanes.ui.strings.PROJECT_ASKED_BY.format(name="Priya Nair")
+
+    def test_project_without_a_requester_omits_the_label(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._project(tmp_path, monkeypatch)
+
+        view = PageView(lambda: None)
+
+        assert view.meta_asked.visible is False
+        assert view.meta_asked.value == ""
+
     def test_note_page_has_no_meta_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
@@ -682,6 +771,7 @@ class TestProjectMeta:
         view = PageView(lambda: None)
 
         assert view.meta_row.visible is False
+        assert view.meta_asked.visible is False
 
     def test_due_date_is_set_from_read_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         path, _state = self._project(tmp_path, monkeypatch, due_date=None)

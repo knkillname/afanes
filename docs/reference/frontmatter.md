@@ -6,8 +6,8 @@ Afanes uses to classify the note; the rest of the file is ordinary Markdown.
 :::{admonition} tl;dr
 :class: note
 
-Only four keys are recognized: `type`, `category`, `status`, and `due_date`. Unknown keys are
-preserved, and a missing status means the default for that note type.
+Only five keys are recognized: `type`, `category`, `status`, `due_date`, and `asked_by`. Unknown keys
+are preserved, and a missing status means the default for that note type.
 :::
 
 ## 🧾 Keys
@@ -18,6 +18,7 @@ preserved, and a missing status means the default for that note type.
 | `category` | references only | any non-empty single folder label; case is preserved |
 | `status` | projects and references | projects: `active`, `waiting`, `done`, `cancelled`, `archived`, `later`; references: `later`, `archived`, or absent |
 | `due_date` | projects only | a calendar date written as `YYYY-MM-DD` |
+| `asked_by` | projects only | a single non-empty name, shown as plain text |
 
 Unknown keys are preserved when Afanes rewrites a note. A due date is a date, not a timestamp.
 
@@ -46,6 +47,13 @@ A project without a status is active. `done`, `cancelled`, and `archived` projec
 `due_date` is valid only on projects and must be a calendar date written as `YYYY-MM-DD`. It is not
 tied to any step. A project may have a due date without steps, and a step may have a plan date without
 the project having a due date.
+
+## 🙋 Asked by
+
+`asked_by` is valid only on projects. It records the person or group that requested the project and is
+shown in the project meta row. The value is one plain name; it is not a reference, does not become a
+link, and does not resolve through the vault. Renaming the named note does not rewrite the value, so
+correct a stale name by editing the project.
 
 ## 🚫 Retired values
 
