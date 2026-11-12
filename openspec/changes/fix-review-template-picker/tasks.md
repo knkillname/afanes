@@ -13,7 +13,7 @@
 
 ## 3. Integration checks
 
-- [ ] 3.1 Run `hatch check`, `hatch test --cover`, `openspec validate --all --strict`, and `openspec doctor`; verify all pass and coverage remains at or above 85 percent.
+- [x] 3.1 Run `hatch check`, `hatch test --cover`, `openspec validate --all --strict`, and `openspec doctor`; verify all pass and coverage remains at or above 85 percent.
 - [ ] 3.2 Run the AGENTS.md section 6.1 vocabulary grep commands; verify each exits with no output. Record `Docs: no change required` because the existing documentation already states that the Template field lists every valid card plus Empty.
 
 ## Workflow follow-up
