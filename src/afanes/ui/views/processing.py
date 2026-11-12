@@ -15,30 +15,7 @@ from afanes.core.processing import ProcessingOutcome, ProcessingPlan
 from afanes.core.vault import VaultNote
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import Status
-
-
-def build_processing(
-    update: Callable[[], None],
-    on_cancel: Callable[[], Awaitable[None]],
-    on_finish: Callable[[], Awaitable[None]],
-) -> ft.Control:
-    """Build the Processing Wizard.
-
-    Parameters
-    ----------
-    update : Callable[[], None]
-        Requests a repaint of the page.
-    on_cancel : Callable[[], Awaitable[None]]
-        Command that closes the wizard without writing.
-    on_finish : Callable[[], Awaitable[None]]
-        Command that closes the success state and returns to the Inbox.
-
-    Returns
-    -------
-    ft.Control
-        Composed wizard layout.
-    """
-    return ProcessingView(update, on_cancel, on_finish).build()
+from afanes.ui.components.banner import Banner
 
 
 class ProcessingView:
@@ -431,7 +408,7 @@ class ProcessingView:
 
         banners: list[ft.Control] = []
         if state.message is not None:
-            banners.append(_banner(state.message))
+            banners.append(Banner(state.message).build())
         self.banners.controls = banners
         self.banners.visible = bool(banners)
         self.progress.visible = self._working or state.busy
@@ -563,29 +540,3 @@ class ProcessingView:
     def _apply_project_suggestion(self, identity: str) -> None:
         """Replace the project field with a page identity."""
         self.project.value = identity
-
-
-def _banner(message: str) -> ft.Control:
-    """Build an accessible warning banner."""
-    return ft.Container(
-        bgcolor=afanes.ui.theme.ERROR_CONTAINER_COLOR,
-        padding=afanes.ui.theme.BANNER_PADDING,
-        border_radius=afanes.ui.theme.CARD_RADIUS,
-        content=ft.Row(
-            controls=[
-                ft.Icon(
-                    ft.Icons.ERROR_OUTLINE,
-                    color=afanes.ui.theme.ERROR_TEXT_COLOR,
-                    size=18,
-                ),
-                ft.Text(
-                    message,
-                    color=afanes.ui.theme.ERROR_TEXT_COLOR,
-                    selectable=True,
-                    expand=True,
-                ),
-            ],
-            spacing=afanes.ui.theme.ITEM_GAP,
-            vertical_alignment=ft.CrossAxisAlignment.START,
-        ),
-    )

@@ -25,6 +25,38 @@ class ReferenceScheme(StrEnum):
     PROJECT = "project"
     NOTE = "note"
 
+    @classmethod
+    def for_note(cls, note_type: str, category: str | None = None) -> "ReferenceScheme":
+        """Map a note type and optional category to the scheme that addresses it.
+
+        Parameters
+        ----------
+        note_type : str
+            Declared note type value, normally a :class:`afanes.models.note.NoteType`
+            member. Accepting the plain value keeps ``models.link`` independent
+            of ``models.note``, so the model package stays a standard-library
+            leaf.
+        category : str | None
+            Reference category value when the note is a reference. ``None``
+            means an uncategorized reference or a non-reference note.
+
+        Returns
+        -------
+        ReferenceScheme
+            ``person`` for a reference with category ``person``, ``project``
+            for a project note, and ``note`` for the document family.
+
+        Notes
+        -----
+        A note belongs to exactly one scheme. A categorized reference is not
+        also addressable through the ``note`` scheme.
+        """
+        if note_type == "project":
+            return cls.PROJECT
+        if note_type == "reference" and category == "person":
+            return cls.PERSON
+        return cls.NOTE
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class NoteReference:
@@ -44,7 +76,7 @@ class NoteReference:
     Notes
     -----
     The value object performs no validation. Construction from untrusted text
-    must go through ``core.links.parse_reference``.
+    must go through ``core.links.ReferenceParser``.
     """
 
     scheme: ReferenceScheme

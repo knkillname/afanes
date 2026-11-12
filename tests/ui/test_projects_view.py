@@ -57,7 +57,9 @@ def _open_view(
     *,
     on_select: Callable[[Path], Awaitable[None]] = _select,
 ) -> afanes.ui.views.projects.ProjectsView:
-    monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: tmp_path / "settings.json")
+    monkeypatch.setattr(
+        afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: tmp_path / "settings.json")
+    )
     asyncio.run(afanes.ui.state.app_state.choose_vault(tmp_path / "vault"))
     return afanes.ui.views.projects.ProjectsView(_noop, on_select)
 

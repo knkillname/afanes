@@ -54,7 +54,9 @@ def _open_capture(body: str = "Buy milk") -> afanes.ui.state.AppState:
 
 
 def _open_vault_capture(root: Path, capture: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: root.parent / "settings.json")
+    monkeypatch.setattr(
+        afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: root.parent / "settings.json")
+    )
     state = afanes.ui.state.app_state
 
     async def scenario() -> None:
@@ -80,7 +82,9 @@ class TestProcessingView:
         root = tmp_path / "vault"
         root.mkdir()
         capture = afanes.core.vault.Vault(root).capture("Q1: Planning?")
-        monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: tmp_path / "settings.json")
+        monkeypatch.setattr(
+            afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: tmp_path / "settings.json")
+        )
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:

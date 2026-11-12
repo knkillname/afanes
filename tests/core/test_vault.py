@@ -20,7 +20,7 @@ from afanes.core.errors import (
 )
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import ResolutionOutcome
-from afanes.core.vault import LinkOutcome, ReferenceSite
+from afanes.core.vault import LinkOutcome, NoteOrder, ParsedPage, ReferenceSite, UnparsedPage, VaultNote
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteType, ReferenceCategory, Status
 
@@ -67,6 +67,67 @@ def _tree_state(root: Path) -> dict[str, bytes]:
 
 def _set_modified_ns(path: Path, modified_ns: int) -> None:
     os.utime(path, ns=(modified_ns, modified_ns))
+
+
+class TestNoteOrder:
+    def _note(
+        self,
+        *,
+        name: str = "Note",
+        title: str = "Note",
+        due_date: datetime.date | None = None,
+        status: Status | None = None,
+        modified_ns: int = 0,
+    ) -> VaultNote:
+        return VaultNote(
+            path=Path("/vault") / f"{name}.md",
+            relative_path=Path(f"{name}.md"),
+            name=name,
+            title=title,
+            note_type=NoteType.NOTE,
+            category=None,
+            status=status,
+            due_date=due_date,
+            content_hash="",
+            modified_ns=modified_ns,
+            body_references=(),
+            frontmatter_references=(),
+        )
+
+    def test_dated_notes_sort_before_undated_notes(self) -> None:
+        dated = self._note(name="Dated", due_date=datetime.date(2026, 1, 1)).order
+        undated = self._note(name="Undated").order
+
+        assert dated < undated
+
+    def test_earlier_due_dates_sort_first(self) -> None:
+        earlier = self._note(name="A", due_date=datetime.date(2026, 1, 1)).order
+        later = self._note(name="Z", due_date=datetime.date(2026, 6, 1)).order
+
+        assert earlier < later
+
+    def test_action_rank_places_active_before_waiting(self) -> None:
+        active = self._note(name="Same", status=Status.ACTIVE).action_order
+        waiting = self._note(name="Same", status=Status.WAITING).action_order
+
+        assert active < waiting
+
+    def test_alphabetical_order_ignores_due_date(self) -> None:
+        titled = self._note(name="Alpha", title="Alpha")
+
+        assert titled.alphabetical_order == NoteOrder(True, datetime.date.max, 0, "alpha", "alpha", "Alpha.md")
+
+    def test_inbox_order_places_newer_notes_first(self) -> None:
+        newer = self._note(name="Newer", modified_ns=2).inbox_order
+        older = self._note(name="Older", modified_ns=1).inbox_order
+
+        assert newer < older
+
+    def test_equal_fields_produce_equal_keys(self) -> None:
+        first = NoteOrder(False, datetime.date(2026, 1, 1), 0, "a", "a", "a.md")
+        second = NoteOrder(False, datetime.date(2026, 1, 1), 0, "a", "a", "a.md")
+
+        assert first == second
 
 
 class TestVaultService:
@@ -411,9 +472,8 @@ class TestReadPage:
         assert content.relative_path == Path("notes/Ada.md")
         assert content.text == path.read_text(encoding="utf-8")
         assert content.content_hash == hashlib.sha256(path.read_bytes()).hexdigest()
-        assert content.document is not None
+        assert isinstance(content, ParsedPage)
         assert content.document.body == "\n# Ada\n"
-        assert content.failure is None
 
     def test_malformed_note_keeps_the_raw_text(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -425,7 +485,7 @@ class TestReadPage:
 
         content = afanes.core.vault.Vault(root).read_page(path)
 
-        assert content.document is None
+        assert isinstance(content, UnparsedPage)
         assert content.failure
         assert content.text == text
         assert content.content_hash == hashlib.sha256(text.encode("utf-8")).hexdigest()

@@ -225,9 +225,9 @@ class TestPageEditingLifecycle:
             body="[Ada](<person:Ada>) and [Budget](<note:Budget>)\n",
         )
         monkeypatch.setattr(
-            afanes.core.settings,
+            afanes.core.settings.SettingsStore,
             "settings_path",
-            lambda: tmp_path / "settings.json",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
         )
         state = afanes.ui.state.app_state
         state.reset()
@@ -310,7 +310,9 @@ class TestReviewActionCreation:
             body="# Draft brief",
         )
         before = {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
-        monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: tmp_path / "settings.json")
+        monkeypatch.setattr(
+            afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: tmp_path / "settings.json")
+        )
         state = afanes.ui.state.app_state
         state.reset()
 
@@ -357,7 +359,9 @@ class TestReviewWorkspaceWorkflow:
         )
         _write_note(root, "projects/Finished.md", note_type="project", status="done", body="# Finished")
         _write_note(root, "inbox/Call the printer.md", note_type="note", body="# Call the printer")
-        monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: tmp_path / "settings.json")
+        monkeypatch.setattr(
+            afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: tmp_path / "settings.json")
+        )
         state = afanes.ui.state.app_state
         state.reset()
 
@@ -393,7 +397,7 @@ class TestReviewWorkspaceWorkflow:
 
         snapshot = afanes.core.vault.Vault(root).scan()
         assert snapshot.inbox_notes() == ()
-        summaries = {summary.note.name: summary for summary in afanes.core.search.project_summaries(snapshot)}
+        summaries = {summary.note.name: summary for summary in afanes.core.search.ProjectBoard(snapshot).summaries()}
         assert summaries["Release 1.0"].next_action is not None
         assert summaries["Release 1.0"].next_action.name == "Draft checklist"
         assert summaries["Office move"].next_action is not None

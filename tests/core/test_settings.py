@@ -19,34 +19,34 @@ class TestConfigDirectory:
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
 
-        assert afanes.core.settings.config_directory() == tmp_path / "xdg" / "afanes"
+        assert SettingsStore.config_directory() == tmp_path / "xdg" / "afanes"
 
     def test_linux_falls_back_to_home_config(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "platform", "linux")
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
 
-        assert afanes.core.settings.config_directory() == tmp_path / "home" / ".config" / "afanes"
+        assert SettingsStore.config_directory() == tmp_path / "home" / ".config" / "afanes"
 
     def test_linux_ignores_a_relative_xdg_config_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "platform", "linux")
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
         monkeypatch.setenv("XDG_CONFIG_HOME", "relative/config")
 
-        assert afanes.core.settings.config_directory() == tmp_path / "home" / ".config" / "afanes"
+        assert SettingsStore.config_directory() == tmp_path / "home" / ".config" / "afanes"
 
     def test_macos_uses_application_support(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "platform", "darwin")
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
 
         expected = tmp_path / "home" / "Library" / "Application Support" / "afanes"
-        assert afanes.core.settings.config_directory() == expected
+        assert SettingsStore.config_directory() == expected
 
     def test_windows_uses_appdata(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "platform", "win32")
         monkeypatch.setenv("APPDATA", str(tmp_path / "roaming"))
 
-        assert afanes.core.settings.config_directory() == tmp_path / "roaming" / "afanes"
+        assert SettingsStore.config_directory() == tmp_path / "roaming" / "afanes"
 
     def test_windows_falls_back_to_roaming_appdata(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "platform", "win32")
@@ -54,12 +54,12 @@ class TestConfigDirectory:
         monkeypatch.delenv("APPDATA", raising=False)
 
         expected = tmp_path / "home" / "AppData" / "Roaming" / "afanes"
-        assert afanes.core.settings.config_directory() == expected
+        assert SettingsStore.config_directory() == expected
 
     def test_settings_path_appends_the_filename(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(afanes.core.settings, "config_directory", _config_directory)
+        monkeypatch.setattr(SettingsStore, "config_directory", classmethod(lambda _cls: _config_directory()))
 
-        assert afanes.core.settings.settings_path() == Path("config/afanes/settings.json")
+        assert SettingsStore.settings_path() == Path("config/afanes/settings.json")
 
 
 class TestSettingsPayload:
@@ -197,7 +197,7 @@ class TestSettingsStoreLoad:
 
 class TestSettingsStoreSave:
     def test_default_uses_the_platform_settings_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: tmp_path / "settings.json")
+        monkeypatch.setattr(SettingsStore, "settings_path", classmethod(lambda _cls: tmp_path / "settings.json"))
 
         assert SettingsStore.default() == SettingsStore(tmp_path / "settings.json")
 

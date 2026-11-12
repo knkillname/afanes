@@ -77,7 +77,7 @@ def _welcome_button(control: ft.Control) -> ft.FilledButton:
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
-    monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: path)
+    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
 
 
 def _find_by_key(control: ft.Control, key: str) -> ft.Control | None:

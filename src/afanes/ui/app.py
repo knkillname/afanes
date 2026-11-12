@@ -45,7 +45,7 @@ class _Shell:
         """Configure the page, claim the session, and open the first state."""
         self._configure()
         if not self.state.begin_session():
-            self.page.add(afanes.ui.views.inbox.build_session_notice(self.retry_session))
+            self.page.add(afanes.ui.views.inbox.SessionNotice(self.retry_session).build())
             self.page.update()
             return
         await self._start_workspace()
@@ -85,11 +85,11 @@ class _Shell:
         self.page.controls.clear()
         if self.state.vault_root is None:
             if self.is_desktop:
-                self.page.add(afanes.ui.views.inbox.build_welcome(on_choose=self.choose_vault))
+                self.page.add(afanes.ui.views.inbox.WelcomeView(on_choose=self.choose_vault).build())
             else:
-                self.page.add(afanes.ui.views.inbox.build_welcome(on_open_path=self.open_path))
+                self.page.add(afanes.ui.views.inbox.WelcomeView(on_open_path=self.open_path).build())
         else:
-            self.page.add(afanes.ui.views.workspace.build_workspace(self.page.update, self.choose_vault))
+            self.page.add(afanes.ui.views.workspace.WorkspaceView(self.page.update, self.choose_vault).build())
         self.page.update()
 
     async def open_path(self, text: str) -> None:

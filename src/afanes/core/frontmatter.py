@@ -17,14 +17,33 @@ from markdown_it import MarkdownIt
 from markdown_it.token import Token
 from yaml import YAMLError
 
-import afanes.core.links
-import afanes.models.note
 from afanes.core.errors import InvalidReferenceError, NoteParseError
+from afanes.core.links import ReferenceKey, ReferenceParser
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteType, ReferenceCategory, Status
 
 # Public canonical frontmatter delimiter.
 FRONTMATTER_FENCE = "---"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class FrontmatterSplit:
+    """Source split produced by the frontmatter fence parser.
+
+    Attributes
+    ----------
+    raw : dict[str, object]
+        Loaded frontmatter mapping, empty when no fence block is present.
+    body : str
+        Markdown body after the closing fence, or the complete source when no
+        frontmatter is present.
+    has_frontmatter : bool
+        Whether the source began with a complete fence block.
+    """
+
+    raw: dict[str, object]
+    body: str
+    has_frontmatter: bool
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -99,18 +118,18 @@ class NoteDocument:
         Frontmatter exists only when the first line is exactly ``---``. A body
         that later begins with ``---`` is ordinary content and is preserved.
         """
-        raw, body, has_frontmatter = cls._split_frontmatter(text)
+        split = cls._split_frontmatter(text)
         newline = "\r\n" if "\r\n" in text else "\n"
-        note_type = cls._declared_note_type(raw)
-        category = cls._declared_category(raw, note_type)
-        status = cls._declared_status(raw, note_type)
+        note_type = cls._declared_note_type(split.raw)
+        category = cls._declared_category(split.raw, note_type)
+        status = cls._declared_status(split.raw, note_type)
         return cls(
-            raw=raw,
-            body=body,
+            raw=split.raw,
+            body=split.body,
             newline=newline,
-            has_frontmatter=has_frontmatter,
+            has_frontmatter=split.has_frontmatter,
             note_type=note_type,
-            references=cls._references_from_raw(raw),
+            references=cls._references_from_raw(split.raw),
             category=category,
             status=status,
         )
@@ -227,7 +246,7 @@ class NoteDocument:
         heading. The value is display-only; it does not participate in
         identity, uniqueness, or reference resolution.
         """
-        return _body_title(self.body)
+        return self._body_title()
 
     def with_metadata(self, raw: dict[str, object]) -> Self:
         """Return a copy with replaced frontmatter, revalidated.
@@ -301,7 +320,7 @@ class NoteDocument:
         their order are preserved. Frontmatter values never use angle brackets.
         """
         raw = dict(self.raw)
-        old_key = afanes.core.links.reference_key(old)
+        old_key = ReferenceKey.from_reference(old)
         count = 0
 
         people = raw.get("people")
@@ -309,7 +328,7 @@ class NoteDocument:
             rewritten_people: list[object] = []
             for value in people:
                 reference = self._person_reference(value)
-                if afanes.core.links.reference_key(reference) == old_key:
+                if ReferenceKey.from_reference(reference) == old_key:
                     rewritten_people.append(self._frontmatter_value(new))
                     count += 1
                 else:
@@ -319,7 +338,7 @@ class NoteDocument:
         project = raw.get("project")
         if isinstance(project, str):
             reference = self._project_reference(project)
-            if afanes.core.links.reference_key(reference) == old_key:
+            if ReferenceKey.from_reference(reference) == old_key:
                 raw["project"] = self._frontmatter_value(new)
                 count += 1
 
@@ -332,18 +351,18 @@ class NoteDocument:
         ), count
 
     @staticmethod
-    def _split_frontmatter(text: str) -> tuple[dict[str, object], str, bool]:
+    def _split_frontmatter(text: str) -> FrontmatterSplit:
         """Split source into raw frontmatter, body, and a presence flag."""
         lines = text.splitlines(keepends=True)
         if not lines or NoteDocument._without_ending(lines[0]) != FRONTMATTER_FENCE:
-            return {}, text, False
+            return FrontmatterSplit(raw={}, body=text, has_frontmatter=False)
 
         for index in range(1, len(lines)):
             if NoteDocument._without_ending(lines[index]) != FRONTMATTER_FENCE:
                 continue
             source = "".join(lines[1:index])
             raw = NoteDocument._load_yaml(source)
-            return raw, "".join(lines[index + 1 :]), True
+            return FrontmatterSplit(raw=raw, body="".join(lines[index + 1 :]), has_frontmatter=True)
 
         message = "Frontmatter opening fence is never closed"
         raise NoteParseError(message)
@@ -436,7 +455,7 @@ class NoteDocument:
         if note_type is None:
             message = "Frontmatter status requires a note type"
             raise NoteParseError(message)
-        if status not in afanes.models.note.allowed_statuses(note_type):
+        if status not in note_type.allowed_statuses:
             message = f"Status {value!r} is not valid for {note_type.value} notes"
             raise NoteParseError(message)
         raw["status"] = status.value
@@ -466,7 +485,7 @@ class NoteDocument:
         if not isinstance(value, str):
             message = "Frontmatter people entries must be strings"
             raise InvalidReferenceError(message)
-        reference = afanes.core.links.parse_reference(value)
+        reference = ReferenceParser().parse(value)
         if reference.scheme is not ReferenceScheme.PERSON:
             message = f"Frontmatter people entry is not a person reference: {value!r}"
             raise InvalidReferenceError(message)
@@ -478,7 +497,7 @@ class NoteDocument:
         if not isinstance(value, str):
             message = "Frontmatter project must be a string"
             raise InvalidReferenceError(message)
-        reference = afanes.core.links.parse_reference(value)
+        reference = ReferenceParser().parse(value)
         if reference.scheme is not ReferenceScheme.PROJECT:
             message = f"Frontmatter project value is not a project reference: {value!r}"
             raise InvalidReferenceError(message)
@@ -489,62 +508,56 @@ class NoteDocument:
         """Render a reference as a frontmatter value without angle brackets."""
         return f"{reference.scheme.value}:{reference.name}"
 
+    def _body_title(self) -> str | None:
+        """Return the plain text of the first level-1 heading in the body.
 
-def _body_title(body: str) -> str | None:
-    """Return the plain text of the first level-1 heading in a body.
+        Returns
+        -------
+        str | None
+            Trimmed heading text, or ``None`` when the first level-1 heading is
+            absent or blank.
 
-    Parameters
-    ----------
-    body : str
-        Markdown body without frontmatter.
+        Notes
+        -----
+        Extraction uses the CommonMark parser, so headings inside code blocks
+        are not considered. Inline markup is flattened to text and a multi-line
+        setext heading is joined with single spaces.
+        """
+        tokens = MarkdownIt("commonmark").parse(self.body)
+        for index, token in enumerate(tokens):
+            if token.type != "heading_open" or token.tag != "h1":
+                continue
+            inline = tokens[index + 1] if index + 1 < len(tokens) else None
+            text = self._inline_text(inline) if inline is not None and inline.type == "inline" else ""
+            return text.strip() or None
+        return None
 
-    Returns
-    -------
-    str | None
-        Trimmed heading text, or ``None`` when the first level-1 heading is
-        absent or blank.
+    @staticmethod
+    def _inline_text(token: Token) -> str:
+        """Flatten one inline token's children to plain text.
 
-    Notes
-    -----
-    Extraction uses the CommonMark parser, so headings inside code blocks are
-    not considered. Inline markup is flattened to text and a multi-line setext
-    heading is joined with single spaces.
-    """
-    tokens = MarkdownIt("commonmark").parse(body)
-    for index, token in enumerate(tokens):
-        if token.type != "heading_open" or token.tag != "h1":
-            continue
-        inline = tokens[index + 1] if index + 1 < len(tokens) else None
-        text = _inline_text(inline) if inline is not None and inline.type == "inline" else ""
-        return text.strip() or None
-    return None
+        Parameters
+        ----------
+        token : Token
+            Inline token holding the heading's children.
 
+        Returns
+        -------
+        str
+            Concatenated text of text, code, and image children, with line
+            breaks rendered as single spaces.
 
-def _inline_text(token: Token) -> str:
-    """Flatten one inline token's children to plain text.
-
-    Parameters
-    ----------
-    token : Token
-        Inline token holding the heading's children.
-
-    Returns
-    -------
-    str
-        Concatenated text of text, code, and image children, with line breaks
-        rendered as single spaces.
-
-    Notes
-    -----
-    Formatting markers and raw inline HTML are omitted because the result is a
-    display title, not a Markdown fragment.
-    """
-    if token.children is None:
-        return token.content
-    parts: list[str] = []
-    for child in token.children:
-        if child.type in {"text", "code_inline", "image"}:
-            parts.append(child.content)
-        elif child.type in {"softbreak", "hardbreak"}:
-            parts.append(" ")
-    return "".join(parts)
+        Notes
+        -----
+        Formatting markers and raw inline HTML are omitted because the result
+        is a display title, not a Markdown fragment.
+        """
+        if token.children is None:
+            return token.content
+        parts: list[str] = []
+        for child in token.children:
+            if child.type in {"text", "code_inline", "image"}:
+                parts.append(child.content)
+            elif child.type in {"softbreak", "hardbreak"}:
+                parts.append(" ")
+        return "".join(parts)

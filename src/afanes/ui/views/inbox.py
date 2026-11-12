@@ -19,13 +19,11 @@ import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.page
 from afanes.core.vault import VaultFailure, VaultNote
+from afanes.ui.components.banner import Banner
 
 
-def build_welcome(
-    on_choose: Callable[[], Awaitable[None]] | None = None,
-    on_open_path: Callable[[str], Awaitable[None]] | None = None,
-) -> ft.Control:
-    """Build the first-run welcome state.
+class WelcomeView:
+    """First-run welcome state.
 
     Parameters
     ----------
@@ -36,122 +34,143 @@ def build_welcome(
         Command that opens the vault named by a typed path. Supplied by the
         browser presentation, which has no native directory dialog.
 
-    Returns
-    -------
-    ft.Control
-        Centered welcome layout with the selection action for this
-        presentation and any startup message.
-
     Raises
     ------
     ValueError
         If neither selection command is supplied. Each presentation must offer
         exactly one way to choose a vault.
     """
-    if on_choose is None and on_open_path is None:
-        message = "The welcome state needs one vault selection command."
-        raise ValueError(message)
-    controls: list[ft.Control] = [
-        ft.Text(
-            afanes.ui.strings.WELCOME_TITLE,
-            theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM,
-            text_align=ft.TextAlign.CENTER,
-        ),
-        ft.Text(afanes.ui.strings.WELCOME_BODY, text_align=ft.TextAlign.CENTER),
-    ]
-    if on_choose is not None:
+
+    def __init__(
+        self,
+        on_choose: Callable[[], Awaitable[None]] | None = None,
+        on_open_path: Callable[[str], Awaitable[None]] | None = None,
+    ) -> None:
+        """Store the vault selection actions for this presentation."""
+        if on_choose is None and on_open_path is None:
+            message = "The welcome state needs one vault selection command."
+            raise ValueError(message)
+        self._on_choose = on_choose
+        self._on_open_path = on_open_path
+
+    def build(self) -> ft.Control:
+        """Build the welcome layout.
+
+        Returns
+        -------
+        ft.Control
+            Centered welcome layout with the selection action for this
+            presentation and any startup message.
+        """
+        controls: list[ft.Control] = [
+            ft.Text(
+                afanes.ui.strings.WELCOME_TITLE,
+                theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM,
+                text_align=ft.TextAlign.CENTER,
+            ),
+            ft.Text(afanes.ui.strings.WELCOME_BODY, text_align=ft.TextAlign.CENTER),
+        ]
+        if self._on_choose is not None:
+            controls.append(
+                ft.FilledButton(
+                    content=afanes.ui.strings.WELCOME_CHOOSE,
+                    icon=ft.Icons.FOLDER_OPEN,
+                    on_click=self._on_choose,
+                    autofocus=True,
+                ),
+            )
+        if self._on_open_path is not None:
+            controls.extend(self._vault_path_entry(self._on_open_path))
         controls.append(
-            ft.FilledButton(
-                content=afanes.ui.strings.WELCOME_CHOOSE,
-                icon=ft.Icons.FOLDER_OPEN,
-                on_click=on_choose,
-                autofocus=True,
+            ft.Text(
+                afanes.ui.strings.WELCOME_NOTE,
+                size=12,
+                color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                text_align=ft.TextAlign.CENTER,
             ),
         )
-    if on_open_path is not None:
-        controls.extend(_vault_path_entry(on_open_path))
-    controls.append(
-        ft.Text(
-            afanes.ui.strings.WELCOME_NOTE,
-            size=12,
-            color=afanes.ui.theme.MUTED_TEXT_COLOR,
-            text_align=ft.TextAlign.CENTER,
-        ),
-    )
-    message = afanes.ui.state.app_state.message
-    if message is not None:
-        controls.append(_banner(message))
-    return ft.Container(
-        expand=True,
-        alignment=ft.Alignment.CENTER,
-        content=ft.Column(
-            controls=controls,
-            spacing=afanes.ui.theme.SECTION_GAP,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            width=520,
-        ),
-    )
+        message = afanes.ui.state.app_state.message
+        if message is not None:
+            controls.append(Banner(message).build())
+        return ft.Container(
+            expand=True,
+            alignment=ft.Alignment.CENTER,
+            content=ft.Column(
+                controls=controls,
+                spacing=afanes.ui.theme.SECTION_GAP,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                width=520,
+            ),
+        )
+
+    @staticmethod
+    def _vault_path_entry(on_open_path: Callable[[str], Awaitable[None]]) -> list[ft.Control]:
+        """Build the typed-path selection controls for a browser session."""
+        field = ft.TextField(
+            label=afanes.ui.strings.WELCOME_PATH_LABEL,
+            hint_text=afanes.ui.strings.WELCOME_PATH_HINT,
+            width=420,
+            autofocus=True,
+            key="welcome-path",
+        )
+
+        async def open_typed_path() -> None:
+            await on_open_path(field.value or "")
+
+        field.on_submit = open_typed_path
+        button = ft.FilledButton(
+            content=afanes.ui.strings.WELCOME_OPEN,
+            icon=ft.Icons.FOLDER_OPEN,
+            on_click=open_typed_path,
+            key="welcome-open",
+        )
+        return [field, button]
 
 
-def _vault_path_entry(on_open_path: Callable[[str], Awaitable[None]]) -> list[ft.Control]:
-    """Build the typed-path selection controls for a browser session."""
-    field = ft.TextField(
-        label=afanes.ui.strings.WELCOME_PATH_LABEL,
-        hint_text=afanes.ui.strings.WELCOME_PATH_HINT,
-        width=420,
-        autofocus=True,
-        key="welcome-path",
-    )
-
-    async def open_typed_path() -> None:
-        await on_open_path(field.value or "")
-
-    field.on_submit = open_typed_path
-    button = ft.FilledButton(
-        content=afanes.ui.strings.WELCOME_OPEN,
-        icon=ft.Icons.FOLDER_OPEN,
-        on_click=open_typed_path,
-        key="welcome-open",
-    )
-    return [field, button]
-
-
-def build_session_notice(on_retry: Callable[[], Awaitable[None]]) -> ft.Control:
-    """Build the state shown when another session already owns the workspace.
+class SessionNotice:
+    """Notice shown when another session already owns the workspace.
 
     Parameters
     ----------
     on_retry : Callable[[], Awaitable[None]]
         Command that tries to claim the session again.
-
-    Returns
-    -------
-    ft.Control
-        Centered notice with a single retry action.
     """
-    return ft.Container(
-        expand=True,
-        alignment=ft.Alignment.CENTER,
-        content=ft.Column(
-            controls=[
-                ft.Text(
-                    afanes.ui.strings.SESSION_ACTIVE_TITLE,
-                    theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM,
-                    text_align=ft.TextAlign.CENTER,
-                ),
-                ft.Text(afanes.ui.strings.SESSION_ACTIVE_BODY, text_align=ft.TextAlign.CENTER),
-                ft.FilledButton(
-                    content=afanes.ui.strings.SESSION_RETRY,
-                    on_click=on_retry,
-                    autofocus=True,
-                    key="session-retry",
-                ),
-            ],
-            spacing=afanes.ui.theme.SECTION_GAP,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            width=520,
-        ),
-    )
+
+    def __init__(self, on_retry: Callable[[], Awaitable[None]]) -> None:
+        """Store the retry action."""
+        self._on_retry = on_retry
+
+    def build(self) -> ft.Control:
+        """Build the session notice.
+
+        Returns
+        -------
+        ft.Control
+            Centered notice with a single retry action.
+        """
+        return ft.Container(
+            expand=True,
+            alignment=ft.Alignment.CENTER,
+            content=ft.Column(
+                controls=[
+                    ft.Text(
+                        afanes.ui.strings.SESSION_ACTIVE_TITLE,
+                        theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    ft.Text(afanes.ui.strings.SESSION_ACTIVE_BODY, text_align=ft.TextAlign.CENTER),
+                    ft.FilledButton(
+                        content=afanes.ui.strings.SESSION_RETRY,
+                        on_click=self._on_retry,
+                        autofocus=True,
+                        key="session-retry",
+                    ),
+                ],
+                spacing=afanes.ui.theme.SECTION_GAP,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                width=520,
+            ),
+        )
 
 
 class InboxView:
@@ -365,7 +384,7 @@ class InboxView:
             self.list_view.controls = [self._empty_state()]
         banners: list[ft.Control] = []
         if state.message is not None:
-            banners.append(_banner(state.message))
+            banners.append(Banner(state.message).build())
         if state.failures:
             banners.append(self._failure_banner(state.failures))
         self.banners.controls = banners
@@ -451,53 +470,3 @@ class InboxView:
                 spacing=afanes.ui.theme.ITEM_GAP,
             ),
         )
-
-
-def build_inbox(
-    update: Callable[[], None],
-    on_change_vault: Callable[[], Awaitable[None]],
-    on_process: Callable[[Path], Awaitable[None]],
-) -> ft.Control:
-    """Build the Inbox view.
-
-    Parameters
-    ----------
-    update : Callable[[], None]
-        Requests a repaint of the page.
-    on_change_vault : Callable[[], Awaitable[None]]
-        Command that opens the folder picker and switches the vault.
-    on_process : Callable[[Path], Awaitable[None]]
-        Command that opens the Processing Wizard for a selected capture.
-
-    Returns
-    -------
-    ft.Control
-        Composed Inbox layout.
-    """
-    return InboxView(update, on_change_vault, on_process).build()
-
-
-def _banner(message: str) -> ft.Control:
-    """Build an accessible warning banner."""
-    return ft.Container(
-        bgcolor=afanes.ui.theme.ERROR_CONTAINER_COLOR,
-        padding=afanes.ui.theme.BANNER_PADDING,
-        border_radius=afanes.ui.theme.CARD_RADIUS,
-        content=ft.Row(
-            controls=[
-                ft.Icon(
-                    ft.Icons.ERROR_OUTLINE,
-                    color=afanes.ui.theme.ERROR_TEXT_COLOR,
-                    size=18,
-                ),
-                ft.Text(
-                    message,
-                    color=afanes.ui.theme.ERROR_TEXT_COLOR,
-                    selectable=True,
-                    expand=True,
-                ),
-            ],
-            spacing=afanes.ui.theme.ITEM_GAP,
-            vertical_alignment=ft.CrossAxisAlignment.START,
-        ),
-    )

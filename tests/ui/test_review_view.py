@@ -56,7 +56,7 @@ def _write_typed_note(
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
-    monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: path)
+    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
 
 
 def _choose_vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.AppState:

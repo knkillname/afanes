@@ -46,7 +46,7 @@ def _write_note(path: Path, body: str) -> Path:
 
 class TestWelcomeView:
     def test_welcome_has_a_folder_action(self) -> None:
-        control = afanes.ui.views.inbox.build_welcome(_change_vault)
+        control = afanes.ui.views.inbox.WelcomeView(_change_vault).build()
         assert isinstance(control, ft.Container)
         content = control.content
 
@@ -58,7 +58,7 @@ class TestWelcomeView:
     def test_welcome_shows_the_startup_message(self) -> None:
         afanes.ui.state.app_state.message = afanes.ui.strings.SETTINGS_UNREADABLE
 
-        control = afanes.ui.views.inbox.build_welcome(_change_vault)
+        control = afanes.ui.views.inbox.WelcomeView(_change_vault).build()
         assert isinstance(control, ft.Container)
         content = control.content
 
@@ -68,7 +68,7 @@ class TestWelcomeView:
 
 class TestBrowserWelcomeView:
     def test_browser_welcome_has_a_path_field(self) -> None:
-        control = afanes.ui.views.inbox.build_welcome(on_open_path=_open_path)
+        control = afanes.ui.views.inbox.WelcomeView(on_open_path=_open_path).build()
         assert isinstance(control, ft.Container)
         content = control.content
         assert isinstance(content, ft.Column)
@@ -81,7 +81,7 @@ class TestBrowserWelcomeView:
 
     def test_welcome_requires_a_selection_command(self) -> None:
         with pytest.raises(ValueError, match="selection command"):
-            afanes.ui.views.inbox.build_welcome()
+            afanes.ui.views.inbox.WelcomeView()
 
 
 class TestInboxView:
@@ -98,7 +98,7 @@ class TestInboxView:
         assert view.page_view.process_button.visible is False
 
     def test_build_returns_the_root_control(self) -> None:
-        control = afanes.ui.views.inbox.build_inbox(_noop, _change_vault, _process)
+        control = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process).build()
 
         assert isinstance(control, ft.Column)
 
@@ -106,9 +106,9 @@ class TestInboxView:
         vault = tmp_path / "vault"
         vault.mkdir()
         monkeypatch.setattr(
-            afanes.core.settings,
+            afanes.core.settings.SettingsStore,
             "settings_path",
-            lambda: tmp_path / "settings.json",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
         )
         state = afanes.ui.state.app_state
 
@@ -133,9 +133,9 @@ class TestInboxView:
         vault = tmp_path / "vault"
         _write_note(vault / "inbox" / "Ada.md", "# Ada, Countess of Lovelace\n")
         monkeypatch.setattr(
-            afanes.core.settings,
+            afanes.core.settings.SettingsStore,
             "settings_path",
-            lambda: tmp_path / "settings.json",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
         )
         state = afanes.ui.state.app_state
 
@@ -151,9 +151,9 @@ class TestInboxView:
         vault = tmp_path / "vault"
         _write_note(vault / "inbox" / "Plain note.md", "No heading\n")
         monkeypatch.setattr(
-            afanes.core.settings,
+            afanes.core.settings.SettingsStore,
             "settings_path",
-            lambda: tmp_path / "settings.json",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
         )
         state = afanes.ui.state.app_state
 
@@ -169,9 +169,9 @@ class TestInboxView:
         _write_note(vault / "inbox" / "First.md", "# Buy milk\n")
         _write_note(vault / "inbox" / "Second.md", "# Buy milk\n")
         monkeypatch.setattr(
-            afanes.core.settings,
+            afanes.core.settings.SettingsStore,
             "settings_path",
-            lambda: tmp_path / "settings.json",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
         )
         state = afanes.ui.state.app_state
 
@@ -186,9 +186,9 @@ class TestInboxView:
         vault = tmp_path / "vault"
         note = _write_note(vault / "inbox" / "Ada.md", "# Ada, Countess of Lovelace\n")
         monkeypatch.setattr(
-            afanes.core.settings,
+            afanes.core.settings.SettingsStore,
             "settings_path",
-            lambda: tmp_path / "settings.json",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
         )
         state = afanes.ui.state.app_state
 
@@ -206,9 +206,9 @@ class TestInboxView:
         vault = tmp_path / "vault"
         note = _write_note(vault / "inbox" / "Plain note.md", "No heading\n")
         monkeypatch.setattr(
-            afanes.core.settings,
+            afanes.core.settings.SettingsStore,
             "settings_path",
-            lambda: tmp_path / "settings.json",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
         )
         state = afanes.ui.state.app_state
 
@@ -225,9 +225,9 @@ class TestInboxView:
         vault = tmp_path / "vault"
         vault.mkdir()
         monkeypatch.setattr(
-            afanes.core.settings,
+            afanes.core.settings.SettingsStore,
             "settings_path",
-            lambda: tmp_path / "settings.json",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
         )
         state = afanes.ui.state.app_state
         calls: list[Path] = []
@@ -267,9 +267,9 @@ class TestInboxView:
         broken.parent.mkdir(parents=True)
         broken.write_text("---\ntype: refrence\n---\nBody\n", encoding="utf-8")
         monkeypatch.setattr(
-            afanes.core.settings,
+            afanes.core.settings.SettingsStore,
             "settings_path",
-            lambda: tmp_path / "settings.json",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
         )
         state = afanes.ui.state.app_state
 

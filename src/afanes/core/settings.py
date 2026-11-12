@@ -89,44 +89,6 @@ class Settings:
         return {"version": SETTINGS_VERSION, "vault": str(self.vault)}
 
 
-def config_directory() -> Path:
-    r"""Return the platform-specific Afanes configuration directory.
-
-    Returns
-    -------
-    Path
-        Linux uses ``$XDG_CONFIG_HOME/afanes`` or ``~/.config/afanes``;
-        macOS uses ``~/Library/Application Support/afanes``; Windows uses
-        ``%APPDATA%\afanes`` or ``~/AppData/Roaming/afanes``.
-
-    Notes
-    -----
-    The directory is resolved without creating it. This function reads the
-    environment and performs no filesystem write.
-    """
-    if sys.platform == "win32":
-        appdata = os.environ.get("APPDATA")
-        base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
-        return base / APP_DIRECTORY_NAME
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / APP_DIRECTORY_NAME
-    xdg_config = os.environ.get("XDG_CONFIG_HOME")
-    if xdg_config and Path(xdg_config).is_absolute():
-        return Path(xdg_config) / APP_DIRECTORY_NAME
-    return Path.home() / ".config" / APP_DIRECTORY_NAME
-
-
-def settings_path() -> Path:
-    """Return the absolute path of the settings file.
-
-    Returns
-    -------
-    Path
-        ``settings.json`` inside :func:`config_directory`.
-    """
-    return config_directory() / SETTINGS_FILENAME
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
 class SettingsStore:
     """Application settings file owned by one store instance.
@@ -140,15 +102,53 @@ class SettingsStore:
     path: Path
 
     @classmethod
+    def config_directory(cls) -> Path:
+        r"""Return the platform-specific Afanes configuration directory.
+
+        Returns
+        -------
+        Path
+            Linux uses ``$XDG_CONFIG_HOME/afanes`` or ``~/.config/afanes``;
+            macOS uses ``~/Library/Application Support/afanes``; Windows uses
+            ``%APPDATA%\afanes`` or ``~/AppData/Roaming/afanes``.
+
+        Notes
+        -----
+        The directory is resolved without creating it. This method reads the
+        environment and performs no filesystem write.
+        """
+        if sys.platform == "win32":
+            appdata = os.environ.get("APPDATA")
+            base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
+            return base / APP_DIRECTORY_NAME
+        if sys.platform == "darwin":
+            return Path.home() / "Library" / "Application Support" / APP_DIRECTORY_NAME
+        xdg_config = os.environ.get("XDG_CONFIG_HOME")
+        if xdg_config and Path(xdg_config).is_absolute():
+            return Path(xdg_config) / APP_DIRECTORY_NAME
+        return Path.home() / ".config" / APP_DIRECTORY_NAME
+
+    @classmethod
+    def settings_path(cls) -> Path:
+        """Return the absolute path of the settings file.
+
+        Returns
+        -------
+        Path
+            ``settings.json`` inside :meth:`config_directory`.
+        """
+        return cls.config_directory() / SETTINGS_FILENAME
+
+    @classmethod
     def default(cls) -> Self:
         """Return a store for the platform's default settings file.
 
         Returns
         -------
         SettingsStore
-            Store pointing at :func:`settings_path`.
+            Store pointing at :meth:`settings_path`.
         """
-        return cls(path=settings_path())
+        return cls(path=cls.settings_path())
 
     def load(self) -> Settings | None:
         """Load settings from this store's file.

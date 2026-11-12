@@ -426,6 +426,38 @@ Review checklist for a change:
 - [ ] Are tests targeting public methods rather than private helpers?
 - [ ] Is the import graph still acyclic and within the layering rules in section 3.3?
 
+#### Ownership rule
+
+Behavior lives with the data it protects. Classify every new unit against this decision tree before writing it:
+
+1. If a function operates mainly on a project-defined type, it is a method on that type or on a service that owns the resource.
+2. If exactly one method uses a helper, the helper is a private method of that method's class.
+3. If a helper is duplicated across classes or modules, it becomes a shared component with one owner.
+4. A stateless transformation of built-in values may remain a function only in a named policy module and only when several independent callers use it.
+5. A composite return of three or more meaningful values, or a tuple that crosses a module boundary, becomes a named value object.
+6. If moving behavior would violate the import graph, introduce a value object or service in the allowed layer instead.
+
+The only allowlisted free functions are:
+
+- `src/afanes/core/names.py`: name normalization and filename policy.
+- `src/afanes/core/atomic.py`: the atomic write primitive.
+- `src/afanes/ui/strings.py`: user-facing copy.
+- Entry-point callbacks: `main` in `src/afanes/ui/app.py` and `src/afanes/__main__.py`, plus the `argparse` type callback `_port_number` in `src/afanes/__main__.py`.
+
+Callbacks passed to a framework, test functions, and private helpers used by exactly one method are not free functions in this sense; the first two are exempt by contract and the third must be a method.
+
+A hard architecture gate in `tests/core/test_architecture.py` enforces the end state:
+
+- `core/` has no module-level functions outside `names.py` and `atomic.py`.
+- `models/` has no module-level functions.
+- `ui/` has no module-level functions outside `strings.py` and the `ui/app.py` entry point.
+- `ui/views/` and `ui/state.py` have no module-level functions.
+- `__main__.py` has no module-level functions outside `main` and `_port_number`.
+- No view module defines `_banner`, `_status_label`, `_panel`, or `_card`; those live in `ui/components/`.
+- `AppState` has at most ten instance fields: its collaborators, the shared lock, and the global status flags.
+
+The gate is intentionally blunt. A legitimate new free function requires an OpenSpec change and an allowlist update, which is the intended friction. During the `refactor-object-ownership` change the gate carries a temporary allowlist; each phase removes its entries until only the final entries above remain. Do not add a new temporary entry without an approved change.
+
 ### 4.4 Python style
 
 - Target Python 3.13. Do not use 3.14-only syntax or standard-library behavior.
@@ -836,6 +868,7 @@ Every successful archive, including `--skip-specs` infrastructure changes, ends 
    - Use only `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Omit empty sections.
    - Write user-facing, observable outcomes. Do not paste task lists, commit messages, or internal file inventories.
    - Name the archived OpenSpec change in the entry when it helps traceability.
+   - **Migration notes.** A major release records every moved or removed public Python API in the `Changed` section, each with its replacement, so users can migrate without reading the diff. Do not add compatibility shims to avoid writing the note.
    - Update the comparison links so `[Unreleased]` compares the new version to `HEAD` and the new version links to its release tag. If release tags are not used, omit the links instead of linking to nonexistent tags.
    - Never rewrite an entry for a version that was already released or tagged. Ship a new patch release instead.
 4. **Review `README.md`.** Update it when the change affects installation, quick start, features, supported platforms, configuration, CLI usage, or any statement that is now stale. If nothing needs to change, record `README: no change required` in the archive summary.

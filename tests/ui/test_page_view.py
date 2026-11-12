@@ -23,7 +23,7 @@ def _reset_state() -> None:
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
-    monkeypatch.setattr(afanes.core.settings, "settings_path", lambda: path)
+    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
 
 
 def _write_note(path: Path, content: str) -> Path:

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-11
+
+### Changed
+
+- The Python API now gives each behavior an owner instead of exposing module-level helper functions. Vault files, frontmatter, settings JSON, CLI flags, and user-visible interface behavior are unchanged.
+- Query functions moved to services: `search.browse_groups(snapshot)` is `Browser(snapshot).groups()`; `search.filter_notes(notes, query)` is `Browser.filter_notes(notes, query)`; `search.project_summaries(snapshot)` is `ProjectBoard(snapshot).summaries()`; `search.project_groups(snapshot)` is `ProjectBoard(snapshot).groups()`; `search.review_queue(snapshot)` is `ReviewPlanner(snapshot).queue()`; `search.review_pending_count(snapshot)` is `ReviewPlanner(snapshot).pending_count()`; and `search.is_open_project`/`is_open_action` are `VaultNote.is_open_project`/`VaultNote.is_open_action`.
+- Reference helpers moved to their owning types: `links.rewrite_body_references(markdown, old, new)` is `MarkdownBody(markdown).rewrite_references(old, new)`; `links.reference_key(reference)` is `ReferenceKey.from_reference(reference)`; `links.scheme_for_note(type, category)` is `ReferenceScheme.for_note(type, category)`; `links.parse_reference(destination)` is `ReferenceParser().parse(destination)`; `links.classify_destination(destination)` is `DestinationKind.classify(destination)`; `models.note.allowed_statuses(type)` is `NoteType.allowed_statuses`; and `vault.is_inbox_path(relative)` is `VaultNote.is_inbox` or `VaultPath(relative).is_inbox`.
+- Page and draft shapes are explicit unions: `PageContent.document`/`.failure` are `ParsedPage.document`/`UnparsedPage.failure`; `PageDraft.from_page` is `PageDraftFactory.from_page`; `PageDraft.new` is `NormalDraft.new`; and `PageDraft.labels`/`.source`/`.raw_text` are the `NormalDraft`/`RawDraft` cases. `Vault.read_page` returns `ParsedPage | UnparsedPage`.
+- Entry-point helpers moved to services: `state.open_vault(path)` is `VaultOpener.open(path)`; `__main__.parse_launch_options(argv)` is `LaunchOptions.parse(argv)`; `settings.config_directory()` is `SettingsStore.config_directory()`; and `settings.settings_path()` is `SettingsStore.settings_path()`.
+
+### Added
+
+- A hard object-ownership architecture gate that rejects module-level helpers outside the policy modules and entry points, duplicate view helpers, and uncontrolled `AppState` growth.
+- `Banner`, `StatusLabel`, `Panel`, and `Card` components shared by the interface views.
+
 ## [0.4.1] - 2026-11-11
 
 ### Added

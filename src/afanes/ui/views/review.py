@@ -18,7 +18,9 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.search import ProjectSummary, ReviewItem
-from afanes.models.note import Status
+from afanes.ui.components.banner import Banner
+from afanes.ui.components.panel import Card
+from afanes.ui.components.status import StatusLabel
 
 
 class ReviewView:
@@ -62,7 +64,7 @@ class ReviewView:
         session = self._state.review_session
         controls: list[ft.Control] = []
         if self._state.message is not None:
-            controls.append(_banner(self._state.message))
+            controls.append(Banner(self._state.message).build())
         if session is None:
             controls.append(self._start_card())
         elif session.complete:
@@ -92,7 +94,7 @@ class ReviewView:
                 ],
                 spacing=afanes.ui.theme.ITEM_GAP,
             )
-            return _card(body)
+            return Card(body).build()
         body = ft.Column(
             controls=[
                 ft.Text(afanes.ui.strings.REVIEW_TITLE, theme_style=ft.TextThemeStyle.HEADLINE_SMALL),
@@ -106,7 +108,7 @@ class ReviewView:
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
         )
-        return _card(body)
+        return Card(body).build()
 
     def _completion_card(self, reviewed: int, skipped: int) -> ft.Control:
         """Build the end-of-session summary."""
@@ -126,7 +128,7 @@ class ReviewView:
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
         )
-        return _card(body)
+        return Card(body).build()
 
     def _capture_card(self, item: ReviewItem) -> ft.Control:
         """Build the fallback card for an inbox capture awaiting processing."""
@@ -155,13 +157,13 @@ class ReviewView:
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
         )
-        return _card(body)
+        return Card(body).build()
 
     def _project_card(self, item: ReviewItem) -> ft.Control:
         """Build the project review card with its next step."""
         summary = item.project
         if summary is None:
-            return _card(
+            return Card(
                 ft.Column(
                     controls=[
                         ft.Text(afanes.ui.strings.REVIEW_PROJECT_FAILED.format(detail=item.path.as_posix())),
@@ -169,12 +171,12 @@ class ReviewView:
                     ],
                     spacing=afanes.ui.theme.ITEM_GAP,
                 )
-            )
+            ).build()
         controls: list[ft.Control] = [
             ft.Text(afanes.ui.strings.REVIEW_TITLE, theme_style=ft.TextThemeStyle.LABEL_LARGE),
             ft.Text(summary.note.title, theme_style=ft.TextThemeStyle.HEADLINE_SMALL, selectable=True),
             ft.Text(
-                afanes.ui.strings.PROJECT_STATUS.format(status=_status_label(summary.note.status)),
+                afanes.ui.strings.PROJECT_STATUS.format(status=StatusLabel(summary.note.status).text),
                 color=afanes.ui.theme.MUTED_TEXT_COLOR,
             ),
         ]
@@ -240,7 +242,7 @@ class ReviewView:
                     wrap=True,
                 )
             )
-        return _card(ft.Column(controls=controls, spacing=afanes.ui.theme.ITEM_GAP))
+        return Card(ft.Column(controls=controls, spacing=afanes.ui.theme.ITEM_GAP)).build()
 
     def _next_step_controls(self, summary: ProjectSummary) -> list[ft.Control]:
         """Build the next-step and remaining-action controls."""
@@ -522,59 +524,3 @@ class ReviewView:
         if isinstance(content, ft.Control):
             found.extend(ReviewView._walk(content))
         return found
-
-
-def build_review(update: Callable[[], None]) -> ft.Control:
-    """Build the review area.
-
-    Parameters
-    ----------
-    update : Callable[[], None]
-        Requests a repaint of the page and its surrounding workspace.
-
-    Returns
-    -------
-    ft.Control
-        Composed review layout.
-    """
-    return ReviewView(update).build()
-
-
-def _card(body: ft.Control) -> ft.Control:
-    """Wrap review content in one surface card."""
-    return ft.Container(
-        expand=True,
-        padding=afanes.ui.theme.SECTION_GAP,
-        bgcolor=afanes.ui.theme.SURFACE_CONTAINER_COLOR,
-        border_radius=afanes.ui.theme.CARD_RADIUS,
-        content=body,
-    )
-
-
-def _status_label(status: Status | None) -> str:
-    """Return the display label for a project status."""
-    if status is None:
-        return afanes.ui.strings.PROJECT_GROUP_LABELS["active"]
-    return afanes.ui.strings.PROCESSING_STATUS_LABELS[status.value]
-
-
-def _banner(message: str) -> ft.Control:
-    """Build an accessible warning banner."""
-    return ft.Container(
-        bgcolor=afanes.ui.theme.ERROR_CONTAINER_COLOR,
-        padding=afanes.ui.theme.BANNER_PADDING,
-        border_radius=afanes.ui.theme.CARD_RADIUS,
-        content=ft.Row(
-            controls=[
-                ft.Icon(ft.Icons.ERROR_OUTLINE, color=afanes.ui.theme.ERROR_TEXT_COLOR, size=18),
-                ft.Text(
-                    message,
-                    color=afanes.ui.theme.ERROR_TEXT_COLOR,
-                    selectable=True,
-                    expand=True,
-                ),
-            ],
-            spacing=afanes.ui.theme.ITEM_GAP,
-            vertical_alignment=ft.CrossAxisAlignment.START,
-        ),
-    )

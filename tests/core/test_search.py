@@ -51,7 +51,9 @@ def _names(notes: tuple[afanes.core.vault.VaultNote, ...]) -> list[str]:
 
 
 def _summary(snapshot: afanes.core.vault.VaultSnapshot, name: str) -> afanes.core.search.ProjectSummary:
-    return next(summary for summary in afanes.core.search.project_summaries(snapshot) if summary.note.name == name)
+    return next(
+        summary for summary in afanes.core.search.ProjectBoard(snapshot).summaries() if summary.note.name == name
+    )
 
 
 class TestBrowseGroups:
@@ -63,7 +65,7 @@ class TestBrowseGroups:
         _write(root, "reference/people/Ada.md", note_type="reference", category="person")
         _write(root, "reference/Reading list.md", note_type="reference")
         _write(root, "notes/Idea.md")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         assert _names(listing.group(BrowserSection.INBOX).notes) == ["Capture"]
         assert _names(listing.group(BrowserSection.PROJECTS).notes) == ["Launch"]
@@ -75,7 +77,7 @@ class TestBrowseGroups:
     def test_capture_appears_only_under_inbox(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write(root, "inbox/Capture.md")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         assert _names(listing.group(BrowserSection.INBOX).notes) == ["Capture"]
         assert listing.group(BrowserSection.NOTES).notes == ()
@@ -83,7 +85,7 @@ class TestBrowseGroups:
     def test_nested_inbox_folder_still_counts_as_inbox(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write(root, "inbox/day/Capture.md")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         assert _names(listing.group(BrowserSection.INBOX).notes) == ["Capture"]
         assert listing.group(BrowserSection.NOTES).notes == ()
@@ -91,7 +93,7 @@ class TestBrowseGroups:
     def test_trashed_notes_are_absent(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write(root, "trash/Old.md")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         assert all(group.notes == () for group in listing.groups)
 
@@ -100,7 +102,7 @@ class TestBrowseGroups:
         broken = root / "reference" / "Broken.md"
         broken.parent.mkdir(parents=True)
         broken.write_text("---\ntype: refrence\n---\nBody\n", encoding="utf-8")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         assert all(group.notes == () for group in listing.groups)
         assert [failure.path.as_posix() for failure in listing.failures] == ["reference/Broken.md"]
@@ -111,7 +113,7 @@ class TestBrowseGroups:
         newer = _write(root, "inbox/Newer.md")
         older.touch()
         newer.touch()
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         assert _names(listing.group(BrowserSection.INBOX).notes) == ["Newer", "Older"]
 
@@ -119,7 +121,7 @@ class TestBrowseGroups:
         root = tmp_path / "vault"
         _write(root, "reference/Zulu.md", note_type="reference", body="# Alpha")
         _write(root, "reference/Alpha.md", note_type="reference", body="# Zulu")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         assert _names(listing.group(BrowserSection.REFERENCES).notes) == ["Zulu", "Alpha"]
 
@@ -128,7 +130,7 @@ class TestBrowseGroups:
         _write(root, "inbox/Capture.md")
         before = {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()}
 
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
         listing.filtered("capture")
 
         after = {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()}
@@ -139,7 +141,7 @@ class TestSearchFiltering:
     def test_title_match_is_listed(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write(root, "reference/Ada.md", note_type="reference", body="# Ada, Countess of Lovelace")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         filtered = listing.filtered("Countess")
 
@@ -148,7 +150,7 @@ class TestSearchFiltering:
     def test_identity_match_is_listed(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write(root, "reference/Ada Lovelace.md", note_type="reference", body="# A person")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         filtered = listing.filtered("lovelace")
 
@@ -157,7 +159,7 @@ class TestSearchFiltering:
     def test_matching_ignores_case_and_repeated_whitespace(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write(root, "reference/Ada.md", note_type="reference", body="# Ada, Countess of Lovelace")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         assert _names(listing.filtered("ada").group(BrowserSection.REFERENCES).notes) == ["Ada"]
         assert _names(listing.filtered("Ada,   Countess of Lovelace").group(BrowserSection.REFERENCES).notes) == ["Ada"]
@@ -165,7 +167,7 @@ class TestSearchFiltering:
     def test_matching_ignores_unicode_form(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write(root, "reference/Emile.md", note_type="reference", body="# E\u0301mile")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         filtered = listing.filtered("\u00c9mile")
 
@@ -174,7 +176,7 @@ class TestSearchFiltering:
     def test_body_only_term_is_not_matched(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write(root, "reference/Ada.md", note_type="reference", body="# Ada\n\nAnalytical engine")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         filtered = listing.filtered("Analytical")
 
@@ -184,7 +186,7 @@ class TestSearchFiltering:
         root = tmp_path / "vault"
         _write(root, "reference/Ada.md", note_type="reference")
         _write(root, "reference/Grace.md", note_type="reference")
-        listing = afanes.core.search.browse_groups(_scan(root))
+        listing = afanes.core.search.Browser(_scan(root)).groups()
 
         assert _names(listing.filtered("  ").group(BrowserSection.REFERENCES).notes) == ["Ada", "Grace"]
 
@@ -195,7 +197,7 @@ class TestSearchFiltering:
         snapshot = _scan(root)
         notes = tuple(reversed(snapshot.notes))
 
-        assert _names(afanes.core.search.filter_notes(notes, "common")) == ["Zulu", "Alpha"]
+        assert _names(afanes.core.search.Browser.filter_notes(notes, "common")) == ["Zulu", "Alpha"]
 
 
 class TestProjectGroups:
@@ -208,7 +210,7 @@ class TestProjectGroups:
         _write(root, "projects/Finished.md", note_type="project", status="done")
         _write(root, "projects/Dropped.md", note_type="project", status="cancelled")
         _write(root, "projects/Stored.md", note_type="project", status="archived")
-        groups = {group.stage: group for group in afanes.core.search.project_groups(_scan(root))}
+        groups = {group.stage: group for group in afanes.core.search.ProjectBoard(_scan(root)).groups()}
 
         assert _names(tuple(summary.note for summary in groups[ProjectStage.ACTIVE].projects)) == ["Now", "Plain"]
         assert _names(tuple(summary.note for summary in groups[ProjectStage.WAITING].projects)) == ["Blocked"]
@@ -222,7 +224,7 @@ class TestProjectGroups:
     def test_every_stage_is_present_even_when_empty(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        groups = afanes.core.search.project_groups(_scan(root))
+        groups = afanes.core.search.ProjectBoard(_scan(root)).groups()
 
         assert [group.stage for group in groups] == list(ProjectStage)
         assert all(group.projects == () for group in groups)
@@ -232,7 +234,7 @@ class TestProjectGroups:
         _write(root, "projects/Zulu.md", note_type="project", status="active", due_date="2026-12-01")
         _write(root, "projects/Alpha.md", note_type="project", status="active")
         _write(root, "projects/Beta.md", note_type="project", status="active", due_date="2026-11-01")
-        groups = {group.stage: group for group in afanes.core.search.project_groups(_scan(root))}
+        groups = {group.stage: group for group in afanes.core.search.ProjectBoard(_scan(root)).groups()}
 
         assert _names(tuple(summary.note for summary in groups[ProjectStage.ACTIVE].projects)) == [
             "Beta",
@@ -274,7 +276,9 @@ class TestProjectMembership:
         snapshot = _scan(root)
 
         summaries = [
-            summary for summary in afanes.core.search.project_summaries(snapshot) if summary.note.name == "Machine"
+            summary
+            for summary in afanes.core.search.ProjectBoard(snapshot).summaries()
+            if summary.note.name == "Machine"
         ]
 
         assert all(summary.open_actions == () for summary in summaries)
@@ -284,7 +288,7 @@ class TestProjectMembership:
         _write(root, "actions/Build.md", note_type="action", status="active", project="project:Missing")
         snapshot = _scan(root)
 
-        assert afanes.core.search.project_summaries(snapshot) == ()
+        assert afanes.core.search.ProjectBoard(snapshot).summaries() == ()
 
     def test_action_without_a_project_is_unassigned(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -405,7 +409,7 @@ class TestProjectStatusStability:
         before = project.read_bytes()
         snapshot = _scan(root)
 
-        afanes.core.search.project_groups(snapshot)
+        afanes.core.search.ProjectBoard(snapshot).groups()
 
         assert next(note for note in snapshot.notes if note.name == "Machine").status is Status.ACTIVE
         assert project.read_bytes() == before
@@ -417,7 +421,7 @@ class TestProjectStatusStability:
         before = action.read_bytes()
         snapshot = _scan(root)
 
-        afanes.core.search.project_groups(snapshot)
+        afanes.core.search.ProjectBoard(snapshot).groups()
 
         assert next(note for note in snapshot.notes if note.name == "Build").status is Status.ACTIVE
         assert action.read_bytes() == before
@@ -434,14 +438,14 @@ class TestReviewQueue:
         _write(root, "actions/Build.md", note_type="action", status="active", project="project:Healthy")
         snapshot = _scan(root)
 
-        assert afanes.core.search.review_pending_count(snapshot) == FIVE
+        assert afanes.core.search.ReviewPlanner(snapshot).pending_count() == FIVE
 
     def test_closed_projects_are_not_pending(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write(root, "projects/Finished.md", note_type="project", status="done")
         snapshot = _scan(root)
 
-        assert afanes.core.search.review_pending_count(snapshot) == 0
+        assert afanes.core.search.ReviewPlanner(snapshot).pending_count() == 0
 
     def test_zero_pending_state_has_an_empty_queue(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -449,8 +453,8 @@ class TestReviewQueue:
 
         snapshot = _scan(root)
 
-        assert afanes.core.search.review_pending_count(snapshot) == 0
-        assert afanes.core.search.review_queue(snapshot) == ()
+        assert afanes.core.search.ReviewPlanner(snapshot).pending_count() == 0
+        assert afanes.core.search.ReviewPlanner(snapshot).queue() == ()
 
     def test_queue_orders_inbox_then_stalled_then_healthy(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -461,7 +465,7 @@ class TestReviewQueue:
         _write(root, "projects/Finished.md", note_type="project", status="done")
         snapshot = _scan(root)
 
-        queue = afanes.core.search.review_queue(snapshot)
+        queue = afanes.core.search.ReviewPlanner(snapshot).queue()
 
         assert [item.kind for item in queue] == [
             ReviewItemKind.INBOX,
@@ -477,26 +481,26 @@ class TestReviewQueue:
         _write(root, "projects/Stored.md", note_type="project", status="archived")
         snapshot = _scan(root)
 
-        assert afanes.core.search.review_queue(snapshot) == ()
+        assert afanes.core.search.ReviewPlanner(snapshot).queue() == ()
 
     def test_queue_is_a_snapshot_of_the_scan(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write(root, "inbox/Capture.md")
         snapshot = _scan(root)
-        queue = afanes.core.search.review_queue(snapshot)
+        queue = afanes.core.search.ReviewPlanner(snapshot).queue()
 
         _write(root, "inbox/Later.md")
         _write(root, "projects/New.md", note_type="project", status="active")
 
-        assert queue == afanes.core.search.review_queue(snapshot)
+        assert queue == afanes.core.search.ReviewPlanner(snapshot).queue()
         assert len(queue) == 1
-        assert len(afanes.core.search.review_queue(_scan(root))) == THREE
+        assert len(afanes.core.search.ReviewPlanner(_scan(root)).queue()) == THREE
 
     def test_new_work_is_not_appended_to_an_existing_queue(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write(root, "projects/Stalled.md", note_type="project", status="active")
         snapshot = _scan(root)
-        queue = afanes.core.search.review_queue(snapshot)
+        queue = afanes.core.search.ReviewPlanner(snapshot).queue()
 
         _write(root, "projects/Created during review.md", note_type="project", status="active")
 

@@ -32,36 +32,36 @@ class TestConsoleEntryPoint:
 
 class TestLaunchOptions:
     def test_defaults_to_the_desktop_presentation(self) -> None:
-        options = afanes.__main__.parse_launch_options([])
+        options = afanes.__main__.LaunchOptions.parse([])
 
         assert options.web is False
         assert options.vault is None
         assert options.port == 0
 
     def test_web_option_selects_the_browser_presentation(self) -> None:
-        options = afanes.__main__.parse_launch_options(["--web"])
+        options = afanes.__main__.LaunchOptions.parse(["--web"])
 
         assert options.web is True
 
     def test_port_option_is_read(self) -> None:
-        options = afanes.__main__.parse_launch_options(["--web", "--port", str(TEST_PORT)])
+        options = afanes.__main__.LaunchOptions.parse(["--web", "--port", str(TEST_PORT)])
 
         assert options.port == TEST_PORT
 
     def test_vault_option_is_read(self, tmp_path: Path) -> None:
-        options = afanes.__main__.parse_launch_options(["--vault", str(tmp_path)])
+        options = afanes.__main__.LaunchOptions.parse(["--vault", str(tmp_path)])
 
         assert options.vault == tmp_path
 
     def test_unknown_option_is_a_usage_error(self) -> None:
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.parse_launch_options(["--unknown"])
+            afanes.__main__.LaunchOptions.parse(["--unknown"])
 
         assert excinfo.value.code == USAGE_EXIT_CODE
 
     def test_out_of_range_port_is_a_usage_error(self) -> None:
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.parse_launch_options(["--port", "70000"])
+            afanes.__main__.LaunchOptions.parse(["--port", "70000"])
 
         assert excinfo.value.code == USAGE_EXIT_CODE
 

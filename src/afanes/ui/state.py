@@ -25,7 +25,7 @@ import afanes.core.links
 import afanes.core.names
 import afanes.core.search
 import afanes.ui.strings
-from afanes.core.editing import DraftMode, PageDraft, PageLabels
+from afanes.core.editing import DraftMode, NormalDraft, PageDraft, PageDraftFactory, PageLabels, RawDraft
 from afanes.core.errors import (
     AfanesError,
     ConfigurationError,
@@ -36,7 +36,7 @@ from afanes.core.errors import (
     VaultError,
     VaultPathError,
 )
-from afanes.core.links import DestinationKind
+from afanes.core.links import DestinationKind, ReferenceParser
 from afanes.core.processing import ProcessingOutcome, ProcessingPlan
 from afanes.core.search import (
     BrowserListing,
@@ -67,25 +67,8 @@ PAGE_HISTORY_LIMIT = 50
 AUTOSAVE_SECONDS = 30
 
 
-def open_vault(path: Path) -> Vault:
-    """Open and validate a vault directory for the interface.
-
-    Parameters
-    ----------
-    path : pathlib.Path
-        Candidate vault directory. A relative path is resolved by
-        :class:`afanes.core.vault.Vault`.
-
-    Returns
-    -------
-    Vault
-        Validated vault service for the directory.
-
-    Raises
-    ------
-    VaultError
-        If the path is missing, is not a directory, cannot be read, or cannot
-        be resolved.
+class VaultOpener:
+    """Validate and open a vault directory for the interface.
 
     Notes
     -----
@@ -94,16 +77,38 @@ def open_vault(path: Path) -> Vault:
     filesystem checks; call it from a worker thread when a command is
     responding to a UI event.
     """
-    if not path.exists():
-        raise VaultError(afanes.ui.strings.VAULT_MISSING)
-    if not path.is_dir():
-        raise VaultError(afanes.ui.strings.VAULT_NOT_DIRECTORY)
-    if not os.access(path, os.R_OK):
-        raise VaultError(afanes.ui.strings.VAULT_UNREADABLE)
-    try:
-        return Vault(path)
-    except OSError as exc:
-        raise VaultError(afanes.ui.strings.VAULT_UNREADABLE) from exc
+
+    @staticmethod
+    def open(path: Path) -> Vault:
+        """Open and validate a vault directory.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+            Candidate vault directory. A relative path is resolved by
+            :class:`afanes.core.vault.Vault`.
+
+        Returns
+        -------
+        Vault
+            Validated vault service for the directory.
+
+        Raises
+        ------
+        VaultError
+            If the path is missing, is not a directory, cannot be read, or
+            cannot be resolved.
+        """
+        if not path.exists():
+            raise VaultError(afanes.ui.strings.VAULT_MISSING)
+        if not path.is_dir():
+            raise VaultError(afanes.ui.strings.VAULT_NOT_DIRECTORY)
+        if not os.access(path, os.R_OK):
+            raise VaultError(afanes.ui.strings.VAULT_UNREADABLE)
+        try:
+            return Vault(path)
+        except OSError as exc:
+            raise VaultError(afanes.ui.strings.VAULT_UNREADABLE) from exc
 
 
 class WorkspaceSection(StrEnum):
@@ -276,44 +281,257 @@ class ReviewSession:
         return dataclasses.replace(self, items=tuple(items))
 
 
-@dataclasses.dataclass(slots=True, eq=False)
-class AppState:
-    """Mutable state shared by the welcome and Inbox views.
+@dataclasses.dataclass(slots=True)
+class UiStatus:
+    """Cross-cutting status flags shared by the application collaborators.
 
     Attributes
     ----------
+    message : str | None
+        Banner text for the current error or warning.
+    busy : bool
+        Whether a blocking command is in progress.
+    session_active : bool
+        Whether a presentation session currently drives the workspace.
+    """
+
+    message: str | None = None
+    busy: bool = False
+    session_active: bool = False
+
+
+@dataclasses.dataclass(slots=True)
+class VaultSession:
+    """Vault lifecycle, scan snapshot, and selection state.
+
+    Attributes
+    ----------
+    status : UiStatus
+        Shared banner and busy flags.
     vault : Vault | None
         Active vault service, or ``None`` while the welcome state is shown.
+    snapshot : VaultSnapshot | None
+        Latest scan result.
     notes : tuple[VaultNote, ...]
         Inbox notes, newest first.
     failures : tuple[VaultFailure, ...]
         Notes the last scan could not parse.
-    active_section : WorkspaceSection
-        Sidebar destination currently shown.
-    browser_query : str
-        Title and identity filter typed into the browser search field.
-    review_session : ReviewSession | None
-        Guided review session in progress, or ``None`` when review is not
-        active.
     selected : Path | None
         Absolute path of the note shown in the preview.
     preview_body : str | None
         Markdown body of the previewed note, without frontmatter.
-    busy : bool
-        Whether a blocking command is in progress.
-    message : str | None
-        Banner text for the current error or warning.
-    processing_note : Path | None
-        Capture currently open in the Processing Wizard.
-    processing_body : str | None
-        Markdown body of the processing capture.
-    processing_plan : ProcessingPlan | None
-        Validated plan waiting for confirmation.
-    processing_result : Path | None
-        Destination of the last successful processing apply.
+    """
+
+    status: UiStatus
+    vault: Vault | None = None
+    snapshot: VaultSnapshot | None = None
+    notes: tuple[VaultNote, ...] = ()
+    failures: tuple[VaultFailure, ...] = ()
+    selected: Path | None = None
+    preview_body: str | None = None
+
+    @property
+    def vault_root(self) -> Path | None:
+        """Return the active vault root, or ``None`` in the welcome state.
+
+        Returns
+        -------
+        Path | None
+            Resolved root of :attr:`vault`, or ``None`` when no vault is open.
+        """
+        return None if self.vault is None else self.vault.root
+
+    def begin_session(self) -> bool:
+        """Claim the single active workspace session.
+
+        Returns
+        -------
+        bool
+            ``True`` when this caller became the active session.
+        """
+        if self.status.session_active:
+            return False
+        self.status.session_active = True
+        return True
+
+    def release_session(self) -> None:
+        """Release the active workspace session."""
+        self.status.session_active = False
+
+    def note_title(self, path: Path) -> str:
+        """Return the display title for a note in the latest scan.
+
+        Parameters
+        ----------
+        path : Path
+            Absolute path of a note in the vault.
+
+        Returns
+        -------
+        str
+            Display title, or the filename stem when the note is not in the
+            latest scan.
+        """
+        if self.snapshot is not None:
+            note = next((note for note in self.snapshot.notes if note.path == path), None)
+            if note is not None:
+                return note.title
+        note = next((note for note in self.notes if note.path == path), None)
+        return path.stem if note is None else note.title
+
+    def assignment_candidates(self, scheme: ReferenceScheme, query: str) -> tuple[VaultNote, ...]:
+        """Return assignment suggestions from the last vault scan.
+
+        Parameters
+        ----------
+        scheme : ReferenceScheme
+            Namespace to search, normally ``person`` or ``project``.
+        query : str
+            Free text typed by the user.
+
+        Returns
+        -------
+        tuple[VaultNote, ...]
+            Matching notes ordered by display title, then identity, or an
+            empty tuple when no vault is open.
+        """
+        if self.snapshot is None:
+            return ()
+        return self.snapshot.assignment_candidates(scheme, query)
+
+    async def refresh_snapshot(self) -> None:
+        """Rescan the vault and update the inbox lists."""
+        vault = self.vault
+        if vault is None:
+            return
+        try:
+            snapshot = await asyncio.to_thread(vault.scan)
+        except (VaultError, OSError) as exc:
+            logger.debug("Snapshot refresh failed", exc_info=True)
+            self.status.message = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
+            return
+        self.apply_snapshot(snapshot)
+
+    def apply_snapshot(self, snapshot: VaultSnapshot, focus: Path | None = None) -> None:
+        """Replace the inbox list from a scan result.
+
+        Parameters
+        ----------
+        snapshot : VaultSnapshot
+            Scan result to retain.
+        focus : Path | None
+            Note to promote to the top of the inbox list.
+        """
+        self.snapshot = snapshot
+        notes = list(snapshot.inbox_notes())
+        if focus is not None:
+            for index, note in enumerate(notes):
+                if note.path == focus:
+                    notes.insert(0, notes.pop(index))
+                    break
+        self.notes = tuple(notes)
+        self.failures = snapshot.failures
+        if self.selected is not None and all(note.path != self.selected for note in self.notes):
+            self.selected = None
+            self.preview_body = None
+        self.status.message = None
+
+
+@dataclasses.dataclass(slots=True)
+class BrowserState:
+    """Sidebar destination and browser query.
+
+    Attributes
+    ----------
+    session : VaultSession
+        Vault state that owns the scan snapshot.
+    active_section : WorkspaceSection
+        Sidebar destination currently shown.
+    query : str
+        Title and identity filter typed into the browser search field.
+    """
+
+    session: VaultSession
+    active_section: WorkspaceSection = WorkspaceSection.INBOX
+    query: str = ""
+
+    def set_section(self, section: WorkspaceSection) -> None:
+        """Select one workspace sidebar destination.
+
+        Parameters
+        ----------
+        section : WorkspaceSection
+            Destination to show.
+        """
+        self.active_section = section
+        self.session.status.message = None
+
+    def set_query(self, query: str) -> None:
+        """Filter browser entries by display title or identity.
+
+        Parameters
+        ----------
+        query : str
+            Text typed into the search field.
+        """
+        self.query = query
+        self.session.status.message = None
+
+    def listing(self) -> BrowserListing | None:
+        """Return the current browser groups after applying the query.
+
+        Returns
+        -------
+        BrowserListing | None
+            Grouped notes from the latest scan, or ``None`` when no vault is
+            open.
+        """
+        snapshot = self.session.snapshot
+        if snapshot is None:
+            return None
+        return afanes.core.search.Browser(snapshot).filter(self.query)
+
+    def project_groups(self) -> tuple[ProjectGroup, ...]:
+        """Return project summaries grouped by presentation stage.
+
+        Returns
+        -------
+        tuple[ProjectGroup, ...]
+            Active, Waiting, Later, and Closed groups, or an empty tuple when
+            no vault is open.
+        """
+        snapshot = self.session.snapshot
+        if snapshot is None:
+            return ()
+        return afanes.core.search.ProjectBoard(snapshot).groups()
+
+    def pending_count(self) -> int:
+        """Return the number of items that need review attention.
+
+        Returns
+        -------
+        int
+            Pending inbox captures plus open projects without an open action.
+            Zero when no vault is open.
+        """
+        snapshot = self.session.snapshot
+        if snapshot is None:
+            return 0
+        return afanes.core.search.ReviewPlanner(snapshot).pending_count()
+
+
+@dataclasses.dataclass(slots=True)
+class PageEditorState:
+    """Page draft, editing mode, history, and pending page dialogs.
+
+    Attributes
+    ----------
+    session : VaultSession
+        Vault state that owns the scan snapshot.
+    status : UiStatus
+        Shared banner and busy flags.
     page : PageDraft | None
-        Page currently open in the right pane, or ``None`` when no page is
-        shown.
+        Page currently open in the right pane.
     editing : bool
         Whether the page is in edit mode.
     history : tuple[Path, ...]
@@ -335,31 +553,12 @@ class AppState:
         Trash preview waiting for confirmation.
     saving : bool
         Whether a page write is in progress.
-    session_active : bool
-        Whether a presentation session currently drives the workspace. A
-        second browser session is refused while this is ``True``.
-
-    Notes
-    -----
-    This is the only permitted mutable module-level state in the application.
-    Tests call :meth:`reset` between cases. Views must not mutate these fields
-    directly; they call the command methods.
+    autosave_task : asyncio.Task[None] | None
+        Single background autosave loop, when started.
     """
 
-    vault: Vault | None = None
-    notes: tuple[VaultNote, ...] = ()
-    failures: tuple[VaultFailure, ...] = ()
-    active_section: WorkspaceSection = WorkspaceSection.INBOX
-    browser_query: str = ""
-    review_session: ReviewSession | None = None
-    selected: Path | None = None
-    preview_body: str | None = None
-    busy: bool = False
-    message: str | None = None
-    processing_note: Path | None = None
-    processing_body: str | None = None
-    processing_plan: ProcessingPlan | None = None
-    processing_result: Path | None = None
+    session: VaultSession
+    status: UiStatus
     page: PageDraft | None = None
     editing: bool = False
     history: tuple[Path, ...] = ()
@@ -371,10 +570,365 @@ class AppState:
     rename_preview: RenamePreview | None = None
     trash_preview: TrashPreview | None = None
     saving: bool = False
-    session_active: bool = False
-    _snapshot: VaultSnapshot | None = dataclasses.field(default=None, repr=False)
-    _autosave_task: asyncio.Task[None] | None = dataclasses.field(default=None, repr=False)
+    autosave_task: asyncio.Task[None] | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class ProcessingState:
+    """Processing Wizard session for one capture.
+
+    Attributes
+    ----------
+    session : VaultSession
+        Vault state that owns the active vault and snapshot.
+    status : UiStatus
+        Shared banner and busy flags.
+    note : Path | None
+        Capture currently open in the wizard.
+    body : str | None
+        Markdown body of the processing capture.
+    plan : ProcessingPlan | None
+        Validated plan waiting for confirmation.
+    result : Path | None
+        Destination of the last successful processing apply.
+    """
+
+    session: VaultSession
+    status: UiStatus
+    note: Path | None = None
+    body: str | None = None
+    plan: ProcessingPlan | None = None
+    result: Path | None = None
+
+
+@dataclasses.dataclass(slots=True)
+class ReviewState:
+    """Guided review session and queue navigation.
+
+    Attributes
+    ----------
+    session : VaultSession
+        Vault state that owns the active vault and snapshot.
+    browser : BrowserState
+        Sidebar destination state.
+    processing : ProcessingState
+        Processing state used to load the current capture.
+    pages : PageEditorState
+        Page state used when a review opens a note.
+    status : UiStatus
+        Shared banner and busy flags.
+    review_session : ReviewSession | None
+        Guided review session in progress, or ``None``.
+    """
+
+    session: VaultSession
+    browser: BrowserState
+    processing: ProcessingState
+    pages: PageEditorState
+    status: UiStatus
+    review_session: ReviewSession | None = None
+
+
+@dataclasses.dataclass(slots=True, eq=False)
+class AppState:
+    """Single mutable controller exposed to the presentation layer.
+
+    The controller owns five collaborators, the shared command lock, and the
+    cross-cutting status flags. Views use the module-level
+    :data:`app_state` instance and call its command methods; they never mutate
+    collaborator fields directly.
+
+    Attributes
+    ----------
+    _status : UiStatus
+        Shared message, busy, and session flags.
+    _lock : asyncio.Lock
+        Lock that serializes commands.
+    _vault_session : VaultSession
+        Vault lifecycle, snapshot, and selection state.
+    _browser : BrowserState
+        Sidebar destination and browser query.
+    _pages : PageEditorState
+        Page draft, editing mode, and page dialogs.
+    _processing : ProcessingState
+        Processing Wizard session.
+    _review : ReviewState
+        Guided review session.
+    """
+
+    _status: UiStatus = dataclasses.field(default_factory=UiStatus)
     _lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock, repr=False)
+    _vault_session: VaultSession = dataclasses.field(init=False)
+    _browser: BrowserState = dataclasses.field(init=False)
+    _pages: PageEditorState = dataclasses.field(init=False)
+    _processing: ProcessingState = dataclasses.field(init=False)
+    _review: ReviewState = dataclasses.field(init=False)
+
+    def __post_init__(self) -> None:
+        """Create the collaborators and wire their shared state."""
+        self._vault_session = VaultSession(self._status)
+        self._browser = BrowserState(self._vault_session)
+        self._pages = PageEditorState(self._vault_session, self._status)
+        self._processing = ProcessingState(self._vault_session, self._status)
+        self._review = ReviewState(
+            self._vault_session,
+            self._browser,
+            self._processing,
+            self._pages,
+            self._status,
+        )
+
+    @property
+    def vault(self) -> Vault | None:
+        """Return the active vault service, or ``None`` in the welcome state."""
+        return self._vault_session.vault
+
+    @vault.setter
+    def vault(self, value: Vault | None) -> None:
+        self._vault_session.vault = value
+
+    @property
+    def notes(self) -> tuple[VaultNote, ...]:
+        """Return inbox notes, newest first."""
+        return self._vault_session.notes
+
+    @notes.setter
+    def notes(self, value: tuple[VaultNote, ...]) -> None:
+        self._vault_session.notes = value
+
+    @property
+    def failures(self) -> tuple[VaultFailure, ...]:
+        """Return notes the last scan could not parse."""
+        return self._vault_session.failures
+
+    @failures.setter
+    def failures(self, value: tuple[VaultFailure, ...]) -> None:
+        self._vault_session.failures = value
+
+    @property
+    def selected(self) -> Path | None:
+        """Return the absolute path of the previewed note."""
+        return self._vault_session.selected
+
+    @selected.setter
+    def selected(self, value: Path | None) -> None:
+        self._vault_session.selected = value
+
+    @property
+    def preview_body(self) -> str | None:
+        """Return the Markdown body of the previewed note."""
+        return self._vault_session.preview_body
+
+    @preview_body.setter
+    def preview_body(self, value: str | None) -> None:
+        self._vault_session.preview_body = value
+
+    @property
+    def _snapshot(self) -> VaultSnapshot | None:
+        """Return the latest scan result."""
+        return self._vault_session.snapshot
+
+    @_snapshot.setter
+    def _snapshot(self, value: VaultSnapshot | None) -> None:
+        self._vault_session.snapshot = value
+
+    @property
+    def active_section(self) -> WorkspaceSection:
+        """Return the sidebar destination currently shown."""
+        return self._browser.active_section
+
+    @active_section.setter
+    def active_section(self, value: WorkspaceSection) -> None:
+        self._browser.active_section = value
+
+    @property
+    def browser_query(self) -> str:
+        """Return the browser search text."""
+        return self._browser.query
+
+    @browser_query.setter
+    def browser_query(self, value: str) -> None:
+        self._browser.query = value
+
+    @property
+    def review_session(self) -> ReviewSession | None:
+        """Return the guided review session in progress."""
+        return self._review.review_session
+
+    @review_session.setter
+    def review_session(self, value: ReviewSession | None) -> None:
+        self._review.review_session = value
+
+    @property
+    def page(self) -> PageDraft | None:
+        """Return the page currently open in the right pane."""
+        return self._pages.page
+
+    @page.setter
+    def page(self, value: PageDraft | None) -> None:
+        self._pages.page = value
+
+    @property
+    def editing(self) -> bool:
+        """Return whether the page is in edit mode."""
+        return self._pages.editing
+
+    @editing.setter
+    def editing(self, value: bool) -> None:
+        self._pages.editing = value
+
+    @property
+    def history(self) -> tuple[Path, ...]:
+        """Return page paths behind the current page."""
+        return self._pages.history
+
+    @history.setter
+    def history(self, value: tuple[Path, ...]) -> None:
+        self._pages.history = value
+
+    @property
+    def conflict(self) -> str | None:
+        """Return the disk conflict state."""
+        return self._pages.conflict
+
+    @conflict.setter
+    def conflict(self, value: str | None) -> None:
+        self._pages.conflict = value
+
+    @property
+    def ambiguous(self) -> tuple[Path, ...]:
+        """Return candidate paths waiting for the user."""
+        return self._pages.ambiguous
+
+    @ambiguous.setter
+    def ambiguous(self, value: tuple[Path, ...]) -> None:
+        self._pages.ambiguous = value
+
+    @property
+    def pending_labels(self) -> PageLabels | None:
+        """Return labels waiting for a scheme-change confirmation."""
+        return self._pages.pending_labels
+
+    @pending_labels.setter
+    def pending_labels(self, value: PageLabels | None) -> None:
+        self._pages.pending_labels = value
+
+    @property
+    def type_change_sites(self) -> tuple[ReferenceSite, ...]:
+        """Return references a pending type change would strand."""
+        return self._pages.type_change_sites
+
+    @type_change_sites.setter
+    def type_change_sites(self, value: tuple[ReferenceSite, ...]) -> None:
+        self._pages.type_change_sites = value
+
+    @property
+    def repair_preview(self) -> ReferenceRepairPreview | None:
+        """Return the unsafe-name repair waiting for an action."""
+        return self._pages.repair_preview
+
+    @repair_preview.setter
+    def repair_preview(self, value: ReferenceRepairPreview | None) -> None:
+        self._pages.repair_preview = value
+
+    @property
+    def rename_preview(self) -> RenamePreview | None:
+        """Return the rename preview waiting for confirmation."""
+        return self._pages.rename_preview
+
+    @rename_preview.setter
+    def rename_preview(self, value: RenamePreview | None) -> None:
+        self._pages.rename_preview = value
+
+    @property
+    def trash_preview(self) -> TrashPreview | None:
+        """Return the trash preview waiting for confirmation."""
+        return self._pages.trash_preview
+
+    @trash_preview.setter
+    def trash_preview(self, value: TrashPreview | None) -> None:
+        self._pages.trash_preview = value
+
+    @property
+    def saving(self) -> bool:
+        """Return whether a page write is in progress."""
+        return self._pages.saving
+
+    @saving.setter
+    def saving(self, value: bool) -> None:
+        self._pages.saving = value
+
+    @property
+    def _autosave_task(self) -> asyncio.Task[None] | None:
+        """Return the single background autosave loop."""
+        return self._pages.autosave_task
+
+    @_autosave_task.setter
+    def _autosave_task(self, value: asyncio.Task[None] | None) -> None:
+        self._pages.autosave_task = value
+
+    @property
+    def processing_note(self) -> Path | None:
+        """Return the capture currently open in the wizard."""
+        return self._processing.note
+
+    @processing_note.setter
+    def processing_note(self, value: Path | None) -> None:
+        self._processing.note = value
+
+    @property
+    def processing_body(self) -> str | None:
+        """Return the Markdown body of the processing capture."""
+        return self._processing.body
+
+    @processing_body.setter
+    def processing_body(self, value: str | None) -> None:
+        self._processing.body = value
+
+    @property
+    def processing_plan(self) -> ProcessingPlan | None:
+        """Return the validated plan waiting for confirmation."""
+        return self._processing.plan
+
+    @processing_plan.setter
+    def processing_plan(self, value: ProcessingPlan | None) -> None:
+        self._processing.plan = value
+
+    @property
+    def processing_result(self) -> Path | None:
+        """Return the destination of the last successful apply."""
+        return self._processing.result
+
+    @processing_result.setter
+    def processing_result(self, value: Path | None) -> None:
+        self._processing.result = value
+
+    @property
+    def message(self) -> str | None:
+        """Return the banner text for the current error or warning."""
+        return self._status.message
+
+    @message.setter
+    def message(self, value: str | None) -> None:
+        self._status.message = value
+
+    @property
+    def busy(self) -> bool:
+        """Return whether a blocking command is in progress."""
+        return self._status.busy
+
+    @busy.setter
+    def busy(self, value: bool) -> None:
+        self._status.busy = value
+
+    @property
+    def session_active(self) -> bool:
+        """Return whether a presentation session drives the workspace."""
+        return self._status.session_active
+
+    @session_active.setter
+    def session_active(self, value: bool) -> None:
+        self._status.session_active = value
 
     @property
     def vault_root(self) -> Path | None:
@@ -385,7 +939,7 @@ class AppState:
         Path | None
             Resolved root of :attr:`vault`, or ``None`` when no vault is open.
         """
-        return None if self.vault is None else self.vault.root
+        return self._vault_session.vault_root
 
     @property
     def browser_listing(self) -> BrowserListing | None:
@@ -405,7 +959,7 @@ class AppState:
         snapshot = self._snapshot
         if snapshot is None:
             return None
-        return afanes.core.search.browse_groups(snapshot).filtered(self.browser_query)
+        return self._browser.listing()
 
     @property
     def project_groups(self) -> tuple[ProjectGroup, ...]:
@@ -424,7 +978,7 @@ class AppState:
         snapshot = self._snapshot
         if snapshot is None:
             return ()
-        return afanes.core.search.project_groups(snapshot)
+        return self._browser.project_groups()
 
     @property
     def review_pending_count(self) -> int:
@@ -439,7 +993,7 @@ class AppState:
         snapshot = self._snapshot
         if snapshot is None:
             return 0
-        return afanes.core.search.review_pending_count(snapshot)
+        return self._browser.pending_count()
 
     async def set_section(self, section: WorkspaceSection) -> None:
         """Select one workspace sidebar destination.
@@ -455,8 +1009,7 @@ class AppState:
         the page pane.
         """
         async with self._lock:
-            self.active_section = section
-            self.message = None
+            self._browser.set_section(section)
 
     async def set_browser_query(self, query: str) -> None:
         """Filter browser entries by display title or identity.
@@ -471,8 +1024,7 @@ class AppState:
         This command performs no file I/O and never reads a note body.
         """
         async with self._lock:
-            self.browser_query = query
-            self.message = None
+            self._browser.set_query(query)
 
     async def start_review(self) -> bool:
         """Start a guided review from the latest vault scan.
@@ -494,7 +1046,7 @@ class AppState:
             snapshot = self._snapshot
             if snapshot is None:
                 return False
-            queue = afanes.core.search.review_queue(snapshot)
+            queue = afanes.core.search.ReviewPlanner(snapshot).queue()
             self.review_session = ReviewSession(items=queue) if queue else None
             self.active_section = WorkspaceSection.REVIEW
             self.message = None
@@ -635,7 +1187,7 @@ class AppState:
                     self._show_welcome(None)
                     return
                 try:
-                    vault = await asyncio.to_thread(open_vault, settings.vault)
+                    vault = await asyncio.to_thread(VaultOpener.open, settings.vault)
                     snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Saved vault could not be opened", exc_info=True)
@@ -721,7 +1273,7 @@ class AppState:
         self.message = None
         try:
             try:
-                vault = await asyncio.to_thread(open_vault, path)
+                vault = await asyncio.to_thread(VaultOpener.open, path)
                 snapshot = await asyncio.to_thread(vault.scan)
             except (VaultError, OSError) as exc:
                 logger.debug("Selected vault could not be opened", exc_info=True)
@@ -779,10 +1331,7 @@ class AppState:
         The marker is process-wide, matching the single controller and single
         vault. A refused caller must not scan or write the vault.
         """
-        if self.session_active:
-            return False
-        self.session_active = True
-        return True
+        return self._vault_session.begin_session()
 
     def release_session(self) -> None:
         """Release the active workspace session.
@@ -792,7 +1341,7 @@ class AppState:
         The interface shell calls this when its page disconnects. Releasing an
         unclaimed session is a no-op.
         """
-        self.session_active = False
+        self._vault_session.release_session()
 
     async def refresh(self) -> None:
         """Re-read the vault and update the Inbox.
@@ -820,7 +1369,7 @@ class AppState:
                 if page is not None and page.path is not None and not self.editing:
                     try:
                         content = await asyncio.to_thread(vault.read_page, page.path)
-                        self.page = PageDraft.from_page(content, page.reference)
+                        self.page = PageDraftFactory.from_page(content, page.reference)
                     except (AfanesError, OSError, UnicodeError) as exc:
                         logger.debug("Page could not be refreshed", exc_info=True)
                         self._clear_page()
@@ -934,6 +1483,76 @@ class AppState:
             is open.
         """
         return "" if self.page is None else self.page.display_title
+
+    @property
+    def page_mode(self) -> DraftMode | None:
+        """Return the current page's editing mode, or ``None``.
+
+        Returns
+        -------
+        DraftMode | None
+            Normal editing or raw rescue mode, or ``None`` when no page is
+            open.
+        """
+        return None if self.page is None else self.page.mode
+
+    @property
+    def page_body(self) -> str:
+        """Return the current page's editable body.
+
+        Returns
+        -------
+        str
+            Draft body, or an empty string when no page is open or the page is
+            in raw rescue mode.
+        """
+        return "" if self.page is None else self.page.body
+
+    @property
+    def page_labels(self) -> PageLabels | None:
+        """Return the current page's editable labels.
+
+        Returns
+        -------
+        PageLabels | None
+            Labels for a normal draft, or ``None`` when no page is open or the
+            page is in raw rescue mode.
+        """
+        return None if self.page is None else self.page.labels
+
+    @property
+    def page_raw_text(self) -> str:
+        """Return the current page's complete text.
+
+        Returns
+        -------
+        str
+            Raw rescue text, or the serialized normal draft, or an empty string
+            when no page is open.
+        """
+        return "" if self.page is None else self.page.raw_text
+
+    @property
+    def page_is_new(self) -> bool:
+        """Return whether the current page has not been written yet.
+
+        Returns
+        -------
+        bool
+            ``True`` for an unwritten draft; ``False`` when no page is open.
+        """
+        return self.page is not None and self.page.is_new
+
+    @property
+    def page_is_dirty(self) -> bool:
+        """Return whether the current page differs from its baseline.
+
+        Returns
+        -------
+        bool
+            ``True`` for a dirty draft; ``False`` when no page is open.
+        """
+        return self.page is not None and self.page.is_dirty
 
     @property
     def page_path_label(self) -> str:
@@ -1089,8 +1708,9 @@ class AppState:
             Complete body, including its heading.
         """
         async with self._lock:
-            if self.page is not None:
-                self.page = self.page.with_body(body)
+            page = self.page
+            if isinstance(page, NormalDraft):
+                self.page = page.with_body(body)
 
     async def set_page_raw_text(self, text: str) -> None:
         """Replace raw rescue text.
@@ -1102,7 +1722,7 @@ class AppState:
         """
         async with self._lock:
             page = self.page
-            if page is not None and page.mode is DraftMode.RAW:
+            if isinstance(page, RawDraft):
                 self.page = page.with_raw_text(text)
 
     async def set_page_type(self, note_type: NoteType) -> bool:
@@ -1193,7 +1813,7 @@ class AppState:
         async with self._lock:
             page = self.page
             labels = self.pending_labels
-            if page is None or labels is None:
+            if not isinstance(page, NormalDraft) or labels is None:
                 return False
             self.page = page.with_labels(labels)
             self.pending_labels = None
@@ -1225,7 +1845,7 @@ class AppState:
             try:
                 try:
                     content = await asyncio.to_thread(vault.read_page, page.path)
-                    draft = PageDraft.from_page(content, page.reference)
+                    draft = PageDraftFactory.from_page(content, page.reference)
                 except (AfanesError, OSError, UnicodeError) as exc:
                     logger.debug("Page reload failed", exc_info=True)
                     self.message = afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc))
@@ -1329,11 +1949,11 @@ class AppState:
         Resolved references open their page, ambiguous references expose the
         candidates, and missing references start a draft.
         """
-        kind = afanes.core.links.classify_destination(destination)
+        kind = DestinationKind.classify(destination)
         if kind is not DestinationKind.INTERNAL:
             return
         try:
-            reference = afanes.core.links.parse_reference(destination)
+            reference = ReferenceParser().parse(destination)
         except InvalidReferenceError as exc:
             self.message = str(exc)
             return
@@ -1868,7 +2488,7 @@ class AppState:
         if snapshot is None or session is None:
             return
         summary = next(
-            (value for value in afanes.core.search.project_summaries(snapshot) if value.note.path == path),
+            (value for value in afanes.core.search.ProjectBoard(snapshot).summaries() if value.note.path == path),
             None,
         )
         if summary is not None:
@@ -1877,7 +2497,7 @@ class AppState:
     async def _mutate_labels(self, transform: Callable[[PageLabels], PageLabels]) -> bool:
         """Apply a label transformation that cannot change the scheme."""
         page = self.page
-        if page is None or page.labels is None:
+        if not isinstance(page, NormalDraft):
             return False
         try:
             labels = transform(page.labels)
@@ -1891,7 +2511,7 @@ class AppState:
     async def _apply_label_change(self, transform: Callable[[PageLabels], PageLabels]) -> bool:
         """Apply a label transformation, previewing a scheme change."""
         page = self.page
-        if page is None or page.labels is None:
+        if not isinstance(page, NormalDraft):
             return False
         current = page.labels
         try:
@@ -1939,7 +2559,7 @@ class AppState:
                 if not await self._commit_current():
                     return False
                 previous = self.page.path if self.page is not None else None
-                self.page = PageDraft.new(reference)
+                self.page = NormalDraft.new(reference)
                 self.editing = True
                 self.conflict = None
                 self.ambiguous = ()
@@ -1985,13 +2605,10 @@ class AppState:
         vault = self.vault
         if page is None or vault is None:
             return False
-        if page.mode is DraftMode.RAW:
+        if isinstance(page, RawDraft):
             return await self._save_raw_page(page, vault)
 
         labels = page.labels
-        if labels is None:
-            self.message = afanes.ui.strings.PAGE_SAVE_FAILED.format(detail="Labels are unavailable")
-            return False
         try:
             text = page.to_text()
         except NoteParseError as exc:
@@ -2029,7 +2646,7 @@ class AppState:
 
     async def _create_new_page(
         self,
-        page: PageDraft,
+        page: NormalDraft,
         labels: PageLabels,
         text: str,
         vault: Vault,
@@ -2050,11 +2667,12 @@ class AppState:
             self.message = afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc))
             return False
         new_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
-        self.page = page.after_write(text, content_hash=new_hash, path=path)
-        await self._plan_repair_after_create(self.page, vault)
+        updated = page.after_write(text, content_hash=new_hash, path=path)
+        self.page = updated
+        await self._plan_repair_after_create(updated, vault)
         return True
 
-    async def _save_raw_page(self, page: PageDraft, vault: Vault) -> bool:
+    async def _save_raw_page(self, page: RawDraft, vault: Vault) -> bool:
         """Write raw rescue text with the conflict guard."""
         path = page.path
         if path is None:
@@ -2075,8 +2693,9 @@ class AppState:
                 logger.debug("Raw page save failed", exc_info=True)
                 self.message = afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc))
                 return False
-            self.page = page.after_write(page.raw_text, content_hash=new_hash)
-            if self.page.mode is DraftMode.NORMAL:
+            updated = page.after_write(page.raw_text, content_hash=new_hash)
+            self.page = updated
+            if updated.mode is DraftMode.NORMAL:
                 self.message = afanes.ui.strings.PAGE_RAW_UPGRADED
             else:
                 self.message = None
@@ -2153,7 +2772,7 @@ class AppState:
             return False
         try:
             content = await asyncio.to_thread(vault.read_page, path)
-            draft = PageDraft.from_page(content)
+            draft = PageDraftFactory.from_page(content)
         except (AfanesError, OSError, UnicodeError) as exc:
             logger.debug("Page could not be read", exc_info=True)
             self.message = afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc))
@@ -2169,16 +2788,7 @@ class AppState:
 
     async def _refresh_snapshot(self) -> None:
         """Rescan the vault and update the Inbox lists."""
-        vault = self.vault
-        if vault is None:
-            return
-        try:
-            snapshot = await asyncio.to_thread(vault.scan)
-        except (VaultError, OSError) as exc:
-            logger.debug("Snapshot refresh failed", exc_info=True)
-            self.message = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
-            return
-        self._apply_snapshot(snapshot)
+        await self._vault_session.refresh_snapshot()
 
     def _start_autosave(self) -> None:
         """Start the single autosave loop when it is not already running."""
@@ -2262,13 +2872,7 @@ class AppState:
         This method is pure in-memory work over the last scan. It never reads
         the file and never parses Markdown in the view layer.
         """
-        snapshot = self._snapshot
-        if snapshot is not None:
-            note = next((note for note in snapshot.notes if note.path == path), None)
-            if note is not None:
-                return note.title
-        note = next((note for note in self.notes if note.path == path), None)
-        return path.stem if note is None else note.title
+        return self._vault_session.note_title(path)
 
     def assignment_candidates(self, scheme: ReferenceScheme, query: str) -> tuple[VaultNote, ...]:
         """Return assignment suggestions from the last vault scan.
@@ -2293,10 +2897,7 @@ class AppState:
         file I/O and never rescans the vault, so it is safe to call from a
         keystroke handler.
         """
-        snapshot = self._snapshot
-        if snapshot is None:
-            return ()
-        return snapshot.assignment_candidates(scheme, query)
+        return self._vault_session.assignment_candidates(scheme, query)
 
     def _clear_processing(self) -> None:
         """Clear the Processing Wizard session fields."""
@@ -2307,35 +2908,22 @@ class AppState:
 
     def _show_welcome(self, message: str | None) -> None:
         """Clear the vault state and show the welcome screen."""
-        self.vault = None
-        self.notes = ()
-        self.failures = ()
-        self.active_section = WorkspaceSection.INBOX
-        self.browser_query = ""
-        self.review_session = None
-        self.selected = None
-        self.preview_body = None
-        self._snapshot = None
-        self.history = ()
+        self._vault_session.vault = None
+        self._vault_session.snapshot = None
+        self._vault_session.notes = ()
+        self._vault_session.failures = ()
+        self._vault_session.selected = None
+        self._vault_session.preview_body = None
+        self._browser.active_section = WorkspaceSection.INBOX
+        self._browser.query = ""
+        self._review.review_session = None
         self._clear_processing()
         self._clear_page()
         self.message = message
 
     def _apply_snapshot(self, snapshot: VaultSnapshot, focus: Path | None = None) -> None:
         """Replace the inbox list from a scan result."""
-        self._snapshot = snapshot
-        notes = list(snapshot.inbox_notes())
-        if focus is not None:
-            for index, note in enumerate(notes):
-                if note.path == focus:
-                    notes.insert(0, notes.pop(index))
-                    break
-        self.notes = tuple(notes)
-        self.failures = snapshot.failures
-        if self.selected is not None and all(note.path != self.selected for note in self.notes):
-            self.selected = None
-            self.preview_body = None
-        self.message = None
+        self._vault_session.apply_snapshot(snapshot, focus)
 
 
 app_state = AppState()

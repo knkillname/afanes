@@ -17,7 +17,7 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.search import ProjectGroup, ProjectStage, ProjectSummary
-from afanes.models.note import Status
+from afanes.ui.components.status import StatusLabel
 
 
 class ProjectsView:
@@ -75,7 +75,7 @@ class ProjectsView:
         total = 0
         for group in groups:
             projects = tuple(
-                summary for summary in group.projects if afanes.core.search.filter_notes((summary.note,), query)
+                summary for summary in group.projects if afanes.core.search.Browser.matches(summary.note, query)
             )
             total += len(projects)
             controls.append(self._expansion(group, projects))
@@ -110,7 +110,7 @@ class ProjectsView:
         note = summary.note
         details: list[ft.Control] = [
             ft.Text(
-                afanes.ui.strings.PROJECT_STATUS.format(status=_status_label(note.status)),
+                afanes.ui.strings.PROJECT_STATUS.format(status=StatusLabel(note.status).text),
                 size=12,
                 color=afanes.ui.theme.MUTED_TEXT_COLOR,
             )
@@ -152,31 +152,3 @@ class ProjectsView:
             await self._on_select(path)
 
         return handle
-
-
-def build_projects(
-    update: Callable[[], None],
-    on_select: Callable[[Path], Awaitable[None]],
-) -> ft.Control:
-    """Build the Projects sidebar view.
-
-    Parameters
-    ----------
-    update : Callable[[], None]
-        Requests a repaint of the page.
-    on_select : Callable[[Path], Awaitable[None]]
-        Command that opens a project note in the page pane.
-
-    Returns
-    -------
-    ft.Control
-        Composed status-grouped Projects view.
-    """
-    return ProjectsView(update, on_select).build()
-
-
-def _status_label(status: Status | None) -> str:
-    """Return the display label for a project status."""
-    if status is None:
-        return afanes.ui.strings.PROJECT_GROUP_LABELS[ProjectStage.ACTIVE.value]
-    return afanes.ui.strings.PROCESSING_STATUS_LABELS[status.value]

@@ -12,7 +12,7 @@ import afanes.core.vault
 from afanes.core.errors import NameCollisionError, ProcessingError, VaultError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import ResolutionOutcome
-from afanes.core.processing import ProcessingOutcome, ProcessingPlan
+from afanes.core.processing import ProcessingOutcome, ProcessingPlan, ProcessingTarget
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteType, ReferenceCategory, Status
 
@@ -74,6 +74,34 @@ class TestProcessingOutcome:
 
     def test_members_compare_as_strings(self) -> None:
         assert ProcessingOutcome.LATER == "later"
+
+
+class TestProcessingTarget:
+    def test_action_defaults_to_active(self) -> None:
+        target = ProcessingTarget.from_outcome(ProcessingOutcome.ACTION, None)
+
+        assert target.note_type is NoteType.ACTION
+        assert target.status is Status.ACTIVE
+
+    def test_later_forces_the_later_status(self) -> None:
+        target = ProcessingTarget.from_outcome(ProcessingOutcome.LATER, None)
+
+        assert target.note_type is NoteType.REFERENCE
+        assert target.status is Status.LATER
+
+    def test_reference_rejects_a_status(self) -> None:
+        with pytest.raises(ProcessingError):
+            ProcessingTarget.from_outcome(ProcessingOutcome.REFERENCE, Status.ACTIVE)
+
+    def test_project_defaults_to_active(self) -> None:
+        target = ProcessingTarget.from_outcome(ProcessingOutcome.PROJECT, None)
+
+        assert target.note_type is NoteType.PROJECT
+        assert target.status is Status.ACTIVE
+
+    def test_later_rejects_another_status(self) -> None:
+        with pytest.raises(ProcessingError):
+            ProcessingTarget.from_outcome(ProcessingOutcome.LATER, Status.ACTIVE)
 
 
 class TestProcessingPlan:

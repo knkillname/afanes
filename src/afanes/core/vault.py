@@ -14,7 +14,6 @@ from types import MappingProxyType
 import afanes.core.atomic
 import afanes.core.links
 import afanes.core.names
-import afanes.models.note
 from afanes.core.errors import (
     AfanesError,
     ContentChangedError,
@@ -28,8 +27,8 @@ from afanes.core.errors import (
     VaultPathError,
 )
 from afanes.core.frontmatter import NoteDocument
-from afanes.core.links import NameCatalog, ResolutionOutcome
-from afanes.core.processing import ProcessingOutcome, ProcessingPlan
+from afanes.core.links import CatalogEntry, NameCatalog, ReferenceKey, ResolutionOutcome
+from afanes.core.processing import ProcessingOutcome, ProcessingPlan, ProcessingTarget
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteType, ReferenceCategory, Status
 
@@ -47,29 +46,193 @@ CATEGORY_DIRECTORIES: Mapping[ReferenceCategory, Path] = MappingProxyType({Refer
 _MIN_INBOX_PART_COUNT = 2
 
 
-def is_inbox_path(relative_path: Path) -> bool:
-    """Return whether a vault-relative path is inside the inbox directory.
+@dataclasses.dataclass(frozen=True, slots=True, order=True)
+class NoteOrder:
+    """Deterministic ordering key for notes.
 
-    Parameters
+    Attributes
     ----------
-    relative_path : Path
-        Path relative to the vault root.
-
-    Returns
-    -------
-    bool
-        ``True`` when the first path component names the inbox directory,
-        compared case-insensitively, and the path has a filename component.
-
-    Notes
-    -----
-    Only the first component is checked. Nested inbox folders remain part of
-    the inbox, matching the capture workflow and the scan's classification.
+    undated : bool
+        ``True`` when the note has no due date, so undated notes sort last.
+    due : datetime.date
+        Calendar due date, or :attr:`datetime.date.max` when undated.
+    status_rank : int
+        Workflow rank used to place active actions before deferred ones. Zero
+        for projects and alphabetical listings.
+    title_key : str
+        Normalized display title.
+    name_key : str
+        Normalized identity.
+    path_key : str
+        Vault-relative POSIX path, the final deterministic tie-breaker.
     """
-    return (
-        len(relative_path.parts) >= _MIN_INBOX_PART_COUNT
-        and relative_path.parts[0].casefold() == INBOX_DIRECTORY.name.casefold()
-    )
+
+    undated: bool
+    due: datetime.date
+    status_rank: int
+    title_key: str
+    name_key: str
+    path_key: str
+
+    @classmethod
+    def for_due(cls, note: "VaultNote", status_rank: int = 0) -> "NoteOrder":
+        """Build a due-date-first ordering key for one note.
+
+        Parameters
+        ----------
+        note : VaultNote
+            Note to order.
+        status_rank : int
+            Workflow rank used only when due dates and titles tie.
+
+        Returns
+        -------
+        NoteOrder
+            Key that sorts dated notes before undated notes, then by due date,
+            status rank, title, identity, and path.
+        """
+        due_date = note.due_date
+        return cls(
+            undated=due_date is None,
+            due=due_date or datetime.date.max,
+            status_rank=status_rank,
+            title_key=afanes.core.names.normalize_name(note.title),
+            name_key=afanes.core.names.normalize_name(note.name),
+            path_key=note.relative_path.as_posix(),
+        )
+
+    @classmethod
+    def alphabetical(cls, note: "VaultNote") -> "NoteOrder":
+        """Build a title-first ordering key for one note.
+
+        Parameters
+        ----------
+        note : VaultNote
+            Note to order.
+
+        Returns
+        -------
+        NoteOrder
+            Key whose due and status fields are constant, so ordering falls
+            through to title, identity, and path.
+        """
+        return cls(
+            undated=True,
+            due=datetime.date.max,
+            status_rank=0,
+            title_key=afanes.core.names.normalize_name(note.title),
+            name_key=afanes.core.names.normalize_name(note.name),
+            path_key=note.relative_path.as_posix(),
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True, order=True)
+class InboxOrder:
+    """Newest-first ordering key for inbox captures.
+
+    Attributes
+    ----------
+    recency_rank : int
+        Negative modification time, so newer files sort first.
+    name_key : str
+        Normalized identity.
+    path_key : str
+        Vault-relative POSIX path.
+    """
+
+    recency_rank: int
+    name_key: str
+    path_key: str
+
+    @classmethod
+    def from_note(cls, note: "VaultNote") -> "InboxOrder":
+        """Build a newest-first key for one note.
+
+        Parameters
+        ----------
+        note : VaultNote
+            Note to order.
+
+        Returns
+        -------
+        InboxOrder
+            Key ordered by modification time newest first, then identity and
+            path.
+        """
+        return cls(
+            recency_rank=-note.modified_ns,
+            name_key=note.name.casefold(),
+            path_key=note.relative_path.as_posix(),
+        )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class VaultPath:
+    """One path interpreted under the vault's path policy.
+
+    Attributes
+    ----------
+    value : Path
+        Vault-relative path to interpret.
+    """
+
+    value: Path
+
+    @property
+    def is_inbox(self) -> bool:
+        """Return whether the path is inside the inbox directory.
+
+        Returns
+        -------
+        bool
+            ``True`` when the first path component names the inbox directory,
+            compared case-insensitively, and the path has a filename
+            component.
+
+        Notes
+        -----
+        Only the first component is checked. Nested inbox folders remain part
+        of the inbox, matching the capture workflow and the scan's
+        classification.
+        """
+        return (
+            len(self.value.parts) >= _MIN_INBOX_PART_COUNT
+            and self.value.parts[0].casefold() == INBOX_DIRECTORY.name.casefold()
+        )
+
+    @classmethod
+    def same(cls, left: Path, right: Path) -> bool:
+        """Compare two paths after resolving filesystem aliases.
+
+        Parameters
+        ----------
+        left : Path
+            First path to compare.
+        right : Path
+            Second path to compare.
+
+        Returns
+        -------
+        bool
+            ``True`` when both paths resolve to the same location.
+        """
+        return left.resolve() == right.resolve()
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class NotePath:
+    """A scanned note path and its vault-relative form.
+
+    Attributes
+    ----------
+    path : Path
+        Absolute path to the note file.
+    relative_path : Path
+        Vault-relative path used for diagnostics.
+    """
+
+    path: Path
+    relative_path: Path
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -135,6 +298,126 @@ class VaultNote:
         """
         return self.body_references + self.frontmatter_references
 
+    @property
+    def order(self) -> NoteOrder:
+        """Return the due-date-first ordering key for this note.
+
+        Returns
+        -------
+        NoteOrder
+            Key used for project and general due-date ordering.
+        """
+        return NoteOrder.for_due(self)
+
+    @property
+    def action_order(self) -> NoteOrder:
+        """Return the action ordering key for this note.
+
+        Returns
+        -------
+        NoteOrder
+            Due-date-first key that places active actions before waiting ones
+            when earlier fields tie.
+        """
+        status_rank = 0 if self.status in (None, Status.ACTIVE) else 1
+        return NoteOrder.for_due(self, status_rank=status_rank)
+
+    @property
+    def alphabetical_order(self) -> NoteOrder:
+        """Return the title-first ordering key for this note.
+
+        Returns
+        -------
+        NoteOrder
+            Key that orders by display title, identity, and path.
+        """
+        return NoteOrder.alphabetical(self)
+
+    @property
+    def inbox_order(self) -> InboxOrder:
+        """Return the newest-first ordering key for this note.
+
+        Returns
+        -------
+        InboxOrder
+            Key that orders by modification time, identity, and path.
+        """
+        return InboxOrder.from_note(self)
+
+    @property
+    def is_inbox(self) -> bool:
+        """Return whether this note is inside the vault's inbox directory.
+
+        Returns
+        -------
+        bool
+            ``True`` when the first vault-relative path component names the
+            inbox directory, compared case-insensitively.
+        """
+        return VaultPath(self.relative_path).is_inbox
+
+    @property
+    def is_open_project(self) -> bool:
+        """Return whether this note is an open project.
+
+        Returns
+        -------
+        bool
+            ``True`` when the note is a project whose status is absent,
+            ``active``, ``waiting``, or ``later``.
+        """
+        if self.note_type is not NoteType.PROJECT:
+            return False
+        return self.status not in (Status.DONE, Status.CANCELLED, Status.ARCHIVED)
+
+    @property
+    def is_open_action(self) -> bool:
+        """Return whether this note is an open action.
+
+        Returns
+        -------
+        bool
+            ``True`` when the note is an action whose status is absent,
+            ``active``, or ``waiting``. A ``later`` action is deferred and not
+            open.
+        """
+        if self.note_type is not NoteType.ACTION:
+            return False
+        return self.status in (None, Status.ACTIVE, Status.WAITING)
+
+    @staticmethod
+    def due_date_from_raw(value: object) -> datetime.date | None:
+        """Convert a raw frontmatter due date into a calendar date.
+
+        Parameters
+        ----------
+        value : object
+            Raw value from the parsed frontmatter mapping.
+
+        Returns
+        -------
+        datetime.date | None
+            The declared date for a YAML date or a valid ISO date string;
+            otherwise ``None``.
+
+        Notes
+        -----
+        Invalid input is not an error: the scan continues and the page editor
+        is responsible for reporting the invalid text when the note is edited.
+        A YAML timestamp with a time component is not a calendar date and
+        becomes ``None``.
+        """
+        if isinstance(value, datetime.datetime):
+            return None
+        if isinstance(value, datetime.date):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.date.fromisoformat(value.strip())
+            except ValueError:
+                return None
+        return None
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class VaultFailure:
@@ -153,8 +436,8 @@ class VaultFailure:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PageContent:
-    """One note read for viewing or editing.
+class PageFile:
+    """One note file read from disk.
 
     Attributes
     ----------
@@ -166,23 +449,88 @@ class PageContent:
         Complete file text, including any frontmatter block.
     content_hash : str
         SHA-256 digest of the file bytes, captured when the note was read.
-    document : NoteDocument | None
-        Parsed document, or ``None`` when the note could not be parsed.
-    failure : str | None
-        Parse failure message, or ``None`` when :attr:`document` is present.
-
-    Notes
-    -----
-    The raw text is retained even when parsing fails so a page can open in raw
-    rescue mode without losing the file's current content.
     """
 
     path: Path
     relative_path: Path
     text: str
     content_hash: str
-    document: NoteDocument | None
-    failure: str | None
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ParsedPage:
+    """A page whose frontmatter parsed successfully.
+
+    Attributes
+    ----------
+    file : PageFile
+        Raw file content and identity.
+    document : NoteDocument
+        Parsed document with a declared note type.
+    """
+
+    file: PageFile
+    document: NoteDocument
+
+    @property
+    def path(self) -> Path:
+        """Return the absolute note path."""
+        return self.file.path
+
+    @property
+    def relative_path(self) -> Path:
+        """Return the vault-relative note path."""
+        return self.file.relative_path
+
+    @property
+    def text(self) -> str:
+        """Return the complete file text."""
+        return self.file.text
+
+    @property
+    def content_hash(self) -> str:
+        """Return the content hash captured at read time."""
+        return self.file.content_hash
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class UnparsedPage:
+    """A page whose frontmatter or type could not be parsed.
+
+    Attributes
+    ----------
+    file : PageFile
+        Raw file content and identity.
+    failure : str
+        Parse failure message. The raw text is retained so the page can open in
+        raw rescue mode without losing the file's current content.
+    """
+
+    file: PageFile
+    failure: str
+
+    @property
+    def path(self) -> Path:
+        """Return the absolute note path."""
+        return self.file.path
+
+    @property
+    def relative_path(self) -> Path:
+        """Return the vault-relative note path."""
+        return self.file.relative_path
+
+    @property
+    def text(self) -> str:
+        """Return the complete file text."""
+        return self.file.text
+
+    @property
+    def content_hash(self) -> str:
+        """Return the content hash captured at read time."""
+        return self.file.content_hash
+
+
+type PageContent = ParsedPage | UnparsedPage
 
 
 class LinkOutcome(StrEnum):
@@ -281,13 +629,8 @@ class VaultSnapshot:
         vault behaves consistently on case-sensitive and case-insensitive
         filesystems. This method performs no file I/O.
         """
-        notes = [note for note in self.notes if is_inbox_path(note.relative_path)]
-        return tuple(
-            sorted(
-                notes,
-                key=lambda note: (-note.modified_ns, note.name.casefold(), note.relative_path.as_posix()),
-            )
-        )
+        notes = [note for note in self.notes if note.is_inbox]
+        return tuple(sorted(notes, key=lambda note: note.inbox_order))
 
     def assignment_candidates(self, scheme: ReferenceScheme, query: str) -> tuple[VaultNote, ...]:
         """Return notes whose identity or display title contains a query.
@@ -318,7 +661,7 @@ class VaultSnapshot:
         matches = [
             note
             for note in self.notes
-            if afanes.core.links.scheme_for_note(note.note_type, note.category) is scheme
+            if ReferenceScheme.for_note(note.note_type, note.category) is scheme
             and (
                 normalized_query in afanes.core.names.normalize_name(note.name)
                 or normalized_query in afanes.core.names.normalize_name(note.title)
@@ -327,11 +670,7 @@ class VaultSnapshot:
         return tuple(
             sorted(
                 matches,
-                key=lambda note: (
-                    afanes.core.names.normalize_name(note.title),
-                    afanes.core.names.normalize_name(note.name),
-                    note.relative_path.as_posix(),
-                ),
+                key=lambda note: note.alphabetical_order,
             )
         )
 
@@ -374,6 +713,83 @@ class VaultSnapshot:
             return LinkTarget(reference=reference, outcome=LinkOutcome.BROKEN, paths=broken)
         return LinkTarget(reference=reference, outcome=LinkOutcome.MISSING)
 
+    def find_note(self, source: Path) -> VaultNote | None:
+        """Find a scanned note by path.
+
+        Parameters
+        ----------
+        source : Path
+            Note path, relative or absolute.
+
+        Returns
+        -------
+        VaultNote | None
+            Matching scanned note, or ``None`` when the path is not in this
+            snapshot.
+        """
+        return next((note for note in self.notes if VaultPath.same(note.path, source)), None)
+
+    def affected_sites(self, source: Path) -> tuple[ReferenceSite, ...]:
+        """Collect per-note reference counts that resolve to a target note.
+
+        Parameters
+        ----------
+        source : Path
+            Target note path.
+
+        Returns
+        -------
+        tuple[ReferenceSite, ...]
+            Referring notes with per-note reference counts, in scan order.
+        """
+        sites: list[ReferenceSite] = []
+        for note in self.notes:
+            count = sum(1 for reference in note.references if self.resolves_to(reference, source))
+            if count:
+                sites.append(ReferenceSite(path=note.path, reference_count=count))
+        return tuple(sites)
+
+    def resolves_to(self, reference: NoteReference, source: Path) -> bool:
+        """Return whether a reference uniquely resolves to a target note.
+
+        Parameters
+        ----------
+        reference : NoteReference
+            Reference to resolve.
+        source : Path
+            Target note path.
+
+        Returns
+        -------
+        bool
+            ``True`` only for a unique resolution to ``source``.
+        """
+        resolution = self.catalog.resolve(reference)
+        if resolution.outcome is not ResolutionOutcome.RESOLVED:
+            return False
+        return VaultPath.same(resolution.targets[0], source)
+
+    def hash_for_note(self, path: Path) -> str:
+        """Return the content hash captured for a scanned note.
+
+        Parameters
+        ----------
+        path : Path
+            Note path to find.
+
+        Returns
+        -------
+        str
+            SHA-256 digest captured during the scan.
+
+        Raises
+        ------
+        StopIteration
+            If the path is not part of this snapshot.
+        """
+        note = next(note for note in self.notes if VaultPath.same(note.path, path))
+        return note.content_hash
+
     def referrers(self, note_path: Path) -> tuple[ReferenceSite, ...]:
         """Return notes whose references resolve to one target note.
 
@@ -394,7 +810,7 @@ class VaultSnapshot:
         to any candidate. The result is computed from the snapshot and performs
         no file I/O.
         """
-        return _affected_sites(self, note_path)
+        return self.affected_sites(note_path)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -565,7 +981,11 @@ class Vault:
         VaultError
             If the path does not exist or is not a directory.
         """
-        object.__setattr__(self, "root", _resolve_vault_root(self.root))
+        resolved = self.root.expanduser().resolve()
+        if not resolved.is_dir():
+            message = f"Vault root is not a directory: {self.root}"
+            raise VaultError(message)
+        object.__setattr__(self, "root", resolved)
 
     def contained(self, candidate: Path) -> Path:
         """Resolve a path and verify that it stays inside this vault.
@@ -585,7 +1005,11 @@ class Vault:
         VaultPathError
             If the resolved candidate escapes the vault root.
         """
-        return _contained_path(self.root, candidate)
+        resolved = candidate.resolve() if candidate.is_absolute() else (self.root / candidate).resolve()
+        if not resolved.is_relative_to(self.root):
+            message = f"Path escapes the vault: {candidate}"
+            raise VaultPathError(message)
+        return resolved
 
     def scan(self) -> VaultSnapshot:
         """Scan this vault without writing anything.
@@ -602,7 +1026,74 @@ class Vault:
         vault. A malformed note becomes a ``VaultFailure`` and does not abort
         the scan. This method performs blocking file I/O and never writes.
         """
-        return _scan_vault(self.root)
+        return self._scan()
+
+    def _scan(self) -> VaultSnapshot:
+        """Scan this vault's notes and build the name catalog."""
+        notes: list[VaultNote] = []
+        failures: list[VaultFailure] = []
+        reader = afanes.core.links.ReferenceReader()
+
+        for note_path in self._note_paths():
+            try:
+                notes.append(Vault._read_note(note_path, reader))
+            except (OSError, UnicodeDecodeError, AfanesError) as exc:
+                failures.append(VaultFailure(path=note_path.relative_path, message=str(exc)))
+
+        catalog = NameCatalog.from_entries(
+            CatalogEntry(path=note.path, note_type=note.note_type, category=note.category) for note in notes
+        )
+        return VaultSnapshot(root=self.root, notes=tuple(notes), failures=tuple(failures), catalog=catalog)
+
+    def _note_paths(self) -> list[NotePath]:
+        """Return note paths and their vault-relative paths in deterministic order."""
+        paths: list[NotePath] = []
+        trash_name = TRASH_DIRECTORY.name.casefold()
+        for path in sorted(self.root.rglob("*"), key=lambda item: item.as_posix()):
+            relative = path.relative_to(self.root)
+            if relative.parts and relative.parts[0].casefold() == trash_name:
+                continue
+            if any(part.startswith(".") for part in relative.parts[:-1]):
+                continue
+            if path.suffix.casefold() != NOTE_SUFFIX or not path.is_file():
+                continue
+            try:
+                resolved = path.resolve()
+            except OSError:
+                continue
+            if not resolved.is_relative_to(self.root):
+                continue
+            paths.append(NotePath(path=path, relative_path=relative))
+        return paths
+
+    @staticmethod
+    def _read_note(
+        note_path: NotePath,
+        reader: afanes.core.links.ReferenceReader,
+    ) -> VaultNote:
+        """Read and parse one note, raising on malformed input."""
+        stat = note_path.path.stat()
+        data = note_path.path.read_bytes()
+        text = data.decode("utf-8")
+        document = NoteDocument.from_text(text)
+        if document.note_type is None:
+            message = "Note has no type"
+            raise NoteParseError(message)
+        body_references = tuple(reader.extract(document.body))
+        return VaultNote(
+            path=note_path.path,
+            relative_path=note_path.relative_path,
+            name=note_path.path.stem,
+            title=document.title or note_path.path.stem,
+            note_type=document.note_type,
+            category=document.category,
+            status=document.status,
+            due_date=VaultNote.due_date_from_raw(document.raw.get("due_date")),
+            content_hash=hashlib.sha256(data).hexdigest(),
+            modified_ns=stat.st_mtime_ns,
+            body_references=body_references,
+            frontmatter_references=document.references,
+        )
 
     def directory_for(self, note_type: NoteType, category: ReferenceCategory | None = None) -> Path:
         """Return the default destination directory for a note kind.
@@ -632,19 +1123,19 @@ class Vault:
             message = "Only reference notes can declare a category"
             raise VaultError(message)
         if note_type is NoteType.ACTION:
-            return _existing_directory(self.root, ACTIONS_DIRECTORY)
+            return self._existing_directory(self.root, ACTIONS_DIRECTORY)
         if note_type is NoteType.PROJECT:
-            return _existing_directory(self.root, PROJECTS_DIRECTORY)
+            return self._existing_directory(self.root, PROJECTS_DIRECTORY)
         if note_type is NoteType.REFERENCE:
-            reference_root = _existing_directory(self.root, REFERENCE_DIRECTORY)
+            reference_root = self._existing_directory(self.root, REFERENCE_DIRECTORY)
             if category is None:
                 return reference_root
             folder = CATEGORY_DIRECTORIES.get(category)
             if folder is None:
                 message = f"Unknown reference category: {category}"
                 raise VaultError(message)
-            return _existing_directory(reference_root, folder)
-        return _existing_directory(self.root, INBOX_DIRECTORY)
+            return self._existing_directory(reference_root, folder)
+        return self._existing_directory(self.root, INBOX_DIRECTORY)
 
     def plan_processing(
         self,
@@ -701,17 +1192,17 @@ class Vault:
         the current source hash so apply can detect an external edit.
         """
         source = self.contained(note_path)
-        _require_inbox_note(self.root, source)
+        self._require_inbox_note(source)
 
         vault = snapshot or self.scan()
-        note = _find_note(vault, source)
+        note = vault.find_note(source)
         if note is None:
             message = f"Note is not part of the vault: {note_path}"
             raise ProcessingError(message)
 
-        people_references = tuple(_person_reference(name) for name in people)
-        project_reference = _project_reference(project) if project is not None else None
-        source_scheme = afanes.core.links.scheme_for_note(note.note_type, note.category)
+        people_references = tuple(self._person_reference(name) for name in people)
+        project_reference = self._project_reference(project) if project is not None else None
+        source_scheme = ReferenceScheme.for_note(note.note_type, note.category)
         source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
 
         if outcome is ProcessingOutcome.TRASH:
@@ -737,7 +1228,9 @@ class Vault:
                 unresolved_references=(),
             )
 
-        target_type, target_status = _processing_target(outcome, status)
+        target = ProcessingTarget.from_outcome(outcome, status)
+        target_type = target.note_type
+        target_status = target.status
         if due_date is not None and outcome not in (ProcessingOutcome.ACTION, ProcessingOutcome.PROJECT):
             message = "Only actions and projects accept a due date"
             raise ProcessingError(message)
@@ -746,16 +1239,16 @@ class Vault:
             raise ProcessingError(message)
 
         target_path = self.directory_for(target_type) / f"{source.stem}{NOTE_SUFFIX}"
-        target_scheme = afanes.core.links.scheme_for_note(target_type)
+        target_scheme = ReferenceScheme.for_note(target_type)
         existing = vault.catalog.candidates(target_scheme, source.stem)
-        if any(not _same_path(path, source) for path in existing):
+        if any(not VaultPath.same(path, source) for path in existing):
             message = f"A {target_scheme.value} note named {source.stem!r} already exists"
             raise NameCollisionError(message)
-        if target_path.exists() and not _same_path(target_path, source):
+        if target_path.exists() and not VaultPath.same(target_path, source):
             message = f"Destination already exists: {target_path}"
             raise NameCollisionError(message)
 
-        affected = _affected_sites(vault, source)
+        affected = vault.affected_sites(source)
         unresolved = tuple(
             reference
             for reference in (*people_references, project_reference)
@@ -779,7 +1272,7 @@ class Vault:
             unresolved_references=unresolved,
         )
         document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
-        processed_text = _processed_text(plan, document)
+        processed_text = plan.processed_text(document)
         return dataclasses.replace(
             plan,
             processed_hash=hashlib.sha256(processed_text.encode("utf-8")).hexdigest(),
@@ -829,16 +1322,16 @@ class Vault:
             raise ProcessingError(message)
 
         source = self.contained(plan.source_path)
-        _require_inbox_note(self.root, source)
+        self._require_inbox_note(source)
         if not source.is_file():
             message = f"Capture no longer exists: {plan.source_path}"
             raise ProcessingError(message)
 
-        target = self._processing_target(plan)
+        target = self._processing_destination(plan)
         self._write_processing(plan, source)
         return self._move_processing(source, target)
 
-    def _processing_target(self, plan: ProcessingPlan) -> Path:
+    def _processing_destination(self, plan: ProcessingPlan) -> Path:
         """Resolve and validate the destination path for a plan."""
         target = self.contained(plan.target_path)
         if target.exists():
@@ -861,7 +1354,7 @@ class Vault:
             message = "Source note changed after planning"
             raise ProcessingError(message)
         document = NoteDocument.from_text(data.decode("utf-8"))
-        text = _processed_text(plan, document)
+        text = plan.processed_text(document)
         processed_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
         if processed_hash != plan.processed_hash:
             message = "Processed note does not match the plan"
@@ -936,10 +1429,10 @@ class Vault:
 
         Notes
         -----
-        A note with malformed frontmatter is returned with ``document`` set to
-        ``None`` and a diagnostic in ``failure``. The raw text is preserved so
-        the page can offer raw rescue mode. This method performs blocking file
-        I/O and never writes.
+        A note with malformed frontmatter is returned as an
+        :class:`UnparsedPage` with a diagnostic in ``failure``. The raw text is
+        preserved so the page can offer raw rescue mode. This method performs
+        blocking file I/O and never writes.
         """
         source = self.contained(note_path)
         try:
@@ -954,35 +1447,14 @@ class Vault:
         text = data.decode("utf-8")
         content_hash = hashlib.sha256(data).hexdigest()
         relative_path = source.relative_to(self.root)
+        file = PageFile(path=source, relative_path=relative_path, text=text, content_hash=content_hash)
         try:
             document = NoteDocument.from_text(text)
         except (NoteParseError, InvalidReferenceError) as exc:
-            return PageContent(
-                path=source,
-                relative_path=relative_path,
-                text=text,
-                content_hash=content_hash,
-                document=None,
-                failure=str(exc),
-            )
+            return UnparsedPage(file=file, failure=str(exc))
         if document.note_type is None:
-            message = "Note has no type"
-            return PageContent(
-                path=source,
-                relative_path=relative_path,
-                text=text,
-                content_hash=content_hash,
-                document=None,
-                failure=message,
-            )
-        return PageContent(
-            path=source,
-            relative_path=relative_path,
-            text=text,
-            content_hash=content_hash,
-            document=document,
-            failure=None,
-        )
+            return UnparsedPage(file=file, failure="Note has no type")
+        return ParsedPage(file=file, document=document)
 
     def write_page(self, note_path: Path, text: str, expected_hash: str) -> str:
         """Write a note after confirming that its content is unchanged.
@@ -1096,17 +1568,15 @@ class Vault:
         target_directory.mkdir(parents=True, exist_ok=True)
 
         snapshot = self.scan()
-        scheme = afanes.core.links.scheme_for_note(note_type, category)
+        scheme = ReferenceScheme.for_note(note_type, category)
         taken = {
-            note.name
-            for note in snapshot.notes
-            if afanes.core.links.scheme_for_note(note.note_type, note.category) is scheme
+            note.name for note in snapshot.notes if ReferenceScheme.for_note(note.note_type, note.category) is scheme
         }
         taken.update(entry.stem for entry in target_directory.iterdir())
         taken.update(entry.name for entry in target_directory.iterdir())
         name = afanes.core.names.unique_name(afanes.core.names.safe_filename(title), taken)
 
-        document = _new_note_document(note_type, category, status, body)
+        document = self._new_note_document(note_type, category, status, body)
         path = target_directory / f"{name}{NOTE_SUFFIX}"
         afanes.core.atomic.write_text_atomic(path, document.to_text())
         return path
@@ -1171,7 +1641,7 @@ class Vault:
 
         content: str
         if text is None:
-            content = _new_note_document(note_type, category, None, body).to_text()
+            content = self._new_note_document(note_type, category, None, body).to_text()
         else:
             parsed = NoteDocument.from_text(text)
             if parsed.note_type is not note_type or parsed.category is not category:
@@ -1185,7 +1655,7 @@ class Vault:
             raise VaultError(message)
 
         name = afanes.core.names.safe_filename(reference_name)
-        scheme = afanes.core.links.scheme_for_note(note_type, category)
+        scheme = ReferenceScheme.for_note(note_type, category)
         snapshot = self.scan()
         if snapshot.catalog.candidates(scheme, name):
             message = f"A {scheme.value} note named {name!r} already exists"
@@ -1264,7 +1734,7 @@ class Vault:
         if project.scheme is not ReferenceScheme.PROJECT or not project.name.strip():
             message = "An action needs a project reference"
             raise InvalidReferenceError(message)
-        if status is not None and status not in afanes.models.note.allowed_statuses(NoteType.ACTION):
+        if status is not None and status not in NoteType.ACTION.allowed_statuses:
             message = "Status is not valid for an action"
             raise NoteParseError(message)
 
@@ -1274,7 +1744,7 @@ class Vault:
             message = f"Project reference does not resolve: {project.name}"
             raise VaultError(message)
 
-        people_references = tuple(_person_reference(name) for name in people)
+        people_references = tuple(self._person_reference(name) for name in people)
         target_directory = self.contained(self.directory_for(NoteType.ACTION))
         if target_directory.exists() and not target_directory.is_dir():
             message = f"Note directory is not a directory: {target_directory}"
@@ -1284,13 +1754,13 @@ class Vault:
         taken = {
             note.name
             for note in snapshot.notes
-            if afanes.core.links.scheme_for_note(note.note_type, note.category) is ReferenceScheme.NOTE
+            if ReferenceScheme.for_note(note.note_type, note.category) is ReferenceScheme.NOTE
         }
         taken.update(entry.stem for entry in target_directory.iterdir())
         taken.update(entry.name for entry in target_directory.iterdir())
         name = afanes.core.names.unique_name(afanes.core.names.safe_filename(trimmed), taken)
 
-        document = _new_note_document(NoteType.ACTION, None, status, f"# {trimmed}\n")
+        document = self._new_note_document(NoteType.ACTION, None, status, f"# {trimmed}\n")
         raw = dict(document.raw)
         if due_date is not None:
             raw["due_date"] = due_date.isoformat()
@@ -1357,7 +1827,7 @@ class Vault:
             message = f"Not a note file: {note_path}"
             raise VaultPathError(message)
         vault = snapshot or self.scan()
-        note = _find_note(vault, source)
+        note = vault.find_note(source)
         if note is None:
             message = f"Note is not part of the vault: {note_path}"
             raise VaultError(message)
@@ -1558,27 +2028,27 @@ class Vault:
         """
         source = self.contained(note_path)
         vault = snapshot or self.scan()
-        note = _find_note(vault, source)
+        note = vault.find_note(source)
         if note is None:
             message = f"Note is not part of the vault: {note_path}"
             raise VaultError(message)
 
         new_name = afanes.core.names.safe_filename(new_title)
-        scheme = afanes.core.links.scheme_for_note(note.note_type, note.category)
+        scheme = ReferenceScheme.for_note(note.note_type, note.category)
         target = source.with_name(f"{new_name}{NOTE_SUFFIX}")
         same_name = afanes.core.names.normalize_name(new_name) == afanes.core.names.normalize_name(note.name)
 
         if not same_name:
             existing = vault.catalog.candidates(scheme, new_name)
-            if any(not _same_path(path, source) for path in existing):
+            if any(not VaultPath.same(path, source) for path in existing):
                 message = f"A {scheme.value} note named {new_name!r} already exists"
                 raise NameCollisionError(message)
             if target.exists():
                 message = f"Destination already exists: {target}"
                 raise NameCollisionError(message)
 
-        affected = () if same_name else _affected_sites(vault, source)
-        hashes = {site.path: _hash_for_note(vault, site.path) for site in affected}
+        affected = () if same_name else vault.affected_sites(source)
+        hashes = {site.path: vault.hash_for_note(site.path) for site in affected}
 
         heading_update = False
         if not same_name:
@@ -1643,7 +2113,7 @@ class Vault:
         renamed = False
 
         if source.exists():
-            if target.exists() and not _same_path(source, target):
+            if target.exists() and not VaultPath.same(source, target):
                 message = f"Destination already exists: {target}"
                 raise NameCollisionError(message)
             source.replace(target)
@@ -1705,7 +2175,7 @@ class Vault:
         if hashlib.sha256(data).hexdigest() != preview.content_hashes.get(source):
             return ((), (target,), (), ())
         try:
-            changed = _rewrite_renamed_note(
+            changed = self._rewrite_renamed_note(
                 target,
                 data,
                 old_reference,
@@ -1734,9 +2204,9 @@ class Vault:
         unchanged: list[Path] = []
         failed: list[RewriteFailure] = []
         for site in preview.affected:
-            if skip_source and _same_path(site.path, source):
+            if skip_source and VaultPath.same(site.path, source):
                 continue
-            read_path = target if _same_path(site.path, source) else site.path
+            read_path = target if VaultPath.same(site.path, source) else site.path
             try:
                 data = read_path.read_bytes()
             except OSError as exc:
@@ -1747,7 +2217,7 @@ class Vault:
                 continue
 
             try:
-                changed = _rewrite_note(read_path, data, old_reference, new_reference)
+                changed = self._rewrite_note(read_path, data, old_reference, new_reference)
             except (OSError, UnicodeDecodeError, AfanesError) as exc:
                 failed.append(RewriteFailure(path=read_path, message=str(exc)))
                 continue
@@ -1798,11 +2268,11 @@ class Vault:
             raise VaultError(message)
 
         vault = snapshot or self.scan()
-        old_key = afanes.core.links.reference_key(old)
+        old_key = ReferenceKey.from_reference(old)
         sites: list[ReferenceSite] = []
         hashes: dict[Path, str] = {}
         for note in vault.notes:
-            count = sum(1 for reference in note.references if afanes.core.links.reference_key(reference) == old_key)
+            count = sum(1 for reference in note.references if ReferenceKey.from_reference(reference) == old_key)
             if count:
                 sites.append(ReferenceSite(path=note.path, reference_count=count))
                 hashes[note.path] = note.content_hash
@@ -1859,7 +2329,7 @@ class Vault:
                 skipped.append(site.path)
                 continue
             try:
-                changed = _rewrite_note(site.path, data, preview.old, preview.new)
+                changed = self._rewrite_note(site.path, data, preview.old, preview.new)
             except (OSError, UnicodeDecodeError, AfanesError) as exc:
                 failed.append(RewriteFailure(path=site.path, message=str(exc)))
                 continue
@@ -1902,24 +2372,148 @@ class Vault:
         """
         source = self.contained(note_path)
         vault = snapshot or self.scan()
-        note = _find_note(vault, source)
+        note = vault.find_note(source)
         if note is None:
             message = f"Note is not part of the vault: {note_path}"
             raise VaultError(message)
 
-        trash_directory = _existing_directory(self.root, TRASH_DIRECTORY)
+        trash_directory = self._existing_directory(self.root, TRASH_DIRECTORY)
         taken: set[str] = set()
         if trash_directory.is_dir():
             taken.update(entry.stem for entry in trash_directory.iterdir())
             taken.update(entry.name for entry in trash_directory.iterdir())
         trash_name = afanes.core.names.unique_name(source.stem, taken)
-        affected = _affected_sites(vault, source)
+        affected = vault.affected_sites(source)
         return TrashPreview(
             note_path=source,
             trash_path=trash_directory / f"{trash_name}{NOTE_SUFFIX}",
             reference_count=sum(site.reference_count for site in affected),
             affected_notes=tuple(site.path for site in affected),
         )
+
+    @staticmethod
+    def _person_reference(name: str) -> NoteReference:
+        """Build a person reference from a name supplied by the user."""
+        trimmed = name.strip()
+        if not trimmed:
+            message = "A person reference needs a name"
+            raise ProcessingError(message)
+        return NoteReference(scheme=ReferenceScheme.PERSON, name=trimmed)
+
+    @staticmethod
+    def _project_reference(name: str) -> NoteReference:
+        """Build a project reference from a name supplied by the user."""
+        trimmed = name.strip()
+        if not trimmed:
+            message = "A project reference needs a name"
+            raise ProcessingError(message)
+        return NoteReference(scheme=ReferenceScheme.PROJECT, name=trimmed)
+
+    @staticmethod
+    def _new_note_document(
+        note_type: NoteType,
+        category: ReferenceCategory | None,
+        status: Status | None,
+        body: str,
+    ) -> NoteDocument:
+        """Build the canonical document for a newly created note."""
+        normalized_body = body.replace("\r\n", "\n").replace("\r", "\n").removeprefix("\ufeff")
+        raw: dict[str, object] = {"type": note_type.value}
+        if category is not None:
+            raw["category"] = category.value
+        if status is not None:
+            raw["status"] = status.value
+        return NoteDocument(
+            raw=raw,
+            body=normalized_body,
+            newline="\n",
+            has_frontmatter=True,
+            note_type=note_type,
+            references=(),
+            category=category,
+            status=status,
+        )
+
+    def _require_inbox_note(self, source: Path) -> None:
+        """Require a source path to be under the vault's inbox directory."""
+        relative = source.relative_to(self.root)
+        if (
+            len(relative.parts) < _MIN_INBOX_PART_COUNT
+            or relative.parts[0].casefold() != INBOX_DIRECTORY.name.casefold()
+        ):
+            message = "Only notes in the inbox can be processed"
+            raise ProcessingError(message)
+
+    @staticmethod
+    def _existing_directory(parent: Path, name: Path) -> Path:
+        """Return an existing case variant of a directory, or the canonical path."""
+        candidate = parent / name
+        if candidate.is_dir() or not parent.is_dir():
+            return candidate
+        folded = name.name.casefold()
+        matches = sorted(
+            (child for child in parent.iterdir() if child.is_dir() and child.name.casefold() == folded),
+            key=lambda child: child.name,
+        )
+        return matches[0] if matches else candidate
+
+    @staticmethod
+    def _rewrite_note(
+        path: Path,
+        data: bytes,
+        old: NoteReference,
+        new: NoteReference,
+    ) -> bool:
+        """Rewrite body and frontmatter references in one note atomically."""
+        document = NoteDocument.from_text(data.decode("utf-8"))
+        rewrite = afanes.core.links.MarkdownBody(document.body).rewrite_references(old, new)
+        rewritten, frontmatter_count = document.rewrite_references(old, new)
+        if rewrite.count + frontmatter_count == 0:
+            return False
+
+        final = rewritten.with_body(rewrite.text)
+        text = final.to_text()
+        reader = afanes.core.links.ReferenceReader()
+        Vault._verify_rewrite(text, old, reader)
+        afanes.core.atomic.write_text_atomic(path, text)
+        return True
+
+    @staticmethod
+    def _rewrite_renamed_note(
+        path: Path,
+        data: bytes,
+        old: NoteReference,
+        new: NoteReference,
+        new_title: str,
+    ) -> bool:
+        """Rewrite a renamed note's heading and references atomically."""
+        current = data.decode("utf-8")
+        document = NoteDocument.from_text(current)
+        rewrite = afanes.core.links.MarkdownBody(document.body).rewrite_references(old, new)
+        rewritten, _ = document.rewrite_references(old, new)
+        final = rewritten.with_body(rewrite.text).with_heading(new_title)
+        text = final.to_text()
+        if text == current:
+            return False
+        reader = afanes.core.links.ReferenceReader()
+        Vault._verify_rewrite(text, old, reader)
+        afanes.core.atomic.write_text_atomic(path, text)
+        return True
+
+    @staticmethod
+    def _verify_rewrite(
+        text: str,
+        old: NoteReference,
+        reader: afanes.core.links.ReferenceReader,
+    ) -> None:
+        """Confirm that a rewritten note no longer names the old reference."""
+        document = NoteDocument.from_text(text)
+        old_key = ReferenceKey.from_reference(old)
+        body_references = reader.extract(document.body)
+        remaining = body_references + list(document.references)
+        if any(ReferenceKey.from_reference(reference) == old_key for reference in remaining):
+            message = "Rewritten note still contains the old reference"
+            raise ReferenceRewriteError(message)
 
     def trash(
         self,
@@ -1969,393 +2563,3 @@ class Vault:
             message = f"Could not move the note to trash: {preview.note_path}"
             raise VaultError(message) from exc
         return preview.reference_count
-
-
-def _resolve_vault_root(root: Path) -> Path:
-    """Resolve and validate a vault root directory.
-
-    Parameters
-    ----------
-    root : Path
-        Candidate vault root. ``~`` is expanded.
-
-    Returns
-    -------
-    Path
-        Absolute, resolved directory path.
-
-    Raises
-    ------
-    VaultError
-        If the path does not exist or is not a directory.
-    """
-    resolved = root.expanduser().resolve()
-    if not resolved.is_dir():
-        message = f"Vault root is not a directory: {root}"
-        raise VaultError(message)
-    return resolved
-
-
-def _contained_path(vault_root: Path, candidate: Path) -> Path:
-    """Resolve a path and verify that it stays inside the vault.
-
-    Parameters
-    ----------
-    vault_root : Path
-        Vault root, resolved by :func:`_resolve_vault_root`.
-    candidate : Path
-        Relative or absolute candidate path.
-
-    Returns
-    -------
-    Path
-        Resolved candidate path inside the vault.
-
-    Raises
-    ------
-    VaultPathError
-        If the resolved candidate escapes the vault root.
-    """
-    root = _resolve_vault_root(vault_root)
-    resolved = candidate.resolve() if candidate.is_absolute() else (root / candidate).resolve()
-    if not resolved.is_relative_to(root):
-        message = f"Path escapes the vault: {candidate}"
-        raise VaultPathError(message)
-    return resolved
-
-
-def _scan_vault(root: Path) -> VaultSnapshot:
-    """Scan a vault without writing anything.
-
-    Parameters
-    ----------
-    root : Path
-        Vault root directory.
-
-    Returns
-    -------
-    VaultSnapshot
-        Parsed notes, failures, and the resulting name catalog.
-
-    Notes
-    -----
-    Files are visited in deterministic path order. Directories whose names
-    begin with a dot are skipped, as are symlinks that resolve outside the
-    vault. A malformed note becomes a :class:`VaultFailure` and does not abort
-    the scan. This function performs blocking file I/O and never writes.
-    """
-    vault_root = _resolve_vault_root(root)
-    notes: list[VaultNote] = []
-    failures: list[VaultFailure] = []
-    reader = afanes.core.links.ReferenceReader()
-
-    for path, relative_path in _note_paths(vault_root):
-        try:
-            notes.append(_read_note(path, relative_path, reader))
-        except (OSError, UnicodeDecodeError, AfanesError) as exc:
-            failures.append(VaultFailure(path=relative_path, message=str(exc)))
-
-    catalog = NameCatalog.from_entries((note.path, note.note_type, note.category) for note in notes)
-    return VaultSnapshot(root=vault_root, notes=tuple(notes), failures=tuple(failures), catalog=catalog)
-
-
-def _note_paths(root: Path) -> list[tuple[Path, Path]]:
-    """Return note paths and their vault-relative paths in deterministic order."""
-    paths: list[tuple[Path, Path]] = []
-    trash_name = TRASH_DIRECTORY.name.casefold()
-    for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
-        relative = path.relative_to(root)
-        if relative.parts and relative.parts[0].casefold() == trash_name:
-            continue
-        if any(part.startswith(".") for part in relative.parts[:-1]):
-            continue
-        if path.suffix.casefold() != NOTE_SUFFIX or not path.is_file():
-            continue
-        try:
-            resolved = path.resolve()
-        except OSError:
-            continue
-        if not resolved.is_relative_to(root):
-            continue
-        paths.append((path, relative))
-    return paths
-
-
-def _read_note(
-    path: Path,
-    relative_path: Path,
-    reader: afanes.core.links.ReferenceReader,
-) -> VaultNote:
-    """Read and parse one note, raising on malformed input."""
-    stat = path.stat()
-    data = path.read_bytes()
-    text = data.decode("utf-8")
-    document = NoteDocument.from_text(text)
-    if document.note_type is None:
-        message = "Note has no type"
-        raise NoteParseError(message)
-    body_references = tuple(reader.extract(document.body))
-    return VaultNote(
-        path=path,
-        relative_path=relative_path,
-        name=path.stem,
-        title=document.title or path.stem,
-        note_type=document.note_type,
-        category=document.category,
-        status=document.status,
-        due_date=_due_date_from_raw(document.raw.get("due_date")),
-        content_hash=hashlib.sha256(data).hexdigest(),
-        modified_ns=stat.st_mtime_ns,
-        body_references=body_references,
-        frontmatter_references=document.references,
-    )
-
-
-def _due_date_from_raw(value: object) -> datetime.date | None:
-    """Convert a raw frontmatter due date into a calendar date.
-
-    Parameters
-    ----------
-    value : object
-        Raw value from the parsed frontmatter mapping.
-
-    Returns
-    -------
-    datetime.date | None
-        The declared date for a YAML date or a valid ISO date string;
-        otherwise ``None``.
-
-    Notes
-    -----
-    Invalid input is not an error: the scan continues and the page editor is
-    responsible for reporting the invalid text when the note is edited. A YAML
-    timestamp with a time component is not a calendar date and becomes
-    ``None``.
-    """
-    if isinstance(value, datetime.datetime):
-        return None
-    if isinstance(value, datetime.date):
-        return value
-    if isinstance(value, str):
-        try:
-            return datetime.date.fromisoformat(value.strip())
-        except ValueError:
-            return None
-    return None
-
-
-def _processing_target(
-    outcome: ProcessingOutcome,
-    status: Status | None,
-) -> tuple[NoteType, Status | None]:
-    """Resolve the target type and status for a processing outcome."""
-    if outcome is ProcessingOutcome.LATER:
-        if status not in (None, Status.LATER):
-            message = "Later uses the later status"
-            raise ProcessingError(message)
-        return NoteType.REFERENCE, Status.LATER
-    if outcome is ProcessingOutcome.REFERENCE:
-        if status is not None:
-            message = "Reference outcomes do not accept a status"
-            raise ProcessingError(message)
-        return NoteType.REFERENCE, None
-    if outcome is ProcessingOutcome.ACTION:
-        target_status = status or Status.ACTIVE
-        if target_status not in afanes.models.note.allowed_statuses(NoteType.ACTION):
-            message = "Status is not valid for an action"
-            raise ProcessingError(message)
-        return NoteType.ACTION, target_status
-    if outcome is ProcessingOutcome.PROJECT:
-        target_status = status or Status.ACTIVE
-        if target_status not in afanes.models.note.allowed_statuses(NoteType.PROJECT):
-            message = "Status is not valid for a project"
-            raise ProcessingError(message)
-        return NoteType.PROJECT, target_status
-    message = f"Unsupported processing outcome: {outcome!r}"
-    raise ProcessingError(message)
-
-
-def _person_reference(name: str) -> NoteReference:
-    """Build a person reference from a name supplied by the user."""
-    trimmed = name.strip()
-    if not trimmed:
-        message = "A person reference needs a name"
-        raise ProcessingError(message)
-    return NoteReference(scheme=ReferenceScheme.PERSON, name=trimmed)
-
-
-def _project_reference(name: str) -> NoteReference:
-    """Build a project reference from a name supplied by the user."""
-    trimmed = name.strip()
-    if not trimmed:
-        message = "A project reference needs a name"
-        raise ProcessingError(message)
-    return NoteReference(scheme=ReferenceScheme.PROJECT, name=trimmed)
-
-
-def _new_note_document(
-    note_type: NoteType,
-    category: ReferenceCategory | None,
-    status: Status | None,
-    body: str,
-) -> NoteDocument:
-    """Build the canonical document for a newly created note."""
-    normalized_body = body.replace("\r\n", "\n").replace("\r", "\n").removeprefix("\ufeff")
-    raw: dict[str, object] = {"type": note_type.value}
-    if category is not None:
-        raw["category"] = category.value
-    if status is not None:
-        raw["status"] = status.value
-    return NoteDocument(
-        raw=raw,
-        body=normalized_body,
-        newline="\n",
-        has_frontmatter=True,
-        note_type=note_type,
-        references=(),
-        category=category,
-        status=status,
-    )
-
-
-def _processed_text(plan: ProcessingPlan, document: NoteDocument) -> str:
-    """Return the classified Markdown text for a non-trash plan."""
-    if plan.outcome is ProcessingOutcome.TRASH:
-        return document.to_text()
-
-    raw = dict(document.raw)
-    raw["type"] = plan.target_type.value
-    if plan.target_category is None:
-        raw.pop("category", None)
-    else:
-        raw["category"] = plan.target_category.value
-    if plan.target_status is None:
-        raw.pop("status", None)
-    else:
-        raw["status"] = plan.target_status.value
-    if plan.due_date is None:
-        raw.pop("due_date", None)
-    else:
-        raw["due_date"] = plan.due_date.isoformat()
-    if plan.people:
-        raw["people"] = [f"{reference.scheme.value}:{reference.name}" for reference in plan.people]
-    else:
-        raw.pop("people", None)
-    if plan.project is None:
-        raw.pop("project", None)
-    else:
-        raw["project"] = f"{plan.project.scheme.value}:{plan.project.name}"
-    return document.with_metadata(raw).to_text()
-
-
-def _require_inbox_note(root: Path, source: Path) -> None:
-    """Require a source path to be under the vault's inbox directory."""
-    relative = source.relative_to(root)
-    if len(relative.parts) < _MIN_INBOX_PART_COUNT or relative.parts[0].casefold() != INBOX_DIRECTORY.name.casefold():
-        message = "Only notes in the inbox can be processed"
-        raise ProcessingError(message)
-
-
-def _existing_directory(parent: Path, name: Path) -> Path:
-    """Return an existing case variant of a directory, or the canonical path."""
-    candidate = parent / name
-    if candidate.is_dir() or not parent.is_dir():
-        return candidate
-    folded = name.name.casefold()
-    matches = sorted(
-        (child for child in parent.iterdir() if child.is_dir() and child.name.casefold() == folded),
-        key=lambda child: child.name,
-    )
-    return matches[0] if matches else candidate
-
-
-def _find_note(snapshot: VaultSnapshot, source: Path) -> VaultNote | None:
-    """Find a scanned note by path."""
-    return next((note for note in snapshot.notes if _same_path(note.path, source)), None)
-
-
-def _affected_sites(snapshot: VaultSnapshot, source: Path) -> tuple[ReferenceSite, ...]:
-    """Collect per-note reference counts that resolve to a target note."""
-    sites: list[ReferenceSite] = []
-    for note in snapshot.notes:
-        count = sum(1 for reference in note.references if _resolves_to(snapshot, reference, source))
-        if count:
-            sites.append(ReferenceSite(path=note.path, reference_count=count))
-    return tuple(sites)
-
-
-def _resolves_to(snapshot: VaultSnapshot, reference: NoteReference, source: Path) -> bool:
-    """Return whether a reference uniquely resolves to a target note."""
-    resolution = snapshot.catalog.resolve(reference)
-    if resolution.outcome is not ResolutionOutcome.RESOLVED:
-        return False
-    return _same_path(resolution.targets[0], source)
-
-
-def _hash_for_note(snapshot: VaultSnapshot, path: Path) -> str:
-    """Return the content hash captured for a scanned note."""
-    note = next(note for note in snapshot.notes if _same_path(note.path, path))
-    return note.content_hash
-
-
-def _same_path(left: Path, right: Path) -> bool:
-    """Compare two paths after resolving filesystem aliases."""
-    return left.resolve() == right.resolve()
-
-
-def _rewrite_note(
-    path: Path,
-    data: bytes,
-    old: NoteReference,
-    new: NoteReference,
-) -> bool:
-    """Rewrite body and frontmatter references in one note atomically."""
-    document = NoteDocument.from_text(data.decode("utf-8"))
-    body, body_count = afanes.core.links.rewrite_body_references(document.body, old, new)
-    rewritten, frontmatter_count = document.rewrite_references(old, new)
-    if body_count + frontmatter_count == 0:
-        return False
-
-    final = rewritten.with_body(body)
-    text = final.to_text()
-    reader = afanes.core.links.ReferenceReader()
-    _verify_rewrite(text, old, reader)
-    afanes.core.atomic.write_text_atomic(path, text)
-    return True
-
-
-def _rewrite_renamed_note(
-    path: Path,
-    data: bytes,
-    old: NoteReference,
-    new: NoteReference,
-    new_title: str,
-) -> bool:
-    """Rewrite a renamed note's heading and references atomically."""
-    current = data.decode("utf-8")
-    document = NoteDocument.from_text(current)
-    body, _ = afanes.core.links.rewrite_body_references(document.body, old, new)
-    rewritten, _ = document.rewrite_references(old, new)
-    final = rewritten.with_body(body).with_heading(new_title)
-    text = final.to_text()
-    if text == current:
-        return False
-    reader = afanes.core.links.ReferenceReader()
-    _verify_rewrite(text, old, reader)
-    afanes.core.atomic.write_text_atomic(path, text)
-    return True
-
-
-def _verify_rewrite(
-    text: str,
-    old: NoteReference,
-    reader: afanes.core.links.ReferenceReader,
-) -> None:
-    """Confirm that a rewritten note no longer names the old reference."""
-    document = NoteDocument.from_text(text)
-    old_key = afanes.core.links.reference_key(old)
-    body_references = reader.extract(document.body)
-    remaining = body_references + list(document.references)
-    if any(afanes.core.links.reference_key(reference) == old_key for reference in remaining):
-        message = "Rewritten note still contains the old reference"
-        raise ReferenceRewriteError(message)

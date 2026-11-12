@@ -4,7 +4,7 @@ import pytest
 
 import afanes.models.note
 from afanes.core.errors import InvalidReferenceError, NoteParseError
-from afanes.core.frontmatter import NoteDocument
+from afanes.core.frontmatter import FrontmatterSplit, NoteDocument
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteType, ReferenceCategory, Status
 
@@ -452,3 +452,21 @@ class TestRewriteReferenceValues:
         rewritten, _ = document.rewrite_references(old, new)
         reparsed = NoteDocument.from_text(rewritten.to_text())
         assert reparsed.references == (new,)
+
+
+class TestFrontmatterSplit:
+    def test_keeps_raw_body_and_presence(self) -> None:
+        split = FrontmatterSplit(
+            raw={"type": "note"},
+            body="Body\n",
+            has_frontmatter=True,
+        )
+
+        assert split.raw == {"type": "note"}
+        assert split.body == "Body\n"
+        assert split.has_frontmatter is True
+
+    def test_reports_absent_frontmatter(self) -> None:
+        split = FrontmatterSplit(raw={}, body="Body\n", has_frontmatter=False)
+
+        assert split.has_frontmatter is False

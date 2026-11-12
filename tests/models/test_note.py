@@ -36,7 +36,7 @@ class TestStatus:
 
 class TestAllowedStatuses:
     def test_actions_allow_workflow_states(self) -> None:
-        assert afanes.models.note.allowed_statuses(NoteType.ACTION) == {
+        assert NoteType.ACTION.allowed_statuses == {
             Status.ACTIVE,
             Status.WAITING,
             Status.DONE,
@@ -46,7 +46,7 @@ class TestAllowedStatuses:
         }
 
     def test_projects_allow_workflow_states(self) -> None:
-        assert afanes.models.note.allowed_statuses(NoteType.PROJECT) == {
+        assert NoteType.PROJECT.allowed_statuses == {
             Status.ACTIVE,
             Status.WAITING,
             Status.DONE,
@@ -56,7 +56,7 @@ class TestAllowedStatuses:
         }
 
     def test_references_allow_only_deferred_or_archived(self) -> None:
-        assert afanes.models.note.allowed_statuses(NoteType.REFERENCE) == {Status.LATER, Status.ARCHIVED}
+        assert NoteType.REFERENCE.allowed_statuses == {Status.LATER, Status.ARCHIVED}
 
     def test_notes_allow_no_status(self) -> None:
-        assert afanes.models.note.allowed_statuses(NoteType.NOTE) == frozenset()
+        assert NoteType.NOTE.allowed_statuses == frozenset()

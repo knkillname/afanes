@@ -23,6 +23,7 @@ import afanes.ui.views.processing
 import afanes.ui.views.projects
 import afanes.ui.views.review
 from afanes.core.vault import VaultFailure, VaultNote
+from afanes.ui.components.banner import Banner
 
 _SECTION_ICONS = {
     afanes.ui.state.WorkspaceSection.INBOX: ft.Icons.INBOX,
@@ -462,7 +463,7 @@ class WorkspaceView:
         banners: list[ft.Control] = []
         message = self._state.message
         if message is not None:
-            banners.append(_banner(message))
+            banners.append(Banner(message).build())
         self.banners.controls = banners
         self.banners.visible = bool(banners)
 
@@ -490,46 +491,3 @@ class WorkspaceView:
             return
         self.page_view.refresh()
         self.main_host.content = self.page_view.build()
-
-
-def build_workspace(
-    update: Callable[[], None],
-    on_change_vault: Callable[[], Awaitable[None]],
-) -> ft.Control:
-    """Build the workspace shell.
-
-    Parameters
-    ----------
-    update : Callable[[], None]
-        Requests a repaint of the page.
-    on_change_vault : Callable[[], Awaitable[None]]
-        Command that opens the folder picker and switches the vault.
-
-    Returns
-    -------
-    ft.Control
-        Composed workspace layout.
-    """
-    return WorkspaceView(update, on_change_vault).build()
-
-
-def _banner(message: str) -> ft.Control:
-    """Build an accessible warning banner."""
-    return ft.Container(
-        bgcolor=afanes.ui.theme.ERROR_CONTAINER_COLOR,
-        padding=afanes.ui.theme.BANNER_PADDING,
-        border_radius=afanes.ui.theme.CARD_RADIUS,
-        content=ft.Row(
-            controls=[
-                ft.Icon(ft.Icons.ERROR_OUTLINE, color=afanes.ui.theme.ERROR_TEXT_COLOR, size=18),
-                ft.Text(
-                    message,
-                    color=afanes.ui.theme.ERROR_TEXT_COLOR,
-                    selectable=True,
-                    expand=True,
-                ),
-            ],
-            spacing=afanes.ui.theme.ITEM_GAP,
-            vertical_alignment=ft.CrossAxisAlignment.START,
-        ),
-    )

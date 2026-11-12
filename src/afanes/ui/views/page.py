@@ -13,7 +13,6 @@ from pathlib import Path
 
 import flet as ft
 
-import afanes.models.note
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
@@ -21,45 +20,8 @@ from afanes.core.editing import DraftMode, PageDraft
 from afanes.core.vault import VaultNote
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import NoteType, ReferenceCategory, Status
-
-
-def _banner(message: str) -> ft.Control:
-    """Build an accessible warning banner."""
-    return ft.Container(
-        bgcolor=afanes.ui.theme.ERROR_CONTAINER_COLOR,
-        padding=afanes.ui.theme.BANNER_PADDING,
-        border_radius=afanes.ui.theme.CARD_RADIUS,
-        content=ft.Row(
-            controls=[
-                ft.Icon(ft.Icons.ERROR_OUTLINE, color=afanes.ui.theme.ERROR_TEXT_COLOR, size=18),
-                ft.Text(
-                    message,
-                    color=afanes.ui.theme.ERROR_TEXT_COLOR,
-                    selectable=True,
-                    expand=True,
-                ),
-            ],
-            spacing=afanes.ui.theme.ITEM_GAP,
-            vertical_alignment=ft.CrossAxisAlignment.START,
-        ),
-    )
-
-
-def _panel(title: str, body: ft.Control, actions: list[ft.Control]) -> ft.Container:
-    """Build one inline confirmation panel."""
-    return ft.Container(
-        bgcolor=afanes.ui.theme.SURFACE_CONTAINER_COLOR,
-        border_radius=afanes.ui.theme.CARD_RADIUS,
-        padding=afanes.ui.theme.ITEM_GAP,
-        content=ft.Column(
-            controls=[
-                ft.Text(title, theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
-                body,
-                ft.Row(controls=actions, spacing=afanes.ui.theme.ITEM_GAP, wrap=True),
-            ],
-            spacing=afanes.ui.theme.ITEM_GAP,
-        ),
-    )
+from afanes.ui.components.banner import Banner
+from afanes.ui.components.panel import Panel
 
 
 class PageView:
@@ -300,11 +262,11 @@ class PageView:
             content=afanes.ui.strings.PAGE_CONFLICT_DISCARD,
             on_click=self.discard_draft,
         )
-        self.conflict_panel = _panel(
+        self.conflict_panel = Panel(
             afanes.ui.strings.PAGE_CONFLICT_TITLE,
             self.conflict_text,
             [self.reload_button, self.overwrite_button, self.recreate_button, self.discard_button],
-        )
+        ).build()
         self.conflict_panel.visible = False
 
         self.ambiguous_list = ft.Column(controls=[], spacing=0)
@@ -312,7 +274,7 @@ class PageView:
             content=afanes.ui.strings.PAGE_CANCEL,
             on_click=self.clear_ambiguous,
         )
-        self.ambiguous_panel = _panel(
+        self.ambiguous_panel = Panel(
             afanes.ui.strings.PAGE_AMBIGUOUS_TITLE,
             ft.Column(
                 controls=[
@@ -322,7 +284,7 @@ class PageView:
                 spacing=afanes.ui.theme.ITEM_GAP,
             ),
             [self.ambiguous_cancel_button],
-        )
+        ).build()
         self.ambiguous_panel.visible = False
 
         self.repair_text = ft.Text("", selectable=True)
@@ -339,11 +301,11 @@ class PageView:
             content=afanes.ui.strings.PAGE_REPAIR_CANCEL,
             on_click=self.cancel_repair,
         )
-        self.repair_panel = _panel(
+        self.repair_panel = Panel(
             afanes.ui.strings.PAGE_REPAIR_TITLE,
             self.repair_text,
             [self.repair_rewrite_button, self.repair_keep_button, self.repair_cancel_button],
-        )
+        ).build()
         self.repair_panel.visible = False
 
         self.type_change_text = ft.Text("", selectable=True)
@@ -356,11 +318,11 @@ class PageView:
             content=afanes.ui.strings.PAGE_CANCEL,
             on_click=self.cancel_type_change,
         )
-        self.type_change_panel = _panel(
+        self.type_change_panel = Panel(
             afanes.ui.strings.PAGE_TYPE_CHANGE_TITLE,
             self.type_change_text,
             [self.type_change_confirm_button, self.type_change_cancel_button],
-        )
+        ).build()
         self.type_change_panel.visible = False
 
         self.rename_field = ft.TextField(
@@ -412,11 +374,11 @@ class PageView:
             content=afanes.ui.strings.PAGE_CANCEL,
             on_click=self.cancel_trash,
         )
-        self.trash_panel = _panel(
+        self.trash_panel = Panel(
             afanes.ui.strings.PAGE_TRASH_TITLE,
             self.trash_text,
             [self.trash_confirm_button, self.trash_cancel_button],
-        )
+        ).build()
         self.trash_panel.visible = False
 
         self.dialogs = ft.Column(
@@ -486,7 +448,7 @@ class PageView:
     def refresh(self) -> None:
         """Refresh every control from the shared application state."""
         page = self._state.page
-        editing = self._state.editing or (page is not None and page.mode is DraftMode.RAW)
+        editing = self._state.editing or self._state.page_mode is DraftMode.RAW
         self._refresh_header(page, editing=editing)
         self._refresh_read(page, editing=editing)
         self._refresh_edit(page, editing=editing)
@@ -505,44 +467,47 @@ class PageView:
         self.title.value = state.page_title if page is not None else ""
         self.path.value = state.page_path_label
         self.back_button.disabled = page is None and not state.history
-        self.edit_button.visible = page is not None and not editing and page.mode is DraftMode.NORMAL
+        self.edit_button.visible = page is not None and not editing and self._state.page_mode is DraftMode.NORMAL
         self.done_button.visible = page is not None and editing
-        self.rename_button.visible = page is not None and not editing and page.mode is DraftMode.NORMAL
+        self.rename_button.visible = page is not None and not editing and self._state.page_mode is DraftMode.NORMAL
         self.trash_button.visible = page is not None and not editing
         self.process_button.visible = page is not None and not editing and self._is_inbox_page(page)
         self.progress.visible = state.busy or state.saving
         if state.saving:
             self.status_text.value = afanes.ui.strings.PAGE_SAVING
-        elif page is not None and editing and page.is_dirty:
+        elif page is not None and editing and state.page_is_dirty:
             self.status_text.value = afanes.ui.strings.PAGE_UNSAVED
         else:
             self.status_text.value = ""
 
     def _refresh_read(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the rendered read mode."""
+        state = self._state
         visible = page is not None and not editing
         self.empty_text.visible = page is None
         self.read_body.visible = visible
         if visible and page is not None:
-            self.read_body.value = page.body
+            self.read_body.value = state.page_body
 
     def _refresh_edit(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the body field and label form."""
-        labels = page.labels if page is not None else None
-        visible = page is not None and editing and page.mode is DraftMode.NORMAL and labels is not None
+        state = self._state
+        labels = state.page_labels if page is not None else None
+        visible = page is not None and editing and state.page_mode is DraftMode.NORMAL and labels is not None
         self.edit_form.visible = visible
         if not visible or page is None or labels is None:
             self._clear_suggestions(self.people_suggestions)
             self._clear_suggestions(self.project_suggestions)
             return
 
-        if self.body_field.value != page.body:
-            self.body_field.value = page.body
+        body = state.page_body
+        if self.body_field.value != body:
+            self.body_field.value = body
         self.identity_text.value = f"{afanes.ui.strings.PAGE_IDENTITY_LABEL}: {page.identity}"
         self.type_dropdown.value = labels.note_type.value
         self.category_dropdown.visible = labels.note_type is NoteType.REFERENCE
         self.category_dropdown.value = labels.category.value if labels.category is not None else ""
-        allowed = afanes.models.note.allowed_statuses(labels.note_type)
+        allowed = labels.note_type.allowed_statuses
         self.status_dropdown.options = [
             ft.dropdown.Option(key="", text=afanes.ui.strings.PAGE_NONE),
             *[
@@ -570,16 +535,17 @@ class PageView:
 
     def _refresh_raw(self, page: PageDraft | None) -> None:
         """Refresh raw rescue mode."""
-        visible = page is not None and page.mode is DraftMode.RAW
+        state = self._state
+        visible = page is not None and state.page_mode is DraftMode.RAW
         self.raw_panel.visible = visible
-        if visible and page is not None and self.raw_field.value != page.raw_text:
-            self.raw_field.value = page.raw_text
+        if visible and page is not None and self.raw_field.value != state.page_raw_text:
+            self.raw_field.value = state.page_raw_text
         self.raw_save_button.disabled = self._state.busy or self._state.saving
 
     def _refresh_banners(self) -> None:
         """Refresh the message banner."""
         message = self._state.message
-        self.banners.controls = [] if message is None else [_banner(message)]
+        self.banners.controls = [] if message is None else [Banner(message).build()]
         self.banners.visible = message is not None
 
     def _refresh_conflict(self) -> None:
