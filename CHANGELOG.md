@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ### Fixed
 
 - The README, run guide, browser mode, and troubleshooting pages now start Afanes from a source checkout with Hatch instead of showing package-index install commands and badges. Distribution is documented as local packaged builds for now. This implements the `document-local-install` OpenSpec change.
+- Review cards and project rows now render step text as Markdown outside edit mode, so links and emphasis no longer appear as raw source such as `[Incident notes](<note:Incident notes>)` or `**Bold** step`. Review summary links stay display-only while the project page keeps link navigation. This implements the `render-step-markdown` OpenSpec change.
 
 ## [0.5.2] - 2026-11-12
 
