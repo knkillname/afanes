@@ -8,6 +8,7 @@ import pytest
 
 import afanes.core.atomic
 import afanes.core.processing
+import afanes.core.template_cards
 import afanes.core.vault.naming
 import afanes.core.vault.pages
 import afanes.core.vault.processing
@@ -16,7 +17,7 @@ from afanes.core.errors import NameCollisionError, ProcessingError, VaultError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan, ProcessingTarget
 from afanes.core.steps import StepDocument
-from afanes.models.note import NoteType, Status
+from afanes.models.note import CategoryLabel, NoteType, Status
 
 HASH_A = "a" * 64
 HASH_B = "b" * 64
@@ -33,9 +34,13 @@ def _plan(
     target_status: Status | None = Status.ACTIVE,
     due_date: datetime.date | None = None,
     body_override: str | None = None,
+    category: CategoryLabel | None = None,
+    scaffold: str | None = None,
     source_hash: str = HASH_A,
     processed_hash: str = HASH_B,
 ) -> ProcessingPlan:
+    if target_type is NoteType.REFERENCE and category is None:
+        category = CategoryLabel("general")
     return ProcessingPlan(
         source_path=(tmp_path / "inbox" / "Foo.md").resolve(),
         target_path=(tmp_path / "projects" / "Foo.md").resolve(),
@@ -44,6 +49,8 @@ def _plan(
         target_status=target_status,
         due_date=due_date,
         body_override=body_override,
+        category=category,
+        scaffold=scaffold,
         source_hash=source_hash,
         processed_hash=processed_hash,
         reference_count=0,
@@ -54,6 +61,21 @@ def _plan(
 
 def _capture(root: Path, text: str = "Call Ada") -> Path:
     return afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).capture(text)
+
+
+def _card(
+    *,
+    category: str = "person",
+    body: str = "## Contact\n\n- Email:\n",
+) -> afanes.core.template_cards.TemplateCard:
+    return afanes.core.template_cards.TemplateCard(
+        relative_path=Path(f"{category}.md"),
+        category=CategoryLabel(category),
+        title=category.title(),
+        description=None,
+        body=body,
+        text=f"---\ntype: reference\ncategory: {category}\n---\n\n{body}",
+    )
 
 
 def _tree_state(root: Path) -> dict[str, bytes]:
@@ -147,6 +169,8 @@ class TestProcessingPlan:
                 target_status=Status.ACTIVE,
                 due_date=None,
                 body_override=None,
+                category=None,
+                scaffold=None,
                 source_hash=HASH_A,
                 processed_hash=HASH_B,
                 reference_count=0,
@@ -165,6 +189,8 @@ class TestProcessingPlan:
                 target_status=Status.ACTIVE,
                 due_date=None,
                 body_override=None,
+                category=None,
+                scaffold=None,
                 source_hash=HASH_A,
                 processed_hash=HASH_B,
                 reference_count=0,
@@ -225,6 +251,52 @@ class TestProcessingPlan:
     def test_rejects_an_append_outcome(self, tmp_path: Path) -> None:
         with pytest.raises(ProcessingError):
             _plan(tmp_path, outcome=ProcessingOutcome.APPEND_STEP)
+
+    def test_accepts_a_reference_with_a_category_and_scaffold(self, tmp_path: Path) -> None:
+        plan = _plan(
+            tmp_path,
+            outcome=ProcessingOutcome.REFERENCE,
+            target_type=NoteType.REFERENCE,
+            target_status=None,
+            category=CategoryLabel("person"),
+            scaffold="## Contact\n",
+        )
+
+        assert plan.category == CategoryLabel("person")
+        assert plan.scaffold == "## Contact\n"
+
+    def test_rejects_a_reference_without_a_category(self, tmp_path: Path) -> None:
+        with pytest.raises(ProcessingError):
+            ProcessingPlan(
+                source_path=(tmp_path / "inbox" / "Foo.md").resolve(),
+                target_path=(tmp_path / "reference" / "Foo.md").resolve(),
+                outcome=ProcessingOutcome.REFERENCE,
+                target_type=NoteType.REFERENCE,
+                target_status=None,
+                due_date=None,
+                body_override=None,
+                category=None,
+                scaffold=None,
+                source_hash=HASH_A,
+                processed_hash=HASH_B,
+                reference_count=0,
+                affected_notes=(),
+                changes_scheme=False,
+            )
+
+    def test_rejects_a_project_with_a_category(self, tmp_path: Path) -> None:
+        with pytest.raises(ProcessingError):
+            _plan(tmp_path, category=CategoryLabel("general"))
+
+    def test_rejects_trash_with_a_scaffold(self, tmp_path: Path) -> None:
+        with pytest.raises(ProcessingError):
+            _plan(
+                tmp_path,
+                outcome=ProcessingOutcome.TRASH,
+                target_type=NoteType.NOTE,
+                target_status=None,
+                scaffold="## Contact\n",
+            )
 
 
 class TestAppendStepPlan:
@@ -314,6 +386,77 @@ class TestProcessedText:
         assert "- [x] Call" in text
         assert "status: done" in text
 
+    def test_sets_the_reference_category(self, tmp_path: Path) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n# Ada\n")
+        plan = _plan(
+            tmp_path,
+            outcome=ProcessingOutcome.REFERENCE,
+            target_type=NoteType.REFERENCE,
+            target_status=None,
+            category=CategoryLabel("person"),
+        )
+        text = plan.processed_text(document)
+
+        assert NoteDocument.from_text(text).category == CategoryLabel("person")
+
+    def test_appends_the_scaffold_below_the_capture(self, tmp_path: Path) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n# Ada\n")
+        plan = _plan(
+            tmp_path,
+            outcome=ProcessingOutcome.REFERENCE,
+            target_type=NoteType.REFERENCE,
+            target_status=None,
+            category=CategoryLabel("person"),
+            scaffold="## Contact\n\n- Email:\n",
+        )
+        reparsed = NoteDocument.from_text(plan.processed_text(document))
+
+        assert reparsed.body == "# Ada\n\n## Contact\n\n- Email:\n"
+
+    def test_the_capture_text_remains_a_prefix(self, tmp_path: Path) -> None:
+        document = NoteDocument.from_text("---\ntype: note\ncustom: keep\n---\n# Ada\n\nBody.\n")
+        plan = _plan(
+            tmp_path,
+            outcome=ProcessingOutcome.REFERENCE,
+            target_type=NoteType.REFERENCE,
+            target_status=None,
+            category=CategoryLabel("person"),
+            scaffold="## Contact\n",
+        )
+        reparsed = NoteDocument.from_text(plan.processed_text(document))
+
+        assert reparsed.body.startswith("# Ada\n\nBody.\n")
+        assert reparsed.raw["custom"] == "keep"
+
+    def test_the_scaffold_follows_the_document_newline_style(self, tmp_path: Path) -> None:
+        document = NoteDocument.from_text("---\r\ntype: note\r\n---\r\n# Ada\r\n")
+        plan = _plan(
+            tmp_path,
+            outcome=ProcessingOutcome.REFERENCE,
+            target_type=NoteType.REFERENCE,
+            target_status=None,
+            category=CategoryLabel("person"),
+            scaffold="## Contact\n",
+        )
+        reparsed = NoteDocument.from_text(plan.processed_text(document))
+
+        assert "\r\n## Contact\r\n" in reparsed.body
+        assert reparsed.newline == "\r\n"
+
+    def test_an_empty_scaffold_leaves_the_body(self, tmp_path: Path) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n# Ada\n")
+        plan = _plan(
+            tmp_path,
+            outcome=ProcessingOutcome.REFERENCE,
+            target_type=NoteType.REFERENCE,
+            target_status=None,
+            category=CategoryLabel("person"),
+            scaffold="",
+        )
+        reparsed = NoteDocument.from_text(plan.processed_text(document))
+
+        assert reparsed.body == "# Ada\n"
+
 
 class TestPlanProcessing:
     def test_plans_a_project_with_defaults(self, tmp_path: Path) -> None:
@@ -356,6 +499,58 @@ class TestPlanProcessing:
         assert isinstance(plan, ProcessingPlan)
         assert plan.target_type is NoteType.REFERENCE
         assert plan.target_status is None
+        assert plan.category == CategoryLabel("general")
+        assert plan.scaffold is None
+        assert plan.target_path == root / "reference" / "general" / source.name
+
+    def test_plans_a_reference_from_a_card(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        source = _capture(root)
+        card = _card()
+
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source, ProcessingOutcome.REFERENCE, card=card
+        )
+
+        assert isinstance(plan, ProcessingPlan)
+        assert plan.category == CategoryLabel("person")
+        assert plan.scaffold == "## Contact\n\n- Email:\n"
+        assert plan.target_path == root / "reference" / "person" / source.name
+
+    def test_a_card_with_an_empty_body_adds_no_scaffold(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        source = _capture(root)
+
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source, ProcessingOutcome.REFERENCE, card=_card(body="")
+        )
+
+        assert isinstance(plan, ProcessingPlan)
+        assert plan.scaffold is None
+
+    def test_a_project_rejects_a_card(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        source = _capture(root)
+
+        with pytest.raises(ProcessingError):
+            afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+                source, ProcessingOutcome.PROJECT, card=_card()
+            )
+
+    def test_planning_with_a_card_leaves_the_capture_unchanged(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        source = _capture(root)
+        before = source.read_bytes()
+
+        afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source, ProcessingOutcome.REFERENCE, card=_card()
+        )
+
+        assert source.read_bytes() == before
 
     def test_plans_a_later_reference(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -682,9 +877,25 @@ class TestApplyProcessing:
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
-        assert target == root / "reference" / source.name
+        assert target == root / "reference" / "general" / source.name
         assert document.note_type is NoteType.REFERENCE
         assert document.status is None
+
+    def test_applies_a_reference_from_a_card(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        source = _capture(root)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            source, ProcessingOutcome.REFERENCE, card=_card()
+        )
+
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
+
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert target == root / "reference" / "person" / source.name
+        assert document.category == CategoryLabel("person")
+        assert document.body == "# Call Ada\n\n## Contact\n\n- Email:\n"
 
     def test_applies_a_later_reference(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

@@ -29,6 +29,7 @@ INBOX_DIRECTORY = Path("inbox")
 TRASH_DIRECTORY = Path("trash")
 REFERENCE_DIRECTORY = Path("reference")
 PROJECTS_DIRECTORY = Path("projects")
+TEMPLATES_DIRECTORY = Path("templates")
 
 MIN_INBOX_PART_COUNT = 2
 

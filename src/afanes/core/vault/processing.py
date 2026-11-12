@@ -18,11 +18,12 @@ import afanes.core.vault.snapshot
 from afanes.core.errors import AfanesError, NameCollisionError, ProcessingError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan, ProcessingTarget
+from afanes.core.template_cards import TemplateCard
 from afanes.core.vault.naming import VaultNaming
 from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultNote, VaultPath, VaultSnapshot
 from afanes.models.link import ReferenceScheme
-from afanes.models.note import Status
+from afanes.models.note import CategoryLabel, Status
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -45,6 +46,7 @@ class VaultProcessing:
         status: Status | None = None,
         due_date: datetime.date | None = None,
         project: str | None = None,
+        card: TemplateCard | None = None,
         today: datetime.date | None = None,
         snapshot: VaultSnapshot | None = None,
     ) -> ProcessingPlan | AppendStepPlan:
@@ -64,6 +66,9 @@ class VaultProcessing:
         project : str | None
             Target project identity for Append step. Text that matches no
             project is rejected.
+        card : TemplateCard | None
+            Template card chosen for Reference or Later. ``None`` is the Empty
+            option and produces a ``general`` reference with no starter body.
         today : datetime.date | None
             Calendar date recorded as ``actual`` by Done now. ``None`` uses the
             current local date.
@@ -93,8 +98,13 @@ class VaultProcessing:
         Notes
         -----
         Planning performs blocking reads but never writes. The plan captures
-        the current source hash so apply can detect an external edit.
+        the current source hash so apply can detect an external edit. Reference
+        and Later always carry a category: the chosen card's label, or
+        ``general`` for Empty. Only those outcomes accept a card.
         """
+        if card is not None and outcome not in (ProcessingOutcome.REFERENCE, ProcessingOutcome.LATER):
+            message = "Only Reference and Later accept a template card"
+            raise ProcessingError(message)
         source = self.vault.contained(note_path)
         self._require_inbox_note(source)
 
@@ -126,7 +136,13 @@ class VaultProcessing:
             message = "Only projects accept a due date"
             raise ProcessingError(message)
 
-        target_path = self.vault.directory_for(target_type) / f"{source.stem}{afanes.core.vault.snapshot.NOTE_SUFFIX}"
+        category: CategoryLabel | None = None
+        scaffold: str | None = None
+        if outcome in (ProcessingOutcome.REFERENCE, ProcessingOutcome.LATER):
+            category = card.category if card is not None else CategoryLabel("general")
+            scaffold = card.body if card is not None and card.body.strip() else None
+        target_directory = self.vault.directory_for(target_type, category)
+        target_path = target_directory / f"{source.stem}{afanes.core.vault.snapshot.NOTE_SUFFIX}"
         target_scheme = ReferenceScheme.for_note(target_type)
         existing = vault.catalog.candidates(target_scheme, source.stem)
         if any(not VaultPath.same(path, source) for path in existing):
@@ -146,6 +162,8 @@ class VaultProcessing:
             target_status=target_status,
             due_date=due_date,
             body_override=body_override,
+            category=category,
+            scaffold=scaffold,
             source_hash=source_hash,
             processed_hash=source_hash,
             reference_count=sum(site.reference_count for site in affected),
@@ -193,6 +211,8 @@ class VaultProcessing:
                 target_status=note.status,
                 due_date=None,
                 body_override=None,
+                category=None,
+                scaffold=None,
                 source_hash=source_hash,
                 processed_hash=source_hash,
                 reference_count=trash_preview.reference_count,

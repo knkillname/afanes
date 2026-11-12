@@ -19,6 +19,8 @@ do not define identity.
 - Directories only classify notes. Moving a note between folders never changes a reference.
 - A note belongs to exactly one folder, and the browser shows it in exactly one group.
 - Notes under `trash/` are excluded from scans, name uniqueness, and reference resolution.
+- Files under `templates/` are reference template cards, not notes. They are excluded from scans, the
+  browser, name uniqueness, and reference resolution. See [Template cards](template-cards.md).
 
 ## 🏷️ Note types
 
@@ -83,11 +85,19 @@ vault/
   reference/      non-actionable notes
     <category>/   optional category folders, such as reference/person/
   projects/       project notes
+  templates/      reference template cards, not notes
 ```
 
 These folders are conveniences, not requirements. Existing notes anywhere in the vault still resolve.
 Folders are created only when a write needs them. A newly created vault also contains the `Getting
-started` guide and the chosen template's notes; a vault opened later is never seeded or repaired.
+started` guide, the seven reference template cards under `templates/`, and the chosen template's
+notes; a vault opened later is never seeded or repaired.
+
+:::{warning}
+`templates/` is reserved. If an existing vault already used that folder for ordinary notes, those
+notes stop appearing in the browser and search because the folder is now read as template cards. Move
+them out of `templates/` to restore them.
+:::
 
 A categorized reference is filed under `reference/<category-folder>/`, where the folder is derived
 from the label through the cross-platform filename policy. An existing case variant is reused.

@@ -80,6 +80,19 @@ def _change_handler(control: ft.Control) -> Handler:
     return typing.cast("Handler", control.__getattribute__("on_change"))
 
 
+def _find_control(control: ft.Control, key: str) -> ft.Control | None:
+    if getattr(control, "key", None) == key:
+        return control
+    for child in getattr(control, "controls", []) or []:
+        found = _find_control(child, key)
+        if found is not None:
+            return found
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        return _find_control(content, key)
+    return None
+
+
 class TestWorkspaceShell:
     def test_builds_capture_bar_and_browser(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -388,7 +401,7 @@ class TestDatePickerWiring:
             _change_vault,
             _create_vault,
             _close_vault,
-            pick_date,
+            pick_date=pick_date,
         )
 
         asyncio.run(view.page_view.choose_due_date())
@@ -396,6 +409,65 @@ class TestDatePickerWiring:
         assert calls == [None]
         document = afanes.core.frontmatter.NoteDocument.from_text(project.read_text(encoding="utf-8"))
         assert document.due_date == chosen
+
+
+class TestBrowserCreationAction:
+    def test_the_new_reference_action_is_only_in_references(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
+        calls: list[str] = []
+
+        async def new_reference() -> None:
+            calls.append("new")
+
+        view = afanes.ui.views.workspace.WorkspaceView(
+            _noop,
+            _change_vault,
+            _create_vault,
+            _close_vault,
+            on_new_reference=new_reference,
+        )
+
+        assert _find_control(view.browser_list, "browser-new-reference") is None
+        section = afanes.ui.state.browser.WorkspaceSection.REFERENCES
+        asyncio.run(_handler(view.section_tiles[section])())
+        button = typing.cast("ft.FilledButton", _find_control(view.browser_list, "browser-new-reference"))
+        assert button.content == afanes.ui.strings.BROWSER_NEW_REFERENCE
+
+        asyncio.run(_handler(button)())
+
+        assert calls == ["new"]
+
+    def test_the_new_reference_action_is_disabled_while_it_runs(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
+        observed: list[bool] = []
+
+        async def new_reference() -> None:
+            observed.append(view.new_reference_button.disabled)
+
+        view = afanes.ui.views.workspace.WorkspaceView(
+            _noop,
+            _change_vault,
+            _create_vault,
+            _close_vault,
+            on_new_reference=new_reference,
+        )
+        section = afanes.ui.state.browser.WorkspaceSection.REFERENCES
+        asyncio.run(_handler(view.section_tiles[section])())
+
+        asyncio.run(_handler(view.new_reference_button)())
+
+        assert observed == [True]
+        assert view.new_reference_button.disabled is False
 
 
 def _row_for(browser: ft.ListView, title: str) -> ft.ListTile:

@@ -18,7 +18,9 @@ import afanes.ui.app
 import afanes.ui.state
 import afanes.ui.strings
 from afanes.core.errors import TemplateContentError
+from afanes.core.frontmatter import NoteDocument
 from afanes.core.settings import Settings
+from afanes.models.note import CategoryLabel
 
 Handler = Callable[[], Awaitable[None]]
 WINDOW_WIDTH = 1100
@@ -540,6 +542,23 @@ def _select_template(page: FakePage, identifier: str) -> None:
     typing.cast("typing.Any", handler)()
 
 
+async def _open_reference_dialog(page: FakePage) -> None:
+    tile = _typed(_find_by_key(page.controls[0], "section-references"), ft.ListTile)
+    await typing.cast("Handler", tile.on_click)()
+    button = _typed(_find_by_key(page.controls[0], "browser-new-reference"), ft.FilledButton)
+    await typing.cast("Handler", button.on_click)()
+
+
+async def _submit_reference(page: FakePage, name: str, template: str = "empty") -> None:
+    dialog = page.dialogs[-1]
+    name_field = _typed(_find_by_key(dialog, "new-reference-name"), ft.TextField)
+    name_field.value = name
+    selector = _typed(_find_by_key(dialog, "new-reference-template"), ft.Dropdown)
+    selector.value = template
+    submit = _typed(_find_by_key(dialog, "new-reference-submit"), ft.FilledButton)
+    await typing.cast("Handler", submit.on_click)()
+
+
 class TestCreation:
     def test_desktop_welcome_offers_creation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -968,3 +987,110 @@ def _all_texts(control: ft.Control) -> list[str]:
     if isinstance(content, ft.Control):
         values.extend(_all_texts(content))
     return values
+
+
+class TestBrowserReferenceCreation:
+    def _open_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[FakePage, Path]:
+        vault = tmp_path / "vault"
+        card = vault / "templates" / "person.md"
+        card.parent.mkdir(parents=True)
+        card.write_text(
+            "---\ntype: reference\ncategory: person\ntitle: Person\n"
+            "description: A contact.\n---\n\n## Contact\n\n- Email:\n",
+            encoding="utf-8",
+        )
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
+        return FakePage(), vault
+
+    def test_creates_a_card_reference_and_opens_edit_mode(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        page, vault = self._open_vault(tmp_path, monkeypatch)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            state.browser.query = "stale"
+            await _open_reference_dialog(page)
+            await _submit_reference(page, "Priya Nair", "card:person.md")
+
+        asyncio.run(scenario())
+
+        path = vault / "reference" / "person" / "Priya Nair.md"
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.category == CategoryLabel("person")
+        assert document.body == "# Priya Nair\n\n## Contact\n\n- Email:\n"
+        assert state.pages.editing is True
+        assert state.pages.page is not None
+        assert state.pages.page.path == path.resolve()
+        assert state.browser.query == ""
+
+    def test_empty_uses_the_general_category(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        page, vault = self._open_vault(tmp_path, monkeypatch)
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await _open_reference_dialog(page)
+            await _submit_reference(page, "Inbox thought", "empty")
+
+        asyncio.run(scenario())
+
+        path = vault / "reference" / "general" / "Inbox thought.md"
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.category == CategoryLabel("general")
+        assert document.body == "# Inbox thought\n"
+
+    def test_a_blank_name_keeps_the_dialog_open(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        page, vault = self._open_vault(tmp_path, monkeypatch)
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await _open_reference_dialog(page)
+            await _submit_reference(page, "   ", "empty")
+
+        asyncio.run(scenario())
+
+        assert len(page.dialogs) == 1
+        error = _typed(_find_by_key(page.dialogs[-1], "new-reference-error"), ft.Text)
+        assert error.visible is True
+        assert error.value == afanes.ui.strings.BROWSER_NAME_REQUIRED
+        assert not (vault / "reference" / "general").exists()
+
+    def test_a_collision_keeps_the_dialog_open(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        page, vault = self._open_vault(tmp_path, monkeypatch)
+        existing = vault / "reference" / "Ada.md"
+        existing.parent.mkdir(parents=True)
+        existing.write_text("---\ntype: reference\n---\n# Ada\n", encoding="utf-8")
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await _open_reference_dialog(page)
+            await _submit_reference(page, "Ada", "empty")
+
+        asyncio.run(scenario())
+
+        assert len(page.dialogs) == 1
+        error = _typed(_find_by_key(page.dialogs[-1], "new-reference-error"), ft.Text)
+        assert error.visible is True
+        assert not (vault / "reference" / "general" / "Ada.md").exists()
+        assert not (vault / "reference" / "general" / "Ada 2.md").exists()
+
+    def test_invalid_cards_are_named_in_the_dialog(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        page, vault = self._open_vault(tmp_path, monkeypatch)
+        broken = vault / "templates" / "broken.md"
+        broken.write_text("---\ntype: reference\n---\n", encoding="utf-8")
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await _open_reference_dialog(page)
+
+        asyncio.run(scenario())
+
+        dialog = page.dialogs[-1]
+        warning = _typed(_find_by_key(dialog, "new-reference-template-warning"), ft.Text)
+        assert warning.visible is True
+        assert "broken.md" in warning.value
+        selector = _typed(_find_by_key(dialog, "new-reference-template"), ft.Dropdown)
+        assert [option.key for option in selector.options] == ["card:person.md", "empty"]

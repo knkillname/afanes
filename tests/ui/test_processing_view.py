@@ -9,6 +9,7 @@ import flet as ft
 import pytest
 
 import afanes.core.settings
+import afanes.core.template_cards
 import afanes.core.vault.pages
 import afanes.core.vault.processing
 import afanes.core.vault.service
@@ -16,7 +17,7 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.views.processing
 from afanes.core.processing import ProcessingOutcome, ProcessingPlan
-from afanes.models.note import NoteType, Status
+from afanes.models.note import CategoryLabel, NoteType, Status
 
 
 @pytest.fixture(autouse=True)
@@ -64,6 +65,24 @@ def _open_vault_capture(root: Path, capture: Path, monkeypatch: pytest.MonkeyPat
         await state.processing.begin(capture)
 
     asyncio.run(scenario())
+
+
+def _card(
+    *,
+    title: str = "Person",
+    category: str = "person",
+    path: str = "person.md",
+    description: str | None = "A contact.",
+    body: str = "## Contact\n",
+) -> afanes.core.template_cards.TemplateCard:
+    return afanes.core.template_cards.TemplateCard(
+        relative_path=Path(path),
+        category=CategoryLabel(category),
+        title=title,
+        description=description,
+        body=body,
+        text="",
+    )
 
 
 class TestProcessingView:
@@ -128,6 +147,28 @@ class TestProcessingView:
         assert view.status.visible is False
         assert view.due_date.visible is False
         assert view.project.visible is False
+        assert view.template.visible is True
+        assert view.template_description.visible is True
+
+    def test_later_outcome_reveals_the_template_picker(self) -> None:
+        _open_capture()
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.LATER.value
+
+        _select_outcome(view)
+
+        assert view.template.visible is True
+        assert view.template_description.visible is True
+
+    def test_project_outcome_hides_the_template_picker(self) -> None:
+        _open_capture()
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.PROJECT.value
+
+        _select_outcome(view)
+
+        assert view.template.visible is False
+        assert view.template_description.visible is False
 
     def test_trash_outcome_hides_all_metadata(self) -> None:
         _open_capture()
@@ -139,6 +180,82 @@ class TestProcessingView:
         assert view.status.visible is False
         assert view.due_date.visible is False
         assert view.project.visible is False
+        assert view.template.visible is False
+
+    def test_template_options_list_cards_then_empty(self) -> None:
+        state = _open_capture()
+        state.processing.cards = (
+            _card(),
+            _card(title="Place", category="place", path="place.md", description="A location."),
+        )
+
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+
+        assert [option.key for option in view.template.options] == [
+            "card:person.md",
+            "card:place.md",
+            "empty",
+        ]
+        assert view.template.value == "empty"
+
+    def test_selecting_a_card_shows_its_description(self) -> None:
+        state = _open_capture()
+        state.processing.cards = (_card(description="A contact."),)
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.REFERENCE.value
+        _select_outcome(view)
+        view.template.value = "card:person.md"
+
+        _select_outcome(view)
+
+        assert view.template_description.value == "A contact."
+
+    def test_empty_describes_the_general_category(self) -> None:
+        _open_capture()
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.REFERENCE.value
+
+        _select_outcome(view)
+
+        assert view.template_description.value == afanes.ui.strings.PROCESSING_TEMPLATE_DESCRIPTION_EMPTY
+
+    def test_a_card_without_a_description_says_so(self) -> None:
+        state = _open_capture()
+        state.processing.cards = (_card(description=None),)
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.REFERENCE.value
+        _select_outcome(view)
+        view.template.value = "card:person.md"
+
+        _select_outcome(view)
+
+        assert view.template_description.value == afanes.ui.strings.PROCESSING_TEMPLATE_NO_DESCRIPTION
+
+    def test_duplicate_titles_show_the_card_path(self) -> None:
+        state = _open_capture()
+        state.processing.cards = (
+            _card(title="Same", path="alpha.md"),
+            _card(title="Same", path="zeta.md"),
+        )
+
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+
+        texts = [option.text or "" for option in view.template.options]
+        assert "alpha.md" in texts[0]
+        assert "zeta.md" in texts[1]
+
+    def test_invalid_cards_show_a_warning(self) -> None:
+        state = _open_capture()
+        state.processing.card_issues = (
+            afanes.core.template_cards.TemplateCardIssue(relative_path=Path("broken.md"), message="bad"),
+        )
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.REFERENCE.value
+
+        _select_outcome(view)
+
+        assert view.template_warning.visible is True
+        assert "broken.md" in view.template_warning.value
 
     def test_plan_preview_shows_the_destination(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -155,6 +272,46 @@ class TestProcessingView:
         assert view.plan_panel.visible is True
         assert str(plan.target_path) in view.plan_destination.value
         assert "Project" in view.plan_details.value
+
+    def test_plan_preview_names_the_category_and_starter_body(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.service.Vault(root)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Approve the invoice")
+        card = afanes.core.template_cards.TemplateCard(
+            relative_path=Path("process.md"),
+            category=CategoryLabel("process"),
+            title="Process",
+            description="A procedure.",
+            body="## Steps\n",
+            text="",
+        )
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            capture, ProcessingOutcome.REFERENCE, card=card
+        )
+        assert isinstance(plan, ProcessingPlan)
+        state = _open_capture("Approve the invoice")
+
+        state.processing.plan = plan
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+
+        assert "Category: process" in view.plan_details.value
+        assert afanes.ui.strings.PROCESSING_PLAN_SCAFFOLD in view.plan_details.value
+
+    def test_plan_preview_names_general_for_empty(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.service.Vault(root)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Approve the invoice")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.REFERENCE)
+        assert isinstance(plan, ProcessingPlan)
+        state = _open_capture("Approve the invoice")
+
+        state.processing.plan = plan
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+
+        assert "Category: general" in view.plan_details.value
+        assert afanes.ui.strings.PROCESSING_PLAN_SCAFFOLD not in view.plan_details.value
 
     def test_plan_preview_shows_the_scheme_warning(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -283,6 +440,52 @@ class TestProcessingView:
 
         assert calls[0][0] is ProcessingOutcome.APPEND_STEP
         assert calls[0][1]["project"] == "Launch"
+
+    def test_reference_preview_passes_the_selected_card(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        state = _open_capture()
+        card = _card()
+        state.processing.cards = (card,)
+        calls: list[tuple[ProcessingOutcome, dict[str, object]]] = []
+
+        async def fake_plan(
+            _self: afanes.ui.state.processing.ProcessingState,
+            outcome: ProcessingOutcome,
+            **kwargs: object,
+        ) -> None:
+            calls.append((outcome, kwargs))
+
+        monkeypatch.setattr(afanes.ui.state.processing.ProcessingState, "build_plan", fake_plan)
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.REFERENCE.value
+        _select_outcome(view)
+        view.template.value = "card:person.md"
+
+        assert view.preview_button.on_click is not None
+        asyncio.run(_click(view.preview_button.on_click))
+
+        assert calls[0][0] is ProcessingOutcome.REFERENCE
+        assert calls[0][1]["card"] is card
+
+    def test_reference_preview_passes_empty_as_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _open_capture()
+        calls: list[tuple[ProcessingOutcome, dict[str, object]]] = []
+
+        async def fake_plan(
+            _self: afanes.ui.state.processing.ProcessingState,
+            outcome: ProcessingOutcome,
+            **kwargs: object,
+        ) -> None:
+            calls.append((outcome, kwargs))
+
+        monkeypatch.setattr(afanes.ui.state.processing.ProcessingState, "build_plan", fake_plan)
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.LATER.value
+        _select_outcome(view)
+
+        assert view.preview_button.on_click is not None
+        asyncio.run(_click(view.preview_button.on_click))
+
+        assert calls[0][1]["card"] is None
 
     def test_project_suggestions_store_the_identity(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"

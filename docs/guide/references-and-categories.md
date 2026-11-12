@@ -28,6 +28,17 @@ name, identity, and inbound references do not change. Cancelling leaves both the
 location unchanged. If a move fails, the note keeps the new category in its old folder; grouping uses
 the label, so the drift is invisible in the browser.
 
+## ➕ Creating a reference
+
+Open the **References** section and choose **New reference**. The dialog asks for a name and a template
+card, or **Empty**. A card supplies the category and a starter body; Empty uses `category: general` and
+adds no starter body. Invalid cards are skipped and named in the dialog warning.
+
+**Create** writes the note immediately and opens it in edit mode. The new note appears under its
+category group, and an active search is cleared so it is visible. A blank name or a name already used
+in the `note:` scheme writes nothing and is reported in the dialog. See
+[Template cards](../reference/template-cards.md) for the card format and the cards a new vault seeds.
+
 ## 🔗 Names and links
 
 Use `project:` for project notes and `note:` for every other note, including references in any

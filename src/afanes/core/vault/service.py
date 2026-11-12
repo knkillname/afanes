@@ -20,6 +20,7 @@ from afanes.core.errors import (
     AfanesError,
     InvalidReferenceError,
     NoteParseError,
+    TemplateCardWriteError,
     TemplateWriteError,
     VaultError,
     VaultMissingError,
@@ -30,6 +31,7 @@ from afanes.core.errors import (
 )
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import CatalogEntry, NameCatalog
+from afanes.core.template_cards import TemplateCard, TemplateCardCatalog
 from afanes.core.vault.snapshot import (
     NotePath,
     PageContent,
@@ -51,6 +53,7 @@ INBOX_DIRECTORY = afanes.core.vault.snapshot.INBOX_DIRECTORY
 TRASH_DIRECTORY = afanes.core.vault.snapshot.TRASH_DIRECTORY
 REFERENCE_DIRECTORY = afanes.core.vault.snapshot.REFERENCE_DIRECTORY
 PROJECTS_DIRECTORY = afanes.core.vault.snapshot.PROJECTS_DIRECTORY
+TEMPLATES_DIRECTORY = afanes.core.vault.snapshot.TEMPLATES_DIRECTORY
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -167,7 +170,8 @@ class Vault:
         -------
         VaultCreation
             Created vault, the intermediate directories made for it, the
-            default folders created inside it, and the notes written into it.
+            default folders created inside it, the notes written into it, and
+            the reference template cards seeded into it.
 
         Raises
         ------
@@ -179,9 +183,14 @@ class Vault:
             If ``template`` names no catalog entry.
         TemplateContentError
             If the bundled content is missing or violates a vault validity rule.
+        TemplateCardContentError
+            If a bundled template card is invalid or missing.
         TemplateWriteError
             If a bundled note cannot be written. Notes written before the
             failure remain in place.
+        TemplateCardWriteError
+            If a bundled template card cannot be written. Cards written before
+            the failure remain in place.
         VaultError
             If a directory cannot be created or seeded.
 
@@ -189,10 +198,11 @@ class Vault:
         -----
         Missing intermediate folders are created. The path is resolved before
         it is inspected, so a symlink cannot smuggle a populated directory past
-        the emptiness check. Bundled content is resolved and validated before
-        the first directory is created, so a refused tree leaves the filesystem
-        unchanged. Nothing is rolled back when seeding or writing fails partway:
-        the directories and notes already created stay in place.
+        the emptiness check. Bundled content and the template cards are
+        resolved and validated before the first directory is created, so a
+        refused tree leaves the filesystem unchanged. Nothing is rolled back
+        when seeding or writing fails partway: the directories and notes already
+        created stay in place.
         """
         target = path.expanduser().resolve()
         try:
@@ -207,6 +217,7 @@ class Vault:
             raise VaultError(message) from exc
 
         bundle = afanes.core.templates.TemplateCatalog.bundled().bundle(template, locale)
+        cards = TemplateCardCatalog.bundled().strict_cards()
 
         try:
             created = cls._missing_directories(target.parent)
@@ -221,11 +232,13 @@ class Vault:
             message = f"Could not seed the vault directory: {path}"
             raise VaultError(message) from exc
         written = vault._write_bundle(bundle)
+        written_cards = vault._write_template_cards(cards)
         return VaultCreation(
             vault=vault,
             created_directories=created,
             seeded_directories=seeded,
             written_notes=written,
+            written_cards=written_cards,
             template=bundle.template,
         )
 
@@ -260,6 +273,43 @@ class Vault:
                     f"Could not write bundled note {note.relative_path.as_posix()!r}; notes already written: {already}"
                 )
                 raise TemplateWriteError(message) from exc
+            written.append(target)
+        return tuple(written)
+
+    def _write_template_cards(self, cards: tuple[TemplateCard, ...]) -> tuple[Path, ...]:
+        """Write the bundled reference template cards into this new vault.
+
+        Parameters
+        ----------
+        cards : tuple[TemplateCard, ...]
+            Validated cards resolved for this creation, in title order.
+
+        Returns
+        -------
+        tuple[pathlib.Path, ...]
+            Absolute paths of the cards written, in creation order.
+
+        Raises
+        ------
+        TemplateCardWriteError
+            If a card cannot be written. The message names the failing card and
+            the cards already written, which stay in place.
+        """
+        if not cards:
+            return ()
+        directory = self.templates_directory()
+        written: list[Path] = []
+        for card in cards:
+            target = self.contained(directory / card.relative_path)
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                afanes.core.atomic.write_text_atomic(target, card.text)
+            except (OSError, VaultError) as exc:
+                already = ", ".join(path.relative_to(self.root).as_posix() for path in written) or "none"
+                message = (
+                    f"Could not write template card {card.relative_path.as_posix()!r}; cards already written: {already}"
+                )
+                raise TemplateCardWriteError(message) from exc
             written.append(target)
         return tuple(written)
 
@@ -385,10 +435,10 @@ class Vault:
     def _note_paths(self) -> list[NotePath]:
         """Return note paths and their vault-relative paths in deterministic order."""
         paths: list[NotePath] = []
-        trash_name = TRASH_DIRECTORY.name.casefold()
+        excluded = {TRASH_DIRECTORY.name.casefold(), TEMPLATES_DIRECTORY.name.casefold()}
         for path in sorted(self.root.rglob("*"), key=lambda item: item.as_posix()):
             relative = path.relative_to(self.root)
-            if relative.parts and relative.parts[0].casefold() == trash_name:
+            if relative.parts and relative.parts[0].casefold() in excluded:
                 continue
             if any(part.startswith(".") for part in relative.parts[:-1]):
                 continue
@@ -477,6 +527,24 @@ class Vault:
             folder = Path(afanes.core.names.safe_filename(category.value))
             return self.existing_directory(reference_root, folder)
         return self.existing_directory(self.root, INBOX_DIRECTORY)
+
+    def templates_directory(self) -> Path:
+        """Return the reference template card folder without creating it.
+
+        Returns
+        -------
+        pathlib.Path
+            Absolute ``templates/`` folder inside this vault. An existing
+            directory whose name differs only by case is reused, following the
+            same rule as every other layout directory.
+
+        Notes
+        -----
+        Opening or scanning a vault never creates this folder. A missing folder
+        is returned as its canonical path so a caller can decide whether to
+        write into it.
+        """
+        return self.existing_directory(self.root, TEMPLATES_DIRECTORY)
 
     def read_body(self, note_path: Path) -> str:
         """Read a note and return its Markdown body without frontmatter.
@@ -683,6 +751,8 @@ class VaultCreation:
         Default folders created inside the vault, in layout order.
     written_notes : tuple[pathlib.Path, ...]
         Notes written into the vault, guide first, in creation order.
+    written_cards : tuple[pathlib.Path, ...]
+        Reference template cards written into ``templates/``, in title order.
     template : str | None
         Template identifier used for the notes, or ``None`` for a vault without
         starter content.
@@ -692,4 +762,5 @@ class VaultCreation:
     created_directories: tuple[Path, ...]
     seeded_directories: tuple[Path, ...]
     written_notes: tuple[Path, ...]
+    written_cards: tuple[Path, ...]
     template: str | None

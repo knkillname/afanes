@@ -10,9 +10,16 @@ import afanes.core.frontmatter
 import afanes.core.links
 import afanes.core.search
 import afanes.core.steps
+import afanes.core.template_cards
 import afanes.core.templates
 import afanes.core.vault.service
-from afanes.core.errors import TemplateContentError, TemplateWriteError, UnknownTemplateError
+from afanes.core.errors import (
+    TemplateCardContentError,
+    TemplateCardWriteError,
+    TemplateContentError,
+    TemplateWriteError,
+    UnknownTemplateError,
+)
 from afanes.models.note import NoteType, Status
 
 GUIDE_TEXT = "---\ntype: reference\n---\n\n# Getting started\n\nA guide.\n"
@@ -22,6 +29,7 @@ PLACE_TEXT = "---\ntype: reference\ncategory: place\n---\n\n# Garage\n"
 CATALOG_SIZE = 3
 PERSONAL_NOTE_COUNT = 3
 FAILING_WRITE_CALL = 4
+CARD_COUNT = 7
 CLOSED_STATUSES = frozenset({Status.DONE, Status.CANCELLED, Status.ARCHIVED})
 TODAY = datetime.date(2026, 1, 1)
 
@@ -613,15 +621,25 @@ class TestDateRules:
 
 
 class TestCreationWritesBundledContent:
-    def test_blank_creation_writes_only_the_guide(self, tmp_path: Path) -> None:
+    def test_blank_creation_writes_the_guide_and_cards(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
 
         creation = afanes.core.vault.service.Vault.create_directory(root)
 
         files = sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
-        assert files == ["reference/Getting started.md"]
+        assert files == [
+            "reference/Getting started.md",
+            "templates/organization.md",
+            "templates/person.md",
+            "templates/place.md",
+            "templates/process.md",
+            "templates/source.md",
+            "templates/team.md",
+            "templates/topic.md",
+        ]
         assert creation.template is None
         assert creation.written_notes == (root.resolve() / "reference/Getting started.md",)
+        assert len(creation.written_cards) == CARD_COUNT
 
     def test_templated_creation_writes_the_guide_first(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -727,3 +745,91 @@ class TestCreationWritesBundledContent:
         assert (root / "reference" / "Getting started.md").is_file()
         assert (root / "projects" / "Car service.md").is_file()
         assert not (root / "projects" / "Monthly budget.md").exists()
+
+
+class TestTemplateCardSeeding:
+    def test_a_templated_vault_also_writes_the_seven_cards(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+
+        creation = afanes.core.vault.service.Vault.create_directory(root, template="personal")
+
+        assert len(creation.written_cards) == CARD_COUNT
+        snapshot = creation.vault.scan()
+        assert "Person" not in {note.name for note in snapshot.notes}
+        assert snapshot.failures == ()
+
+    def test_a_card_can_be_edited_after_creation(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        afanes.core.vault.service.Vault.create_directory(root)
+        card = root / "templates" / "person.md"
+        card.write_text(
+            "---\ntype: reference\ncategory: person\ntitle: Contact\ndescription: A person.\n---\n\n## Details\n",
+            encoding="utf-8",
+        )
+
+        listing = afanes.core.template_cards.TemplateCardCatalog.from_root(root / "templates").load()
+
+        assert [item.title for item in listing.cards if item.relative_path.name == "person.md"] == ["Contact"]
+
+    def test_a_deleted_card_is_not_restored(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        creation = afanes.core.vault.service.Vault.create_directory(root)
+        card = root / "templates" / "person.md"
+        card.unlink()
+
+        creation.vault.scan()
+        listing = afanes.core.template_cards.TemplateCardCatalog.from_root(root / "templates").load()
+
+        assert not card.exists()
+        assert [item.relative_path.name for item in listing.cards].count("person.md") == 0
+
+    def test_a_broken_bundled_card_writes_nothing(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        cards_root = tmp_path / "template_cards"
+        _write(cards_root, Path("broken.md"), "---\ntype: reference\n---\n")
+        catalog = afanes.core.template_cards.TemplateCardCatalog.from_root(cards_root)
+        monkeypatch.setattr(
+            afanes.core.template_cards.TemplateCardCatalog,
+            "bundled",
+            classmethod(lambda _cls: catalog),
+        )
+        target = tmp_path / "vault"
+
+        with pytest.raises(TemplateCardContentError):
+            afanes.core.vault.service.Vault.create_directory(target)
+
+        assert not target.exists()
+
+    def test_a_mid_write_card_failure_names_the_card_and_the_written_cards(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        original = afanes.core.atomic.write_text_atomic
+        calls: list[Path] = []
+
+        def fail_on_fourth(path: Path, text: str) -> None:
+            calls.append(path)
+            if len(calls) == FAILING_WRITE_CALL:
+                message = "disk full"
+                raise OSError(message)
+            original(path, text)
+
+        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail_on_fourth)
+        root = tmp_path / "vault"
+
+        with pytest.raises(TemplateCardWriteError) as info:
+            afanes.core.vault.service.Vault.create_directory(root)
+
+        message = str(info.value)
+        assert calls[3].name == "place.md"
+        assert "place.md" in message
+        assert "templates/organization.md" in message
+        assert "templates/person.md" in message
+        assert (root / "reference" / "Getting started.md").is_file()
+        assert (root / "templates" / "organization.md").is_file()
+        assert not (root / "templates" / "place.md").exists()
+        assert afanes.core.vault.service.Vault(root).scan().failures == ()

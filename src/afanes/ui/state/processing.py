@@ -8,9 +8,11 @@ from pathlib import Path
 
 import afanes.core.processing
 import afanes.core.vault.processing
+import afanes.core.vault.service
 import afanes.ui.strings
 from afanes.core.errors import AfanesError, VaultError
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
+from afanes.core.template_cards import TemplateCard, TemplateCardCatalog, TemplateCardIssue, TemplateCardListing
 from afanes.models.note import Status
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.session import VaultSession
@@ -39,6 +41,10 @@ class ProcessingState:
         Validated plan waiting for confirmation.
     result : Path | None
         Destination of the last successful processing apply.
+    cards : tuple[TemplateCard, ...]
+        Valid template cards read when the wizard opened, ordered by title.
+    card_issues : tuple[TemplateCardIssue, ...]
+        Template card files that could not be read or validated.
     """
 
     session: VaultSession
@@ -48,6 +54,8 @@ class ProcessingState:
     body: str | None = None
     plan: ProcessingPlan | AppendStepPlan | None = None
     result: Path | None = None
+    cards: tuple[TemplateCard, ...] = ()
+    card_issues: tuple[TemplateCardIssue, ...] = ()
 
     def reset(self) -> None:
         """Clear the wizard session."""
@@ -55,6 +63,8 @@ class ProcessingState:
         self.body = None
         self.plan = None
         self.result = None
+        self.cards = ()
+        self.card_issues = ()
 
     async def begin(self, path: Path) -> bool:
         """Open the Processing Wizard for an Inbox capture.
@@ -91,10 +101,13 @@ class ProcessingState:
                     logger.debug("Capture could not be read for processing", exc_info=True)
                     self.status.show_message(afanes.ui.strings.PROCESSING_READ_FAILED.format(detail=str(exc)))
                     return False
+                listing = await asyncio.to_thread(self._load_cards, vault)
                 self.note = path
                 self.body = body
                 self.plan = None
                 self.result = None
+                self.cards = listing.cards
+                self.card_issues = listing.issues
                 self.session.selected = path
                 self.session.preview_body = body
                 return True
@@ -108,6 +121,7 @@ class ProcessingState:
         status: Status | None = None,
         due_date: datetime.date | None = None,
         project: str | None = None,
+        card: TemplateCard | None = None,
     ) -> ProcessingPlan | AppendStepPlan | None:
         """Build a processing preview for the open capture.
 
@@ -121,6 +135,8 @@ class ProcessingState:
             Optional calendar due date for a new project.
         project : str | None
             Target project identity for Append step.
+        card : TemplateCard | None
+            Template card chosen for Reference or Later, or ``None`` for Empty.
 
         Returns
         -------
@@ -149,6 +165,7 @@ class ProcessingState:
                         status=status,
                         due_date=due_date,
                         project=project,
+                        card=card,
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Processing plan failed", exc_info=True)
@@ -222,3 +239,23 @@ class ProcessingState:
         self.body = None
         self.plan = None
         self.result = None
+        self.cards = ()
+        self.card_issues = ()
+
+    @staticmethod
+    def _load_cards(vault: afanes.core.vault.service.Vault) -> TemplateCardListing:
+        """Read the vault template card catalog without blocking the UI.
+
+        Parameters
+        ----------
+        vault : afanes.core.vault.service.Vault
+            Active vault whose ``templates/`` folder should be read.
+
+        Returns
+        -------
+        TemplateCardListing
+            Valid cards plus an issue for each refused file. A missing folder
+            yields an empty listing.
+        """
+        catalog = TemplateCardCatalog.from_root(vault.templates_directory())
+        return catalog.load()

@@ -153,6 +153,108 @@ class TestProcessingState:
 
         assert _tree_state(vault) == before
 
+    def test_begin_processing_loads_the_valid_cards(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        card = vault / "templates" / "person.md"
+        card.parent.mkdir(parents=True)
+        card.write_text(
+            "---\ntype: reference\ncategory: person\ntitle: Person\n---\n\n## Contact\n",
+            encoding="utf-8",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            capture = await state.session.capture("Buy milk")
+            assert capture is not None
+            assert await state.processing.begin(capture) is True
+
+        asyncio.run(scenario())
+
+        assert [item.title for item in state.processing.cards] == ["Person"]
+        assert state.processing.card_issues == ()
+
+    def test_begin_processing_without_a_folder_offers_no_cards(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            capture = await state.session.capture("Buy milk")
+            assert capture is not None
+            assert await state.processing.begin(capture) is True
+
+        asyncio.run(scenario())
+
+        assert state.processing.cards == ()
+        assert state.processing.card_issues == ()
+
+    def test_begin_processing_reports_invalid_cards(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        broken = vault / "templates" / "broken.md"
+        broken.parent.mkdir(parents=True)
+        broken.write_text("---\ntype: reference\n---\n", encoding="utf-8")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            capture = await state.session.capture("Buy milk")
+            assert capture is not None
+            assert await state.processing.begin(capture) is True
+
+        asyncio.run(scenario())
+
+        assert state.processing.cards == ()
+        assert [issue.relative_path.as_posix() for issue in state.processing.card_issues] == ["broken.md"]
+
+    def test_build_plan_uses_the_selected_card(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        card = vault / "templates" / "person.md"
+        card.parent.mkdir(parents=True)
+        card.write_text(
+            "---\ntype: reference\ncategory: person\ntitle: Person\n---\n\n## Contact\n",
+            encoding="utf-8",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            capture = await state.session.capture("Buy milk")
+            assert capture is not None
+            assert await state.processing.begin(capture) is True
+            selected = state.processing.cards[0]
+            plan = await state.processing.build_plan(ProcessingOutcome.REFERENCE, card=selected)
+            assert isinstance(plan, ProcessingPlan)
+            assert plan.category == CategoryLabel("person")
+            assert plan.scaffold == "## Contact"
+
+        asyncio.run(scenario())
+
+    def test_build_plan_empty_uses_general(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            capture = await state.session.capture("Buy milk")
+            assert capture is not None
+            assert await state.processing.begin(capture) is True
+            plan = await state.processing.build_plan(ProcessingOutcome.REFERENCE)
+            assert isinstance(plan, ProcessingPlan)
+            assert plan.category == CategoryLabel("general")
+            assert plan.scaffold is None
+
+        asyncio.run(scenario())
+
     def test_plan_processing_builds_a_plan_without_writing(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -221,6 +323,31 @@ class TestProcessingState:
         assert state.processing.note is None
         assert state.processing.plan is None
         assert state.session.notes == ()
+
+    def test_apply_processing_leaves_the_open_page_untouched(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        note = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
+            capture = await state.session.capture("Buy milk")
+            assert capture is not None
+            await state.processing.begin(capture)
+            await state.processing.build_plan(ProcessingOutcome.PROJECT)
+            assert await state.processing.apply() is not None
+
+        asyncio.run(scenario())
+
+        assert state.pages.page is not None
+        assert state.pages.page.path == note.resolve()
+        assert state.pages.editing is False
+        assert state.processing.result is not None
 
     def test_apply_processing_failure_keeps_the_plan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -293,6 +420,187 @@ class TestProcessingState:
 
         assert state.processing.result is None
         assert state.processing.note is None
+
+
+class TestTemplateCards:
+    def test_reads_valid_cards(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        card = vault / "templates" / "person.md"
+        card.parent.mkdir(parents=True)
+        card.write_text("---\ntype: reference\ncategory: person\ntitle: Person\n---\n", encoding="utf-8")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.core.template_cards.TemplateCardListing | None:
+            await state.workspace.choose_vault(vault)
+            return await state.session.template_cards()
+
+        listing = asyncio.run(scenario())
+
+        assert listing is not None
+        assert [item.title for item in listing.cards] == ["Person"]
+        assert listing.issues == ()
+
+    def test_a_missing_folder_is_empty(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.core.template_cards.TemplateCardListing | None:
+            await state.workspace.choose_vault(vault)
+            return await state.session.template_cards()
+
+        listing = asyncio.run(scenario())
+
+        assert listing is not None
+        assert listing.cards == ()
+        assert listing.issues == ()
+
+    def test_invalid_cards_are_reported(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        broken = vault / "templates" / "broken.md"
+        broken.parent.mkdir(parents=True)
+        broken.write_text("---\ntype: reference\n---\n", encoding="utf-8")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.core.template_cards.TemplateCardListing | None:
+            await state.workspace.choose_vault(vault)
+            return await state.session.template_cards()
+
+        listing = asyncio.run(scenario())
+
+        assert listing is not None
+        assert [issue.relative_path.as_posix() for issue in listing.issues] == ["broken.md"]
+
+    def test_without_a_vault_returns_none(self) -> None:
+        state = afanes.ui.state.app_state
+
+        assert asyncio.run(state.session.template_cards()) is None
+
+
+class TestCreateReference:
+    def test_creates_and_opens_the_note_in_edit_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        state.browser.query = "stale"
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.create_reference("Priya Nair", CategoryLabel("person"), "## Contact\n")
+
+        created = asyncio.run(scenario())
+
+        path = vault / "reference" / "person" / "Priya Nair.md"
+        assert created is True
+        assert path.is_file()
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.category == CategoryLabel("person")
+        assert document.body == "# Priya Nair\n\n## Contact\n"
+        assert state.pages.editing is True
+        assert state.pages.page is not None
+        assert state.pages.page.path == path.resolve()
+        assert state.browser.query == ""
+
+    def test_empty_uses_the_general_category(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.create_reference("Inbox thought", CategoryLabel("general"), None)
+
+        created = asyncio.run(scenario())
+
+        path = vault / "reference" / "general" / "Inbox thought.md"
+        assert created is True
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.category == CategoryLabel("general")
+        assert document.body == "# Inbox thought\n"
+
+    def test_a_blank_name_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.create_reference("  ", CategoryLabel("general"), None)
+
+        created = asyncio.run(scenario())
+
+        assert created is False
+        assert not (vault / "reference" / "general").exists()
+        assert state.status.message == afanes.ui.strings.BROWSER_NAME_REQUIRED
+
+    def test_a_collision_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.create_reference("Ada", CategoryLabel("general"), None)
+
+        created = asyncio.run(scenario())
+
+        assert created is False
+        assert not (vault / "reference" / "general" / "Ada.md").exists()
+        assert not (vault / "reference" / "general" / "Ada 2.md").exists()
+
+    def test_a_dirty_current_page_is_saved_first(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        note = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
+            state.pages.edit_page()
+            await state.pages.set_page_body("# Ada\n\nChanged.\n")
+            return await state.navigation.create_reference("Priya", CategoryLabel("person"), "## Contact\n")
+
+        created = asyncio.run(scenario())
+
+        assert created is True
+        assert "# Ada\n\nChanged.\n" in note.read_text(encoding="utf-8")
+        assert state.pages.page is not None
+        assert state.pages.page.path == (vault / "reference" / "person" / "Priya.md").resolve()
+
+    def test_a_refresh_failure_is_reported_after_the_write(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        original = afanes.core.vault.service.Vault.scan
+
+        def failing_scan(current: afanes.core.vault.service.Vault) -> afanes.core.vault.snapshot.VaultSnapshot:
+            if (current.root / "reference" / "person" / "Priya.md").exists():
+                message = "scan failed"
+                raise VaultError(message)
+            return original(current)
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            monkeypatch.setattr(afanes.core.vault.service.Vault, "scan", failing_scan)
+            return await state.navigation.create_reference("Priya", CategoryLabel("person"), None)
+
+        created = asyncio.run(scenario())
+
+        assert created is True
+        assert (vault / "reference" / "person" / "Priya.md").is_file()
+        assert state.status.message is not None
+        assert state.status.message.startswith("Could not refresh")
 
 
 class TestAssignmentCandidates:

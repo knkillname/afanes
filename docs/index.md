@@ -53,6 +53,7 @@ reference/vault-format
 reference/frontmatter
 reference/step-metadata
 reference/templates
+reference/template-cards
 reference/names-and-links
 reference/migration
 reference/troubleshooting

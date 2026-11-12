@@ -12,6 +12,7 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
+from afanes.core.template_cards import TemplateCard
 from afanes.core.vault.snapshot import VaultNote
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import Status
@@ -146,6 +147,28 @@ class ProcessingView:
             width=420,
             visible=False,
         )
+        self._template_choices: dict[str, TemplateCard | None] = {}
+        self.template = ft.Dropdown(
+            label=afanes.ui.strings.PROCESSING_TEMPLATE_LABEL,
+            options=self._template_options(),
+            value="empty",
+            on_select=self._invalidate_plan,
+            width=420,
+            visible=False,
+            key="processing-template",
+        )
+        self.template_description = ft.Text(
+            "",
+            color=afanes.ui.theme.MUTED_TEXT_COLOR,
+            selectable=True,
+            visible=False,
+        )
+        self.template_warning = ft.Text(
+            "",
+            color=afanes.ui.theme.ERROR_TEXT_COLOR,
+            selectable=True,
+            visible=False,
+        )
         self.project_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.preview_button = ft.FilledButton(
             content=afanes.ui.strings.PROCESSING_PREVIEW_ACTION,
@@ -168,6 +191,9 @@ class ProcessingView:
                     spacing=afanes.ui.theme.ITEM_GAP,
                     wrap=True,
                 ),
+                self.template,
+                self.template_description,
+                self.template_warning,
                 ft.Row(
                     controls=[self.due_date, self.project],
                     spacing=afanes.ui.theme.ITEM_GAP,
@@ -278,6 +304,63 @@ class ProcessingView:
         except ValueError:
             return None
 
+    def _template_options(self) -> list[ft.dropdown.Option]:
+        """Build the template options from the catalog loaded for this capture.
+
+        Returns
+        -------
+        list[flet.dropdown.Option]
+            One option per valid card, followed by Empty. Duplicate titles
+            include the relative card path so they stay distinguishable.
+        """
+        cards = self._state.processing.cards
+        counts: dict[str, int] = {}
+        for card in cards:
+            counts[card.title.casefold()] = counts.get(card.title.casefold(), 0) + 1
+        options: list[ft.dropdown.Option] = []
+        self._template_choices = {}
+        for card in cards:
+            key = f"card:{card.relative_path.as_posix()}"
+            self._template_choices[key] = card
+            options.append(ft.dropdown.Option(key=key, text=self._template_option_text(card, counts)))
+        self._template_choices["empty"] = None
+        options.append(ft.dropdown.Option(key="empty", text=afanes.ui.strings.PROCESSING_TEMPLATE_EMPTY))
+        return options
+
+    @staticmethod
+    def _template_option_text(card: TemplateCard, counts: dict[str, int]) -> str:
+        """Return the display text for one card option."""
+        duplicate = counts[card.title.casefold()] > 1
+        if card.description:
+            if duplicate:
+                return afanes.ui.strings.PROCESSING_TEMPLATE_OPTION_DUPLICATE.format(
+                    title=card.title,
+                    description=card.description,
+                    path=card.relative_path.as_posix(),
+                )
+            return afanes.ui.strings.PROCESSING_TEMPLATE_OPTION.format(
+                title=card.title,
+                description=card.description,
+            )
+        if duplicate:
+            return afanes.ui.strings.PROCESSING_TEMPLATE_OPTION_DUPLICATE_PLAIN.format(
+                title=card.title,
+                path=card.relative_path.as_posix(),
+            )
+        return afanes.ui.strings.PROCESSING_TEMPLATE_OPTION_PLAIN.format(title=card.title)
+
+    def _selected_card(self) -> TemplateCard | None:
+        """Return the selected card, or ``None`` for Empty."""
+        key = self.template.value or "empty"
+        return self._template_choices.get(key)
+
+    def _template_summary(self) -> str:
+        """Return the description line for the selected template option."""
+        card = self._selected_card()
+        if card is None:
+            return afanes.ui.strings.PROCESSING_TEMPLATE_DESCRIPTION_EMPTY
+        return card.description or afanes.ui.strings.PROCESSING_TEMPLATE_NO_DESCRIPTION
+
     def _invalidate_plan(self) -> None:
         """Hide stale plan details after the form changes."""
         self._plan_hidden = True
@@ -301,6 +384,7 @@ class ProcessingView:
         status: Status | None = None
         due_date: datetime.date | None = None
         project: str | None = None
+        card: TemplateCard | None = None
 
         if outcome in (ProcessingOutcome.PROJECT, ProcessingOutcome.DONE_NOW):
             if outcome is ProcessingOutcome.PROJECT and self.status.value is not None:
@@ -314,6 +398,8 @@ class ProcessingView:
                     return
         if outcome is ProcessingOutcome.APPEND_STEP:
             project = (self.project.value or "").strip() or None
+        if outcome in (ProcessingOutcome.REFERENCE, ProcessingOutcome.LATER):
+            card = self._selected_card()
 
         self.form_error.visible = False
         self._set_working(working=True)
@@ -323,6 +409,7 @@ class ProcessingView:
                 status=status,
                 due_date=due_date,
                 project=project,
+                card=card,
             )
         finally:
             self._set_working(working=False)
@@ -357,6 +444,7 @@ class ProcessingView:
         self.status.disabled = working
         self.due_date.disabled = working
         self.project.disabled = working
+        self.template.disabled = working
         for control in self.project_suggestions.controls:
             if isinstance(control, ft.ListTile):
                 control.disabled = working
@@ -379,6 +467,16 @@ class ProcessingView:
         self.status.visible = outcome is ProcessingOutcome.PROJECT
         self.due_date.visible = outcome is ProcessingOutcome.PROJECT
         self.project.visible = outcome is ProcessingOutcome.APPEND_STEP
+        reference_outcome = outcome in (ProcessingOutcome.REFERENCE, ProcessingOutcome.LATER)
+        self.template.visible = reference_outcome
+        self.template_description.visible = reference_outcome
+        if reference_outcome:
+            self.template_description.value = self._template_summary()
+        issues = self._state.processing.card_issues
+        self.template_warning.visible = reference_outcome and bool(issues)
+        if issues:
+            paths = ", ".join(issue.relative_path.as_posix() for issue in issues)
+            self.template_warning.value = afanes.ui.strings.PROCESSING_TEMPLATE_INVALID.format(paths=paths)
         self._refresh_suggestions()
 
         success = state.processing.result is not None
@@ -421,6 +519,10 @@ class ProcessingView:
             details.append(f"Status: {plan.target_status.value}")
         if plan.due_date is not None:
             details.append(f"Due: {plan.due_date.isoformat()}")
+        if plan.category is not None:
+            details.append(afanes.ui.strings.PROCESSING_PLAN_CATEGORY.format(category=plan.category.value))
+        if plan.scaffold is not None:
+            details.append(afanes.ui.strings.PROCESSING_PLAN_SCAFFOLD)
         self.plan_details.value = "\n".join(details)
 
         warnings: list[ft.Control] = []

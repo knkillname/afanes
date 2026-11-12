@@ -26,6 +26,7 @@ from afanes.core.errors import (
     VaultNotEmptyError,
     VaultUnreadableError,
 )
+from afanes.core.template_cards import TemplateCardCatalog, TemplateCardListing
 from afanes.core.templates import TemplateSummary
 from afanes.core.vault.service import Vault, VaultCreation
 from afanes.core.vault.snapshot import (
@@ -335,6 +336,47 @@ class VaultSession:
         except (VaultError, OSError):
             logger.debug("Bundled starter content could not be read", exc_info=True)
             return None
+
+    async def template_cards(self) -> TemplateCardListing | None:
+        """Read the vault reference template cards without blocking the interface.
+
+        Returns
+        -------
+        TemplateCardListing | None
+            Valid cards plus an issue for each refused file, or ``None`` when no
+            vault is open or the folder cannot be read.
+
+        Notes
+        -----
+        A missing ``templates/`` folder is an empty listing, not an error. The
+        read performs blocking file I/O in a worker thread and never writes.
+        """
+        vault = self.vault
+        if vault is None:
+            return None
+        try:
+            return await asyncio.to_thread(self._read_template_cards, vault)
+        except (VaultError, OSError) as exc:
+            logger.debug("Reference template cards could not be read", exc_info=True)
+            self.status.show_message(afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc)))
+            return None
+
+    @staticmethod
+    def _read_template_cards(vault: Vault) -> TemplateCardListing:
+        """Read one vault's template card listing without blocking the UI.
+
+        Parameters
+        ----------
+        vault : Vault
+            Active vault whose ``templates/`` folder should be read.
+
+        Returns
+        -------
+        TemplateCardListing
+            Valid cards plus an issue for each refused file.
+        """
+        catalog = TemplateCardCatalog.from_root(vault.templates_directory())
+        return catalog.load()
 
     async def capture(self, text: str) -> Path | None:
         """Capture raw text into the vault's inbox.

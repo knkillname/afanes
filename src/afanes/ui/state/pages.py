@@ -666,8 +666,27 @@ class PageEditorState:
         if preview.sites:
             self.repair_preview = preview
 
-    async def load(self, path: Path) -> bool:
-        """Read a note into the page pane."""
+    async def load(self, path: Path, *, editing: bool = False) -> bool:
+        """Read a note into the page pane.
+
+        Parameters
+        ----------
+        path : Path
+            Note path, relative or absolute, inside the active vault.
+        editing : bool
+            Whether to open the page in edit mode. Raw rescue drafts always open
+            in edit mode because their text must be repaired directly.
+
+        Returns
+        -------
+        bool
+            ``True`` when the page was read and shown.
+
+        Notes
+        -----
+        A failed read keeps the previous page and reports a message. Blocking
+        file I/O runs in a worker thread.
+        """
         vault = self.session.vault
         if vault is None:
             return False
@@ -679,7 +698,7 @@ class PageEditorState:
             self.status.show_message(afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc)))
             return False
         self.page = draft
-        self.editing = draft.mode is DraftMode.RAW
+        self.editing = editing or draft.mode is DraftMode.RAW
         self.conflict = None
         self.status.clear_message()
         return True

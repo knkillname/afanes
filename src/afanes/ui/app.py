@@ -16,6 +16,8 @@ import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.inbox
 import afanes.ui.views.workspace
+from afanes.core.template_cards import TemplateCard, TemplateCardListing
+from afanes.models.note import CategoryLabel
 
 # Public task name so the shell can be observed without exposing its fields.
 REFRESH_TASK_NAME = "workspace-refresh"
@@ -165,7 +167,8 @@ class _Shell:
                 self.choose_vault,
                 self.create_vault,
                 self.close_vault,
-                self.pick_date,
+                on_new_reference=self.show_new_reference_dialog,
+                pick_date=self.pick_date,
             )
             self.workspace = workspace
             digest = self._due_digest()
@@ -465,6 +468,168 @@ class _Shell:
         error.value = message
         error.visible = True
         self.page.update()
+
+    async def show_new_reference_dialog(self) -> None:
+        """Ask for a name and template card, then create the reference.
+
+        Notes
+        -----
+        The card catalog is read through the controller, so the package
+        resources and vault folder are not touched on the interface thread. The
+        dialog holds no application state: the chosen card is passed straight to
+        the navigation command, which writes the note and opens it in edit mode.
+        A blank name or a collision is reported inline and the dialog stays open.
+        """
+        listing = await self.state.session.template_cards()
+        if listing is None:
+            listing = TemplateCardListing(cards=(), issues=())
+        choices, options = self._reference_template_options(listing.cards)
+        name_field = ft.TextField(
+            label=afanes.ui.strings.BROWSER_NAME_LABEL,
+            autofocus=True,
+            key="new-reference-name",
+        )
+        selector = ft.Dropdown(
+            label=afanes.ui.strings.BROWSER_TEMPLATE_LABEL,
+            options=options,
+            value="empty",
+            key="new-reference-template",
+        )
+        description = ft.Text(
+            afanes.ui.strings.BROWSER_TEMPLATE_DESCRIPTION_EMPTY,
+            size=12,
+            color=afanes.ui.theme.MUTED_TEXT_COLOR,
+            selectable=True,
+        )
+        warning = ft.Text(
+            afanes.ui.strings.BROWSER_TEMPLATE_INVALID.format(
+                paths=", ".join(issue.relative_path.as_posix() for issue in listing.issues)
+            ),
+            color=afanes.ui.theme.ERROR_COLOR,
+            visible=bool(listing.issues),
+            key="new-reference-template-warning",
+        )
+        error = ft.Text(
+            "",
+            color=afanes.ui.theme.ERROR_COLOR,
+            visible=False,
+            key="new-reference-error",
+        )
+
+        def refresh_description(_event: object = None) -> None:
+            card = choices.get(selector.value or "empty")
+            if card is None or not card.description:
+                description.value = (
+                    afanes.ui.strings.BROWSER_TEMPLATE_DESCRIPTION_EMPTY
+                    if card is None
+                    else afanes.ui.strings.BROWSER_TEMPLATE_NO_DESCRIPTION
+                )
+            else:
+                description.value = card.description
+            self.page.update()
+
+        selector.on_select = refresh_description
+
+        async def submit() -> None:
+            name = (name_field.value or "").strip()
+            if not name:
+                self._show_create_error(error, afanes.ui.strings.BROWSER_NAME_REQUIRED)
+                return
+            card = choices.get(selector.value or "empty")
+            category = card.category if card is not None else CategoryLabel("general")
+            scaffold = card.body if card is not None and card.body.strip() else None
+            if not await self.state.navigation.create_reference(name, category, scaffold):
+                self._show_create_error(error, self.state.status.message or afanes.ui.strings.BROWSER_NAME_REQUIRED)
+                return
+            self.page.pop_dialog()
+            await self.render()
+
+        async def cancel() -> None:
+            self.page.pop_dialog()
+            self.page.update()
+
+        name_field.on_submit = submit
+        self.page.show_dialog(
+            ft.AlertDialog(
+                title=ft.Text(afanes.ui.strings.BROWSER_NEW_REFERENCE_TITLE),
+                content=ft.Column(
+                    controls=[
+                        ft.Text(afanes.ui.strings.BROWSER_NEW_REFERENCE_BODY),
+                        name_field,
+                        selector,
+                        description,
+                        warning,
+                        error,
+                    ],
+                    tight=True,
+                ),
+                actions=[
+                    ft.TextButton(
+                        content=afanes.ui.strings.CANCEL_ACTION,
+                        on_click=cancel,
+                        key="new-reference-cancel",
+                    ),
+                    ft.FilledButton(
+                        content=afanes.ui.strings.BROWSER_CREATE_ACTION,
+                        on_click=submit,
+                        key="new-reference-submit",
+                    ),
+                ],
+            ),
+        )
+        self.page.update()
+
+    @staticmethod
+    def _reference_template_options(
+        cards: tuple[TemplateCard, ...],
+    ) -> tuple[dict[str, TemplateCard | None], list[ft.dropdown.Option]]:
+        """Build the dialog's template choices and their display options.
+
+        Parameters
+        ----------
+        cards : tuple[TemplateCard, ...]
+            Valid cards read from the vault.
+
+        Returns
+        -------
+        tuple[dict[str, TemplateCard | None], list[flet.dropdown.Option]]
+            Lookup from option key to card, with ``empty`` mapped to ``None``,
+            and the options in the same order with Empty last.
+        """
+        counts: dict[str, int] = {}
+        for card in cards:
+            counts[card.title.casefold()] = counts.get(card.title.casefold(), 0) + 1
+        choices: dict[str, TemplateCard | None] = {}
+        options: list[ft.dropdown.Option] = []
+        for card in cards:
+            key = f"card:{card.relative_path.as_posix()}"
+            choices[key] = card
+            options.append(ft.dropdown.Option(key=key, text=_Shell._reference_template_text(card, counts)))
+        choices["empty"] = None
+        options.append(ft.dropdown.Option(key="empty", text=afanes.ui.strings.BROWSER_TEMPLATE_EMPTY))
+        return choices, options
+
+    @staticmethod
+    def _reference_template_text(card: TemplateCard, counts: dict[str, int]) -> str:
+        """Return the display text for one browser template option."""
+        duplicate = counts[card.title.casefold()] > 1
+        if card.description:
+            if duplicate:
+                return afanes.ui.strings.BROWSER_TEMPLATE_OPTION_DUPLICATE.format(
+                    title=card.title,
+                    description=card.description,
+                    path=card.relative_path.as_posix(),
+                )
+            return afanes.ui.strings.BROWSER_TEMPLATE_OPTION.format(
+                title=card.title,
+                description=card.description,
+            )
+        if duplicate:
+            return afanes.ui.strings.BROWSER_TEMPLATE_OPTION_DUPLICATE_PLAIN.format(
+                title=card.title,
+                path=card.relative_path.as_posix(),
+            )
+        return afanes.ui.strings.BROWSER_TEMPLATE_OPTION_PLAIN.format(title=card.title)
 
     def show_vault_dialog(self) -> None:
         """Ask for a vault path in a dialog, for a browser session."""

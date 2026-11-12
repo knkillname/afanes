@@ -1,16 +1,20 @@
 """Page navigation, link routing, and the bounded history stack."""
 
+import asyncio
 import dataclasses
 import logging
 from pathlib import Path
 
 import afanes.core.links
 import afanes.core.names
+import afanes.core.vault.pages
+import afanes.ui.state.browser
 import afanes.ui.strings
-from afanes.core.errors import InvalidReferenceError
+from afanes.core.errors import AfanesError, InvalidReferenceError, VaultError
 from afanes.core.links import DestinationKind, ReferenceParser
 from afanes.core.vault.snapshot import LinkOutcome
 from afanes.models.link import NoteReference
+from afanes.models.note import CategoryLabel, NoteType
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.pages import PageEditorState
 from afanes.ui.state.session import VaultSession
@@ -31,6 +35,8 @@ class PageNavigator:
         Vault state that owns the scan snapshot.
     pages : PageEditorState
         Editor that owns the open draft.
+    browser : afanes.ui.state.browser.BrowserState
+        Browser query cleared after a creation.
     status : UiStatus
         Shared banner and busy flags.
     command_lock : CommandLock
@@ -43,6 +49,7 @@ class PageNavigator:
 
     session: VaultSession
     pages: PageEditorState
+    browser: afanes.ui.state.browser.BrowserState
     status: UiStatus
     command_lock: CommandLock
     history: tuple[Path, ...] = ()
@@ -87,6 +94,92 @@ class PageNavigator:
                 return True
             finally:
                 self.status.set_busy(busy=False)
+
+    async def create_reference(
+        self,
+        name: str,
+        category: CategoryLabel,
+        scaffold: str | None,
+    ) -> bool:
+        """Create a reference from the browser and open it for editing.
+
+        Parameters
+        ----------
+        name : str
+            Display name typed by the user. It is sanitized into the identity
+            filename without an added suffix.
+        category : CategoryLabel
+            Reference category, or ``general`` for Empty.
+        scaffold : str | None
+            Starter body from the chosen card, or ``None`` for Empty.
+
+        Returns
+        -------
+        bool
+            ``True`` when the note was written and opened in edit mode.
+
+        Notes
+        -----
+        The current draft is committed first, using the same guard as opening a
+        page. A blank name or a collision writes nothing. The note is written
+        atomically, the scan is refreshed, the browser query is cleared, and the
+        new page opens in edit mode. If the scan fails after the write, the note
+        remains and the banner reports the refresh failure. Blocking I/O runs in
+        a worker thread.
+        """
+        display_name = name.strip()
+        if not display_name:
+            self.status.show_message(afanes.ui.strings.BROWSER_NAME_REQUIRED)
+            return False
+        async with self.command_lock:
+            vault = self.session.vault
+            if vault is None:
+                return False
+            self.status.set_busy(busy=True)
+            try:
+                if not await self.pages.commit():
+                    return False
+                previous = self.pages.page.path if self.pages.page is not None else None
+                body = self._reference_body(display_name, scaffold)
+                try:
+                    path = await asyncio.to_thread(
+                        afanes.core.vault.pages.VaultPages(vault).create_page,
+                        display_name,
+                        NoteType.REFERENCE,
+                        category,
+                        body=body,
+                    )
+                except (AfanesError, OSError) as exc:
+                    logger.debug("Browser reference could not be created", exc_info=True)
+                    self.status.show_message(afanes.ui.strings.BROWSER_CREATE_FAILED.format(detail=str(exc)))
+                    return False
+                refresh_error: str | None = None
+                try:
+                    snapshot = await asyncio.to_thread(vault.scan)
+                except (VaultError, OSError) as exc:
+                    logger.debug("Snapshot refresh after creating a reference failed", exc_info=True)
+                    refresh_error = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
+                else:
+                    self.session.apply_snapshot(snapshot, focus=path)
+                self.browser.query = ""
+                if not await self.pages.load(path, editing=True):
+                    return False
+                self.ambiguous = ()
+                self._push_history(previous)
+                if refresh_error is not None:
+                    self.status.show_message(refresh_error)
+                return True
+            finally:
+                self.status.set_busy(busy=False)
+
+    @staticmethod
+    def _reference_body(name: str, scaffold: str | None) -> str:
+        """Build the body for a browser-created reference."""
+        body = f"# {name}\n"
+        starter = (scaffold or "").strip("\r\n")
+        if starter:
+            return f"{body}\n{starter}\n"
+        return body
 
     async def back(self) -> bool:
         """Return to the previous page in the shared history.

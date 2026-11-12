@@ -290,15 +290,34 @@ class TestVaultCreation:
 
         assert list(creation.seeded_directories) == expected
 
-    def test_creation_writes_only_the_guide(self, tmp_path: Path) -> None:
+    def test_creation_writes_the_guide_and_the_seven_cards(self, tmp_path: Path) -> None:
         creation = afanes.core.vault.service.Vault.create_directory(tmp_path / "vault")
 
         files = [
             path.relative_to(creation.vault.root).as_posix()
-            for path in creation.vault.root.rglob("*")
+            for path in sorted(creation.vault.root.rglob("*"))
             if path.is_file()
         ]
-        assert files == ["reference/Getting started.md"]
+        assert files == [
+            "reference/Getting started.md",
+            "templates/organization.md",
+            "templates/person.md",
+            "templates/place.md",
+            "templates/process.md",
+            "templates/source.md",
+            "templates/team.md",
+            "templates/topic.md",
+        ]
+        assert [path.name for path in creation.written_cards] == [
+            "organization.md",
+            "person.md",
+            "place.md",
+            "process.md",
+            "source.md",
+            "team.md",
+            "topic.md",
+        ]
+        assert all(path.is_relative_to(creation.vault.root) for path in creation.written_cards)
 
     def test_refusal_writes_nothing(self, tmp_path: Path) -> None:
         target = tmp_path / "vault"
@@ -364,6 +383,43 @@ class TestScanVault:
         snapshot = afanes.core.vault.service.Vault(root).scan()
 
         resolution = snapshot.catalog.resolve(NoteReference(scheme=ReferenceScheme.NOTE, name="Ada"))
+        assert resolution.outcome is ResolutionOutcome.UNRESOLVED
+
+    def test_skips_the_templates_directory(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "templates/person.md", "reference", category="person")
+        _write_note(root / "Active.md")
+
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+
+        assert [note.name for note in snapshot.notes] == ["Active"]
+
+    def test_skips_a_case_variant_of_templates(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Templates/person.md", "reference", category="person")
+        _write_note(root / "Active.md")
+
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+
+        assert [note.name for note in snapshot.notes] == ["Active"]
+
+    def test_a_template_name_does_not_collide_with_a_note(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "templates/Ada.md", "reference", category="person")
+        vault = afanes.core.vault.service.Vault(root)
+
+        path = afanes.core.vault.pages.VaultPages(vault).create_page("Ada", NoteType.REFERENCE)
+
+        assert path == root / "reference" / "Ada.md"
+
+    def test_a_reference_to_a_template_name_is_unresolved(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "templates/person.md", "reference", category="person")
+        _write_note(root / "inbox/Note.md", body="[Person](note:person)")
+
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+
+        resolution = snapshot.catalog.resolve(NoteReference(scheme=ReferenceScheme.NOTE, name="person"))
         assert resolution.outcome is ResolutionOutcome.UNRESOLVED
 
     def test_skips_a_symlink_that_escapes_the_vault(self, tmp_path: Path) -> None:
@@ -816,3 +872,30 @@ class TestCreateNote:
                 NoteType.NOTE,
                 category=CategoryLabel("person"),
             )
+
+
+class TestTemplatesDirectory:
+    def test_a_missing_folder_is_not_created(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.service.Vault(root)
+
+        directory = vault.templates_directory()
+        vault.scan()
+
+        assert directory == root / "templates"
+        assert not directory.exists()
+
+    def test_the_canonical_folder_is_returned(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        (root / "templates").mkdir(parents=True)
+        vault = afanes.core.vault.service.Vault(root)
+
+        assert vault.templates_directory() == root / "templates"
+
+    def test_a_case_variant_is_reused(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        (root / "Templates").mkdir(parents=True)
+        vault = afanes.core.vault.service.Vault(root)
+
+        assert vault.templates_directory() == root / "Templates"

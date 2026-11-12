@@ -11,7 +11,7 @@ from typing import Self
 
 from afanes.core.errors import ProcessingError
 from afanes.core.frontmatter import NoteDocument
-from afanes.models.note import NoteType, Status
+from afanes.models.note import CategoryLabel, NoteType, Status
 
 
 class ProcessingOutcome(StrEnum):
@@ -123,6 +123,12 @@ class ProcessingPlan:
         Optional calendar due date for a project.
     body_override : str | None
         Complete replacement body, or ``None`` to preserve the capture body.
+    category : CategoryLabel | None
+        Reference category applied to the note, or ``None`` for outcomes that
+        do not produce a reference.
+    scaffold : str | None
+        Starter body appended below the capture text, or ``None`` when the
+        chosen card has no starter body.
     source_hash : str
         SHA-256 of the source bytes captured while planning.
     processed_hash : str
@@ -148,6 +154,8 @@ class ProcessingPlan:
     target_status: Status | None
     due_date: datetime.date | None
     body_override: str | None
+    category: CategoryLabel | None
+    scaffold: str | None
     source_hash: str
     processed_hash: str
     reference_count: int
@@ -194,8 +202,40 @@ class ProcessingPlan:
             raw.pop("due_date", None)
         else:
             raw["due_date"] = self.due_date
+        if self.category is None:
+            raw.pop("category", None)
+        else:
+            raw["category"] = self.category.value
         body = document.body if self.body_override is None else self.body_override
+        if self.scaffold is not None:
+            body = self._append_scaffold(body, document.newline)
         return document.with_body(body).with_metadata(raw).to_text()
+
+    def _append_scaffold(self, body: str, newline: str) -> str:
+        """Append the starter body below the capture text.
+
+        Parameters
+        ----------
+        body : str
+            Capture body, or the body override, in the document's newline style.
+        newline : str
+            Newline sequence used by the document.
+
+        Returns
+        -------
+        str
+            Body whose original text remains a prefix, followed by the starter
+            body and a final newline. An empty scaffold leaves the body
+            unchanged.
+        """
+        scaffold = (self.scaffold or "").replace("\r\n", "\n").replace("\r", "\n").strip("\n")
+        if not scaffold:
+            return body
+        normalized = scaffold.replace("\n", newline)
+        prefix = body.rstrip("\r\n")
+        if not prefix:
+            return f"{normalized}{newline}"
+        return f"{prefix}{newline}{newline}{normalized}{newline}"
 
     def _validate_common(self) -> None:
         """Validate path, hash, and count invariants."""
@@ -221,6 +261,9 @@ class ProcessingPlan:
             if self.due_date is not None:
                 message = "Trash does not accept assignment metadata"
                 raise ProcessingError(message)
+            if self.category is not None or self.scaffold is not None:
+                message = "Trash does not accept a category or starter body"
+                raise ProcessingError(message)
             return
         if self.outcome in (ProcessingOutcome.LATER, ProcessingOutcome.REFERENCE):
             self._validate_reference_outcome()
@@ -234,6 +277,9 @@ class ProcessingPlan:
             raise ProcessingError(message)
         if self.due_date is not None:
             message = "Reference outcomes do not accept a due date"
+            raise ProcessingError(message)
+        if self.category is None:
+            message = "Reference outcomes need a category"
             raise ProcessingError(message)
         expected_status = Status.LATER if self.outcome is ProcessingOutcome.LATER else None
         if self.target_status is not expected_status:
@@ -250,6 +296,9 @@ class ProcessingPlan:
             raise ProcessingError(message)
         if self.outcome is ProcessingOutcome.DONE_NOW and self.target_status is not Status.DONE:
             message = "Done now must complete the project"
+            raise ProcessingError(message)
+        if self.category is not None or self.scaffold is not None:
+            message = "Project outcomes do not accept a category or starter body"
             raise ProcessingError(message)
 
 

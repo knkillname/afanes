@@ -7,7 +7,7 @@ groups every parsed note, filters the active section, and opens a note without c
 :class: note
 
 The browser has one group per kind of note. A note appears in exactly one group, and anything under
-`trash/` is absent. Search filters the group you are looking at.
+`trash/` or `templates/` is absent. Search filters the group you are looking at.
 :::
 
 ```{image} ../_static/screenshots/workspace.png
@@ -25,8 +25,13 @@ The browser has one group per kind of note. A note appears in exactly one group,
 | **Needs attention** | Parsed `type: note` notes found outside `inbox/` |
 | **Unreadable notes** | Files that could not be parsed; selecting one opens raw rescue mode |
 
-A capture under `inbox/` appears only under **Inbox**. A note under `trash/` appears nowhere. Selecting
-an entry opens it in the page pane without changing the browser section.
+A capture under `inbox/` appears only under **Inbox**. A note under `trash/` appears nowhere, and a
+file under `templates/` is a template card rather than a note. Selecting an entry opens it in the page
+pane without changing the browser section.
+
+The **References** section also offers **New reference**. The dialog asks for a name and a template
+card or Empty, writes the note immediately, and opens it in edit mode. See
+[References and categories](references-and-categories.md) for the creation rules.
 
 **Needs attention** exists because a capture outside the Inbox cannot be processed. Move it back to the
 Inbox or clarify it by editing its frontmatter by hand. **Unreadable notes** opens the complete file in

@@ -11,7 +11,7 @@ out of the Inbox, so a failed move leaves the capture available for a retry.
 :::
 
 ```{image} ../_static/screenshots/processing.png
-:alt: The Process capture wizard with Project selected, a status, and a due date field
+:alt: The Process capture wizard with Reference selected and a template picker
 :class: screenshot
 ```
 
@@ -20,8 +20,8 @@ out of the Inbox, so a failed move leaves the capture available for a retry.
 | Outcome | Result |
 | --- | --- |
 | **Trash** | Moves the capture to `trash/` without rewriting it |
-| **Later** | Keeps it as a reference with `status: later` |
-| **Reference** | Keeps it as an uncategorized reference with no status |
+| **Later** | Keeps it as a reference with `status: later`, using the chosen template card or Empty |
+| **Reference** | Keeps it as a reference, using the chosen template card or Empty |
 | **Project** | Turns it into a project with a status and optional due date |
 | **Append step** | Adds the capture as a step of an existing project and moves the capture to trash |
 | **Done now** | Writes a completed one-step project with `status: done` |
@@ -31,6 +31,21 @@ start empty.
 
 The preview shows the destination and, when the outcome changes scheme, how many inbound references
 will become unresolved.
+
+## 🗂️ Template cards
+
+Reference and Later ask which kind of reference you are creating. The **Template** field lists the
+valid cards from the vault's `templates/` folder plus **Empty**. A card supplies the category and a
+starter body; Empty uses `category: general` and adds no starter body. Processing never guesses the
+card from the capture text.
+
+The starter body is added below the capture text in the same atomic write as the classification. The
+preview names the category and says whether a starter body will be added. Invalid cards are skipped
+and named in a warning; the valid cards remain available. See
+[Template cards](../reference/template-cards.md) for the card format.
+
+Processing finishes on its success panel. It does not open the created note in the page editor, so you
+can continue with the next capture or review item.
 
 ## 🔗 Append step
 
@@ -55,8 +70,8 @@ Every other outcome writes the classified frontmatter atomically and then moves 
 `inbox/`. A failed move leaves the note in the Inbox so the same plan can be retried.
 
 :::{important} Remember
-Processing never infers a status, category, project, owner, or due date from the capture text. You
-choose every label.
+Processing never infers a status, template card, project, owner, or due date from the capture text.
+You choose every label.
 :::
 
 ## 🧭 See also

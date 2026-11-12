@@ -25,6 +25,17 @@ heading in the browser and gives them a folder inside `reference/`. `person`, `p
 `process`, `topic`, and `source` are conventions, not a fixed list; write any label that helps you
 find the note again.
 
+## Reference template cards
+
+Every new vault includes a `templates/` folder with reference template cards. A card declares a
+`category` and a starter body, so choosing it in processing or in the browser creates a reference with
+the right folder and the fields you usually need. The seeded cards cover a person, a team, an
+organization, a place, a process, a topic, and a source.
+
+The folder is not part of your notes. Files in `templates/` are left out of the browser and out of
+searches, and their names never collide with note names. Edit, add, or delete cards with any text
+editor; a card removed from the folder stays removed.
+
 ## How a capture becomes a project
 
 1. Write one line in the Inbox. The first line becomes the note's name and title.

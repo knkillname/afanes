@@ -98,6 +98,37 @@ class TemplateWriteError(TemplateError):
     """
 
 
+class TemplateCardError(TemplateError):
+    """Base class for failures in reference template cards.
+
+    Notes
+    -----
+    Template cards participate in vault creation, so their failures are vault
+    creation refusals and share the same interface message as broken starter
+    content.
+    """
+
+
+class TemplateCardContentError(TemplateCardError):
+    """Raised when a bundled template card violates the card format.
+
+    Notes
+    -----
+    The message names the offending card. Nothing is written when this error is
+    raised, so a broken bundle cannot seed a partial vault.
+    """
+
+
+class TemplateCardWriteError(TemplateCardError):
+    """Raised when a bundled template card cannot be written into a new vault.
+
+    Notes
+    -----
+    Cards written before the failure remain in place, and the message names
+    both the failing card and the cards already written.
+    """
+
+
 class NoteParseError(AfanesError):
     """Raised when a note's frontmatter or metadata cannot be parsed."""
 

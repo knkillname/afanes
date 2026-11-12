@@ -63,6 +63,7 @@ class AppState:
         self.navigation = PageNavigator(
             session=self.session,
             pages=self.pages,
+            browser=self.browser,
             status=self.status,
             command_lock=self._command_lock,
         )

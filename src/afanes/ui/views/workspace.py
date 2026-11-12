@@ -47,6 +47,9 @@ class WorkspaceView:
         Command that asks for a new vault path and creates it.
     on_close_vault : Callable[[], Awaitable[None]]
         Command that closes the current vault and returns to the welcome state.
+    on_new_reference : Callable[[], Awaitable[None]] | None
+        Command that opens the new-reference dialog from the References
+        section.
     """
 
     def __init__(
@@ -55,6 +58,7 @@ class WorkspaceView:
         on_change_vault: Callable[[], Awaitable[None]],
         on_create_vault: Callable[[], Awaitable[None]],
         on_close_vault: Callable[[], Awaitable[None]],
+        on_new_reference: Callable[[], Awaitable[None]] | None = None,
         pick_date: afanes.ui.views.page.PickDate | None = None,
     ) -> None:
         """Build the workspace controls against the shared application state.
@@ -69,6 +73,9 @@ class WorkspaceView:
             Command that creates a new vault.
         on_close_vault : Callable[[], Awaitable[None]]
             Command that closes the current vault.
+        on_new_reference : Callable[[], Awaitable[None]] | None
+            Command that opens the new-reference dialog. ``None`` leaves the
+            action inert, which tests use for unrelated shell coverage.
         pick_date : afanes.ui.views.page.PickDate | None
             Command that opens the date picker for step and project dates.
         """
@@ -77,6 +84,7 @@ class WorkspaceView:
         self._on_change_vault = on_change_vault
         self._on_create_vault = on_create_vault
         self._on_close_vault = on_close_vault
+        self._on_new_reference = on_new_reference
         self._pick_date = pick_date
         self._processing_view: afanes.ui.views.processing.ProcessingView | None = None
         self._processing_key: tuple[Path | None, Path | None] | None = None
@@ -100,6 +108,12 @@ class WorkspaceView:
             tooltip=afanes.ui.strings.REFRESH_ACTION,
             on_click=self._refresh,
             key="workspace-refresh",
+        )
+        self.new_reference_button = ft.FilledButton(
+            content=afanes.ui.strings.BROWSER_NEW_REFERENCE,
+            icon=ft.Icons.ADD,
+            on_click=self._new_reference,
+            key="browser-new-reference",
         )
         self.change_button = ft.PopupMenuButton(
             content=ft.Text(afanes.ui.strings.CHANGE_VAULT_ACTION),
@@ -316,6 +330,16 @@ class WorkspaceView:
         finally:
             self._set_working(working=False)
 
+    async def _new_reference(self) -> None:
+        """Open the new-reference dialog through the application shell."""
+        if self._on_new_reference is None:
+            return
+        self._set_working(working=True)
+        try:
+            await self._on_new_reference()
+        finally:
+            self._set_working(working=False)
+
     async def _select(self, path: Path) -> None:
         """Open one browser entry in the page pane."""
         self._set_working(working=True)
@@ -384,6 +408,7 @@ class WorkspaceView:
         self.capture_button.disabled = working
         self.refresh_button.disabled = working
         self.change_button.disabled = working
+        self.new_reference_button.disabled = working
         self.capture_field.read_only = working
         self._set_section_tiles_disabled(disabled=working)
         self._update()
@@ -442,6 +467,12 @@ class WorkspaceView:
         groups = listing.groups_for(section)
         controls: list[ft.Control] = []
         if section is afanes.core.search.BrowserSection.REFERENCES:
+            controls.append(
+                ft.Container(
+                    padding=afanes.ui.theme.ITEM_GAP,
+                    content=self.new_reference_button,
+                )
+            )
             for group in groups:
                 if not group.notes:
                     continue
@@ -456,7 +487,7 @@ class WorkspaceView:
                     )
                 )
                 controls.extend(self._note_row(note) for note in group.notes)
-            groups_empty = not controls
+            groups_empty = not any(group.notes for group in groups)
         else:
             notes = groups[0].notes if groups else ()
             controls = [self._note_row(note) for note in notes]
@@ -465,12 +496,12 @@ class WorkspaceView:
             message = (
                 afanes.ui.strings.BROWSER_NO_MATCH if state.browser.query.strip() else afanes.ui.strings.BROWSER_EMPTY
             )
-            return [
+            controls.append(
                 ft.Container(
                     padding=afanes.ui.theme.ITEM_GAP,
                     content=ft.Text(message, color=afanes.ui.theme.MUTED_TEXT_COLOR, selectable=True),
                 )
-            ]
+            )
         return controls
 
     def _note_row(self, note: VaultNote) -> ft.Control:
