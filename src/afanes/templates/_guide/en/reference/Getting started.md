@@ -9,7 +9,7 @@ first block between `---` lines holds the metadata Afanes uses; the rest of the 
 Markdown. Nothing is stored anywhere else, so the files stay readable and portable without the
 application.
 
-## Three kinds of notes
+## Four kinds of notes
 
 - **Note** — a thought that has not been clarified yet. Captures live in `inbox/`, and a note may
   only sit there.
@@ -17,6 +17,7 @@ application.
   process. References live in `reference/`, optionally inside one category folder.
 - **Project** — an outcome that needs more than one action. Projects live in `projects/`, and the
   steps that advance them are checkbox items in the same file.
+- **Log** — a dated diary entry. Its date is its identity, and it lives under `log/`.
 
 ## Category labels
 
@@ -27,20 +28,32 @@ find the note again.
 
 ## Reference template cards
 
-Every new vault includes a `templates/` folder with reference template cards. A card declares a
-`category` and a starter body, so choosing it in processing or in the browser creates a reference with
-the right folder and the fields you usually need. The seeded cards cover a person, a team, an
-organization, a place, a process, a topic, and a source.
+Every new vault includes a `templates/` folder with reference and log template cards. A reference
+card declares a `category` and a starter body; a log card declares `type: log` and a starter body.
+Choosing a card in processing, in the browser, or in the Log creates a note with the right shape.
+The seeded cards cover a person, a team, an organization, a place, a process, a topic, a source, and
+a daily entry.
 
 The folder is not part of your notes. Files in `templates/` are left out of the browser and out of
 searches, and their names never collide with note names. Edit, add, or delete cards with any text
 editor; a card removed from the folder stays removed.
 
+## Log entries
+
+A log entry is a diary page. Its `date` is its identity and its filename: `2025.md`, `2025-10.md`, or
+`2025-10-12.md`, filed under `log/<year>/` or `log/<year>/<month>/`. Only one log entry may exist for
+each exact date. The first heading is the display title, so the filename stays a date.
+
+Open the **Log** section to see the calendar and the collapsed year tree. **Today's entry** opens or
+creates today's page; an empty calendar day or the plus on an empty month or year row creates an
+entry for that date. **Entries** shows only log notes; **Everything** is a date lens over the whole
+vault. Changing an entry's date renames and moves it and updates inbound `log:` links.
+
 ## How a capture becomes a project
 
 1. Write one line in the Inbox. The first line becomes the note's name and title.
 2. Open the capture and choose **Process**. Pick an outcome: Trash, Later, Reference, Project,
-   Append step, or Done now.
+   Log entry, Append step, or Done now.
 3. A Project outcome asks for an optional status and due date. The capture moves to `projects/` and
    its body becomes the project body.
 4. Open the project and add steps such as `- [ ] Draft the checklist`. The first unchecked step in
@@ -52,9 +65,9 @@ A note's filename stem is its identity. Renaming the file renames the note, and 
 by that name. The display title comes from the first level-1 heading in the body, so a filename and a
 heading may differ.
 
-Link to a reference or capture with `[Label](<note:Name>)`, or to a project with
-`[Label](<project:Name>)`. Use angle brackets when the name contains spaces so the destination stays
-unambiguous.
+Link to a reference or capture with `[Label](<note:Name>)`, to a project with
+`[Label](<project:Name>)`, or to a log entry with `[Label](<log:2025-10-12>)`. Use angle brackets when
+the name contains spaces so the destination stays unambiguous.
 
 ## Working by hand
 

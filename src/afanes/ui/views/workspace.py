@@ -9,12 +9,17 @@ vault file. The browser stays visible while the main area shows the page pane,
 the Processing Wizard, or a guided review.
 """
 
+import asyncio
+import datetime
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import flet as ft
 
+import afanes.core.log
 import afanes.core.search
+import afanes.ui.components.calendar
+import afanes.ui.components.log_tree
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
@@ -23,13 +28,25 @@ import afanes.ui.views.processing
 import afanes.ui.views.projects
 import afanes.ui.views.review
 from afanes.core.vault.snapshot import VaultFailure, VaultNote
+from afanes.models.note import DatePrecision, NoteDate
 from afanes.ui.components.banner import Banner
+
+_MONTHS_IN_YEAR = 12
 
 _SECTION_ICONS = {
     afanes.ui.state.browser.WorkspaceSection.INBOX: ft.Icons.INBOX,
     afanes.ui.state.browser.WorkspaceSection.PROJECTS: ft.Icons.FOLDER,
     afanes.ui.state.browser.WorkspaceSection.REFERENCES: ft.Icons.BOOK,
+    afanes.ui.state.browser.WorkspaceSection.LOG: ft.Icons.CALENDAR_MONTH,
     afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION: ft.Icons.WARNING_AMBER,
+}
+
+_SECTION_COLORS = {
+    afanes.ui.state.browser.WorkspaceSection.INBOX: afanes.ui.theme.INBOX_SECTION_COLOR,
+    afanes.ui.state.browser.WorkspaceSection.PROJECTS: afanes.ui.theme.PROJECTS_SECTION_COLOR,
+    afanes.ui.state.browser.WorkspaceSection.REFERENCES: afanes.ui.theme.REFERENCES_SECTION_COLOR,
+    afanes.ui.state.browser.WorkspaceSection.LOG: afanes.ui.theme.LOG_SECTION_COLOR,
+    afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION: afanes.ui.theme.ERROR_COLOR,
 }
 
 
@@ -50,6 +67,8 @@ class WorkspaceView:
     on_new_reference : Callable[[], Awaitable[None]] | None
         Command that opens the new-reference dialog from the References
         section.
+    on_log_entry : Callable[[NoteDate], Awaitable[None]] | None
+        Command that opens or creates the log entry for a date.
     """
 
     def __init__(
@@ -60,6 +79,7 @@ class WorkspaceView:
         on_close_vault: Callable[[], Awaitable[None]],
         on_new_reference: Callable[[], Awaitable[None]] | None = None,
         pick_date: afanes.ui.views.page.PickDate | None = None,
+        on_log_entry: Callable[[NoteDate], Awaitable[None]] | None = None,
     ) -> None:
         """Build the workspace controls against the shared application state.
 
@@ -78,6 +98,8 @@ class WorkspaceView:
             action inert, which tests use for unrelated shell coverage.
         pick_date : afanes.ui.views.page.PickDate | None
             Command that opens the date picker for step and project dates.
+        on_log_entry : Callable[[NoteDate], Awaitable[None]] | None
+            Command that opens or creates a log entry for a date.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
@@ -85,7 +107,13 @@ class WorkspaceView:
         self._on_create_vault = on_create_vault
         self._on_close_vault = on_close_vault
         self._on_new_reference = on_new_reference
+        self._on_log_entry = on_log_entry
         self._pick_date = pick_date
+        self.log_calendar: afanes.ui.components.calendar.LogCalendar | None = None
+        self.log_tree: afanes.ui.components.log_tree.LogTree | None = None
+        self.log_today_button: ft.FilledButton | None = None
+        self.log_entries_button: ft.TextButton | None = None
+        self.log_everything_button: ft.TextButton | None = None
         self._processing_view: afanes.ui.views.processing.ProcessingView | None = None
         self._processing_key: tuple[Path | None, Path | None] | None = None
         self._projects_view: afanes.ui.views.projects.ProjectsView | None = None
@@ -99,8 +127,7 @@ class WorkspaceView:
         )
         self.vault_text = ft.Text(
             "",
-            size=12,
-            color=afanes.ui.theme.MUTED_TEXT_COLOR,
+            style=afanes.ui.theme.METADATA_TEXT_STYLE,
             selectable=True,
         )
         self.refresh_button = ft.IconButton(
@@ -145,7 +172,6 @@ class WorkspaceView:
             min_lines=1,
             max_lines=4,
             shift_enter=True,
-            filled=True,
             expand=True,
             on_submit=self._capture,
             key="workspace-capture-field",
@@ -160,28 +186,32 @@ class WorkspaceView:
         self.review_count = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
         self.review_tile = ft.ListTile(
             title=afanes.ui.strings.REVIEW_TITLE,
-            leading=ft.Icons.PLAY_ARROW,
+            leading=ft.Icon(ft.Icons.PLAY_ARROW, color=afanes.ui.theme.REVIEW_SECTION_COLOR),
             trailing=self.review_count,
             selected=False,
             dense=True,
             on_click=self._select_review,
             key="review-entry",
         )
+        self.review_edge = ft.Container(content=self.review_tile, border_radius=afanes.ui.theme.CARD_RADIUS)
         self.section_counts: dict[afanes.ui.state.browser.WorkspaceSection, ft.Text] = {}
         self.section_tiles: dict[afanes.ui.state.browser.WorkspaceSection, ft.ListTile] = {}
+        self.section_edges: dict[afanes.ui.state.browser.WorkspaceSection, ft.Container] = {}
         for section in afanes.ui.state.browser.WorkspaceSection:
             if section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
                 continue
             self.section_counts[section] = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
-            self.section_tiles[section] = ft.ListTile(
+            tile = ft.ListTile(
                 title=afanes.ui.strings.WORKSPACE_SECTION_LABELS[section.value],
-                leading=_SECTION_ICONS[section],
+                leading=ft.Icon(_SECTION_ICONS[section], color=_SECTION_COLORS[section]),
                 trailing=self.section_counts[section],
                 selected=False,
                 dense=True,
                 on_click=self._section_handler(section),
                 key=f"section-{section.value}",
             )
+            self.section_tiles[section] = tile
+            self.section_edges[section] = ft.Container(content=tile, border_radius=afanes.ui.theme.CARD_RADIUS)
 
         self.search_field = ft.TextField(
             label=afanes.ui.strings.BROWSER_SEARCH_LABEL,
@@ -201,13 +231,14 @@ class WorkspaceView:
         self.sidebar = ft.Container(
             width=afanes.ui.theme.SIDEBAR_WIDTH,
             padding=afanes.ui.theme.ITEM_GAP,
-            bgcolor=afanes.ui.theme.SURFACE_CONTAINER_COLOR,
+            bgcolor=afanes.ui.theme.REGION_SURFACE_COLOR,
+            border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
             border_radius=afanes.ui.theme.CARD_RADIUS,
             content=ft.Column(
                 controls=[
-                    self.review_tile,
+                    self.review_edge,
                     ft.Divider(height=1),
-                    *self.section_tiles.values(),
+                    *self.section_edges.values(),
                     self.search_field,
                     ft.Container(content=self.browser_list, expand=True),
                     self.failures_column,
@@ -224,25 +255,23 @@ class WorkspaceView:
             self._pick_date,
         )
         self.main_host = ft.Container(expand=True)
-        self.header = ft.Row(
-            controls=[
-                ft.Column(
-                    controls=[
-                        ft.Text(afanes.ui.strings.APP_TITLE, theme_style=ft.TextThemeStyle.HEADLINE_SMALL),
-                        self.vault_text,
-                    ],
-                    spacing=0,
-                ),
-                ft.Container(expand=True),
-                self.progress,
-                self.refresh_button,
-                self.change_button,
-            ],
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        self.status_bar = ft.Container(
+            padding=ft.Padding.only(top=afanes.ui.theme.ITEM_GAP),
+            border=ft.Border(top=ft.BorderSide(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR)),
+            content=ft.Row(
+                controls=[
+                    self.vault_text,
+                    ft.Container(expand=True),
+                    self.progress,
+                    self.refresh_button,
+                    self.change_button,
+                ],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
         )
         self.root = ft.Column(
             controls=[
-                self.header,
                 ft.Row(
                     controls=[self.capture_field, self.capture_button],
                     spacing=afanes.ui.theme.ITEM_GAP,
@@ -255,6 +284,7 @@ class WorkspaceView:
                     vertical_alignment=ft.CrossAxisAlignment.STRETCH,
                     expand=True,
                 ),
+                self.status_bar,
             ],
             spacing=afanes.ui.theme.SECTION_GAP,
             expand=True,
@@ -410,6 +440,8 @@ class WorkspaceView:
         self.change_button.disabled = working
         self.new_reference_button.disabled = working
         self.capture_field.read_only = working
+        if self.log_today_button is not None:
+            self.log_today_button.disabled = working
         self._set_section_tiles_disabled(disabled=working)
         self._update()
 
@@ -424,15 +456,25 @@ class WorkspaceView:
         state = self._state
         self.vault_text.value = str(state.session.vault_root) if state.session.vault_root is not None else ""
         listing = state.browser.listing()
+        edge = ft.Border(
+            left=ft.BorderSide(afanes.ui.theme.SECTION_EDGE_WIDTH, afanes.ui.theme.ACCENT_COLOR),
+        )
         for section, tile in self.section_tiles.items():
             browser_section = section.browser_section
             count = 0
-            if listing is not None and browser_section is not None:
+            if section is afanes.ui.state.browser.WorkspaceSection.LOG:
+                timeline = state.browser.timeline()
+                count = len(timeline.entries()) if timeline is not None else 0
+            elif listing is not None and browser_section is not None:
                 count = sum(len(group.notes) for group in listing.groups_for(browser_section))
             self.section_counts[section].value = str(count)
-            tile.selected = state.browser.active_section is section
+            active = state.browser.active_section is section
+            tile.selected = active
+            self.section_edges[section].border = edge if active else None
+        review_active = state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW
         self.review_count.value = afanes.ui.strings.review_pending(state.browser.pending_count())
-        self.review_tile.selected = state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW
+        self.review_tile.selected = review_active
+        self.review_edge.border = edge if review_active else None
         self.search_field.value = state.browser.query
         self.browser_list.controls = self._browser_controls(listing)
         self._refresh_failures()
@@ -461,6 +503,8 @@ class WorkspaceView:
                 self._projects_view = afanes.ui.views.projects.ProjectsView(self._update, self._select)
             self._projects_view.refresh()
             return [self._projects_view.root]
+        if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.LOG:
+            return self._log_controls()
         section = state.browser.active_section.browser_section
         if listing is None or section is None:
             return []
@@ -481,8 +525,7 @@ class WorkspaceView:
                         padding=afanes.ui.theme.ITEM_GAP,
                         content=ft.Text(
                             group.title,
-                            theme_style=ft.TextThemeStyle.LABEL_LARGE,
-                            color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                            style=afanes.ui.theme.SECTION_LABEL_TEXT_STYLE,
                         ),
                     )
                 )
@@ -503,6 +546,243 @@ class WorkspaceView:
                 )
             )
         return controls
+
+    @staticmethod
+    def _today() -> datetime.date:
+        """Return the local calendar date used by the Log shortcuts.
+
+        Returns
+        -------
+        datetime.date
+            Current local calendar date.
+        """
+        return datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+
+    async def open_note(self, path: Path) -> None:
+        """Open one note in the page pane.
+
+        Parameters
+        ----------
+        path : Path
+            Note path to open.
+        """
+        await self._select(path)
+
+    async def open_today_log(self) -> None:
+        """Open or create today's log entry."""
+        await self._log_today()
+
+    async def open_log_day(self, day: int) -> None:
+        """Open, expand, or create a calendar day.
+
+        Parameters
+        ----------
+        day : int
+            Calendar day.
+        """
+        await self._log_select_day(day)
+
+    async def show_log_mode(self, mode: str) -> None:
+        """Select the Log mode.
+
+        Parameters
+        ----------
+        mode : str
+            ``entries`` or ``everything``.
+        """
+        if mode == "entries":
+            await self._log_entries()
+        else:
+            await self._log_everything()
+
+    async def open_log_month(self, year: int, month: int) -> None:
+        """Open or create the entry for a whole month.
+
+        Parameters
+        ----------
+        year : int
+            Calendar year.
+        month : int
+            Calendar month.
+        """
+        await self._log_create_month(year, month)
+
+    def _log_controls(self) -> list[ft.Control]:
+        """Build the calendar, mode switch, and date tree for the Log."""
+        state = self._state
+        timeline = state.browser.timeline()
+        if timeline is None:
+            return []
+        today = self._today()
+        year = state.browser.log_year if state.browser.log_year is not None else today.year
+        month = state.browser.log_month if state.browser.log_month is not None else today.month
+        selected_day = None
+        if (
+            state.browser.log_year is not None
+            and state.browser.log_month is not None
+            and state.browser.log_day is not None
+        ):
+            selected_day = (state.browser.log_year, state.browser.log_month, state.browser.log_day)
+        self.log_entries_button = self._log_mode_button(
+            afanes.ui.strings.LOG_MODE_ENTRIES,
+            active=state.browser.log_mode is afanes.core.log.LogMode.ENTRIES,
+            on_click=self._log_entries,
+            key="log-mode-entries",
+        )
+        self.log_everything_button = self._log_mode_button(
+            afanes.ui.strings.LOG_MODE_EVERYTHING,
+            active=state.browser.log_mode is afanes.core.log.LogMode.EVERYTHING,
+            on_click=self._log_everything,
+            key="log-mode-everything",
+        )
+        self.log_today_button = ft.FilledButton(
+            content=afanes.ui.strings.LOG_TODAY_ENTRY,
+            icon=ft.Icons.TODAY,
+            on_click=self._log_today,
+            key="log-today-entry",
+        )
+        self.log_calendar = afanes.ui.components.calendar.LogCalendar(
+            lambda day: asyncio.create_task(self._log_select_day(day)),
+            lambda: asyncio.create_task(self._log_previous_month()),
+            lambda: asyncio.create_task(self._log_next_month()),
+        )
+        self.log_tree = afanes.ui.components.log_tree.LogTree(
+            lambda path: asyncio.create_task(self._select(path)),
+            lambda year, month: asyncio.create_task(self._log_create_month(year, month)),
+            lambda year: asyncio.create_task(self._log_create_year(year)),
+            selected_day,
+        )
+        calendar_month = timeline.calendar(year, month)
+        return [
+            ft.Row(
+                controls=[self.log_today_button],
+                spacing=afanes.ui.theme.ITEM_GAP,
+            ),
+            ft.Row(
+                controls=[self.log_entries_button, self.log_everything_button],
+                spacing=0,
+            ),
+            ft.Container(
+                padding=afanes.ui.theme.ITEM_GAP,
+                content=self.log_calendar.build(calendar_month),
+            ),
+            ft.Divider(height=1),
+            self.log_tree.build(timeline),
+        ]
+
+    @staticmethod
+    def _log_mode_button(
+        label: str,
+        *,
+        active: bool,
+        on_click: Callable[[], Awaitable[None]],
+        key: str,
+    ) -> ft.TextButton:
+        """Build one Log mode control with an active tint."""
+        return ft.TextButton(
+            content=label,
+            on_click=on_click,
+            key=key,
+            style=ft.ButtonStyle(
+                bgcolor=afanes.ui.theme.SELECTED_ROW_COLOR if active else None,
+            ),
+        )
+
+    async def _log_entries(self) -> None:
+        """Switch the Log to Entries mode."""
+        await self._state.workspace.set_log_mode("entries")
+        self._refresh_dynamic()
+        self._update()
+
+    async def _log_everything(self) -> None:
+        """Switch the Log to Everything mode."""
+        await self._state.workspace.set_log_mode("everything")
+        self._refresh_dynamic()
+        self._update()
+
+    async def _log_today(self) -> None:
+        """Open or create today's log entry."""
+        await self._open_log_date(NoteDate.from_date(self._today()))
+
+    async def _log_select_day(self, day: int) -> None:
+        """Open, expand, or create the selected calendar day."""
+        state = self._state
+        timeline = state.browser.timeline()
+        if timeline is None:
+            return
+        today = self._today()
+        year = state.browser.log_year if state.browser.log_year is not None else today.year
+        month = state.browser.log_month if state.browser.log_month is not None else today.month
+        calendar = timeline.calendar(year, month)
+        count = calendar.days[day - 1].count
+        if count == 0:
+            await self._open_log_date(NoteDate.from_text(f"{year:04d}-{month:02d}-{day:02d}"))
+            return
+        if count == 1:
+            target = next(
+                (
+                    note
+                    for note in timeline.entries()
+                    if note.date is not None
+                    and note.date.precision is DatePrecision.DAY
+                    and note.date.year == year
+                    and note.date.month == month
+                    and note.date.day == day
+                ),
+                None,
+            )
+            if target is not None:
+                await self._select(target.path)
+                return
+        state.browser.select_log_day(day)
+        self._refresh_dynamic()
+        self._update()
+
+    async def _log_create_month(self, year: int, month: int) -> None:
+        """Open or create the entry for a whole month."""
+        await self._open_log_date(NoteDate.from_text(f"{year:04d}-{month:02d}"))
+
+    async def _log_create_year(self, year: int) -> None:
+        """Open or create the entry for a whole year."""
+        await self._open_log_date(NoteDate.from_text(f"{year:04d}"))
+
+    async def _open_log_date(self, date: NoteDate) -> None:
+        """Forward a date to the log entry command."""
+        if self._on_log_entry is None:
+            return
+        self._set_working(working=True)
+        try:
+            await self._on_log_entry(date)
+        finally:
+            self._set_working(working=False)
+        self._refresh_dynamic()
+        self._update()
+
+    async def _log_previous_month(self) -> None:
+        """Move the calendar one month back."""
+        today = self._today()
+        year = self._state.browser.log_year if self._state.browser.log_year is not None else today.year
+        month = self._state.browser.log_month if self._state.browser.log_month is not None else today.month
+        if month == 1:
+            year, month = year - 1, 12
+        else:
+            month -= 1
+        self._state.browser.show_log_month(year, month)
+        self._refresh_dynamic()
+        self._update()
+
+    async def _log_next_month(self) -> None:
+        """Move the calendar one month forward."""
+        today = self._today()
+        year = self._state.browser.log_year if self._state.browser.log_year is not None else today.year
+        month = self._state.browser.log_month if self._state.browser.log_month is not None else today.month
+        if month == _MONTHS_IN_YEAR:
+            year, month = year + 1, 1
+        else:
+            month += 1
+        self._state.browser.show_log_month(year, month)
+        self._refresh_dynamic()
+        self._update()
 
     def _note_row(self, note: VaultNote) -> ft.Control:
         """Build one clickable browser entry."""

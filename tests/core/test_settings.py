@@ -69,7 +69,47 @@ class TestSettingsPayload:
         assert settings.to_payload() == {
             "version": afanes.core.settings.SETTINGS_VERSION,
             "vault": str(tmp_path),
+            "log_modes": {},
         }
+
+    def test_log_mode_defaults_to_entries(self, tmp_path: Path) -> None:
+        settings = Settings(vault=tmp_path)
+
+        assert settings.log_mode_for(tmp_path) == "entries"
+        assert settings.log_mode_for(tmp_path / "other") == "entries"
+
+    def test_log_mode_is_stored_per_vault(self, tmp_path: Path) -> None:
+        first = tmp_path / "first"
+        second = tmp_path / "second"
+        first.mkdir()
+        second.mkdir()
+        settings = Settings(vault=first).with_log_mode(first, "everything")
+
+        assert settings.log_mode_for(first) == "everything"
+        assert settings.log_mode_for(second) == "entries"
+
+    def test_unknown_log_mode_is_normalized(self, tmp_path: Path) -> None:
+        settings = Settings(vault=tmp_path).with_log_mode(tmp_path, "unknown")
+
+        assert settings.log_mode_for(tmp_path) == "entries"
+
+    def test_payload_round_trips_log_modes(self, tmp_path: Path) -> None:
+        settings = Settings(vault=tmp_path).with_log_mode(tmp_path, "everything")
+        payload = settings.to_payload()
+
+        loaded = Settings.from_payload(payload, tmp_path / "settings.json")
+
+        assert loaded.log_mode_for(tmp_path) == "everything"
+
+    def test_malformed_log_modes_are_rejected(self, tmp_path: Path) -> None:
+        payload: dict[str, object] = {
+            "version": afanes.core.settings.SETTINGS_VERSION,
+            "vault": str(tmp_path),
+            "log_modes": "bad",
+        }
+
+        with pytest.raises(ConfigurationError):
+            Settings.from_payload(payload, tmp_path / "settings.json")
 
     def test_from_payload_returns_settings(self, tmp_path: Path) -> None:
         payload = {"version": afanes.core.settings.SETTINGS_VERSION, "vault": str(tmp_path)}
@@ -278,6 +318,7 @@ class TestSettingsStoreSave:
         assert json.loads(path.read_text(encoding="utf-8")) == {
             "version": afanes.core.settings.SETTINGS_VERSION,
             "vault": str(vault.resolve()),
+            "log_modes": {},
         }
 
     def test_unicode_path_round_trips(self, tmp_path: Path) -> None:

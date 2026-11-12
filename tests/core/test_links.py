@@ -53,6 +53,10 @@ class TestParseReference:
         reference = _parse("note:Ada")
         assert reference == NoteReference(scheme=ReferenceScheme.NOTE, name="Ada")
 
+    def test_parses_a_log_destination(self) -> None:
+        reference = _parse("log:2025-10-12")
+        assert reference == NoteReference(scheme=ReferenceScheme.LOG, name="2025-10-12")
+
     def test_strips_angle_brackets(self) -> None:
         reference = _parse("<note:Ada Lovelace>")
         assert reference.name == "Ada Lovelace"
@@ -91,7 +95,7 @@ class TestParseReference:
 
 
 class TestClassifyDestination:
-    @pytest.mark.parametrize("destination", ["note:Ada", "project:Turing", "note:Call dentist"])
+    @pytest.mark.parametrize("destination", ["note:Ada", "project:Turing", "log:2025-10-12", "note:Call dentist"])
     def test_internal_schemes(self, destination: str) -> None:
         assert DestinationKind.classify(destination) is DestinationKind.INTERNAL
 
@@ -196,6 +200,9 @@ class TestSchemeForNote:
     def test_note_maps_to_note(self) -> None:
         assert ReferenceScheme.for_note(NoteType.NOTE) is ReferenceScheme.NOTE
 
+    def test_log_maps_to_log(self) -> None:
+        assert ReferenceScheme.for_note(NoteType.LOG) is ReferenceScheme.LOG
+
 
 class TestCatalog:
     def test_maps_each_type_to_its_scheme(self) -> None:
@@ -216,6 +223,13 @@ class TestCatalog:
 
         assert catalog.candidates(ReferenceScheme.NOTE, "ada") == (target,)
         assert catalog.candidates(ReferenceScheme.PROJECT, "ada") == ()
+
+    def test_log_entry_uses_the_log_scheme(self) -> None:
+        target = Path("log/2025/10/2025-10-12.md")
+        catalog = NameCatalog.from_entries([CatalogEntry(target, NoteType.LOG)])
+
+        assert catalog.candidates(ReferenceScheme.LOG, "2025-10-12") == (target,)
+        assert catalog.candidates(ReferenceScheme.NOTE, "2025-10-12") == ()
 
     def test_categorized_and_uncategorized_references_collide(self) -> None:
         categorized = Path("reference/people/Ada.md")
@@ -304,6 +318,15 @@ class TestResolution:
         )
         result = catalog.resolve(NoteReference(scheme=ReferenceScheme.NOTE, name="Ada"))
         assert result.outcome is ResolutionOutcome.UNRESOLVED
+
+    def test_log_reference_resolves_only_a_log_entry(self) -> None:
+        target = Path("log/2025/10/2025-10-12.md")
+        catalog = NameCatalog.from_entries([CatalogEntry(target, NoteType.LOG)])
+
+        result = catalog.resolve(NoteReference(scheme=ReferenceScheme.LOG, name="2025-10-12"))
+
+        assert result.outcome is ResolutionOutcome.RESOLVED
+        assert result.targets == (target,)
 
     def test_heals_when_a_matching_note_is_added(self) -> None:
         reference = NoteReference(scheme=ReferenceScheme.NOTE, name="Ada")

@@ -7,7 +7,7 @@ from pathlib import Path
 import afanes.core.vault.service
 from afanes.core.vault.snapshot import LinkOutcome, NoteOrder, VaultNote
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType, Status
+from afanes.models.note import NoteDate, NoteType, Status
 
 
 def _write_note(
@@ -46,6 +46,7 @@ class TestNoteOrder:
         name: str = "Note",
         title: str = "Note",
         due_date: datetime.date | None = None,
+        date: NoteDate | None = None,
         status: Status | None = None,
         modified_ns: int = 0,
     ) -> VaultNote:
@@ -58,6 +59,7 @@ class TestNoteOrder:
             category=None,
             status=status,
             due_date=due_date,
+            date=date,
             content_hash="",
             modified_ns=modified_ns,
             body_references=(),

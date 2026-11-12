@@ -42,6 +42,13 @@ settings, and templates. It imports `models` and the runtime libraries, never Fl
    :members:
 ```
 
+### 🧩 afanes.core.labels
+
+```{eval-rst}
+.. automodule:: afanes.core.labels
+   :members:
+```
+
 ### 🧩 afanes.core.links
 
 ```{eval-rst}
@@ -96,5 +103,12 @@ settings, and templates. It imports `models` and the runtime libraries, never Fl
 
 ```{eval-rst}
 .. automodule:: afanes.core.templates
+   :members:
+```
+
+### 🧩 afanes.core.template_cards
+
+```{eval-rst}
+.. automodule:: afanes.core.template_cards
    :members:
 ```

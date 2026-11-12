@@ -20,7 +20,7 @@ from afanes.core.errors import (
     TemplateWriteError,
     UnknownTemplateError,
 )
-from afanes.models.note import NoteType, Status
+from afanes.models.note import NoteDate, NoteType, Status
 
 GUIDE_TEXT = "---\ntype: reference\n---\n\n# Getting started\n\nA guide.\n"
 PROJECT_TEXT = "---\ntype: project\nstatus: active\n---\n\n# Home\n\n- [ ] Ask [Sam](<note:Sam>)\n"
@@ -29,7 +29,7 @@ PLACE_TEXT = "---\ntype: reference\ncategory: place\n---\n\n# Garage\n"
 CATALOG_SIZE = 3
 PERSONAL_NOTE_COUNT = 3
 FAILING_WRITE_CALL = 4
-CARD_COUNT = 7
+CARD_COUNT = 8
 CLOSED_STATUSES = frozenset({Status.DONE, Status.CANCELLED, Status.ARCHIVED})
 TODAY = datetime.date(2026, 1, 1)
 
@@ -403,10 +403,25 @@ class TestBundledContent:
         assert guide.category is None
         assert guide.document.status is None
 
+    def test_bundled_notes_carry_the_creation_date(self, fixed_today: datetime.date) -> None:
+        bundle = afanes.core.templates.TemplateCatalog.bundled().bundle(
+            "personal",
+            today=fixed_today,
+        )
+
+        assert all(note.document.date == NoteDate.from_date(fixed_today) for note in bundle.ordered_notes)
+        assert all(f"date: {fixed_today.isoformat()}" in note.text for note in bundle.ordered_notes)
+
     def test_guide_examples_are_not_live_references(self) -> None:
         guide = afanes.core.templates.TemplateCatalog.bundled().bundle(None).guide[0]
 
         assert afanes.core.links.ReferenceReader().extract(guide.document.body) == []
+
+    def test_guide_explains_the_log_type(self) -> None:
+        guide = afanes.core.templates.TemplateCatalog.bundled().bundle(None).guide[0]
+
+        assert "Log entries" in guide.document.body
+        assert "log:2025-10-12" in guide.document.body
 
     @pytest.mark.parametrize(
         "note_text",
@@ -629,6 +644,7 @@ class TestCreationWritesBundledContent:
         files = sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
         assert files == [
             "reference/Getting started.md",
+            "templates/daily.md",
             "templates/organization.md",
             "templates/person.md",
             "templates/place.md",
@@ -825,11 +841,11 @@ class TestTemplateCardSeeding:
             afanes.core.vault.service.Vault.create_directory(root)
 
         message = str(info.value)
-        assert calls[3].name == "place.md"
-        assert "place.md" in message
+        assert calls[3].name == "person.md"
+        assert "person.md" in message
         assert "templates/organization.md" in message
-        assert "templates/person.md" in message
         assert (root / "reference" / "Getting started.md").is_file()
+        assert (root / "templates" / "daily.md").is_file()
         assert (root / "templates" / "organization.md").is_file()
-        assert not (root / "templates" / "place.md").exists()
+        assert not (root / "templates" / "person.md").exists()
         assert afanes.core.vault.service.Vault(root).scan().failures == ()

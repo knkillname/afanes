@@ -26,7 +26,7 @@ from afanes.core.frontmatter import NoteDocument
 from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.models.link import ReferenceScheme
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -154,12 +154,23 @@ class VaultPages:
 
         content: str
         if text is None:
-            content = self.vault.new_note_document(note_type, category, None, body).to_text()
+            content = self.vault.new_note_document(
+                note_type,
+                category,
+                None,
+                body,
+                date=NoteDate.from_date(self.vault.today()),
+            ).to_text()
         else:
             parsed = NoteDocument.from_text(text)
             if parsed.note_type is not note_type or parsed.category != category:
                 message = "Note text does not match the requested type and category"
                 raise NoteParseError(message)
+            if parsed.date is None and parsed.date_error is None:
+                raw = dict(parsed.raw)
+                raw["date"] = NoteDate.from_date(self.vault.today()).to_yaml_value()
+                parsed = parsed.with_metadata(raw)
+                text = parsed.to_text()
             content = text
 
         target_directory = self.vault.contained(self.vault.directory_for(note_type, category))
@@ -182,6 +193,81 @@ class VaultPages:
             message = f"Destination already exists: {target}"
             raise NameCollisionError(message)
 
+        target_directory.mkdir(parents=True, exist_ok=True)
+        afanes.core.atomic.write_text_atomic(target, content)
+        return target
+
+    def create_log_entry(
+        self,
+        date: NoteDate,
+        title: str,
+        scaffold: str | None = None,
+    ) -> Path:
+        """Create a dated log entry under its ISO date name.
+
+        Parameters
+        ----------
+        date : NoteDate
+            Entry date. Its precision selects the filename and folder.
+        title : str
+            Display title written as the level-1 heading. It is trimmed and
+            must not be blank.
+        scaffold : str | None
+            Starter body from a log card, or ``None`` for an empty entry.
+
+        Returns
+        -------
+        Path
+            Absolute path to the created note.
+
+        Raises
+        ------
+        NoteParseError
+            If the title is blank.
+        NameCollisionError
+            If another log entry already uses the date or the target file
+            exists.
+        VaultPathError
+            If the target directory escapes the vault.
+        VaultError
+            If the target path is not a directory or the write fails.
+
+        Notes
+        -----
+        The entry declares only ``type: log`` and ``date``. The starter body is
+        placed below the title heading. The caller opens the returned page in
+        edit mode.
+        """
+        display_title = title.strip()
+        if not display_title:
+            message = "A log entry needs a title"
+            raise NoteParseError(message)
+        starter = (scaffold or "").strip("\r\n")
+        body = f"# {display_title}\n"
+        if starter:
+            body = f"{body}\n{starter}\n"
+
+        snapshot = self.vault.scan()
+        if snapshot.log_entry(date) is not None:
+            message = f"A log entry already exists for {date.text}"
+            raise NameCollisionError(message)
+
+        target_directory = self.vault.contained(self.vault.log_directory(date))
+        if target_directory.exists() and not target_directory.is_dir():
+            message = f"Note directory is not a directory: {target_directory}"
+            raise VaultError(message)
+        target = target_directory / f"{date.text}{afanes.core.vault.snapshot.NOTE_SUFFIX}"
+        if target.exists():
+            message = f"Destination already exists: {target}"
+            raise NameCollisionError(message)
+
+        content = self.vault.new_note_document(
+            NoteType.LOG,
+            None,
+            None,
+            body,
+            date=date,
+        ).to_text()
         target_directory.mkdir(parents=True, exist_ok=True)
         afanes.core.atomic.write_text_atomic(target, content)
         return target

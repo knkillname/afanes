@@ -10,16 +10,31 @@ import flet as ft
 import pytest
 
 import afanes.core.atomic
+import afanes.core.log
 import afanes.core.search
 import afanes.core.settings
 import afanes.core.vault.service
 import afanes.ui.state
 import afanes.ui.strings
+import afanes.ui.theme
 import afanes.ui.views.workspace
 from afanes.core.editing import DraftMode
+from afanes.core.log import LogMode
+from afanes.models.note import NoteDate
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
-FOUR_SECTIONS = 4
+SECTION_COUNT = 5
+FIRST_DAY = 1
+SECOND_DAY = 2
+THIRD_DAY = 3
+
+
+def _today() -> datetime.date:
+    return datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+
+
+def _other_day(today: datetime.date) -> datetime.date:
+    return today.replace(day=SECOND_DAY) if today.day != SECOND_DAY else today.replace(day=THIRD_DAY)
 
 
 @pytest.fixture(autouse=True)
@@ -54,6 +69,7 @@ def _write_note(
     status: str | None = None,
     category: str | None = None,
     body: str = "",
+    date: str | None = None,
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["---", f"type: {note_type}"]
@@ -61,6 +77,8 @@ def _write_note(
         lines.append(f"category: {category}")
     if status is not None:
         lines.append(f"status: {status}")
+    if date is not None:
+        lines.append(f"date: {date}")
     lines.extend(["---", body])
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
@@ -104,7 +122,7 @@ class TestWorkspaceShell:
         assert view.root.key == "workspace-view"
         assert isinstance(view.root, ft.Column)
         assert view.capture_field.label == afanes.ui.strings.COMPOSER_LABEL
-        assert len(view.section_tiles) == FOUR_SECTIONS
+        assert len(view.section_tiles) == SECTION_COUNT
         assert view.review_tile.title == afanes.ui.strings.REVIEW_TITLE
         assert view.page_view.empty_text.visible is True
 
@@ -153,6 +171,56 @@ class TestWorkspaceShell:
         assert view.sidebar.visible is True
         assert view.page_view.title.value == "Buy milk"
         assert view.page_view.read_body.visible is True
+
+    def test_surfaces_use_the_theme_stack(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        border = ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR)
+
+        assert view.sidebar.bgcolor == afanes.ui.theme.REGION_SURFACE_COLOR
+        assert view.sidebar.border == border
+        assert isinstance(view.page_view.root, ft.Container)
+        assert view.page_view.root.bgcolor == afanes.ui.theme.CARD_SURFACE_COLOR
+        assert view.page_view.root.border == border
+
+    def test_status_bar_holds_the_vault_identity_and_actions(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        assert isinstance(view.status_bar.content, ft.Row)
+        assert view.status_bar in view.root.controls
+        assert view.vault_text in view.status_bar.content.controls
+        assert view.refresh_button in view.status_bar.content.controls
+        assert view.change_button in view.status_bar.content.controls
+        assert afanes.ui.strings.APP_TITLE not in _texts(view.root)
+
+    def test_sections_use_distinct_icon_tints(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        icons = [typing.cast("ft.Icon", tile.leading) for tile in view.section_tiles.values()]
+        review_icon = typing.cast("ft.Icon", view.review_tile.leading)
+
+        assert len({icon.color for icon in icons}) == SECTION_COUNT
+        assert review_icon.color == afanes.ui.theme.REVIEW_SECTION_COLOR
+        assert afanes.ui.theme.REVIEW_SECTION_COLOR == afanes.ui.theme.ACCENT_COLOR
+
+    def test_only_the_active_section_shows_an_accent_edge(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        inbox = afanes.ui.state.browser.WorkspaceSection.INBOX
+
+        assert view.section_edges[inbox].border is not None
+        assert view.review_edge.border is None
+        assert all(edge.border is None for section, edge in view.section_edges.items() if section is not inbox)
+
+        asyncio.run(_handler(view.review_tile)())
+
+        assert view.review_edge.border is not None
+        assert view.review_tile.selected is True
+        assert view.section_edges[inbox].border is None
 
     def test_switching_sections_keeps_the_open_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -472,3 +540,171 @@ class TestBrowserCreationAction:
 
 def _row_for(browser: ft.ListView, title: str) -> ft.ListTile:
     return next(control for control in browser.controls if isinstance(control, ft.ListTile) and control.title == title)
+
+
+def _texts(control: ft.Control) -> list[str]:
+    values: list[str] = []
+    if isinstance(control, ft.Text):
+        values.append(str(control.value))
+    for child in getattr(control, "controls", []) or []:
+        values.extend(_texts(child))
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        values.extend(_texts(content))
+    return values
+
+
+class TestLogSection:
+    def _log_path(self, vault: Path, date: datetime.date, title: str) -> Path:
+        return _write_note(
+            vault / "log" / f"{date.year:04d}" / f"{date.month:02d}" / f"{date.isoformat()}.md",
+            note_type="log",
+            body=f"# {title}\n",
+            date=date.isoformat(),
+        )
+
+    def _open_log(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        on_log_entry: Callable[[NoteDate], Coroutine[typing.Any, typing.Any, None]] | None = None,
+    ) -> afanes.ui.views.workspace.WorkspaceView:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(tmp_path / "vault"))
+        view = afanes.ui.views.workspace.WorkspaceView(
+            _noop,
+            _change_vault,
+            _create_vault,
+            _close_vault,
+            on_log_entry=on_log_entry,
+        )
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.LOG])())
+        return view
+
+    def test_log_section_builds_calendar_and_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        today = _today()
+        self._log_path(vault, today, "Today")
+        view = self._open_log(tmp_path, monkeypatch)
+
+        assert view.log_calendar is not None
+        assert view.log_tree is not None
+        assert view.log_today_button is not None
+        assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.LOG].value == "1"
+        assert view.log_calendar.day_buttons[today.day].data["count"] == 1
+
+    def test_calendar_day_opens_a_single_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        today = _today()
+        self._log_path(vault, today, "Today")
+        view = self._open_log(tmp_path, monkeypatch)
+
+        asyncio.run(view.open_log_day(today.day))
+
+        assert afanes.ui.state.app_state.pages.page is not None
+        assert (
+            afanes.ui.state.app_state.pages.page.path
+            == vault / "log" / f"{today.year:04d}" / f"{today.month:02d}" / f"{today.isoformat()}.md"
+        )
+
+    def test_empty_calendar_day_requests_creation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        requested: list[NoteDate] = []
+
+        async def on_log_entry(date: NoteDate) -> None:
+            requested.append(date)
+
+        view = self._open_log(tmp_path, monkeypatch, on_log_entry=on_log_entry)
+        today = _today()
+
+        asyncio.run(view.open_log_day(FIRST_DAY))
+
+        assert requested == [NoteDate.from_text(f"{today.year:04d}-{today.month:02d}-01")]
+
+    def test_today_button_requests_today(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        requested: list[NoteDate] = []
+
+        async def on_log_entry(date: NoteDate) -> None:
+            requested.append(date)
+
+        view = self._open_log(tmp_path, monkeypatch, on_log_entry=on_log_entry)
+
+        asyncio.run(view.open_today_log())
+
+        assert requested == [NoteDate.from_date(_today())]
+
+    def test_mode_switch_changes_the_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        view = self._open_log(tmp_path, monkeypatch)
+
+        asyncio.run(view.show_log_mode("everything"))
+
+        assert afanes.ui.state.app_state.browser.log_mode is LogMode.EVERYTHING
+
+    def test_search_filters_the_calendar_and_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        today = _today()
+        self._log_path(vault, today, "Dentist")
+        other = today.replace(day=1) if today.day != 1 else today.replace(day=2)
+        self._log_path(vault, other, "Groceries")
+        view = self._open_log(tmp_path, monkeypatch)
+
+        asyncio.run(afanes.ui.state.app_state.browser.set_query("dentist"))
+        view.refresh()
+
+        tree = view.log_tree
+        calendar = view.log_calendar
+        assert tree is not None
+        assert calendar is not None
+        assert [note.title for note in tree.note_rows.values()] == ["Dentist"]
+        assert calendar.day_buttons[today.day].data["count"] == 1
+        assert calendar.day_buttons[other.day].data["count"] == 0
+
+    def test_month_plus_requests_a_month_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        today = _today()
+        self._log_path(vault, today, "Today")
+        requested: list[NoteDate] = []
+
+        async def on_log_entry(date: NoteDate) -> None:
+            requested.append(date)
+
+        view = self._open_log(tmp_path, monkeypatch, on_log_entry=on_log_entry)
+
+        asyncio.run(view.open_log_month(today.year, today.month))
+
+        assert requested == [NoteDate.from_text(f"{today.year:04d}-{today.month:02d}")]
+
+    def test_tree_refreshes_after_a_new_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        view = self._open_log(tmp_path, monkeypatch)
+        today = _today()
+        self._log_path(vault, today, "New")
+
+        asyncio.run(afanes.ui.state.app_state.workspace.refresh())
+        view.refresh()
+
+        assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.LOG].value == "1"
+
+    def test_back_returns_to_the_previous_log_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        today = _today()
+        first = self._log_path(vault, today, "First")
+        second = self._log_path(vault, _other_day(today), "Second")
+        view = self._open_log(tmp_path, monkeypatch)
+
+        async def scenario() -> None:
+            await view.open_note(first)
+            await view.open_note(second)
+            await afanes.ui.state.app_state.navigation.back()
+
+        asyncio.run(scenario())
+
+        assert afanes.ui.state.app_state.pages.page is not None
+        assert afanes.ui.state.app_state.pages.page.path == first

@@ -21,7 +21,7 @@ from afanes.core.errors import (
     VaultPathError,
 )
 from afanes.core.frontmatter import NoteDocument
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
 ONE = 1
 TWO = 2
@@ -225,7 +225,7 @@ class TestCreatePage:
     def test_writes_supplied_text_exactly(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        text = "---\ntype: reference\ncategory: person\ncustom: keep\n---\n\n# Ada\n\nBody.\n"
+        text = "---\ntype: reference\ncategory: person\ndate: 2025-10-12\ncustom: keep\n---\n\n# Ada\n\nBody.\n"
 
         path = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).create_page(
             "Ada",
@@ -235,6 +235,21 @@ class TestCreatePage:
         )
 
         assert path.read_text(encoding="utf-8") == text
+
+    def test_adds_a_date_to_supplied_text_without_one(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        text = "---\ntype: reference\ncategory: person\n---\n\n# Ada\n"
+
+        path = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).create_page(
+            "Ada",
+            NoteType.REFERENCE,
+            CategoryLabel("person"),
+            text=text,
+        )
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.date is not None
 
     def test_rejects_supplied_text_with_a_different_type(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -298,6 +313,78 @@ class TestRecreatePage:
             afanes.core.vault.pages.VaultPages(vault).recreate_page(tmp_path / "outside.md", "text")
 
 
+class TestCreateLogEntry:
+    def test_creates_a_day_entry(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).create_log_entry(
+            NoteDate.from_text("2025-10-12"),
+            "A quiet Tuesday",
+        )
+
+        assert path == root / "log" / "2025" / "10" / "2025-10-12.md"
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.note_type is NoteType.LOG
+        assert document.date == NoteDate.from_text("2025-10-12")
+        assert document.title == "A quiet Tuesday"
+
+    def test_creates_a_month_entry(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).create_log_entry(
+            NoteDate.from_text("2025-10"),
+            "October so far",
+        )
+
+        assert path == root / "log" / "2025" / "10" / "2025-10.md"
+
+    def test_creates_a_year_entry(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).create_log_entry(
+            NoteDate.from_text("2025"),
+            "2025 in review",
+        )
+
+        assert path == root / "log" / "2025" / "2025.md"
+
+    def test_appends_the_card_body(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        path = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).create_log_entry(
+            NoteDate.from_text("2025-10-12"),
+            "A quiet Tuesday",
+            "## What happened\n\n- Something.\n",
+        )
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert "## What happened" in document.body
+        assert document.body.index("# A quiet Tuesday") < document.body.index("## What happened")
+
+    def test_blank_title_is_rejected(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        with pytest.raises(NoteParseError, match="title"):
+            afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).create_log_entry(
+                NoteDate.from_text("2025-10-12"),
+                "   ",
+            )
+
+    def test_occupied_date_is_refused(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        pages = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root))
+        pages.create_log_entry(NoteDate.from_text("2025-10-12"), "First")
+
+        with pytest.raises(NameCollisionError):
+            pages.create_log_entry(NoteDate.from_text("2025-10-12"), "Second")
+
+
 class TestCaptureNote:
     def test_creates_a_minimal_note_in_the_inbox(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -308,7 +395,8 @@ class TestCaptureNote:
         assert path == root / "inbox" / "Buy milk.md"
         assert [entry.name for entry in root.iterdir()] == ["inbox"]
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
-        assert document.raw == {"type": "note"}
+        assert document.raw["type"] == "note"
+        assert document.date is not None
         assert document.body == "# Buy milk"
 
     def test_reuses_an_existing_inbox_case_variant(self, tmp_path: Path) -> None:
@@ -410,7 +498,9 @@ class TestCaptureNote:
         )
 
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
-        assert document.raw == {"type": "note"}
+        assert document.raw["type"] == "note"
+        assert document.date is not None
+        assert "due_date" not in document.raw
         snapshot = afanes.core.vault.service.Vault(root).scan()
         assert snapshot.notes[0].body_references == ()
         assert snapshot.notes[0].steps == ()

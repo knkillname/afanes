@@ -10,13 +10,14 @@ import pytest
 import afanes.core.settings
 import afanes.core.vault.naming
 import afanes.ui.state
-from afanes.core.editing import DraftMode, DueDateText, NormalDraft, PageDraftFactory, RawDraft
+from afanes.core.editing import DraftMode, NormalDraft, PageDraftFactory, RawDraft
 from afanes.core.errors import InvalidReferenceError, NoteParseError, VaultError
 from afanes.core.frontmatter import NoteDocument
+from afanes.core.labels import DueDateText
 from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import PageContent, PageFile, ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
 PROJECT_NOTE = """---
 type: project
@@ -164,6 +165,23 @@ class TestLoadDraft:
         assert draft.labels is not None
         assert draft.labels.asked_by_text == "Priya Nair"
 
+    def test_loads_a_note_date(self) -> None:
+        draft = _normal("---\ntype: project\ndate: 2025-10-12\n---\n\nBody\n")
+
+        assert isinstance(draft, NormalDraft)
+        assert draft.labels is not None
+        assert draft.labels.date == NoteDate.from_text("2025-10-12")
+        assert draft.labels.date_text == "2025-10-12"
+
+    def test_loads_a_malformed_date_as_text(self) -> None:
+        draft = _normal("---\ntype: note\ndate: last Tuesday\n---\n\nBody\n")
+
+        assert isinstance(draft, NormalDraft)
+        assert draft.labels is not None
+        assert draft.labels.date is None
+        assert draft.labels.date_text == "last Tuesday"
+        assert draft.labels.date_error is not None
+
     def test_malformed_note_loads_in_raw_mode(self) -> None:
         draft = PageDraftFactory.from_page(_page("---\ntype: action\n---\n"))
 
@@ -240,6 +258,44 @@ class TestLabelRules:
 
         assert labels.asked_by_text == ""
 
+    def test_date_is_kept_when_the_type_changes(self) -> None:
+        draft = _normal("---\ntype: project\ndate: 2025-10\n---\n\nBody\n")
+        labels = draft.labels.with_type(NoteType.NOTE)
+
+        assert labels.date_text == "2025-10"
+        assert labels.date == NoteDate.from_text("2025-10")
+
+    def test_date_is_offered_for_every_type(self) -> None:
+        draft = _normal(REFERENCE_NOTE)
+        labels = draft.labels.with_date_text("2025")
+
+        assert labels.date_text == "2025"
+
+    def test_invalid_date_reports_an_error(self) -> None:
+        draft = _normal(PROJECT_NOTE)
+        labels = draft.labels.with_date_text("January 2")
+
+        assert labels.date is None
+        assert labels.date_error is not None
+
+    def test_switching_to_log_clears_workflow_labels(self) -> None:
+        draft = _normal("---\ntype: project\ndate: 2025-10-12\nstatus: active\nasked_by: Priya Nair\n---\n\nBody\n")
+        labels = draft.labels.with_type(NoteType.LOG)
+
+        assert labels.note_type is NoteType.LOG
+        assert labels.category is None
+        assert labels.status is None
+        assert labels.due_date_text == ""
+        assert labels.asked_by_text == ""
+        assert labels.date_text == "2025-10-12"
+
+    def test_switching_from_log_keeps_the_date(self) -> None:
+        draft = _normal("---\ntype: log\ndate: 2025-10-12\n---\n\nBody\n")
+        labels = draft.labels.with_type(NoteType.REFERENCE)
+
+        assert labels.date_text == "2025-10-12"
+        assert labels.category is None
+
 
 class TestSerialize:
     def test_preserves_unknown_keys_and_updates_owned_labels(self) -> None:
@@ -302,6 +358,24 @@ class TestSerialize:
 
         with pytest.raises(NoteParseError):
             draft.with_labels(draft.labels.with_due_date_text("January 2")).to_text()
+
+    def test_writes_and_removes_the_note_date(self) -> None:
+        draft = _normal(PROJECT_NOTE)
+        labels = draft.labels.with_date_text("2025-10")
+        document = NoteDocument.from_text(draft.with_labels(labels).to_text())
+
+        assert document.date == NoteDate.from_text("2025-10")
+        assert document.raw["date"] == "2025-10"
+
+        cleared = draft.with_labels(labels.with_date_text("")).to_text()
+        reparsed = NoteDocument.from_text(cleared)
+        assert "date" not in reparsed.raw
+
+    def test_invalid_date_blocks_serialization(self) -> None:
+        draft = _normal(PROJECT_NOTE)
+
+        with pytest.raises(NoteParseError):
+            draft.with_labels(draft.labels.with_date_text("January 2")).to_text()
 
     def test_preserves_crlf_newlines(self) -> None:
         text = "---\r\ntype: project\r\n---\r\n\r\n# Call\r\n"

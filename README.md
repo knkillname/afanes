@@ -49,6 +49,7 @@ The full walkthrough is in
 - [Workspace and browser](https://github.com/knkillname/afanes/blob/main/docs/guide/workspace.md)
 - [Inbox](https://github.com/knkillname/afanes/blob/main/docs/guide/inbox.md) and
   [projects](https://github.com/knkillname/afanes/blob/main/docs/guide/projects-and-steps.md)
+- [Log](https://github.com/knkillname/afanes/blob/main/docs/guide/log.md)
 - [Vault format](https://github.com/knkillname/afanes/blob/main/docs/reference/vault-format.md)
 - [Command line](https://github.com/knkillname/afanes/blob/main/docs/guide/command-line.md)
 - [Browser mode](https://github.com/knkillname/afanes/blob/main/docs/guide/browser-mode.md)

@@ -29,7 +29,7 @@ from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import ResolutionOutcome
 from afanes.core.vault.snapshot import ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
 ONE = 1
 TWO = 2
@@ -44,6 +44,7 @@ def _write_note(
     category: str | None = None,
     status: str | None = None,
     due_date: str | None = None,
+    date: str | None = None,
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     if note_type == "person":
@@ -56,6 +57,8 @@ def _write_note(
         lines.append(f"status: {status}")
     if due_date is not None:
         lines.append(f"due_date: {due_date}")
+    if date is not None:
+        lines.append(f"date: {date}")
     lines.extend(["---", "", body])
     path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     return path
@@ -210,6 +213,48 @@ class TestDirectoryFor:
         with pytest.raises(VaultError):
             afanes.core.vault.service.Vault(root).directory_for(NoteType.NOTE, CategoryLabel("place"))
 
+    def test_log_requires_a_date(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        with pytest.raises(VaultError, match="log_directory"):
+            afanes.core.vault.service.Vault(root).directory_for(NoteType.LOG)
+
+
+class TestLogDirectory:
+    def test_year_precision_uses_the_year_folder(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        directory = afanes.core.vault.service.Vault(root).log_directory(NoteDate.from_text("2025"))
+
+        assert directory == root / "log" / "2025"
+
+    @pytest.mark.parametrize("text", ["2025-10", "2025-10-12"])
+    def test_month_and_day_precision_use_the_month_folder(self, tmp_path: Path, text: str) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        directory = afanes.core.vault.service.Vault(root).log_directory(NoteDate.from_text(text))
+
+        assert directory == root / "log" / "2025" / "10"
+
+    def test_reuses_existing_case_variants(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        (root / "Log" / "2025" / "10").mkdir(parents=True)
+
+        directory = afanes.core.vault.service.Vault(root).log_directory(NoteDate.from_text("2025-10-12"))
+
+        assert directory == root / "Log" / "2025" / "10"
+
+    def test_does_not_create_directories(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+
+        afanes.core.vault.service.Vault(root).log_directory(NoteDate.from_text("2025-10-12"))
+
+        assert list(root.iterdir()) == []
+
 
 class TestVaultCreation:
     def test_creates_a_missing_directory(self, tmp_path: Path) -> None:
@@ -286,11 +331,12 @@ class TestVaultCreation:
             vault.root / "trash",
             vault.directory_for(NoteType.REFERENCE),
             vault.directory_for(NoteType.PROJECT),
+            vault.root / "log",
         ]
 
         assert list(creation.seeded_directories) == expected
 
-    def test_creation_writes_the_guide_and_the_seven_cards(self, tmp_path: Path) -> None:
+    def test_creation_writes_the_guide_and_the_eight_cards(self, tmp_path: Path) -> None:
         creation = afanes.core.vault.service.Vault.create_directory(tmp_path / "vault")
 
         files = [
@@ -300,6 +346,7 @@ class TestVaultCreation:
         ]
         assert files == [
             "reference/Getting started.md",
+            "templates/daily.md",
             "templates/organization.md",
             "templates/person.md",
             "templates/place.md",
@@ -309,6 +356,7 @@ class TestVaultCreation:
             "templates/topic.md",
         ]
         assert [path.name for path in creation.written_cards] == [
+            "daily.md",
             "organization.md",
             "person.md",
             "place.md",
@@ -481,6 +529,59 @@ class TestScanVault:
 
         assert snapshot.notes[0].due_date == datetime.date(2026, 11, 20)
 
+    def test_records_a_day_date(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Call.md", date="2025-10-12")
+
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+
+        assert snapshot.notes[0].date == NoteDate.from_text("2025-10-12")
+
+    def test_records_a_month_date(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Call.md", date="'2025-10'")
+
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+
+        assert snapshot.notes[0].date == NoteDate.from_text("2025-10")
+
+    def test_records_a_year_date(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Call.md", date="2025")
+
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+
+        assert snapshot.notes[0].date == NoteDate.from_text("2025")
+
+    def test_absent_date_is_none(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Call.md")
+
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+
+        assert snapshot.notes[0].date is None
+
+    def test_malformed_date_stays_in_the_snapshot(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "Call.md", date="'last Tuesday'")
+
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+
+        assert len(snapshot.notes) == ONE
+        assert snapshot.notes[0].date is None
+        assert snapshot.failures == ()
+
+    def test_finds_a_log_entry_by_exact_date(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        path = _write_note(root / "log/2025/10/2025-10-12.md", "log", date="2025-10-12")
+
+        snapshot = afanes.core.vault.service.Vault(root).scan()
+        found = snapshot.log_entry(NoteDate.from_text("2025-10-12"))
+
+        assert found is not None
+        assert found.path == path
+        assert snapshot.log_entry(NoteDate.from_text("2025-10-13")) is None
+
     def test_absent_due_date_is_none(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write_note(root / "Call.md", "project")
@@ -608,6 +709,18 @@ class TestScanVault:
         monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail_write)
         afanes.core.vault.service.Vault(root).scan()
         assert _tree_state(root) == before
+
+    def test_scanning_undated_notes_creates_no_folders(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "notes" / "Undated.md")
+        before = _tree_state(root)
+        folders_before = {path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_dir()}
+
+        afanes.core.vault.service.Vault(root).scan()
+
+        assert _tree_state(root) == before
+        assert {path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_dir()} == folders_before
+        assert not (root / "log").exists()
 
     def test_catalog_keeps_duplicate_names_ambiguous(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -853,7 +966,9 @@ class TestCreateNote:
         root.mkdir()
         path = afanes.core.vault.service.Vault(root).create("Ada", NoteType.NOTE)
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
-        assert document.raw == {"type": "note"}
+        assert document.raw["type"] == "note"
+        assert document.date is not None
+        assert "status" not in document.raw
 
     def test_explicit_status_is_written(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

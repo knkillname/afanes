@@ -162,6 +162,7 @@ class ProjectBodyView:
                 rows.append(self._owner_panel_control(entry.step))
         return ft.Container(
             bgcolor=afanes.ui.theme.STEP_SURFACE_COLOR,
+            border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
             border_radius=afanes.ui.theme.CARD_RADIUS,
             padding=afanes.ui.theme.ITEM_GAP,
             content=ft.Column(

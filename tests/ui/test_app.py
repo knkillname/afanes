@@ -17,6 +17,7 @@ import afanes.core.vault.snapshot
 import afanes.ui.app
 import afanes.ui.state
 import afanes.ui.strings
+import afanes.ui.theme
 from afanes.core.errors import TemplateContentError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.settings import Settings
@@ -38,6 +39,9 @@ class FakePage:
     def __init__(self, *, web: bool = False) -> None:
         self.title = ""
         self.theme_mode = ft.ThemeMode.SYSTEM
+        self.theme: ft.Theme | None = None
+        self.dark_theme: ft.Theme | None = None
+        self.bgcolor: str | None = None
         self.padding = 0
         self.window = FakeWindow()
         self.services: list[object] = []
@@ -218,6 +222,10 @@ class TestDesktopPresentation:
         assert page.window.width == WINDOW_WIDTH
         assert page.window.height == WINDOW_HEIGHT
         assert len(page.services) == 1
+        assert page.theme_mode is ft.ThemeMode.SYSTEM
+        assert page.theme is afanes.ui.theme.THEME
+        assert page.dark_theme is afanes.ui.theme.THEME
+        assert page.bgcolor == afanes.ui.theme.PAGE_SURFACE_COLOR
 
     def test_desktop_welcome_has_no_path_field(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -720,7 +728,7 @@ class TestCreation:
             assert "actions/" not in (preview.value or "")
             assert (
                 afanes.ui.strings.NEW_VAULT_PREVIEW_GUIDE.format(
-                    folders="inbox/, trash/, reference/, projects/",
+                    folders="inbox/, trash/, reference/, projects/, log/",
                 )
                 == preview.value
             )
@@ -955,6 +963,7 @@ class TestLaunchDigest:
             await afanes.ui.app.main(typing.cast("ft.Page", page), vault)
             digest = _find_by_key(page.controls[0], "launch-digest")
             assert isinstance(digest, ft.Container)
+            assert digest.bgcolor == afanes.ui.theme.NOTICE_SURFACE_COLOR
             texts = _all_texts(digest)
             assert any("1 due step" in text for text in texts)
             start = _typed(_find_by_key(digest, "launch-digest-start"), ft.FilledButton)

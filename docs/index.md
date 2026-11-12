@@ -38,6 +38,7 @@ guide/workspace
 guide/inbox
 guide/projects-and-steps
 guide/references-and-categories
+guide/log
 guide/pages-and-editing
 guide/processing
 guide/review

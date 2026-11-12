@@ -4,10 +4,10 @@
 """Frontmatter-aware note documents.
 
 The module exposes one cohesive value object, :class:`NoteDocument`, which
-owns fence parsing, safe YAML loading, serialization, and validation of the five
+owns fence parsing, safe YAML loading, serialization, and validation of the six
 recognized frontmatter keys. Keeping those behaviors together preserves the
 document's invariants: metadata, body, newline style, declared type, category,
-status, due date, and requester always travel as one unit.
+status, due date, requester, and note date always travel as one unit.
 """
 
 import dataclasses
@@ -20,7 +20,7 @@ from markdown_it.token import Token
 from yaml import YAMLError
 
 from afanes.core.errors import NoteParseError, RetiredValueError
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
 # Public canonical frontmatter delimiter.
 FRONTMATTER_FENCE = "---"
@@ -77,12 +77,19 @@ class NoteDocument:
     asked_by : str | None
         Plain name of the person or group that requested the project, or
         ``None`` when absent.
+    date : NoteDate | None
+        ISO partial date, or ``None`` when absent or malformed.
+    date_error : str | None
+        Validation message for a malformed ``date``, or ``None`` when the value
+        is absent or valid.
 
     Notes
     -----
     Use :meth:`from_text` to build a validated document from source. The raw
     mapping is kept so a rewrite can preserve unknown keys; callers receive a
-    fresh copy from the parser.
+    fresh copy from the parser. A malformed ``date`` is preserved in the raw
+    mapping, reported through :attr:`date_error`, and treated as absent by the
+    scan instead of making the note unreadable.
     """
 
     raw: dict[str, object]
@@ -94,6 +101,8 @@ class NoteDocument:
     status: Status | None = None
     due_date: datetime.date | None = None
     asked_by: str | None = None
+    date: NoteDate | None = None
+    date_error: str | None = None
 
     @classmethod
     def from_text(cls, text: str) -> Self:
@@ -109,7 +118,7 @@ class NoteDocument:
         -------
         NoteDocument
             Raw metadata, body, newline style, declared type, category, status,
-            due date, and requester.
+            due date, requester, and note date.
 
         Raises
         ------
@@ -126,7 +135,9 @@ class NoteDocument:
         Notes
         -----
         Frontmatter exists only when the first line is exactly ``---``. A body
-        that later begins with ``---`` is ordinary content and is preserved.
+        that later begins with ``---`` is ordinary content and is preserved. A
+        malformed ``date`` does not raise; it is preserved in :attr:`raw`,
+        reported through :attr:`date_error`, and treated as absent.
         """
         split = cls._split_frontmatter(text)
         newline = "\r\n" if "\r\n" in text else "\n"
@@ -136,6 +147,7 @@ class NoteDocument:
         status = cls._declared_status(split.raw, note_type)
         due_date = cls._declared_due_date(split.raw, note_type)
         asked_by = cls._declared_asked_by(split.raw, note_type)
+        note_date, date_error = cls._declared_date(split.raw)
         return cls(
             raw=split.raw,
             body=split.body,
@@ -146,6 +158,8 @@ class NoteDocument:
             status=status,
             due_date=due_date,
             asked_by=asked_by,
+            date=note_date,
+            date_error=date_error,
         )
 
     def to_text(self) -> str:
@@ -288,7 +302,8 @@ class NoteDocument:
         Notes
         -----
         Unknown keys are preserved. Category values preserve their written
-        form; retired keys are never accepted back.
+        form; retired keys are never accepted back. A malformed ``date`` is
+        preserved and reported through :attr:`date_error` rather than raising.
         """
         new_raw = dict(raw)
         self._reject_retired_keys(new_raw)
@@ -297,6 +312,7 @@ class NoteDocument:
         status = self._declared_status(new_raw, note_type)
         due_date = self._declared_due_date(new_raw, note_type)
         asked_by = self._declared_asked_by(new_raw, note_type)
+        note_date, date_error = self._declared_date(new_raw)
         return dataclasses.replace(
             self,
             raw=new_raw,
@@ -305,6 +321,8 @@ class NoteDocument:
             status=status,
             due_date=due_date,
             asked_by=asked_by,
+            date=note_date,
+            date_error=date_error,
         )
 
     @staticmethod
@@ -479,6 +497,46 @@ class NoteDocument:
             raise NoteParseError(message)
         raw["asked_by"] = name
         return name
+
+    @staticmethod
+    def _declared_date(raw: dict[str, object]) -> tuple[NoteDate | None, str | None]:
+        """Return the parsed note date and any malformed-value warning.
+
+        Parameters
+        ----------
+        raw : dict[str, object]
+            Frontmatter mapping exactly as loaded. A valid value is normalized
+            in place; a malformed value is left untouched.
+
+        Returns
+        -------
+        tuple[NoteDate | None, str | None]
+            Parsed date and ``None``, or ``None`` and an actionable warning.
+            An absent or null key returns ``(None, None)``.
+        """
+        if "date" not in raw:
+            return None, None
+        value = raw["date"]
+        if value is None:
+            return None, None
+        if isinstance(value, bool):
+            return None, "A note date must be a date written as YYYY, YYYY-MM, or YYYY-MM-DD"
+        if isinstance(value, datetime.datetime):
+            return None, "A note date is a calendar date, not a timestamp"
+        try:
+            if isinstance(value, datetime.date):
+                note_date = NoteDate.from_date(value)
+            elif isinstance(value, int):
+                note_date = NoteDate.from_year(value)
+            elif isinstance(value, str):
+                note_date = NoteDate.from_text(value)
+            else:
+                message = "A note date must be a date written as YYYY, YYYY-MM, or YYYY-MM-DD"
+                return None, message
+        except ValueError as exc:
+            return None, str(exc)
+        raw["date"] = note_date.to_yaml_value()
+        return note_date, None
 
     @staticmethod
     def _calendar_date(value: object) -> datetime.date:

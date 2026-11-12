@@ -30,6 +30,20 @@ rechecks containment and preserves the note bytes it did not intend to change.
    :members:
 ```
 
+### 🧩 afanes.core.vault.naming_reports
+
+```{eval-rst}
+.. automodule:: afanes.core.vault.naming_reports
+   :members:
+```
+
+### 🧩 afanes.core.vault.log_conversions
+
+```{eval-rst}
+.. automodule:: afanes.core.vault.log_conversions
+   :members:
+```
+
 ### 🧩 afanes.core.vault.pages
 
 ```{eval-rst}

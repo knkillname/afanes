@@ -7,12 +7,14 @@ from pathlib import Path
 import pytest
 
 import afanes.core.atomic
+import afanes.core.vault.log_conversions
 import afanes.core.vault.naming
 import afanes.core.vault.pages
 import afanes.core.vault.processing
 import afanes.core.vault.service
 import afanes.core.vault.steps
 from afanes.core.errors import (
+    ContentChangedError,
     NameCollisionError,
     VaultError,
     VaultPathError,
@@ -21,11 +23,12 @@ from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import ResolutionOutcome
 from afanes.core.vault.snapshot import ReferenceSite
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import CategoryLabel, NoteType
+from afanes.models.note import CategoryLabel, NoteDate, NoteType
 
 ONE = 1
 TWO = 2
 THREE_REFERENCES = 3
+YEAR_LENGTH = 4
 
 
 def _write_note(
@@ -36,6 +39,7 @@ def _write_note(
     category: str | None = None,
     status: str | None = None,
     due_date: str | None = None,
+    date: str | None = None,
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     if note_type == "person":
@@ -48,6 +52,8 @@ def _write_note(
         lines.append(f"status: {status}")
     if due_date is not None:
         lines.append(f"due_date: {due_date}")
+    if date is not None:
+        lines.append(f"date: {date}")
     lines.extend(["---", "", body])
     path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     return path
@@ -827,3 +833,219 @@ class TestNamingGuards:
 
         with pytest.raises(NameCollisionError):
             naming.trash(note, confirm=True)
+
+
+class TestLogDateChange:
+    def _log(
+        self,
+        root: Path,
+        date: str = "2025-10-12",
+        *,
+        body: str = "# A quiet Tuesday\n",
+    ) -> Path:
+        year = date[:4]
+        folder = root / "log" / year
+        if len(date) > YEAR_LENGTH:
+            folder = folder / date[5:7]
+        return _write_note(folder / f"{date}.md", "log", body=body, date=date)
+
+    def test_plans_a_day_to_day_change(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root)
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10-13"))
+
+        assert preview.target_path == root / "log" / "2025" / "10" / "2025-10-13.md"
+        assert preview.new_date == NoteDate.from_text("2025-10-13")
+        assert preview.scheme is ReferenceScheme.LOG
+
+    def test_plans_a_day_to_month_change(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root)
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10"))
+
+        assert preview.target_path == root / "log" / "2025" / "10" / "2025-10.md"
+
+    def test_plans_a_month_to_year_change(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = _write_note(root / "log" / "2025" / "10" / "2025-10.md", "log", date="2025-10")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025"))
+
+        assert preview.target_path == root / "log" / "2025" / "2025.md"
+
+    def test_rejects_an_occupied_date(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root)
+        self._log(root, "2025-10-13")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        with pytest.raises(NameCollisionError):
+            naming.plan_log_date_change(source, NoteDate.from_text("2025-10-13"))
+
+    def test_applies_and_rewrites_references(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root)
+        referrer = _write_note(root / "reference" / "Entry.md", "reference", body="[Entry](<log:2025-10-12>)\n")
+        vault = afanes.core.vault.service.Vault(root)
+        naming = afanes.core.vault.log_conversions.LogConversions(vault)
+
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10-13"))
+        report = naming.apply(preview)
+
+        target = root / "log" / "2025" / "10" / "2025-10-13.md"
+        assert report.renamed
+        assert target.is_file()
+        assert not source.exists()
+        assert "log:2025-10-13" in referrer.read_text(encoding="utf-8")
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert document.date == NoteDate.from_text("2025-10-13")
+        assert document.title == "A quiet Tuesday"
+
+    def test_skips_a_changed_referrer(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root)
+        referrer = _write_note(root / "reference" / "Entry.md", "reference", body="[Entry](<log:2025-10-12>)\n")
+        vault = afanes.core.vault.service.Vault(root)
+        naming = afanes.core.vault.log_conversions.LogConversions(vault)
+
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10-13"))
+        referrer.write_text("---\ntype: reference\n---\nchanged\n", encoding="utf-8")
+        report = naming.apply(preview)
+
+        assert referrer in report.skipped
+        assert (root / "log" / "2025" / "10" / "2025-10-13.md").is_file()
+
+    def test_skips_a_changed_source(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root)
+        vault = afanes.core.vault.service.Vault(root)
+        naming = afanes.core.vault.log_conversions.LogConversions(vault)
+
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10-13"))
+        source.write_text("---\ntype: log\ndate: 2025-10-12\n---\nchanged\n", encoding="utf-8")
+
+        with pytest.raises(ContentChangedError):
+            naming.apply(preview)
+
+    def test_rerun_is_safe(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root)
+        vault = afanes.core.vault.service.Vault(root)
+        naming = afanes.core.vault.log_conversions.LogConversions(vault)
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10-13"))
+
+        naming.apply(preview)
+        report = naming.apply(preview)
+
+        assert not report.renamed
+        assert (root / "log" / "2025" / "10" / "2025-10-13.md").is_file()
+
+    def test_requires_confirmation(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root)
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10-13"))
+
+        with pytest.raises(VaultError):
+            naming.apply(preview, confirm=False)
+
+
+class TestLogTypeChange:
+    def test_reference_becomes_a_log_entry(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = _write_note(
+            root / "reference" / "A quiet Tuesday.md",
+            "reference",
+            body="# A quiet Tuesday\n",
+            date="2025-10-12",
+        )
+        referrer = _write_note(
+            root / "inbox" / "Link.md",
+            "note",
+            body="[Entry](<note:A quiet Tuesday>)\n",
+        )
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_type_change(source, NoteType.LOG)
+        naming.apply(preview)
+
+        target = root / "log" / "2025" / "10" / "2025-10-12.md"
+        assert target.is_file()
+        assert not source.exists()
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert document.note_type is NoteType.LOG
+        assert document.date == NoteDate.from_text("2025-10-12")
+        assert "category" not in document.raw
+        assert "log:2025-10-12" in referrer.read_text(encoding="utf-8")
+
+    def test_log_becomes_a_reference(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = _write_note(
+            root / "log" / "2025" / "10" / "2025-10-12.md",
+            "log",
+            body="# A quiet Tuesday\n",
+            date="2025-10-12",
+        )
+        referrer = _write_note(
+            root / "inbox" / "Link.md",
+            "note",
+            body="[Entry](<log:2025-10-12>)\n",
+        )
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_type_change(source, NoteType.REFERENCE)
+        naming.apply(preview)
+
+        target = root / "reference" / "A quiet Tuesday.md"
+        assert target.is_file()
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert document.note_type is NoteType.REFERENCE
+        assert document.date == NoteDate.from_text("2025-10-12")
+        assert "note:A quiet Tuesday" in referrer.read_text(encoding="utf-8")
+
+    def test_log_becomes_a_project(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = _write_note(
+            root / "log" / "2025" / "10" / "2025-10-12.md",
+            "log",
+            body="# A quiet Tuesday\n",
+            date="2025-10-12",
+        )
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_type_change(source, NoteType.PROJECT)
+        naming.apply(preview)
+
+        target = root / "projects" / "A quiet Tuesday.md"
+        assert target.is_file()
+        assert NoteDocument.from_text(target.read_text(encoding="utf-8")).note_type is NoteType.PROJECT
+
+    def test_an_undated_note_cannot_become_a_log(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = _write_note(root / "reference" / "No date.md", "reference")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        with pytest.raises(VaultError, match="Set a date"):
+            naming.plan_type_change(source, NoteType.LOG)
+
+    def test_an_occupied_date_refuses_the_change(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = _write_note(
+            root / "reference" / "A quiet Tuesday.md",
+            "reference",
+            date="2025-10-12",
+        )
+        _write_note(
+            root / "log" / "2025" / "10" / "2025-10-12.md",
+            "log",
+            date="2025-10-12",
+        )
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        with pytest.raises(NameCollisionError):
+            naming.plan_type_change(source, NoteType.LOG)

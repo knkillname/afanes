@@ -4,6 +4,7 @@
 """Vault scanning, path containment, atomic writes, and reference-safe edits."""
 
 import dataclasses
+import datetime
 import hashlib
 import os
 from pathlib import Path
@@ -43,7 +44,7 @@ from afanes.core.vault.snapshot import (
     VaultSnapshot,
 )
 from afanes.models.link import ReferenceScheme
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, DatePrecision, NoteDate, NoteType, Status
 
 # Public canonical note extension.
 NOTE_SUFFIX = afanes.core.vault.snapshot.NOTE_SUFFIX
@@ -53,6 +54,7 @@ INBOX_DIRECTORY = afanes.core.vault.snapshot.INBOX_DIRECTORY
 TRASH_DIRECTORY = afanes.core.vault.snapshot.TRASH_DIRECTORY
 REFERENCE_DIRECTORY = afanes.core.vault.snapshot.REFERENCE_DIRECTORY
 PROJECTS_DIRECTORY = afanes.core.vault.snapshot.PROJECTS_DIRECTORY
+LOG_DIRECTORY = afanes.core.vault.snapshot.LOG_DIRECTORY
 TEMPLATES_DIRECTORY = afanes.core.vault.snapshot.TEMPLATES_DIRECTORY
 
 
@@ -143,6 +145,7 @@ class Vault:
             TRASH_DIRECTORY,
             REFERENCE_DIRECTORY,
             PROJECTS_DIRECTORY,
+            LOG_DIRECTORY,
         )
 
     @classmethod
@@ -333,6 +336,7 @@ class Vault:
             self.existing_directory(self.root, TRASH_DIRECTORY),
             self.directory_for(NoteType.REFERENCE),
             self.directory_for(NoteType.PROJECT),
+            self.existing_directory(self.root, LOG_DIRECTORY),
         ]
         created: list[Path] = []
         for destination in destinations:
@@ -482,6 +486,7 @@ class Vault:
             category=document.category,
             status=document.status,
             due_date=document.due_date,
+            date=document.date,
             content_hash=hashlib.sha256(data).hexdigest(),
             modified_ns=stat.st_mtime_ns,
             body_references=body_references,
@@ -518,6 +523,9 @@ class Vault:
         if category is not None and note_type is not NoteType.REFERENCE:
             message = "Only reference notes can declare a category"
             raise VaultError(message)
+        if note_type is NoteType.LOG:
+            message = "Log directories are selected by date; use log_directory"
+            raise VaultError(message)
         if note_type is NoteType.PROJECT:
             return self.existing_directory(self.root, PROJECTS_DIRECTORY)
         if note_type is NoteType.REFERENCE:
@@ -527,6 +535,34 @@ class Vault:
             folder = Path(afanes.core.names.safe_filename(category.value))
             return self.existing_directory(reference_root, folder)
         return self.existing_directory(self.root, INBOX_DIRECTORY)
+
+    def log_directory(self, date: NoteDate) -> Path:
+        """Return the default destination directory for a log entry.
+
+        Parameters
+        ----------
+        date : NoteDate
+            Date whose precision selects the folder.
+
+        Returns
+        -------
+        Path
+            Absolute ``log/<year>/`` folder for a year-precision date, or
+            ``log/<year>/<month>/`` for a month- or day-precision date. An
+            existing case variant is reused. The directory is not created by
+            this method.
+
+        Notes
+        -----
+        The result is a convention, not a requirement. A log entry stored
+        elsewhere still appears in the Log section because the note type, not
+        the folder, selects the view.
+        """
+        log_root = self.existing_directory(self.root, LOG_DIRECTORY)
+        year = self.existing_directory(log_root, Path(f"{date.year:04d}"))
+        if date.precision is DatePrecision.YEAR:
+            return year
+        return self.existing_directory(year, Path(f"{date.month:02d}"))
 
     def templates_directory(self) -> Path:
         """Return the reference template card folder without creating it.
@@ -693,10 +729,33 @@ class Vault:
         taken.update(entry.name for entry in target_directory.iterdir())
         name = afanes.core.names.unique_name(afanes.core.names.safe_filename(title), taken)
 
-        document = self.new_note_document(note_type, category, status, body)
+        document = self.new_note_document(
+            note_type,
+            category,
+            status,
+            body,
+            date=NoteDate.from_date(self.today()),
+        )
         path = target_directory / f"{name}{NOTE_SUFFIX}"
         afanes.core.atomic.write_text_atomic(path, document.to_text())
         return path
+
+    @classmethod
+    def today(cls) -> datetime.date:
+        """Return the calendar date stamped on a newly created note.
+
+        Returns
+        -------
+        datetime.date
+            Current local calendar date.
+
+        Notes
+        -----
+        This class method is the single time source for note creation. Tests
+        patch it to make a creation deterministic; application code never
+        passes a clock object around.
+        """
+        return datetime.datetime.now(tz=datetime.UTC).astimezone().date()
 
     @staticmethod
     def new_note_document(
@@ -704,10 +763,33 @@ class Vault:
         category: CategoryLabel | None,
         status: Status | None,
         body: str,
+        *,
+        date: NoteDate | None = None,
     ) -> NoteDocument:
-        """Build the canonical document for a newly created note."""
+        """Build the canonical document for a newly created note.
+
+        Parameters
+        ----------
+        note_type : NoteType
+            Declared type for the new note.
+        category : CategoryLabel | None
+            Reference category, or ``None`` when the note has no category.
+        status : Status | None
+            Initial workflow status, or ``None`` to omit the key.
+        body : str
+            Initial Markdown body. CRLF and a leading BOM are normalized.
+        date : NoteDate | None
+            Initial note date, or ``None`` to omit the key.
+
+        Returns
+        -------
+        NoteDocument
+            Canonical document ready to serialize.
+        """
         normalized_body = body.replace("\r\n", "\n").replace("\r", "\n").removeprefix("\ufeff")
         raw: dict[str, object] = {"type": note_type.value}
+        if date is not None:
+            raw["date"] = date.to_yaml_value()
         if category is not None:
             raw["category"] = category.value
         if status is not None:
@@ -720,6 +802,7 @@ class Vault:
             note_type=note_type,
             category=category,
             status=status,
+            date=date,
         )
 
     @staticmethod

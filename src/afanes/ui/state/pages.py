@@ -15,9 +15,10 @@ import afanes.core.vault.naming
 import afanes.core.vault.pages
 import afanes.core.vault.steps
 import afanes.ui.strings
-from afanes.core.editing import DraftMode, NormalDraft, PageDraft, PageDraftFactory, PageLabels, RawDraft
+from afanes.core.editing import DraftMode, NormalDraft, PageDraft, PageDraftFactory, RawDraft
 from afanes.core.errors import AfanesError, ContentChangedError, NoteParseError, VaultError, VaultPathError
-from afanes.core.vault.naming import ReferenceRepairPreview
+from afanes.core.labels import PageLabels
+from afanes.core.vault.naming_reports import ReferenceRepairPreview
 from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.models.link import NoteReference

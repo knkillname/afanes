@@ -23,6 +23,7 @@ out of the Inbox, so a failed move leaves the capture available for a retry.
 | **Later** | Keeps it as a reference with `status: later`, using the chosen template card or Empty |
 | **Reference** | Keeps it as a reference, using the chosen template card or Empty |
 | **Project** | Turns it into a project with a status and optional due date |
+| **Log entry** | Turns it into a dated log entry under `log/`, using the capture's date |
 | **Append step** | Adds the capture as a step of an existing project and moves the capture to trash |
 | **Done now** | Writes a completed one-step project with `status: done` |
 
@@ -30,14 +31,17 @@ Task list items already in the capture body become steps when the outcome is a p
 start empty.
 
 The preview shows the destination and, when the outcome changes scheme, how many inbound references
-will become unresolved.
+will be affected. A Log entry outcome rewrites `note:` links to the new `log:<date>` destination; an
+undated capture uses its last-modified date for this conversion. A date that already has a log entry
+is refused.
 
 ## 🗂️ Template cards
 
 Reference and Later ask which kind of reference you are creating. The **Template** field lists the
-valid cards from the vault's `templates/` folder plus **Empty**. A card supplies the category and a
-starter body; Empty uses `category: general` and adds no starter body. Processing never guesses the
-card from the capture text.
+valid reference cards from the vault's `templates/` folder plus **Empty**. A card supplies the category
+and a starter body; Empty uses `category: general` and adds no starter body. Processing never guesses
+the card from the capture text. The Log entry outcome does not ask for a card and preserves the
+capture body.
 
 The starter body is added below the capture text in the same atomic write as the classification. The
 preview names the category and says whether a starter body will be added. Invalid cards are skipped

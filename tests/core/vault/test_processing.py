@@ -17,7 +17,7 @@ import afanes.core.vault.steps
 from afanes.core.errors import NameCollisionError, ProcessingError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome
-from afanes.models.note import NoteType, Status
+from afanes.models.note import NoteDate, NoteType, Status
 
 ONE = 1
 TWO = 2
@@ -32,6 +32,7 @@ def _write_note(
     category: str | None = None,
     status: str | None = None,
     due_date: str | None = None,
+    date: str | None = None,
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     if note_type == "person":
@@ -44,6 +45,8 @@ def _write_note(
         lines.append(f"status: {status}")
     if due_date is not None:
         lines.append(f"due_date: {due_date}")
+    if date is not None:
+        lines.append(f"date: {date}")
     lines.extend(["---", "", body])
     path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     return path
@@ -209,3 +212,77 @@ class TestProcessingGuards:
 
         with pytest.raises(ProcessingError):
             service.apply_processing(plan, confirm=True)
+
+
+class TestLogProcessing:
+    def test_plan_and_apply_a_dated_capture(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        capture = _write_note(
+            root / "inbox" / "Call the plumber.md",
+            body="Call the plumber\n\nAbout the leak.\n",
+            date="2025-10-12",
+        )
+        vault = afanes.core.vault.service.Vault(root)
+        processing = afanes.core.vault.processing.VaultProcessing(vault)
+
+        plan = processing.plan_processing(capture, ProcessingOutcome.LOG)
+        target = processing.apply_processing(plan, confirm=True)
+
+        expected = root / "log" / "2025" / "10" / "2025-10-12.md"
+        assert target == expected
+        assert expected.is_file()
+        assert not capture.exists()
+        document = NoteDocument.from_text(expected.read_text(encoding="utf-8"))
+        assert document.note_type is NoteType.LOG
+        assert document.date == NoteDate.from_text("2025-10-12")
+        assert "category" not in document.raw
+        assert "status" not in document.raw
+        assert "due_date" not in document.raw
+        assert "asked_by" not in document.raw
+
+    def test_undated_capture_uses_the_last_modified_date(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        capture = _write_note(root / "inbox" / "Call the plumber.md", body="Call the plumber\n")
+        modified = datetime.datetime(2025, 10, 12, 12, tzinfo=datetime.UTC)
+        _set_modified_ns(capture, int(modified.timestamp() * 1_000_000_000))
+        vault = afanes.core.vault.service.Vault(root)
+        processing = afanes.core.vault.processing.VaultProcessing(vault)
+
+        plan = processing.plan_processing(capture, ProcessingOutcome.LOG)
+        target = processing.apply_processing(plan, confirm=True)
+
+        assert target == root / "log" / "2025" / "10" / "2025-10-12.md"
+
+    def test_occupied_date_is_refused(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        capture = _write_note(
+            root / "inbox" / "Call the plumber.md",
+            body="Call the plumber\n",
+            date="2025-10-12",
+        )
+        _write_note(root / "log" / "2025" / "10" / "2025-10-12.md", "log", date="2025-10-12")
+        vault = afanes.core.vault.service.Vault(root)
+        processing = afanes.core.vault.processing.VaultProcessing(vault)
+
+        with pytest.raises(NameCollisionError):
+            processing.plan_processing(capture, ProcessingOutcome.LOG)
+
+    def test_inbound_note_references_are_rewritten(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        capture = _write_note(
+            root / "inbox" / "Call the plumber.md",
+            body="# Call the plumber\n",
+            date="2025-10-12",
+        )
+        referrer = _write_note(
+            root / "reference" / "Entry.md",
+            "reference",
+            body="[Call](<note:Call the plumber>)\n",
+        )
+        vault = afanes.core.vault.service.Vault(root)
+        processing = afanes.core.vault.processing.VaultProcessing(vault)
+
+        plan = processing.plan_processing(capture, ProcessingOutcome.LOG)
+        processing.apply_processing(plan, confirm=True)
+
+        assert "log:2025-10-12" in referrer.read_text(encoding="utf-8")

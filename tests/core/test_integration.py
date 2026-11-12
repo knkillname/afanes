@@ -206,7 +206,9 @@ class TestInboxCapture:
         assert snapshot.inbox_notes()[0].title == "Call Ada"
         assert "About the report." in vault.read_body(path)
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
-        assert document.raw == {"type": "note"}
+        assert document.raw["type"] == "note"
+        assert document.date is not None
+        assert "due_date" not in document.raw
 
 
 class TestPageEditingLifecycle:
@@ -428,6 +430,7 @@ class TestCreatedVaultWorkflow:
             "trash",
             "reference",
             "projects",
+            "log",
         ]
 
 
@@ -482,7 +485,9 @@ class TestDocumentedExamples:
     def test_project_example_parses(self) -> None:
         page = Path(__file__).resolve().parents[2] / "docs" / "reference" / "vault-format.md"
         text = page.read_text(encoding="utf-8")
-        marker = "---\ntype: project\nstatus: active\ndue_date: 2026-11-30\nasked_by: Priya Nair\n---\n"
+        marker = (
+            "---\ntype: project\nstatus: active\ndate: 2025-10-12\ndue_date: 2026-11-30\nasked_by: Priya Nair\n---\n"
+        )
         start = text.index(marker)
         end = text.index("```", start)
         document = NoteDocument.from_text(text[start:end])

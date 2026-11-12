@@ -7,9 +7,9 @@ the filename stem when there is no heading.
 :::{admonition} tl;dr
 :class: note
 
-Three note types share one Markdown format: `note` for Inbox captures, `reference` for non-actionable
-knowledge, and `project` for an outcome whose body holds task-list steps. Folders classify notes; they
-do not define identity.
+Four note types share one Markdown format: `note` for Inbox captures, `reference` for non-actionable
+knowledge, `project` for an outcome whose body holds task-list steps, and `log` for dated diary
+entries. Folders classify notes; they do not define identity.
 :::
 
 ## 🗂️ Files and identity
@@ -17,7 +17,8 @@ do not define identity.
 - The filename stem is the note's identity. Renaming the file renames the note.
 - The first level-1 heading is the display title. A filename and a heading may differ.
 - Directories only classify notes. Moving a note between folders never changes a reference.
-- A note belongs to exactly one folder, and the browser shows it in exactly one group.
+- A note belongs to exactly one folder. In normal browsing it has one type group; the Log's
+  Everything mode is an additional date lens.
 - Notes under `trash/` are excluded from scans, name uniqueness, and reference resolution.
 - Files under `templates/` are reference template cards, not notes. They are excluded from scans, the
   browser, name uniqueness, and reference resolution. See [Template cards](template-cards.md).
@@ -29,9 +30,10 @@ do not define identity.
 | `note` | An unclarified capture | `inbox/` |
 | `reference` | Non-actionable knowledge, optionally with a `category` label | `reference/` |
 | `project` | An outcome with task-list steps in the body | `projects/` |
+| `log` | A dated diary entry whose date is its identity | `log/<year>/` or `log/<year>/<month>/` |
 
 People are references with `category: person`, not a separate note type. Categories never select a
-reference namespace; every reference uses the `note:` scheme.
+reference namespace; every reference uses the `note:` scheme. Log entries use the `log:` scheme.
 
 ## 📋 Frontmatter keys
 
@@ -39,7 +41,8 @@ The recognized keys are:
 
 | Key | Valid on | Values |
 | --- | --- | --- |
-| `type` | every note | `note`, `reference`, or `project` |
+| `type` | every note | `note`, `reference`, `project`, or `log` |
+| `date` | every note | an ISO calendar value: `YYYY`, `YYYY-MM`, or `YYYY-MM-DD` |
 | `category` | references only | any non-empty single folder label; case is preserved |
 | `status` | projects and references | projects: `active`, `waiting`, `done`, `cancelled`, `archived`, `later`; references: `later`, `archived`, or absent |
 | `due_date` | projects only | a calendar date written as `YYYY-MM-DD` |
@@ -50,10 +53,15 @@ the queue. A due date is a date, not a timestamp. `asked_by` records who request
 shown in the project meta row; it does not resolve or navigate. See [Frontmatter](frontmatter.md) for
 the full key reference.
 
+A note's `date` is an ISO calendar value: `YYYY`, `YYYY-MM`, or `YYYY-MM-DD`. It places the note in
+the archive and the Log section and is independent of a project's `due_date`. A malformed date keeps
+the note readable and shows it as Undated until it is corrected.
+
 ```markdown
 ---
 type: project
 status: active
+date: 2025-10-12
 due_date: 2026-11-30
 asked_by: Priya Nair
 ---
@@ -85,13 +93,15 @@ vault/
   reference/      non-actionable notes
     <category>/   optional category folders, such as reference/person/
   projects/       project notes
+  log/            dated diary entries
+    2025/10/      year and month folders selected by the entry date
   templates/      reference template cards, not notes
 ```
 
 These folders are conveniences, not requirements. Existing notes anywhere in the vault still resolve.
 Folders are created only when a write needs them. A newly created vault also contains the `Getting
-started` guide, the seven reference template cards under `templates/`, and the chosen template's
-notes; a vault opened later is never seeded or repaired.
+started` guide, the eight template cards under `templates/`, and the chosen template's notes; a vault
+opened later is never seeded or repaired.
 
 :::{warning}
 `templates/` is reserved. If an existing vault already used that folder for ordinary notes, those
@@ -101,6 +111,24 @@ them out of `templates/` to restore them.
 
 A categorized reference is filed under `reference/<category-folder>/`, where the folder is derived
 from the label through the cross-platform filename policy. An existing case variant is reused.
+
+## 📓 Log entries
+
+A log entry is a dated page. Its `date` is its identity and its filename:
+
+```text
+log/2025/2025.md                    # whole year
+log/2025/10/2025-10.md              # whole month
+log/2025/10/2025-10-12.md           # one day
+```
+
+Only one log entry may exist for each exact date. The entry's first level-1 heading is its display
+title and is not part of its identity. Link to it with `[Tuesday](<log:2025-10-12>)`. A log entry has
+no `category`, `status`, `due_date`, or `asked_by`.
+
+Changing a log entry's date renames and moves it and rewrites inbound `log:` links automatically. A
+note that changes type into or out of `log` is moved and renamed the same way; a note without a date
+cannot become a log entry.
 
 ## 🧩 Steps in a project body
 

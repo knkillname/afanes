@@ -61,17 +61,27 @@ A tap on an internal reference in read mode SHALL resolve the destination agains
 
 ### Requirement: New page type follows the project or note scheme
 
-Creating a page from an unresolved reference SHALL derive its type and default folder from the reference scheme: `note:` creates an uncategorized reference and `project:` creates a project. The draft SHALL open in edit mode with a level-1 heading containing the reference name and an otherwise empty body.
+Creating a page from an unresolved reference SHALL derive its type and default folder from the
+reference scheme: `note:` creates an uncategorized reference, `project:` creates a project, and
+`log:` creates a log entry dated by the reference name. The draft SHALL open in edit mode with a
+level-1 heading containing the reference name and an otherwise empty body.
 
 #### Scenario: Note scheme creates an uncategorized reference
 
 - **WHEN** the user creates a page from `note:Quarterly budget`
-- **THEN** the draft has type `reference`, no category, and defaults to `reference/Quarterly budget.md`
+- **THEN** the draft has type `reference`, no category, and defaults to
+  `reference/Quarterly budget.md`
 
 #### Scenario: Project scheme creates a project
 
 - **WHEN** the user creates a page from `project:Release 1.0`
 - **THEN** the draft has type `project` and defaults to `projects/Release 1.0.md`
+
+#### Scenario: Log scheme creates a log entry
+
+- **WHEN** the user creates a page from `log:2025-10-12`
+- **THEN** the draft has type `log`, date `2025-10-12`, and defaults to
+  `log/2025/10/2025-10-12.md`
 
 #### Scenario: Heading preserves the reference wording
 
@@ -132,7 +142,11 @@ If the safe identity already belongs to a page in the same scheme, the applicati
 
 ### Requirement: The page edits the body and the four labels
 
-Edit mode SHALL present the complete Markdown body, including its headings and steps, as raw text, along with a label form for type, category, status, and due date. Category SHALL be offered only for references and due date only for projects. Status choices SHALL follow the selected type. An invalid label value SHALL block the save and show an inline error.
+Edit mode SHALL present the complete Markdown body, including its headings and steps, as raw text,
+along with a label form for type, date, category, status, due date, and requester. Date SHALL be
+offered for every note. Category SHALL be offered only for references; due date and requester only
+for projects; log SHALL offer none of them. Status choices SHALL follow the selected type. An invalid
+label value SHALL block the save and show an inline error.
 
 #### Scenario: Body is raw Markdown
 
@@ -178,6 +192,45 @@ Edit mode SHALL present the complete Markdown body, including its headings and s
 - **WHEN** the user edits a project
 - **THEN** steps and their metadata are edited through the body field
 
+#### Scenario: Date is offered on every note
+
+- **WHEN** a note, reference, project, or log is edited
+- **THEN** the Date field is offered
+
+#### Scenario: Log offers no workflow labels
+
+- **WHEN** a log entry is edited
+- **THEN** category, status, due date, and requester are not offered
+
+#### Scenario: An invalid date shows a warning
+
+- **WHEN** the Date field contains a malformed value
+- **THEN** the warning from `note-model` is shown and the save is blocked until it is valid
+
+### Requirement: Category suggests existing labels while accepting new ones
+
+Edit mode SHALL present the category as an editable combobox. Its suggestions SHALL be the distinct category labels already present on reference notes in the vault, sorted alphabetically and case-insensitively. Selecting a suggestion or typing a label that is not listed SHALL both be valid, and the existing category validation SHALL still apply.
+
+#### Scenario: Existing labels are suggested
+
+- **WHEN** the vault contains references under the `person` and `place` categories and a reference is edited
+- **THEN** the category combobox offers `person` and `place`
+
+#### Scenario: Typing filters the suggestions
+
+- **WHEN** the user types part of a category name into the combobox
+- **THEN** the suggestions are filtered to the labels that match, ignoring case
+
+#### Scenario: A new label is accepted
+
+- **WHEN** the user types a category that is not in the suggestions and confirms it
+- **THEN** the reference receives that category and the note moves to the matching folder as before
+
+#### Scenario: No existing labels yet
+
+- **WHEN** the vault has no categorized reference notes and a reference is edited
+- **THEN** the combobox offers no suggestions but still accepts a typed category
+
 ### Requirement: The page edits the project requester
 
 Edit mode SHALL offer an `Asked by` field for projects. The field SHALL accept one line of text.
@@ -192,7 +245,7 @@ preserve the body, unknown keys, and every other frontmatter value.
 
 #### Scenario: The field is not offered for other types
 
-- **WHEN** the selected type is `reference` or `note`
+- **WHEN** the selected type is `reference`, `note`, or `log`
 - **THEN** the `Asked by` field is not offered
 
 #### Scenario: A requester is written
@@ -219,6 +272,11 @@ preserve the body, unknown keys, and every other frontmatter value.
 
 - **WHEN** the user saves a requester
 - **THEN** no body reference is created or rewritten
+
+#### Scenario: A log never carries a requester
+
+- **WHEN** a project with `asked_by` is changed to `log`
+- **THEN** the `asked_by` key is removed before the save
 
 ### Requirement: Autosave and commit preserve the draft
 
@@ -280,12 +338,17 @@ Before every write, the application SHALL compare the file's current content wit
 
 ### Requirement: Type changes preview stranded references
 
-Changing a note's type can move it between the `note` and `project` schemes. Before applying such a change, the application SHALL list the inbound references that will become unresolved and SHALL require confirmation. A category change MUST NOT change resolution; it only moves the file.
+Changing a note's type can move it between the `note`, `project`, and `log` schemes. For a change
+between `note` and `project`, the application SHALL list inbound references that will become
+unresolved and SHALL require confirmation. A change to or from `log` SHALL rewrite inbound
+references automatically as defined by `note-identity` and SHALL NOT use the stranded-reference
+preview. A category change MUST NOT change resolution; it only moves the file.
 
 #### Scenario: Scheme change is previewed
 
 - **WHEN** a note referenced as `note:Prepare report` is changed to a project
-- **THEN** the confirmation lists the notes whose `note:Prepare report` references will become unresolved
+- **THEN** the confirmation lists the notes whose `note:Prepare report` references will become
+  unresolved
 
 #### Scenario: Cancel restores the type
 
@@ -306,6 +369,16 @@ Changing a note's type can move it between the `note` and `project` schemes. Bef
 
 - **WHEN** a reference's category changes
 - **THEN** its `note:` references still resolve and only its file location may change
+
+#### Scenario: A log conversion rewrites without a preview
+
+- **WHEN** a reference is changed to `log`
+- **THEN** inbound references are rewritten and no stranded-reference preview is shown
+
+#### Scenario: Leaving the log rewrites without a preview
+
+- **WHEN** a log entry is changed to `reference` or `project`
+- **THEN** inbound references are rewritten and no stranded-reference preview is shown
 
 ### Requirement: Broken notes open in raw rescue mode
 
@@ -333,12 +406,17 @@ A note whose frontmatter cannot be parsed SHALL be reachable from the failure re
 
 ### Requirement: Rename and trash are available from the page
 
-The page SHALL offer rename and trash actions that use the existing preview, confirmation, atomic-write, and inbound-reference rules. Rename SHALL update a level-1 heading only when its text matches the old identity. After a rename or trash, the page history SHALL be updated so Back never returns to a path that no longer exists.
+The page SHALL offer Rename for notes, references, and projects, and SHALL hide it for log entries.
+The page SHALL offer Trash for every type. Rename SHALL use the existing preview, confirmation,
+atomic-write, and inbound-reference rules. Rename SHALL update a level-1 heading only when its text
+matches the old identity. After a rename or trash, the page history SHALL be updated so Back never
+returns to a path that no longer exists.
 
 #### Scenario: Rename previews affected references
 
 - **WHEN** the user requests a rename from the page
-- **THEN** the application reports the affected note and reference counts before asking for confirmation
+- **THEN** the application reports the affected note and reference counts before asking for
+  confirmation
 
 #### Scenario: Matching heading follows the identity
 
@@ -359,6 +437,16 @@ The page SHALL offer rename and trash actions that use the existing preview, con
 
 - **WHEN** the current page is renamed or trashed
 - **THEN** Back opens the previous page and never the old path
+
+#### Scenario: A log entry has no Rename action
+
+- **WHEN** a log entry is open
+- **THEN** the page offers no Rename action
+
+#### Scenario: A log entry can be trashed
+
+- **WHEN** a log entry is open
+- **THEN** the page offers the Trash action
 
 ### Requirement: One history covers list clicks and link taps
 
@@ -569,3 +657,29 @@ While a page is open, a change made to its file outside the application SHALL be
 
 - **WHEN** the user resolves a conflict raised by an external edit
 - **THEN** the reload, overwrite, recreate, and discard actions behave as before
+
+### Requirement: Read mode shows the note date
+
+Read mode SHALL show the note's `date` in the page meta row for every note. A project SHALL also show
+its `due_date` as a separate value. A missing date SHALL show an add-date action, and a malformed
+date SHALL show the warning defined by `note-model`.
+
+#### Scenario: A dated note shows its date
+
+- **WHEN** a note declares `date: 2025-10`
+- **THEN** the meta row shows `2025-10`
+
+#### Scenario: A project shows both dates
+
+- **WHEN** a project declares `date: 2025-10` and `due_date: 2026-01-15`
+- **THEN** the meta row shows both values with distinct labels
+
+#### Scenario: A missing date offers an action
+
+- **WHEN** a note has no `date`
+- **THEN** the meta row shows the add-date action and no date
+
+#### Scenario: A malformed date shows a warning
+
+- **WHEN** a note declares `date: last Tuesday`
+- **THEN** the meta row reports the invalid value

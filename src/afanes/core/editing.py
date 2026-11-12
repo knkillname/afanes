@@ -10,7 +10,6 @@ only writer and the application state orchestrates both.
 """
 
 import dataclasses
-import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Self
@@ -19,9 +18,10 @@ import afanes.core.links
 import afanes.core.names
 from afanes.core.errors import AfanesError, NoteParseError
 from afanes.core.frontmatter import NoteDocument
+from afanes.core.labels import DueDateText, PageLabels
 from afanes.core.vault.snapshot import PageContent, ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteType
 
 
 class DraftMode(StrEnum):
@@ -38,281 +38,6 @@ class DraftMode(StrEnum):
 
     NORMAL = "normal"
     RAW = "raw"
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class DueDateText:
-    """Editable due-date text and its interpretation.
-
-    Attributes
-    ----------
-    text : str
-        Text exactly as shown in the editor.
-    date : datetime.date | None
-        Parsed calendar date, or ``None`` when the text is blank or invalid.
-    error : str | None
-        Actionable validation message for an invalid non-blank value, or
-        ``None`` when the text is valid or blank.
-    """
-
-    text: str
-    date: datetime.date | None
-    error: str | None
-
-    @classmethod
-    def from_text(cls, text: str) -> Self:
-        """Interpret editable due-date text.
-
-        Parameters
-        ----------
-        text : str
-            Field text. Blank means no due date.
-
-        Returns
-        -------
-        DueDateText
-            Parsed date for a valid ``YYYY-MM-DD`` value, or ``None`` plus an
-            actionable error for an invalid value.
-
-        Notes
-        -----
-        The original text is preserved so an invalid value is never silently
-        discarded from the editor.
-        """
-        trimmed = text.strip()
-        if not trimmed:
-            return cls(text=text, date=None, error=None)
-        try:
-            return cls(text=text, date=datetime.date.fromisoformat(trimmed), error=None)
-        except ValueError:
-            return cls(
-                text=text,
-                date=None,
-                error="Enter the due date as YYYY-MM-DD or leave it empty",
-            )
-
-    @classmethod
-    def from_raw(cls, value: object) -> Self:
-        """Interpret a loaded frontmatter value.
-
-        Parameters
-        ----------
-        value : object
-            Raw value of the ``due_date`` key. YAML normally loads an ISO date
-            as a :class:`datetime.date`; strings and other values are preserved
-            for display so the user can correct them.
-
-        Returns
-        -------
-        DueDateText
-            Text and interpretation derived from the raw value. ``None``
-            becomes blank text; a date becomes ISO text; any other value is
-            preserved for correction.
-        """
-        if value is None:
-            return cls.from_text("")
-        if isinstance(value, datetime.datetime):
-            return cls.from_text(value.isoformat())
-        if isinstance(value, datetime.date):
-            return cls.from_text(value.isoformat())
-        if isinstance(value, str):
-            return cls.from_text(value)
-        return cls.from_text(str(value))
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class PageLabels:
-    """Frontmatter labels owned by the page editor.
-
-    Attributes
-    ----------
-    note_type : NoteType
-        Declared note type.
-    category : CategoryLabel | None
-        Free-form reference category, or ``None`` for an uncategorized
-        reference or a non-reference note.
-    status : Status | None
-        Workflow status, or ``None`` when the key is absent.
-    due_date_text : str
-        Due-date field text exactly as shown in the editor.
-    asked_by_text : str
-        Requester field text exactly as shown in the editor.
-    """
-
-    note_type: NoteType
-    category: CategoryLabel | None = None
-    status: Status | None = None
-    due_date_text: str = ""
-    asked_by_text: str = ""
-
-    @classmethod
-    def from_document(cls, document: NoteDocument) -> Self:
-        """Build labels from a parsed note.
-
-        Parameters
-        ----------
-        document : NoteDocument
-            Parsed note with a declared type.
-
-        Returns
-        -------
-        PageLabels
-            Labels populated from the document's type, category, status, due
-            date, and requester.
-
-        Raises
-        ------
-        NoteParseError
-            If the document has no declared type.
-        """
-        if document.note_type is None:
-            message = "Note has no type"
-            raise NoteParseError(message)
-        due_date = document.raw.get("due_date")
-        return cls(
-            note_type=document.note_type,
-            category=document.category,
-            status=document.status,
-            due_date_text=DueDateText.from_raw(due_date).text,
-            asked_by_text=document.asked_by or "",
-        )
-
-    @property
-    def scheme(self) -> ReferenceScheme:
-        """Return the reference scheme this label set belongs to.
-
-        Returns
-        -------
-        ReferenceScheme
-            Scheme derived from the type. Category never changes it.
-        """
-        return ReferenceScheme.for_note(self.note_type)
-
-    @property
-    def due_date(self) -> datetime.date | None:
-        """Return the parsed due date, or ``None`` when absent or invalid.
-
-        Returns
-        -------
-        datetime.date | None
-            Parsed calendar date, or ``None``.
-        """
-        return DueDateText.from_text(self.due_date_text).date
-
-    @property
-    def due_date_error(self) -> str | None:
-        """Return the due-date validation message, or ``None`` when valid.
-
-        Returns
-        -------
-        str | None
-            Actionable message for an invalid non-blank due date.
-        """
-        return DueDateText.from_text(self.due_date_text).error
-
-    def with_type(self, note_type: NoteType) -> Self:
-        """Return labels adjusted for a new note type.
-
-        Parameters
-        ----------
-        note_type : NoteType
-            New declared type.
-
-        Returns
-        -------
-        PageLabels
-            New labels. Category is kept only for references, due-date and
-            requester text are kept only for projects, and a status the new
-            type does not allow is cleared.
-        """
-        category = self.category if note_type is NoteType.REFERENCE else None
-        due_date_text = self.due_date_text if note_type is NoteType.PROJECT else ""
-        asked_by_text = self.asked_by_text if note_type is NoteType.PROJECT else ""
-        status = self.status if self.status in note_type.allowed_statuses else None
-        return dataclasses.replace(
-            self,
-            note_type=note_type,
-            category=category,
-            status=status,
-            due_date_text=due_date_text,
-            asked_by_text=asked_by_text,
-        )
-
-    def with_category(self, category: CategoryLabel | None) -> Self:
-        """Return labels with a reference category.
-
-        Parameters
-        ----------
-        category : CategoryLabel | None
-            New category, or ``None`` for an uncategorized reference.
-
-        Returns
-        -------
-        PageLabels
-            New labels. The category is forced to ``None`` for a non-reference
-            type.
-        """
-        effective = category if self.note_type is NoteType.REFERENCE else None
-        return dataclasses.replace(self, category=effective)
-
-    def with_status(self, status: Status | None) -> Self:
-        """Return labels with a validated workflow status.
-
-        Parameters
-        ----------
-        status : Status | None
-            New status, or ``None`` to clear it.
-
-        Returns
-        -------
-        PageLabels
-            New labels with the status applied.
-
-        Raises
-        ------
-        NoteParseError
-            If the status is not valid for the current type.
-        """
-        if status is not None and status not in self.note_type.allowed_statuses:
-            message = f"Status {status.value!r} is not valid for a {self.note_type.value} note"
-            raise NoteParseError(message)
-        return dataclasses.replace(self, status=status)
-
-    def with_due_date_text(self, text: str) -> Self:
-        """Return labels with new due-date field text.
-
-        Parameters
-        ----------
-        text : str
-            Text exactly as typed. It is validated when the draft is saved.
-
-        Returns
-        -------
-        PageLabels
-            New labels carrying the text, or blank labels for a non-project
-            note.
-        """
-        if self.note_type is not NoteType.PROJECT:
-            return dataclasses.replace(self, due_date_text="")
-        return dataclasses.replace(self, due_date_text=text)
-
-    def with_asked_by_text(self, text: str) -> Self:
-        """Return labels with new requester field text.
-
-        Parameters
-        ----------
-        text : str
-            Text exactly as typed. It is trimmed when the draft is saved.
-
-        Returns
-        -------
-        PageLabels
-            New labels carrying the text, or blank labels for a non-project
-            note.
-        """
-        if self.note_type is not NoteType.PROJECT:
-            return dataclasses.replace(self, asked_by_text="")
-        return dataclasses.replace(self, asked_by_text=text)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -603,31 +328,69 @@ class NormalDraft:
         """
         if self.labels.due_date_error is not None:
             raise NoteParseError(self.labels.due_date_error)
-        due_text = DueDateText.from_text(self.labels.due_date_text)
-
+        if self.labels.date_error is not None:
+            raise NoteParseError(self.labels.date_error)
         raw = dict(self.source.raw)
-        raw["type"] = self.labels.note_type.value
-        if self.labels.note_type is not NoteType.REFERENCE or self.labels.category is None:
+        self._write_labels(raw)
+        document = self.source.with_body(self.body).with_metadata(raw)
+        return document.to_text()
+
+    def _write_labels(self, raw: dict[str, object]) -> None:
+        """Write the editor-owned labels into a raw frontmatter mapping.
+
+        Parameters
+        ----------
+        raw : dict[str, object]
+            Mapping copied from the source document. The method mutates it.
+        """
+        labels = self.labels
+        raw["type"] = labels.note_type.value
+        if labels.note_type is not NoteType.REFERENCE or labels.category is None:
             raw.pop("category", None)
         else:
-            raw["category"] = self.labels.category.value
-        if self.labels.status is None:
+            raw["category"] = labels.category.value
+        if labels.status is None:
             raw.pop("status", None)
         else:
-            raw["status"] = self.labels.status.value
-        due_date = due_text.date
-        if self.labels.note_type is not NoteType.PROJECT or due_date is None:
+            raw["status"] = labels.status.value
+        due_date = DueDateText.from_text(labels.due_date_text).date
+        if labels.note_type is not NoteType.PROJECT or due_date is None:
             raw.pop("due_date", None)
         else:
             raw["due_date"] = due_date
-        asked_by = self.labels.asked_by_text.strip()
-        if self.labels.note_type is not NoteType.PROJECT or not asked_by:
+        asked_by = labels.asked_by_text.strip()
+        if labels.note_type is not NoteType.PROJECT or not asked_by:
             raw.pop("asked_by", None)
         else:
             raw["asked_by"] = asked_by
+        self._write_date(raw)
 
-        document = self.source.with_body(self.body).with_metadata(raw)
-        return document.to_text()
+    def _write_date(self, raw: dict[str, object]) -> None:
+        """Write the note date, refusing a log identity change through a draft.
+
+        Parameters
+        ----------
+        raw : dict[str, object]
+            Mapping copied from the source document. The method mutates it.
+
+        Raises
+        ------
+        NoteParseError
+            If a log entry has no date or its date differs from its filename
+            date. A log date change must use the dedicated date command.
+        """
+        note_date = self.labels.date
+        if self.source.note_type is NoteType.LOG:
+            if note_date is None:
+                message = "A log entry needs a date"
+                raise NoteParseError(message)
+            if self.source.date is not None and note_date != self.source.date:
+                message = "Change a log entry's date from the Date field"
+                raise NoteParseError(message)
+        if note_date is None:
+            raw.pop("date", None)
+        else:
+            raw["date"] = note_date.to_yaml_value()
 
     def after_write(self, text: str, *, content_hash: str, path: Path | None = None) -> Self:
         """Return a draft whose baseline matches a successful write.

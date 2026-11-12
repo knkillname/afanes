@@ -1,15 +1,14 @@
 # 🗂️ Template cards
 
-A template card is a Markdown file in the vault's `templates/` folder. Each card supplies a reference
+A template card is a Markdown file in the vault's `templates/` folder. A reference card supplies a
 category and a starter body, so creating a person, place, or process starts with the fields you always
-need.
+need. A log card supplies only a starter body for a dated log entry.
 
 :::{admonition} tl;dr
 :class: note
 
 Template cards live in `templates/` at the vault root. Add, edit, or delete them with any text editor.
-Processing and the References section offer the valid cards plus an **Empty** option that uses the
-`general` category.
+Processing, the References section, and the Log offer the valid cards plus an **Empty** option.
 :::
 
 ## 📁 The templates folder
@@ -39,8 +38,8 @@ description: A contact, colleague, or someone you deal with.
 
 | Key | Required | Meaning |
 | --- | --- | --- |
-| `type` | Yes | Must be `reference`. |
-| `category` | Yes | Folder label applied to the new note, such as `person` or `place`. |
+| `type` | Yes | `reference` or `log`. |
+| `category` | Reference cards only | Folder label applied to the new note, such as `person` or `place`. A log card must not declare it. |
 | `title` | No | Picker label. Falls back to the file name. |
 | `description` | No | One-line explanation shown in the picker. |
 
@@ -53,7 +52,7 @@ shape.
 
 ## 🌱 Seeded cards
 
-Every new vault receives seven editable cards:
+Every new vault receives eight editable cards:
 
 | File | Category | Title |
 | --- | --- | --- |
@@ -64,6 +63,10 @@ Every new vault receives seven editable cards:
 | `process.md` | `process` | Process |
 | `topic.md` | `topic` | Topic |
 | `source.md` | `source` | Source |
+| `daily.md` | — | Daily entry |
+
+The Daily entry card declares `type: log` and supplies the `## What happened`, `## What I learned`, and
+`## Next` prompts. It does not set a date or a category.
 
 The seeded files are ordinary files from that point on. Edit them, replace them, or delete the ones
 you do not use. A new vault is the only time they are written; existing vaults are never seeded on
@@ -71,9 +74,9 @@ open.
 
 ## 🧭 Empty
 
-Both the Processing Wizard and the References section always offer **Empty**. Empty creates a
-reference with `category: general` and no starter body. It is the right choice when no card fits or
-when you only want a title.
+The Processing Wizard, the References section, and the Log always offer **Empty**. Empty creates a
+reference with `category: general` and no starter body. For a log entry, Empty creates a dated entry
+with only its title heading. It is the right choice when no card fits or when you only want a title.
 
 ## ⚠️ Invalid cards
 

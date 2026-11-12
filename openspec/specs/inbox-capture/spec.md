@@ -8,12 +8,14 @@ Defines how a raw thought becomes a note in the vault's inbox folder, how that f
 
 ### Requirement: Capture writes a note into the inbox
 
-Capturing text SHALL create a Markdown note under the vault's `inbox/` directory, creating the directory when missing. The note SHALL declare `type: note` and MUST NOT declare `status`. A successful capture SHALL clear the composer for the next thought.
+Capturing text SHALL create a Markdown note under the vault's `inbox/` directory, creating the
+directory when missing. The note SHALL declare `type: note` and today's `date` in ISO form, and MUST
+NOT declare `status`. A successful capture SHALL clear the composer for the next thought.
 
 #### Scenario: Capture creates a note
 
 - **WHEN** the user captures `Buy milk`
-- **THEN** `inbox/Buy milk.md` exists with `type: note`
+- **THEN** `inbox/Buy milk.md` exists with `type: note` and today's date
 
 #### Scenario: No status is written
 
@@ -34,6 +36,11 @@ Capturing text SHALL create a Markdown note under the vault's `inbox/` directory
 
 - **WHEN** the capture is written
 - **THEN** the composer is empty and ready for another thought
+
+#### Scenario: The capture date is today
+
+- **WHEN** the user captures on 12 October 2025
+- **THEN** the note declares `date: 2025-10-12`
 
 ### Requirement: The filename comes from the first non-blank line
 
@@ -259,7 +266,9 @@ When a capture cannot be written, the application SHALL report an actionable err
 
 ### Requirement: Capture does not infer structure
 
-Capture SHALL NOT infer a project, people, due date, or references from the text. The note SHALL remain unclassified until a later workflow changes it.
+Capture SHALL NOT infer a project, people, due date, or references from the text. The note SHALL
+declare only `type` and the automatically assigned `date`, and SHALL remain unclassified until a
+later workflow changes it.
 
 #### Scenario: Bare names are not links
 
@@ -274,7 +283,7 @@ Capture SHALL NOT infer a project, people, due date, or references from the text
 #### Scenario: Only the type is declared
 
 - **WHEN** the note is created
-- **THEN** `type` is its only frontmatter key
+- **THEN** `type` is the only classified key and `date` is the automatic note date
 
 ### Requirement: The note type means unclarified
 

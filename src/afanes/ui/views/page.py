@@ -13,6 +13,7 @@ from pathlib import Path
 
 import flet as ft
 
+import afanes.core.search
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
@@ -63,16 +64,16 @@ class PageView:
             tooltip=afanes.ui.strings.PAGE_BACK,
             on_click=self.go_back,
         )
-        self.title = ft.Text("", theme_style=ft.TextThemeStyle.HEADLINE_SMALL)
+        self.title = ft.Text("", style=afanes.ui.theme.PAGE_TITLE_TEXT_STYLE)
         self.path = ft.Text(
             "",
-            size=12,
-            color=afanes.ui.theme.MUTED_TEXT_COLOR,
+            style=afanes.ui.theme.METADATA_TEXT_STYLE,
             selectable=True,
         )
-        self.meta_status = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
-        self.meta_asked = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
-        self.meta_due = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
+        self.meta_status = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
+        self.meta_asked = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
+        self.meta_due = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
+        self.meta_date = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
         self.meta_due_button = ft.IconButton(
             icon=ft.Icons.CALENDAR_MONTH,
             tooltip=afanes.ui.strings.PAGE_PROJECT_DUE_ADD,
@@ -99,6 +100,7 @@ class PageView:
         )
         self.meta_row = ft.Row(
             controls=[
+                self.meta_date,
                 self.meta_status,
                 self.meta_asked,
                 self.meta_due,
@@ -108,7 +110,7 @@ class PageView:
             spacing=afanes.ui.theme.ITEM_GAP,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             visible=False,
-            key="project-meta",
+            key="page-meta",
         )
         self.progress = ft.ProgressRing(
             width=16,
@@ -118,8 +120,7 @@ class PageView:
         )
         self.status_text = ft.Text(
             "",
-            size=12,
-            color=afanes.ui.theme.MUTED_TEXT_COLOR,
+            style=afanes.ui.theme.METADATA_TEXT_STYLE,
         )
         self.process_button = ft.TextButton(
             content=afanes.ui.strings.PROCESS_ACTION,
@@ -185,6 +186,7 @@ class PageView:
             multiline=True,
             min_lines=afanes.ui.theme.PAGE_BODY_MIN_LINES,
             max_lines=None,
+            expand=True,
             on_change=self.change_body,
         )
         self.type_dropdown = ft.Dropdown(
@@ -196,10 +198,14 @@ class PageView:
             on_select=self.change_type,
             width=afanes.ui.theme.PAGE_FIELD_WIDTH,
         )
-        self.category_field = ft.TextField(
+        self.category_field = ft.Dropdown(
             label=afanes.ui.strings.PAGE_CATEGORY_LABEL,
             hint_text=afanes.ui.strings.PAGE_CATEGORY_HINT,
-            on_change=self.change_category,
+            options=[],
+            editable=True,
+            enable_filter=True,
+            on_select=self.change_category,
+            on_blur=self._commit_category_on_blur,
             width=afanes.ui.theme.PAGE_FIELD_WIDTH,
         )
         self.status_dropdown = ft.Dropdown(
@@ -213,6 +219,20 @@ class PageView:
             hint_text="2026-11-20",
             on_change=self.change_due_date,
             width=afanes.ui.theme.PAGE_DUE_WIDTH,
+        )
+        self.date_field = ft.TextField(
+            label=afanes.ui.strings.PAGE_DATE_LABEL,
+            hint_text="2025-10-12",
+            on_blur=self.commit_date,
+            on_submit=self.commit_date,
+            width=afanes.ui.theme.PAGE_DUE_WIDTH,
+        )
+        self.date_error = ft.Text(
+            "",
+            size=12,
+            color=afanes.ui.theme.ERROR_TEXT_COLOR,
+            visible=False,
+            selectable=True,
         )
         self.asked_by_field = ft.TextField(
             label=afanes.ui.strings.PAGE_ASKED_BY_LABEL,
@@ -236,14 +256,22 @@ class PageView:
                     wrap=True,
                 ),
                 ft.Row(
+                    controls=[self.date_field],
+                    spacing=afanes.ui.theme.ITEM_GAP,
+                    wrap=True,
+                ),
+                ft.Row(
                     controls=[self.due_field, self.asked_by_field],
                     spacing=afanes.ui.theme.ITEM_GAP,
                     wrap=True,
                 ),
+                self.date_error,
                 self.due_error,
                 self.body_field,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
+            expand=True,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             visible=False,
         )
 
@@ -257,6 +285,7 @@ class PageView:
             multiline=True,
             min_lines=afanes.ui.theme.PAGE_RAW_MIN_LINES,
             max_lines=None,
+            expand=True,
             on_change=self.change_raw_text,
         )
         self.raw_save_button = ft.FilledButton(
@@ -267,6 +296,8 @@ class PageView:
         self.raw_panel = ft.Column(
             controls=[self.raw_warning, self.raw_field, self.raw_save_button],
             spacing=afanes.ui.theme.ITEM_GAP,
+            expand=True,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             visible=False,
         )
 
@@ -390,7 +421,8 @@ class PageView:
             on_click=self.cancel_rename,
         )
         self.rename_panel = ft.Container(
-            bgcolor=afanes.ui.theme.SURFACE_CONTAINER_COLOR,
+            bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
+            border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
             border_radius=afanes.ui.theme.CARD_RADIUS,
             padding=afanes.ui.theme.ITEM_GAP,
             visible=False,
@@ -439,7 +471,7 @@ class PageView:
             spacing=afanes.ui.theme.ITEM_GAP,
         )
         self.content = ft.Column(
-            controls=[self.empty_text, self.project_body.build(), self.read_body, self.edit_form, self.raw_panel],
+            controls=[self.empty_text, self.project_body.build(), self.read_body],
             spacing=afanes.ui.theme.ITEM_GAP,
             scroll=ft.ScrollMode.AUTO,
             expand=True,
@@ -447,10 +479,19 @@ class PageView:
         self.root = ft.Container(
             expand=True,
             padding=afanes.ui.theme.ITEM_GAP,
-            bgcolor=afanes.ui.theme.SURFACE_CONTAINER_COLOR,
+            bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
+            border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
             border_radius=afanes.ui.theme.CARD_RADIUS,
             content=ft.Column(
-                controls=[self.header, ft.Divider(), self.banners, self.dialogs, self.content],
+                controls=[
+                    self.header,
+                    ft.Divider(),
+                    self.banners,
+                    self.dialogs,
+                    self.content,
+                    self.edit_form,
+                    self.raw_panel,
+                ],
                 spacing=afanes.ui.theme.ITEM_GAP,
                 expand=True,
             ),
@@ -495,6 +536,7 @@ class PageView:
         """Refresh every control from the shared application state."""
         page = self._state.pages.page
         editing = self._state.pages.editing or self._state.pages.page_mode is DraftMode.RAW
+        self.content.visible = not editing
         self._refresh_header(page, editing=editing)
         self._refresh_meta(page, editing=editing)
         self._refresh_read(page, editing=editing)
@@ -517,8 +559,10 @@ class PageView:
         self.back_button.disabled = page is None and not state.navigation.history
         self.edit_button.visible = page is not None and not editing and self._state.pages.page_mode is DraftMode.NORMAL
         self.done_button.visible = page is not None and editing
+        labels = self._state.pages.page_labels if page is not None else None
+        is_log = labels is not None and labels.note_type is NoteType.LOG
         self.rename_button.visible = (
-            page is not None and not editing and self._state.pages.page_mode is DraftMode.NORMAL
+            page is not None and not editing and self._state.pages.page_mode is DraftMode.NORMAL and not is_log
         )
         self.trash_button.visible = page is not None and not editing
         self.process_button.visible = page is not None and not editing and self._is_inbox_page(page)
@@ -543,12 +587,25 @@ class PageView:
             self.read_body.value = state.pages.page_read_text
 
     def _refresh_meta(self, page: PageDraft | None, *, editing: bool) -> None:
-        """Refresh the project status and due-date row."""
+        """Refresh the note date and the project status and due-date row."""
         state = self._state
         labels = state.pages.page_labels if page is not None else None
-        visible = page is not None and not editing and labels is not None and labels.note_type is NoteType.PROJECT
+        visible = page is not None and not editing and labels is not None
         self.meta_row.visible = visible
         if not visible or labels is None:
+            self.meta_asked.visible = False
+            return
+        self.meta_date.value = (
+            afanes.ui.strings.PAGE_DATE.format(date=labels.date_text)
+            if labels.date_text.strip()
+            else afanes.ui.strings.PAGE_NO_DATE
+        )
+        is_project = labels.note_type is NoteType.PROJECT
+        self.meta_status.visible = is_project
+        self.meta_due.visible = is_project
+        self.meta_due_button.visible = is_project
+        self.meta_due_clear.visible = is_project and labels.due_date is not None
+        if not is_project:
             self.meta_asked.visible = False
             return
         status_label = (
@@ -566,7 +623,6 @@ class PageView:
             if due_date is not None
             else afanes.ui.strings.PAGE_PROJECT_NO_DUE
         )
-        self.meta_due_clear.visible = due_date is not None
 
     def _refresh_edit(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the body field and label form."""
@@ -584,6 +640,7 @@ class PageView:
         self.type_dropdown.value = labels.note_type.value
         self.category_field.visible = labels.note_type is NoteType.REFERENCE
         category_value = labels.category.value if labels.category is not None else ""
+        self.category_field.options = self._category_options()
         if self.category_field.value != category_value:
             self.category_field.value = category_value
         allowed = labels.note_type.allowed_statuses
@@ -600,6 +657,11 @@ class PageView:
         ]
         self.status_dropdown.visible = bool(allowed)
         self.status_dropdown.value = labels.status.value if labels.status is not None else ""
+        self.date_field.visible = True
+        if self.date_field.value != labels.date_text:
+            self.date_field.value = labels.date_text
+        self.date_error.value = labels.date_error or ""
+        self.date_error.visible = labels.date_error is not None
         self.due_field.visible = labels.note_type is NoteType.PROJECT
         if self.due_field.value != labels.due_date_text:
             self.due_field.value = labels.due_date_text
@@ -732,7 +794,20 @@ class PageView:
 
     async def finish_edit(self) -> None:
         """Commit the draft and return to read mode."""
+        previous = self._state.pages.page.path if self._state.pages.page is not None else None
+        await self.commit_date()
+        current = self._state.pages.page.path if self._state.pages.page is not None else None
+        if current != previous:
+            self.refresh()
+            self._update()
+            return
         await self._state.pages.done_editing()
+        self.refresh()
+        self._update()
+
+    async def commit_date(self) -> None:
+        """Write the Date field when the user leaves it."""
+        await self._state.dialogs.save_page_date(self.date_field.value or "")
         self.refresh()
         self._update()
 
@@ -762,6 +837,47 @@ class PageView:
             await self._state.dialogs.set_page_type(NoteType(value))
         self.refresh()
         self._update()
+
+    def _category_options(self) -> list[ft.dropdown.Option]:
+        """Return the category labels already used by reference notes.
+
+        Returns
+        -------
+        list[flet.dropdown.Option]
+            One option per distinct label, sorted case-insensitively.
+        """
+        listing = self._state.browser.listing()
+        if listing is None:
+            return []
+        labels = {
+            group.label.value
+            for group in listing.groups_for(afanes.core.search.BrowserSection.REFERENCES)
+            if group.label is not None
+        }
+        return [ft.dropdown.Option(key=label, text=label) for label in sorted(labels, key=str.casefold)]
+
+    async def _commit_category_on_blur(self, _event: object = None) -> None:
+        """Commit typed category text when the combobox loses focus.
+
+        Parameters
+        ----------
+        _event : object
+            Focus-change event supplied by Flet; unused.
+
+        Notes
+        -----
+        Enter and a menu selection already reach :meth:`change_category`. The
+        blur commit covers a typed label that the user leaves without
+        submitting, unless a category move is already waiting for confirmation.
+        """
+        if self._state.dialogs.category_move is not None:
+            return
+        page = self._state.pages.page
+        labels = page.labels if page is not None else None
+        current = labels.category.value if labels is not None and labels.category is not None else ""
+        if (self.category_field.value or "").strip() == current:
+            return
+        await self.change_category()
 
     async def change_category(self) -> None:
         """Forward the category label, using a new label only when valid."""

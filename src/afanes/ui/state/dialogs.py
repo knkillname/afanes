@@ -8,11 +8,13 @@ from pathlib import Path
 
 import afanes.core.vault.naming
 import afanes.ui.strings
-from afanes.core.editing import NormalDraft, PageDraftFactory, PageLabels
+from afanes.core.editing import NormalDraft, PageDraftFactory
 from afanes.core.errors import AfanesError, ContentChangedError, NoteParseError, VaultError
-from afanes.core.vault.naming import CategoryMovePreview, RenamePreview, TrashPreview
+from afanes.core.labels import PageLabels
+from afanes.core.vault.log_conversions import LogConversions
+from afanes.core.vault.naming_reports import CategoryMovePreview, RenamePreview, TrashPreview
 from afanes.core.vault.snapshot import ReferenceSite, VaultPath
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.navigation import PageNavigator
 from afanes.ui.state.pages import PageEditorState
@@ -84,9 +86,79 @@ class PageDialogState:
         bool
             ``True`` when the change was applied immediately. ``False`` means
             a confirmation is pending or the change failed.
+
+        Notes
+        -----
+        A change into or out of ``log`` uses the date/rename pipeline: the
+        draft is committed, the file is renamed and moved, inbound references
+        are rewritten, and the page reloads at its new path. Other type changes
+        keep the existing stranded-reference preview.
         """
         async with self.command_lock:
+            page = self.pages.page
+            if not isinstance(page, NormalDraft):
+                return False
+            if page.labels.note_type is NoteType.LOG or note_type is NoteType.LOG:
+                return await self._apply_log_type_change(page, note_type)
             return await self._apply_label_change(lambda labels: labels.with_type(note_type))
+
+    async def _apply_log_type_change(self, page: NormalDraft, note_type: NoteType) -> bool:
+        """Apply a type change that enters or leaves the log.
+
+        Parameters
+        ----------
+        page : NormalDraft
+            Open draft whose type is changing.
+        note_type : NoteType
+            Replacement type.
+
+        Returns
+        -------
+        bool
+            ``True`` when the file moved and the page reloaded.
+        """
+        if page.labels.note_type is note_type:
+            return True
+        if note_type is NoteType.LOG and page.labels.date is None:
+            self.status.show_message(afanes.ui.strings.PAGE_LOG_DATE_REQUIRED)
+            return False
+        if page.path is None:
+            self.pages.page = page.with_labels(page.labels.with_type(note_type))
+            self.status.clear_message()
+            return True
+        vault = self.session.vault
+        if vault is None:
+            return False
+        if not await self.pages.commit():
+            return False
+        current = self.pages.page
+        if not isinstance(current, NormalDraft) or current.path is None:
+            return False
+        naming = LogConversions(vault)
+        try:
+            preview = await asyncio.to_thread(
+                naming.plan_type_change,
+                current.path,
+                note_type,
+                snapshot=self.session.snapshot,
+            )
+            report = await asyncio.to_thread(naming.apply, preview)
+        except (AfanesError, OSError) as exc:
+            logger.debug("Log type change failed", exc_info=True)
+            self.status.show_message(afanes.ui.strings.PAGE_TYPE_CHANGE_FAILED.format(detail=str(exc)))
+            return False
+        self.navigation.history = tuple(
+            preview.target_path if path == current.path else path for path in self.navigation.history
+        )
+        await self.session.refresh_snapshot()
+        if not await self.pages.load(preview.target_path, editing=True):
+            return False
+        remaining = len(report.failed) + len(report.skipped)
+        if remaining:
+            self.status.show_message(
+                afanes.ui.strings.PAGE_TYPE_CHANGE_FAILED.format(detail=f"{remaining} notes were not updated")
+            )
+        return True
 
     async def set_page_category(self, category: CategoryLabel | None) -> bool:
         """Change the draft category, previewing the folder move.
@@ -170,6 +242,120 @@ class PageDialogState:
         """
         async with self.command_lock:
             await self._mutate_labels(lambda labels: labels.with_asked_by_text(text))
+
+    async def save_page_date(self, text: str) -> bool:
+        """Set or clear the note date from the page.
+
+        Parameters
+        ----------
+        text : str
+            ISO partial date, or an empty string to remove the date from a
+            non-log note.
+
+        Returns
+        -------
+        bool
+            ``True`` when the date was written.
+
+        Notes
+        -----
+        A log entry's date is its identity. Changing it plans and applies the
+        rename, move, and reference rewrite before reloading the page. Other
+        notes update the label and save in place. An invalid date is reported
+        and no file is written.
+        """
+        page = self.pages.page
+        if not isinstance(page, NormalDraft):
+            return False
+        if self.pages.conflict is not None:
+            return False
+        if not text.strip() and page.labels.note_type is NoteType.LOG:
+            self.status.show_message(afanes.ui.strings.PAGE_LOG_DATE_REQUIRED)
+            return False
+        try:
+            note_date = NoteDate.from_text(text) if text.strip() else None
+        except ValueError as exc:
+            self.status.show_message(str(exc))
+            return False
+        if (
+            page.labels.note_type is NoteType.LOG
+            and page.path is not None
+            and note_date is not None
+            and note_date != page.source.date
+        ):
+            return await self._save_log_date(page, note_date)
+        return await self._save_in_place_date(page, text)
+
+    async def _save_log_date(self, page: NormalDraft, note_date: NoteDate) -> bool:
+        """Rename, move, and rewrite one log entry after a date change.
+
+        Parameters
+        ----------
+        page : NormalDraft
+            Open log draft.
+        note_date : NoteDate
+            Replacement date.
+
+        Returns
+        -------
+        bool
+            ``True`` when the page reloaded at its new path.
+        """
+        vault = self.session.vault
+        if vault is None or page.path is None:
+            return False
+        naming = LogConversions(vault)
+        try:
+            preview = await asyncio.to_thread(
+                naming.plan_log_date_change,
+                page.path,
+                note_date,
+                snapshot=self.session.snapshot,
+            )
+            report = await asyncio.to_thread(naming.apply, preview)
+        except (AfanesError, OSError) as exc:
+            logger.debug("Log date change failed", exc_info=True)
+            self.status.show_message(afanes.ui.strings.PAGE_DATE_CHANGE_FAILED.format(detail=str(exc)))
+            return False
+        self.navigation.history = tuple(
+            preview.target_path if path == page.path else path for path in self.navigation.history
+        )
+        await self.session.refresh_snapshot()
+        if not await self.pages.load(preview.target_path, editing=True):
+            return False
+        remaining = len(report.failed) + len(report.skipped)
+        if remaining:
+            self.status.show_message(
+                afanes.ui.strings.PAGE_DATE_CHANGE_FAILED.format(detail=f"{remaining} notes were not updated")
+            )
+        return True
+
+    async def _save_in_place_date(self, page: NormalDraft, text: str) -> bool:
+        """Update a non-log note's date in place.
+
+        Parameters
+        ----------
+        page : NormalDraft
+            Open draft.
+        text : str
+            ISO partial date, or blank to remove the date.
+
+        Returns
+        -------
+        bool
+            ``True`` when the write succeeded.
+        """
+        labels = page.labels.with_date_text(text)
+        if labels.date_error is not None:
+            self.status.show_message(labels.date_error)
+            return False
+        previous = self.pages.page
+        self.pages.page = page.with_labels(labels)
+        if not await self.pages.autosave(force=True):
+            self.pages.page = previous
+            return False
+        await self.session.refresh_snapshot()
+        return True
 
     async def save_page_due_date(self, text: str) -> bool:
         """Set or clear a project due date from read mode.

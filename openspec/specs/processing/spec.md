@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how an inbox capture becomes Trash, Later, Reference, Project, an appended step, or Done now, including the decisions, metadata, confirmation, and safe apply behavior.
+Defines how an inbox capture becomes Trash, Later, Reference, Project, a log entry, an appended step, or Done now, including the decisions, metadata, confirmation, and safe apply behavior.
 
 ## Requirements
 
@@ -27,7 +27,8 @@ Processing SHALL operate only on a note under `inbox/` and SHALL require an expl
 
 ### Requirement: The outcome set is fixed
 
-A processed capture SHALL become exactly one of Trash, Later, Reference, Project, Append step, or Done now. The user SHALL choose the outcome; processing MUST NOT infer it.
+A processed capture SHALL become exactly one of Trash, Later, Reference, Project, Log entry, Append
+step, or Done now. The user SHALL choose the outcome; processing MUST NOT infer it.
 
 #### Scenario: One outcome per apply
 
@@ -43,6 +44,11 @@ A processed capture SHALL become exactly one of Trash, Later, Reference, Project
 
 - **WHEN** the user treats one step as the whole commitment
 - **THEN** the outcome is a one-step project
+
+#### Scenario: A log entry is an explicit outcome
+
+- **WHEN** the user chooses Log entry
+- **THEN** the capture becomes a log entry and no other outcome is applied
 
 ### Requirement: Actionable captures become projects or steps
 
@@ -239,7 +245,10 @@ Applying a plan SHALL write every affected note atomically and then move the cap
 
 ### Requirement: Destination collisions are reported
 
-Processing SHALL abort when the destination filename exists or the target name already identifies another note in the same scheme. It MUST NOT overwrite the destination or add a numeric suffix. Append step SHALL abort when the target project no longer exists or changed after planning.
+Processing SHALL abort when the destination filename exists or the target name already identifies
+another note in the same scheme. It MUST NOT overwrite the destination or add a numeric suffix.
+Append step SHALL abort when the target project no longer exists or changed after planning. The Log
+entry outcome SHALL abort when the target date already has a log entry.
 
 #### Scenario: Existing destination file
 
@@ -261,9 +270,17 @@ Processing SHALL abort when the destination filename exists or the target name a
 - **WHEN** the target project no longer exists at apply time
 - **THEN** the append aborts and the capture remains in `inbox/`
 
+#### Scenario: An occupied log date aborts
+
+- **WHEN** the target date already has a log entry
+- **THEN** processing aborts and the capture remains in `inbox/`
+
 ### Requirement: Scheme changes are reported
 
-When an outcome changes the capture's reference scheme, processing SHALL report the inbound references that will become unresolved and require confirmation. It MUST NOT retarget them automatically.
+When an outcome changes the capture's reference scheme between `note` and `project`, processing
+SHALL report the inbound references that will become unresolved and require confirmation. It MUST
+NOT retarget them automatically. The Log entry outcome SHALL instead rewrite inbound `note:`
+references to `log:<date>` as defined by `note-identity`.
 
 #### Scenario: Note becomes a project
 
@@ -279,6 +296,11 @@ When an outcome changes the capture's reference scheme, processing SHALL report 
 
 - **WHEN** the user cancels after the scheme warning
 - **THEN** no file changes
+
+#### Scenario: Note becomes a log entry
+
+- **WHEN** a capture referenced as `note:Call the plumber` becomes a log entry dated `2025-10-12`
+- **THEN** the referring destination becomes `log:2025-10-12`
 
 ### Requirement: Trash reports inbound references
 
@@ -301,7 +323,10 @@ The Trash outcome SHALL report how many references point to the note before conf
 
 ### Requirement: Processing preserves content
 
-Processing SHALL preserve the capture text, newline style, and unknown frontmatter keys. It MAY append a template card's starter body below the capture text, and SHALL modify only the keys owned by the outcome. Append step SHALL modify only the capture and the target project body.
+Processing SHALL preserve the capture text, newline style, and unknown frontmatter keys. It MAY
+append a template card's starter body below the capture text, and SHALL modify only the keys owned by
+the outcome. The Log entry outcome SHALL preserve the capture body and SHALL NOT append a template
+card. Append step SHALL modify only the capture and the target project body.
 
 #### Scenario: Body is preserved
 
@@ -327,6 +352,11 @@ Processing SHALL preserve the capture text, newline style, and unknown frontmatt
 
 - **WHEN** a capture is processed without Append step
 - **THEN** every other note's content is unchanged
+
+#### Scenario: A log entry keeps the capture body
+
+- **WHEN** a capture is processed into a log entry
+- **THEN** its body is preserved and no starter body is appended
 
 ### Requirement: Reference and Later use a template card
 
@@ -403,3 +433,60 @@ When processing fails, the application SHALL report an actionable error and leav
 
 - **WHEN** the user retries a previously failed plan after the cause is fixed
 - **THEN** the note is processed once and leaves `inbox/`
+
+### Requirement: A capture can become a log entry
+
+The Log entry outcome SHALL turn an inbox capture into `type: log`, move it to the folder its date
+selects, and use the capture's existing `date`. It SHALL preserve the capture body and title, SHALL
+write no category, status, due date, or requester, and SHALL NOT ask for a template card. When the
+capture has no date, the outcome SHALL use the file's last-modified date for this conversion.
+
+#### Scenario: A dated capture becomes a log entry
+
+- **WHEN** a capture dated `2025-10-12` is processed as Log entry
+- **THEN** it becomes `type: log` and is filed at `log/2025/10/2025-10-12.md`
+
+#### Scenario: The title is preserved
+
+- **WHEN** a capture with the heading `A quiet Tuesday` becomes a log entry
+- **THEN** the entry's heading remains `A quiet Tuesday`
+
+#### Scenario: No card is requested
+
+- **WHEN** the user selects Log entry
+- **THEN** the wizard does not ask for a template card
+
+#### Scenario: An undated capture uses its last-modified date
+
+- **WHEN** an undated capture is processed as Log entry
+- **THEN** the entry's date is the file's last-modified calendar date
+
+#### Scenario: The conversion is refused on an occupied date
+
+- **WHEN** the capture's date already has a log entry
+- **THEN** processing reports the conflict and the capture stays in the inbox
+
+#### Scenario: The capture leaves the inbox
+
+- **WHEN** the log outcome succeeds
+- **THEN** the capture is no longer under `inbox/`
+
+### Requirement: A log outcome writes no workflow labels
+
+The Log entry outcome SHALL write only `type: log` and `date`. It MUST NOT write `category`,
+`status`, `due_date`, or `asked_by`, and it SHALL remove those keys if the capture carried them.
+
+#### Scenario: No status is written
+
+- **WHEN** a capture becomes a log entry
+- **THEN** the resulting note has no `status` key
+
+#### Scenario: No due date is written
+
+- **WHEN** a capture becomes a log entry
+- **THEN** the resulting note has no `due_date` key
+
+#### Scenario: No requester is written
+
+- **WHEN** a capture becomes a log entry
+- **THEN** the resulting note has no `asked_by` key

@@ -70,6 +70,7 @@ def _card(
 ) -> afanes.core.template_cards.TemplateCard:
     return afanes.core.template_cards.TemplateCard(
         relative_path=Path(f"{category}.md"),
+        note_type=NoteType.REFERENCE,
         category=CategoryLabel(category),
         title=category.title(),
         description=None,
@@ -91,6 +92,7 @@ class TestProcessingOutcome:
             "project",
             "append_step",
             "done_now",
+            "log",
         }
 
     def test_members_compare_as_strings(self) -> None:

@@ -1,14 +1,16 @@
 """Tests for the note vocabulary."""
 
+import datetime
+
 import pytest
 
 import afanes.models.note
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, DatePrecision, NoteDate, NoteType, Status
 
 
 class TestNoteType:
     def test_members_cover_the_canonical_contract(self) -> None:
-        assert {member.value for member in NoteType} == {"note", "project", "reference"}
+        assert {member.value for member in NoteType} == {"note", "project", "reference", "log"}
 
     def test_members_compare_as_strings(self) -> None:
         assert NoteType.REFERENCE == "reference"
@@ -76,3 +78,60 @@ class TestAllowedStatuses:
 
     def test_notes_allow_no_status(self) -> None:
         assert NoteType.NOTE.allowed_statuses == frozenset()
+
+    def test_logs_allow_no_status(self) -> None:
+        assert NoteType.LOG.allowed_statuses == frozenset()
+
+
+class TestNoteDate:
+    def test_year_precision(self) -> None:
+        value = NoteDate.from_text("2025")
+        assert value.precision is DatePrecision.YEAR
+        assert (value.year, value.month, value.day) == (2025, 0, 0)
+        assert str(value) == "2025"
+
+    def test_month_precision(self) -> None:
+        value = NoteDate.from_text("2025-10")
+        assert value.precision is DatePrecision.MONTH
+        assert (value.year, value.month, value.day) == (2025, 10, 0)
+        assert str(value) == "2025-10"
+
+    def test_day_precision(self) -> None:
+        value = NoteDate.from_text("2025-10-12")
+        assert value.precision is DatePrecision.DAY
+        assert (value.year, value.month, value.day) == (2025, 10, 12)
+        assert str(value) == "2025-10-12"
+
+    def test_ordering_places_partial_dates_first(self) -> None:
+        assert NoteDate.from_text("2025") < NoteDate.from_text("2025-10")
+        assert NoteDate.from_text("2025-10") < NoteDate.from_text("2025-10-12")
+
+    def test_from_date_round_trips(self) -> None:
+        value = NoteDate.from_date(datetime.date(2025, 10, 12))
+        assert value == NoteDate.from_text("2025-10-12")
+
+    def test_from_year_round_trips(self) -> None:
+        assert NoteDate.from_year(2025) == NoteDate.from_text("2025")
+
+    def test_day_precision_writes_a_yaml_date(self) -> None:
+        value = NoteDate.from_text("2025-10-12")
+        assert value.to_yaml_value() == datetime.date(2025, 10, 12)
+
+    def test_partial_precision_writes_a_string(self) -> None:
+        assert NoteDate.from_text("2025").to_yaml_value() == "2025"
+        assert NoteDate.from_text("2025-10").to_yaml_value() == "2025-10"
+
+    @pytest.mark.parametrize(
+        "value",
+        ["", "2025-1-2", "2025-13", "2025-02-30", "2025-10-12T09:30", "last Tuesday", "0000"],
+    )
+    def test_invalid_text_is_rejected(self, value: str) -> None:
+        with pytest.raises(ValueError, match="Invalid"):
+            NoteDate.from_text(value)
+
+    def test_surrounding_whitespace_is_removed_on_parse(self) -> None:
+        assert NoteDate.from_text(" 2025-10 ") == NoteDate.from_text("2025-10")
+
+    def test_direct_construction_rejects_whitespace(self) -> None:
+        with pytest.raises(ValueError, match="whitespace"):
+            NoteDate(" 2025-10 ", DatePrecision.MONTH)

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the persistent workspace shell and browser that make every parsed note reachable, grouped by type, searchable by title and identity, and openable in the shared page pane.
+Defines the persistent workspace shell and browser that make every parsed note reachable, grouped by type with a date-based Log lens, searchable by title and identity, and openable in the shared page pane.
 
 ## Requirements
 
@@ -32,7 +32,11 @@ While browsing a vault, the application SHALL show a persistent navigation brows
 
 ### Requirement: The browser groups every parsed note
 
-The browser SHALL expose every parsed note under Inbox, Projects, References, Needs attention, or Unreadable notes. A note SHALL appear in exactly one group. References SHALL be grouped by their category label. Captures under `inbox/` SHALL appear only under Inbox, and notes under `trash/` SHALL NOT appear.
+The browser SHALL expose every parsed note under Inbox, Projects, References, Log, Needs attention,
+or Unreadable notes. A note SHALL appear in exactly one group in normal browsing: log notes under
+Log, and every other note under its type group. References SHALL be grouped by their category label.
+Captures under `inbox/` SHALL appear only under Inbox, and notes under `trash/` SHALL NOT appear. The
+Log's Everything mode SHALL be an additional date lens that may show a note beside its type group.
 
 #### Scenario: Project appears under Projects
 
@@ -73,6 +77,26 @@ The browser SHALL expose every parsed note under Inbox, Projects, References, Ne
 
 - **WHEN** a capture is processed into a project
 - **THEN** it leaves the Inbox group and appears under Projects
+
+#### Scenario: A log entry appears under Log
+
+- **WHEN** the vault contains a parsed `type: log` note
+- **THEN** the browser lists it under Log and in no other type group
+
+#### Scenario: A log entry is not a reference
+
+- **WHEN** the vault contains a log entry and a reference with the same name
+- **THEN** the Log lists the log entry and References lists only the reference
+
+#### Scenario: Everything is a lens
+
+- **WHEN** the Log is in Everything mode and the vault contains a project
+- **THEN** the project appears under Projects and in the Log date lens
+
+#### Scenario: Entries is not a lens
+
+- **WHEN** the Log is in Entries mode and the vault contains a project
+- **THEN** the project appears only under Projects
 
 ### Requirement: Selecting a browser entry opens it in the page pane
 

@@ -22,8 +22,8 @@ from afanes.core.template_cards import TemplateCard
 from afanes.core.vault.naming import VaultNaming
 from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultNote, VaultPath, VaultSnapshot
-from afanes.models.link import ReferenceScheme
-from afanes.models.note import CategoryLabel, Status
+from afanes.models.link import NoteReference, ReferenceScheme
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -105,6 +105,9 @@ class VaultProcessing:
         if card is not None and outcome not in (ProcessingOutcome.REFERENCE, ProcessingOutcome.LATER):
             message = "Only Reference and Later accept a template card"
             raise ProcessingError(message)
+        if card is not None and card.note_type is not NoteType.REFERENCE:
+            message = "Reference and Later need a reference card"
+            raise ProcessingError(message)
         source = self.vault.contained(note_path)
         self._require_inbox_note(source)
 
@@ -141,12 +144,21 @@ class VaultProcessing:
         if outcome in (ProcessingOutcome.REFERENCE, ProcessingOutcome.LATER):
             category = card.category if card is not None else CategoryLabel("general")
             scaffold = card.body if card is not None and card.body.strip() else None
-        target_directory = self.vault.directory_for(target_type, category)
-        target_path = target_directory / f"{source.stem}{afanes.core.vault.snapshot.NOTE_SUFFIX}"
+        target_date: NoteDate | None = None
+        if outcome is ProcessingOutcome.LOG:
+            target_date = note.date or NoteDate.from_date(
+                datetime.datetime.fromtimestamp(source.stat().st_mtime, tz=datetime.UTC).astimezone().date()
+            )
+            target_directory = self.vault.log_directory(target_date)
+            target_name = target_date.text
+        else:
+            target_directory = self.vault.directory_for(target_type, category)
+            target_name = source.stem
+        target_path = target_directory / f"{target_name}{afanes.core.vault.snapshot.NOTE_SUFFIX}"
         target_scheme = ReferenceScheme.for_note(target_type)
-        existing = vault.catalog.candidates(target_scheme, source.stem)
+        existing = vault.catalog.candidates(target_scheme, target_name)
         if any(not VaultPath.same(path, source) for path in existing):
-            message = f"A {target_scheme.value} note named {source.stem!r} already exists"
+            message = f"A {target_scheme.value} note named {target_name!r} already exists"
             raise NameCollisionError(message)
         if target_path.exists() and not VaultPath.same(target_path, source):
             message = f"Destination already exists: {target_path}"
@@ -169,6 +181,7 @@ class VaultProcessing:
             reference_count=sum(site.reference_count for site in affected),
             affected_notes=tuple(site.path for site in affected),
             changes_scheme=source_scheme is not target_scheme,
+            target_date=target_date,
         )
         document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
         processed_text = plan.processed_text(document)
@@ -356,7 +369,10 @@ class VaultProcessing:
 
         target = self._processing_destination(plan)
         self._write_processing(plan, source)
-        return self._move_processing(source, target)
+        moved = self._move_processing(source, target)
+        if plan.outcome is ProcessingOutcome.LOG:
+            self._rewrite_log_conversion(plan)
+        return moved
 
     def _apply_append_step(self, plan: AppendStepPlan) -> Path:
         """Write the step to the project, then trash the capture."""
@@ -457,6 +473,32 @@ class VaultProcessing:
             message = f"Could not move the note to its destination: {source}"
             raise ProcessingError(message) from exc
         return target
+
+    def _rewrite_log_conversion(self, plan: ProcessingPlan) -> None:
+        """Rewrite `note:` references to the new `log:` date destination.
+
+        Parameters
+        ----------
+        plan : ProcessingPlan
+            Applied log plan carrying the source name and target date.
+
+        Notes
+        -----
+        The move happens first, so the scan sees the entry at its new path. A
+        changed referring note is skipped by the repair hash guard and is
+        reported by the repair service; the log entry itself remains valid.
+        """
+        if plan.target_date is None:
+            return
+        old = NoteReference(ReferenceScheme.NOTE, plan.source_path.stem)
+        new = NoteReference(ReferenceScheme.LOG, plan.target_date.text)
+        naming = VaultNaming(self.vault)
+        preview = naming.plan_reference_repair(
+            old,
+            new,
+            allow_scheme_change=True,
+        )
+        naming.apply_reference_repair(preview, confirm=True)
 
     def _require_inbox_note(self, source: Path) -> None:
         """Require a source path to be under the vault's inbox directory."""

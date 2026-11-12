@@ -9,7 +9,7 @@ import pytest
 import afanes.models.note
 from afanes.core.errors import NoteParseError, RetiredValueError
 from afanes.core.frontmatter import FrontmatterSplit, NoteDocument
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
 CUSTOM_VALUE = 42
 SAMPLE = """---
@@ -262,6 +262,98 @@ class TestDueDate:
         assert "due_date: 2026-12-01" in document.to_text()
 
 
+class TestNoteDate:
+    def test_day_is_parsed_and_normalized(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\ndate: 2025-10-12\n---\n")
+        assert document.date == NoteDate.from_text("2025-10-12")
+        assert document.date_error is None
+        assert document.raw["date"] == datetime.date(2025, 10, 12)
+
+    def test_quoted_day_is_parsed(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\ndate: '2025-10-12'\n---\n")
+        assert document.date == NoteDate.from_text("2025-10-12")
+
+    def test_month_is_parsed(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\ndate: '2025-10'\n---\n")
+        assert document.date == NoteDate.from_text("2025-10")
+        assert document.raw["date"] == "2025-10"
+
+    def test_year_integer_is_parsed(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\ndate: 2025\n---\n")
+        assert document.date == NoteDate.from_text("2025")
+        assert document.raw["date"] == "2025"
+
+    def test_absent_date_is_none(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n")
+        assert document.date is None
+        assert document.date_error is None
+
+    def test_null_date_is_none(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\ndate: null\n---\n")
+        assert document.date is None
+        assert document.date_error is None
+
+    @pytest.mark.parametrize("note_type", ["note", "reference", "project", "log"])
+    def test_date_is_valid_on_every_type(self, note_type: str) -> None:
+        document = NoteDocument.from_text(f"---\ntype: {note_type}\ndate: 2025-10-12\n---\n")
+        assert document.date == NoteDate.from_text("2025-10-12")
+
+    def test_timestamp_is_reported_without_hiding_the_note(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\ndate: 2025-10-12T09:30:00\n---\n")
+        assert document.date is None
+        assert document.date_error is not None
+        assert "calendar date" in document.date_error
+
+    @pytest.mark.parametrize("value", ["last Tuesday", "2025-13", "2025-02-30", "2025-1-2"])
+    def test_malformed_text_is_reported(self, value: str) -> None:
+        document = NoteDocument.from_text(f"---\ntype: note\ndate: '{value}'\n---\n")
+        assert document.date is None
+        assert document.date_error is not None
+
+    @pytest.mark.parametrize("value", ["true", "2025.5", "[2025]"])
+    def test_non_date_value_is_reported(self, value: str) -> None:
+        document = NoteDocument.from_text(f"---\ntype: note\ndate: {value}\n---\n")
+        assert document.date is None
+        assert document.date_error is not None
+
+    @pytest.mark.parametrize(
+        "value",
+        ["date: 2025-10-12\n", "date: '2025-10'\n", "date: 2025\n"],
+    )
+    def test_round_trip_preserves_precision(self, value: str) -> None:
+        document = NoteDocument.from_text(f"---\ntype: note\n{value}---\n")
+        reparsed = NoteDocument.from_text(document.to_text())
+        assert reparsed.date == document.date
+        assert reparsed.raw["date"] == document.raw["date"]
+
+    def test_with_metadata_replaces_and_validates_the_date(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n")
+        updated = document.with_metadata({"type": "note", "date": "2025-10"})
+        assert updated.date == NoteDate.from_text("2025-10")
+        assert updated.date_error is None
+
+    def test_with_metadata_reports_a_malformed_date(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n")
+        updated = document.with_metadata({"type": "note", "date": "last Tuesday"})
+        assert updated.date is None
+        assert updated.date_error is not None
+
+
+class TestLogFrontmatter:
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "category: personal",
+            "status: archived",
+            "due_date: 2025-10-12",
+            "asked_by: Sam Rivera",
+        ],
+    )
+    def test_workflow_labels_are_rejected(self, line: str) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text(f"---\ntype: log\n{line}\n---\n")
+
+
 class TestAskedBy:
     def test_project_accepts_a_requester_name(self) -> None:
         document = NoteDocument.from_text("---\ntype: project\nasked_by: Priya Nair\n---\n")
@@ -400,6 +492,12 @@ class TestSerializeDocument:
             min_size=1,
         ).filter(lambda value: bool(value.strip())),
     ),
+    note_date=hypothesis.strategies.one_of(
+        hypothesis.strategies.none(),
+        hypothesis.strategies.dates().map(NoteDate.from_date),
+        hypothesis.strategies.integers(min_value=1, max_value=9999).map(NoteDate.from_year),
+        hypothesis.strategies.dates().map(lambda value: NoteDate.from_text(value.strftime("%Y-%m"))),
+    ),
     unknown=hypothesis.strategies.text(
         alphabet=hypothesis.strategies.characters(blacklist_characters="\x85\u2028\u2029")
     ),
@@ -410,6 +508,7 @@ def test_frontmatter_round_trip_preserves_recognized_and_unknown_values(
     status: Status | None,
     due_date: datetime.date | None,
     asked_by: str | None,
+    note_date: NoteDate | None,
     unknown: str,
 ) -> None:
     hypothesis.assume(status is None or status in note_type.allowed_statuses)
@@ -422,6 +521,8 @@ def test_frontmatter_round_trip_preserves_recognized_and_unknown_values(
         raw["due_date"] = due_date
     if note_type is NoteType.PROJECT and asked_by is not None:
         raw["asked_by"] = asked_by
+    if note_date is not None:
+        raw["date"] = note_date.to_yaml_value()
     document = NoteDocument.from_text("---\ntype: note\n---\n")
     candidate = document.with_metadata(raw)
     reparsed = NoteDocument.from_text(candidate.to_text())
@@ -431,6 +532,8 @@ def test_frontmatter_round_trip_preserves_recognized_and_unknown_values(
     assert reparsed.status is candidate.status
     assert reparsed.due_date == candidate.due_date
     assert reparsed.asked_by == candidate.asked_by
+    assert reparsed.date == candidate.date
+    assert reparsed.date_error == candidate.date_error
 
 
 class TestWithMetadata:

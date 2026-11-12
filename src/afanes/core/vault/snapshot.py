@@ -18,7 +18,7 @@ import afanes.core.names
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import NameCatalog, ResolutionOutcome
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 from afanes.models.step import ProjectStep
 
 # Public canonical note extension.
@@ -29,6 +29,7 @@ INBOX_DIRECTORY = Path("inbox")
 TRASH_DIRECTORY = Path("trash")
 REFERENCE_DIRECTORY = Path("reference")
 PROJECTS_DIRECTORY = Path("projects")
+LOG_DIRECTORY = Path("log")
 TEMPLATES_DIRECTORY = Path("templates")
 
 MIN_INBOX_PART_COUNT = 2
@@ -249,6 +250,9 @@ class VaultNote:
         Validated workflow status, or ``None`` when absent.
     due_date : datetime.date | None
         Calendar due date read from frontmatter, or ``None`` when absent.
+    date : NoteDate | None
+        ISO partial date read from frontmatter, or ``None`` when absent or
+        malformed.
     content_hash : str
         SHA-256 digest of the file bytes, used as an optimistic write guard.
     modified_ns : int
@@ -271,6 +275,7 @@ class VaultNote:
     category: CategoryLabel | None
     status: Status | None
     due_date: datetime.date | None
+    date: NoteDate | None
     content_hash: str
     modified_ns: int
     body_references: tuple[NoteReference, ...]
@@ -728,6 +733,31 @@ class VaultSnapshot:
             snapshot.
         """
         return next((note for note in self.notes if VaultPath.same(note.path, source)), None)
+
+    def log_entry(self, date: NoteDate) -> VaultNote | None:
+        """Return the log entry for one exact date.
+
+        Parameters
+        ----------
+        date : NoteDate
+            Date whose ISO text is the log entry's name.
+
+        Returns
+        -------
+        VaultNote | None
+            Matching log entry, or ``None`` when the date is free.
+
+        Notes
+        -----
+        A log entry is unique per exact date. This method performs no file I/O
+        and never chooses among duplicates; an external duplicate returns the
+        first match in scan order.
+        """
+        candidates = self.catalog.candidates(ReferenceScheme.LOG, date.text)
+        return next(
+            (note for note in self.notes if note.note_type is NoteType.LOG and note.path in candidates),
+            None,
+        )
 
     def affected_sites(self, source: Path) -> tuple[ReferenceSite, ...]:
         """Collect per-note reference counts that resolve to a target note.

@@ -33,9 +33,49 @@ class Settings:
     ----------
     vault : Path
         Absolute path to the selected vault directory.
+    log_modes : dict[str, str]
+        Log workspace mode per resolved vault path. A missing or unknown value
+        means ``entries``.
     """
 
     vault: Path
+    log_modes: dict[str, str] = dataclasses.field(default_factory=dict)
+
+    def log_mode_for(self, vault: Path) -> str:
+        """Return the remembered Log mode for one vault.
+
+        Parameters
+        ----------
+        vault : Path
+            Vault root to look up.
+
+        Returns
+        -------
+        str
+            ``everything`` when remembered, otherwise ``entries``.
+        """
+        value = self.log_modes.get(str(vault.expanduser().resolve()), "")
+        return "everything" if value == "everything" else "entries"
+
+    def with_log_mode(self, vault: Path, mode: str) -> Self:
+        """Return settings with one vault's Log mode replaced.
+
+        Parameters
+        ----------
+        vault : Path
+            Vault root to update.
+        mode : str
+            Requested mode. Any value other than ``everything`` is stored as
+            ``entries``.
+
+        Returns
+        -------
+        Settings
+            New settings; the original mapping is unchanged.
+        """
+        modes = dict(self.log_modes)
+        modes[str(vault.expanduser().resolve())] = "everything" if mode == "everything" else "entries"
+        return dataclasses.replace(self, log_modes=modes)
 
     @classmethod
     def from_payload(cls, payload: object, source: Path) -> Self:
@@ -52,13 +92,13 @@ class Settings:
         Returns
         -------
         Settings
-            Settings carrying the payload's vault path.
+            Settings carrying the payload's vault path and Log modes.
 
         Raises
         ------
         ConfigurationError
-            If the payload is not an object, uses an unsupported version, or
-            does not contain an absolute vault path.
+            If the payload is not an object, uses an unsupported version, does
+            not contain an absolute vault path, or carries malformed Log modes.
         """
         if not isinstance(payload, dict):
             message = f"Settings must be a JSON object: {source}"
@@ -75,7 +115,17 @@ class Settings:
         if not vault_path.is_absolute():
             message = f"Settings vault path must be absolute: {source}"
             raise ConfigurationError(message)
-        return cls(vault=vault_path)
+        raw_modes = payload.get("log_modes", {})
+        if not isinstance(raw_modes, dict):
+            message = f"Settings Log modes must be a JSON object: {source}"
+            raise ConfigurationError(message)
+        log_modes: dict[str, str] = {}
+        for key, value in raw_modes.items():
+            if not isinstance(key, str) or not isinstance(value, str):
+                message = f"Settings Log modes must map paths to strings: {source}"
+                raise ConfigurationError(message)
+            log_modes[key] = value
+        return cls(vault=vault_path, log_modes=log_modes)
 
     def to_payload(self) -> dict[str, object]:
         """Return the versioned JSON mapping for these settings.
@@ -83,10 +133,14 @@ class Settings:
         Returns
         -------
         dict[str, object]
-            Mapping containing the settings version and the vault path as a
-            string.
+            Mapping containing the settings version, the vault path as a
+            string, and the per-vault Log modes.
         """
-        return {"version": SETTINGS_VERSION, "vault": str(self.vault)}
+        return {
+            "version": SETTINGS_VERSION,
+            "vault": str(self.vault),
+            "log_modes": dict(self.log_modes),
+        }
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

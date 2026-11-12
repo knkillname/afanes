@@ -2,23 +2,25 @@
 
 ## Purpose
 
-Defines the user-editable reference template cards stored in a vault `templates/` folder, their format, the seeded defaults, validation, and how a card supplies a category and starter body when a reference is created.
+Defines the user-editable reference and log template cards stored in a vault `templates/` folder, their format, the seeded defaults, validation, and how a card supplies a category or starter body when a matching note is created.
 
 ## Requirements
 
 ### Requirement: Template cards are vault files
 
-Reference template cards SHALL be Markdown files stored under the vault's `templates/` folder. The folder SHALL be a convention, not a note folder, and users SHALL be able to add, edit, or delete cards with any text editor.
+Reference and log template cards SHALL be Markdown files stored under the vault's `templates/`
+folder. The folder SHALL be a convention, not a note folder, and users SHALL be able to add, edit, or
+delete cards with any text editor.
 
 #### Scenario: A card is a file
 
 - **WHEN** the vault contains `templates/vendor.md`
-- **THEN** the card is available to the reference creation pickers
+- **THEN** the card is available to the matching creation picker
 
 #### Scenario: A user adds a card
 
 - **WHEN** the user creates `templates/vendor.md`
-- **THEN** the card appears the next time a reference creation picker is opened
+- **THEN** the card appears the next time the matching creation picker is opened
 
 #### Scenario: A user deletes a card
 
@@ -30,14 +32,27 @@ Reference template cards SHALL be Markdown files stored under the vault's `templ
 - **WHEN** a vault has no `templates/` folder and the app opens or scans it
 - **THEN** no folder is created and the pickers offer only Empty
 
+#### Scenario: A log card is a file
+
+- **WHEN** the vault contains `templates/daily.md` with `type: log`
+- **THEN** the card appears in the log creation picker
+
 ### Requirement: The card format declares its metadata and starter body
 
-A card SHALL be a Markdown file whose frontmatter declares `type: reference` and a `category` label, and MAY declare `title` and `description`. The Markdown after the frontmatter SHALL be the starter body. The body MUST NOT contain a level-1 heading, and MAY be empty.
+A card SHALL be a Markdown file whose frontmatter declares `type` and MAY declare `title` and
+`description`. A reference card SHALL declare `type: reference` and a `category` label. A log card
+SHALL declare `type: log` and MUST NOT declare a category. The Markdown after the frontmatter SHALL
+be the starter body. The body MUST NOT contain a level-1 heading, and MAY be empty.
 
 #### Scenario: A complete card parses
 
 - **WHEN** a card declares a reference type, a category, a title, and a description
 - **THEN** the picker shows the title and description and uses the category for new notes
+
+#### Scenario: A log card parses
+
+- **WHEN** a card declares `type: log`, a title, and a starter body
+- **THEN** the log picker shows the title and uses the body for new entries
 
 #### Scenario: The title falls back to the file name
 
@@ -56,12 +71,17 @@ A card SHALL be a Markdown file whose frontmatter declares `type: reference` and
 
 #### Scenario: A missing category is refused
 
-- **WHEN** a card omits its category
+- **WHEN** a reference card omits its category
+- **THEN** the card is invalid and is reported
+
+#### Scenario: A log card category is refused
+
+- **WHEN** a log card declares a category
 - **THEN** the card is invalid and is reported
 
 #### Scenario: A non-reference type is refused
 
-- **WHEN** a card declares a type other than reference
+- **WHEN** a card declares a type other than reference or log
 - **THEN** the card is invalid and is reported
 
 #### Scenario: Workflow keys are refused
@@ -76,12 +96,15 @@ A card SHALL be a Markdown file whose frontmatter declares `type: reference` and
 
 ### Requirement: The picker lists valid cards and the Empty option
 
-The reference creation pickers SHALL list every valid card and SHALL always offer Empty. The list SHALL be ordered deterministically by title and then by file path, and duplicate titles SHALL remain distinguishable by their paths.
+The reference creation pickers SHALL list every valid reference card and SHALL always offer Empty.
+The log creation picker SHALL list every valid log card and SHALL always offer Empty. Each list SHALL
+be ordered deterministically by title and then by file path, and duplicate titles SHALL remain
+distinguishable by their paths.
 
 #### Scenario: Cards are listed by title
 
 - **WHEN** the folder contains cards titled Person and Place
-- **THEN** the picker lists both in title order
+- **THEN** the reference picker lists both in title order
 
 #### Scenario: Empty is always available
 
@@ -98,38 +121,17 @@ The reference creation pickers SHALL list every valid card and SHALL always offe
 - **WHEN** one card is invalid and others are valid
 - **THEN** the picker lists the valid cards and names the invalid file
 
-### Requirement: New vaults seed seven default cards
+#### Scenario: The log picker lists only log cards
 
-A newly created vault SHALL contain seven editable template cards: Person, Team, Organization, Place, Process, Topic, and Source. Each card SHALL declare `type: reference`, its category, a title, a description, and its starter body.
-
-#### Scenario: A new vault has the seven cards
-
-- **WHEN** a vault is created
-- **THEN** `templates/` contains person, team, organization, place, process, topic, and source cards
-
-#### Scenario: A blank vault also has the cards
-
-- **WHEN** a vault is created without a vault starter template
-- **THEN** it still contains the seven template cards
-
-#### Scenario: The cards create no pending work
-
-- **WHEN** a vault is created from any starter template
-- **THEN** the review count is zero and no card appears as a note
-
-#### Scenario: The cards are editable
-
-- **WHEN** the user edits a seeded card
-- **THEN** the edited card is used the next time a picker opens
-
-#### Scenario: Deleted cards are not restored
-
-- **WHEN** the user deletes a seeded card and reopens the vault
-- **THEN** the card is not recreated
+- **WHEN** the folder contains a reference card and a log card
+- **THEN** the log picker lists the log card and not the reference card
 
 ### Requirement: A card supplies a category and starter body
 
-Creating a reference from a card SHALL set the note's category to the card's category and SHALL use the card's starter body as appended content. The card's title and description SHALL NOT be copied into the note.
+Creating a reference from a reference card SHALL set the note's category to the card's category and
+SHALL use the card's starter body as appended content. Creating a log entry from a log card SHALL use
+only the card's starter body; the card MUST NOT supply a category, status, or date. The card's title
+and description SHALL NOT be copied into the note.
 
 #### Scenario: The category is applied
 
@@ -156,6 +158,11 @@ Creating a reference from a card SHALL set the note's category to the card's cat
 - **WHEN** `reference/Place/` already exists and a card uses `category: place`
 - **THEN** the new note is filed in the existing `reference/Place/` folder
 
+#### Scenario: A log card supplies no workflow labels
+
+- **WHEN** a log entry is created from a log card
+- **THEN** the note declares no category, status, due date, or requester
+
 ### Requirement: Empty creates a general reference
 
 The Empty option SHALL create a reference with `category: general` and no starter body. The note SHALL be filed under `reference/general/`.
@@ -177,7 +184,8 @@ The Empty option SHALL create a reference with `category: general` and no starte
 
 ### Requirement: Cards apply only when a reference is created
 
-A card SHALL be applied only when a reference is created from it. Opening, scanning, renaming, or changing the category of an existing note MUST NOT insert or repair a starter body.
+A card SHALL be applied only when a note of the card's type is created from it. Opening, scanning,
+renaming, or changing the category of an existing note MUST NOT insert or repair a starter body.
 
 #### Scenario: Category change does not add a starter body
 
@@ -193,6 +201,11 @@ A card SHALL be applied only when a reference is created from it. Opening, scann
 
 - **WHEN** a card's starter body changes after a note was created
 - **THEN** the existing note is unchanged
+
+#### Scenario: An existing log is not repaired
+
+- **WHEN** a log card changes after a log entry was created
+- **THEN** the existing entry is unchanged
 
 ### Requirement: Cards leave no provenance
 
@@ -215,10 +228,65 @@ A note created from a card SHALL be an ordinary reference. It MUST NOT record wh
 
 ### Requirement: Seeding failures are reported
 
-When a default card cannot be written during vault creation, creation SHALL stop and report the failing card and the cards already written. The written cards SHALL remain in place, and the folder SHALL remain openable as a vault.
+When a default card cannot be written during vault creation, creation SHALL stop and report the
+failing card and the cards already written. The written cards SHALL remain in place, and the folder
+SHALL remain openable as a vault.
 
 #### Scenario: A default card fails partway
 
-- **WHEN** the fourth of seven cards cannot be written
+- **WHEN** the fifth of eight cards cannot be written
 - **THEN** the failure names the card and the cards already written
 - **AND** the folder can still be opened as a vault
+
+### Requirement: New vaults seed eight default cards
+
+A newly created vault SHALL contain eight editable template cards: Person, Team, Organization,
+Place, Process, Topic, Source, and Daily entry. Each card SHALL declare its type, a title, a
+description, and its starter body; each reference card SHALL also declare its category, and the
+Daily entry card SHALL declare `type: log` with no category.
+
+#### Scenario: A new vault has the eight cards
+
+- **WHEN** a vault is created
+- **THEN** `templates/` contains person, team, organization, place, process, topic, source, and daily
+  cards
+
+#### Scenario: The Daily entry card is a log card
+
+- **WHEN** a new vault is created
+- **THEN** `templates/daily.md` declares `type: log`, no category, and a reflection body
+
+#### Scenario: A blank vault also has the cards
+
+- **WHEN** a vault is created without a vault starter template
+- **THEN** it still contains the eight template cards
+
+#### Scenario: The cards create no pending work
+
+- **WHEN** a vault is created from any starter template
+- **THEN** the review count is zero and no card appears as a note
+
+#### Scenario: The cards are editable
+
+- **WHEN** the user edits a seeded card
+- **THEN** the edited card is used the next time a picker opens
+
+#### Scenario: Deleted cards are not restored
+
+- **WHEN** the user deletes a seeded card and reopens the vault
+- **THEN** the card is not recreated
+
+### Requirement: Empty creates an untemplated log entry
+
+The Empty option in the log creation picker SHALL create a log entry with no starter body. It MUST
+NOT add a category, status, due date, or requester.
+
+#### Scenario: Empty log entry
+
+- **WHEN** the user creates a log entry from an empty day with Empty
+- **THEN** the note has the chosen date and only the title heading in its body
+
+#### Scenario: Empty does not change the reference rule
+
+- **WHEN** the user creates a reference with Empty
+- **THEN** the reference still receives `category: general` and no starter body

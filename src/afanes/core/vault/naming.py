@@ -17,180 +17,29 @@ import afanes.core.atomic
 import afanes.core.links
 import afanes.core.names
 import afanes.core.vault.snapshot
-from afanes.core.errors import AfanesError, NameCollisionError, ReferenceRewriteError, VaultError, VaultPathError
+from afanes.core.errors import (
+    AfanesError,
+    ContentChangedError,
+    NameCollisionError,
+    ReferenceRewriteError,
+    VaultError,
+    VaultPathError,
+)
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import ReferenceKey
+from afanes.core.vault.naming_reports import (
+    CategoryMovePreview,
+    ReferenceRepairPreview,
+    RenamePreview,
+    RenameReport,
+    RewriteFailure,
+    RewriteReport,
+    TrashPreview,
+)
 from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import ReferenceSite, VaultPath, VaultSnapshot
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class ReferenceRepairPreview:
-    """References that would be rewritten from one name to another.
-
-    Attributes
-    ----------
-    old : NoteReference
-        Reference name currently written in the vault.
-    new : NoteReference
-        Replacement reference name in the same scheme.
-    sites : tuple[ReferenceSite, ...]
-        Referring notes and their per-note reference counts, in scan order.
-    content_hashes : dict[Path, str]
-        Content hash captured at planning time for every referring note.
-    """
-
-    old: NoteReference
-    new: NoteReference
-    sites: tuple[ReferenceSite, ...]
-    content_hashes: dict[Path, str]
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class RenamePreview:
-    """Planned rename and the references that would change.
-
-    Attributes
-    ----------
-    note_path : Path
-        Current absolute path of the note.
-    target_path : Path
-        Absolute path after the rename.
-    scheme : ReferenceScheme
-        Namespace of the note, used to match inbound references.
-    old_name : str
-        Current filename stem.
-    new_name : str
-        Sanitized replacement stem.
-    heading_update : bool
-        Whether the first level-1 heading currently matches the old identity
-        and should be updated to the new one.
-    affected : tuple[ReferenceSite, ...]
-        Referring notes and counts, in scan order.
-    reference_count : int
-        Total number of references that would be rewritten.
-    content_hashes : dict[Path, str]
-        Content hash captured at planning time for every affected note,
-        including the renamed note when it refers to itself or needs a heading
-        update.
-    """
-
-    note_path: Path
-    target_path: Path
-    scheme: ReferenceScheme
-    old_name: str
-    new_name: str
-    heading_update: bool
-    affected: tuple[ReferenceSite, ...]
-    reference_count: int
-    content_hashes: dict[Path, str]
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class RewriteFailure:
-    """A referring note that could not be rewritten.
-
-    Attributes
-    ----------
-    path : Path
-        Absolute path to the note.
-    message : str
-        Concise failure reason.
-    """
-
-    path: Path
-    message: str
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class RewriteReport:
-    """Outcome of applying a reference repair.
-
-    Attributes
-    ----------
-    updated : tuple[Path, ...]
-        Notes whose references were rewritten.
-    skipped : tuple[Path, ...]
-        Notes skipped because their content changed after planning.
-    unchanged : tuple[Path, ...]
-        Notes that no longer contained the old reference.
-    failed : tuple[RewriteFailure, ...]
-        Notes that could not be rewritten, with reasons.
-    """
-
-    updated: tuple[Path, ...]
-    skipped: tuple[Path, ...]
-    unchanged: tuple[Path, ...]
-    failed: tuple[RewriteFailure, ...]
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class RenameReport:
-    """Outcome of applying a rename preview.
-
-    Attributes
-    ----------
-    renamed : bool
-        Whether this call moved the file. ``False`` means a previous run had
-        already renamed it and only reference rewrites remained.
-    updated : tuple[Path, ...]
-        Notes whose references were rewritten.
-    skipped : tuple[Path, ...]
-        Notes skipped because their content changed after planning.
-    unchanged : tuple[Path, ...]
-        Notes that no longer needed a rewrite.
-    failed : tuple[RewriteFailure, ...]
-        Notes that could not be rewritten, with reasons.
-    """
-
-    renamed: bool
-    updated: tuple[Path, ...]
-    skipped: tuple[Path, ...]
-    unchanged: tuple[Path, ...]
-    failed: tuple[RewriteFailure, ...]
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class TrashPreview:
-    """Inbound references and destination reported before trashing a note.
-
-    Attributes
-    ----------
-    note_path : Path
-        Absolute path to the note that would be moved.
-    trash_path : Path
-        Absolute destination inside ``trash/``.
-    reference_count : int
-        Number of references that point to the note.
-    affected_notes : tuple[Path, ...]
-        Notes containing at least one inbound reference.
-    """
-
-    note_path: Path
-    trash_path: Path
-    reference_count: int
-    affected_notes: tuple[Path, ...]
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class CategoryMovePreview:
-    """A reference note's category change and its destination.
-
-    Attributes
-    ----------
-    note_path : Path
-        Absolute path to the reference before the change.
-    target_path : Path
-        Absolute destination inside ``reference/<label>/`` or ``reference/``.
-    category : CategoryLabel | None
-        Category to write, or ``None`` to remove it.
-    """
-
-    note_path: Path
-    target_path: Path
-    category: CategoryLabel | None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -497,6 +346,13 @@ class VaultNaming:
             if target.exists() and not VaultPath.same(source, target):
                 message = f"Destination already exists: {target}"
                 raise NameCollisionError(message)
+            if preview.new_date is not None or preview.new_type is not None:
+                self._write_conversion(source, preview)
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                message = f"Could not create the destination directory: {target.parent}"
+                raise VaultError(message) from exc
             source.replace(target)
             renamed = True
         elif not target.exists():
@@ -504,7 +360,10 @@ class VaultNaming:
             raise VaultError(message)
 
         old_reference = NoteReference(scheme=preview.scheme, name=preview.old_name)
-        new_reference = NoteReference(scheme=preview.scheme, name=preview.new_name)
+        new_reference = NoteReference(
+            scheme=preview.new_scheme or preview.scheme,
+            name=preview.new_name,
+        )
         updated: list[Path] = []
         skipped: list[Path] = []
         unchanged: list[Path] = []
@@ -539,6 +398,51 @@ class VaultNaming:
             unchanged=tuple(unchanged),
             failed=tuple(failed),
         )
+
+    @staticmethod
+    def _write_conversion(source: Path, preview: RenamePreview) -> None:
+        """Write the replacement type and date before a conversion move.
+
+        Parameters
+        ----------
+        source : Path
+            Existing note path.
+        preview : RenamePreview
+            Preview carrying the source hash, new date, and new type.
+
+        Raises
+        ------
+        ContentChangedError
+            If the file changed after the preview was planned.
+        NoteParseError
+            If the file cannot be parsed.
+        VaultError
+            If the atomic write fails.
+        """
+        if preview.new_date is None and preview.new_type is None:
+            return
+        data = source.read_bytes()
+        expected = preview.content_hashes.get(source)
+        if expected is not None and hashlib.sha256(data).hexdigest() != expected:
+            message = f"Note changed on disk: {source}"
+            raise ContentChangedError(message)
+        document = NoteDocument.from_text(data.decode("utf-8"))
+        raw = dict(document.raw)
+        if preview.new_type is not None:
+            raw["type"] = preview.new_type.value
+            if preview.new_type is NoteType.LOG:
+                raw.pop("category", None)
+                raw.pop("status", None)
+                raw.pop("due_date", None)
+                raw.pop("asked_by", None)
+            elif preview.new_type is NoteType.PROJECT:
+                raw.pop("category", None)
+            else:
+                raw.pop("due_date", None)
+                raw.pop("asked_by", None)
+        if preview.new_date is not None:
+            raw["date"] = preview.new_date.to_yaml_value()
+        afanes.core.atomic.write_text_atomic(source, document.with_metadata(raw).to_text())
 
     def _apply_heading_update(
         self,
@@ -614,6 +518,7 @@ class VaultNaming:
         new: NoteReference,
         *,
         snapshot: VaultSnapshot | None = None,
+        allow_scheme_change: bool = False,
     ) -> ReferenceRepairPreview:
         """Plan a rewrite of one reference name to another without writing.
 
@@ -622,9 +527,13 @@ class VaultNaming:
         old : NoteReference
             Reference name currently written in the vault.
         new : NoteReference
-            Replacement reference name. It must use the same scheme as ``old``.
+            Replacement reference name. It must use the same scheme as ``old``
+            unless ``allow_scheme_change`` is ``True``.
         snapshot : VaultSnapshot | None
             Pre-built scan to avoid rescanning, or ``None`` to scan the vault.
+        allow_scheme_change : bool
+            Whether a cross-scheme rewrite is allowed. Log conversion uses this
+            when a `note:` destination becomes a `log:` destination.
 
         Returns
         -------
@@ -635,7 +544,8 @@ class VaultNaming:
         Raises
         ------
         VaultError
-            If the two references use different schemes.
+            If the two references use different schemes and scheme changes are
+            not allowed.
 
         Notes
         -----
@@ -644,7 +554,7 @@ class VaultNaming:
         page yet, which is exactly the unsafe-link repair case. This method
         performs blocking file I/O when it scans, and never writes.
         """
-        if old.scheme is not new.scheme:
+        if old.scheme is not new.scheme and not allow_scheme_change:
             message = "Reference repair must stay within one scheme"
             raise VaultError(message)
 

@@ -6,15 +6,16 @@ Afanes uses to classify the note; the rest of the file is ordinary Markdown.
 :::{admonition} tl;dr
 :class: note
 
-Only five keys are recognized: `type`, `category`, `status`, `due_date`, and `asked_by`. Unknown keys
-are preserved, and a missing status means the default for that note type.
+Only the recognized keys are `type`, `date`, `category`, `status`, `due_date`, and `asked_by`.
+Unknown keys are preserved, and a missing status means the default for that note type.
 :::
 
 ## 🧾 Keys
 
 | Key | Valid on | Values |
 | --- | --- | --- |
-| `type` | every note | `note`, `reference`, or `project` |
+| `type` | every note | `note`, `reference`, `project`, or `log` |
+| `date` | every note | an ISO calendar value: `YYYY`, `YYYY-MM`, or `YYYY-MM-DD` |
 | `category` | references only | any non-empty single folder label; case is preserved |
 | `status` | projects and references | projects: `active`, `waiting`, `done`, `cancelled`, `archived`, `later`; references: `later`, `archived`, or absent |
 | `due_date` | projects only | a calendar date written as `YYYY-MM-DD` |
@@ -28,8 +29,33 @@ Unknown keys are preserved when Afanes rewrites a note. A due date is a date, no
 - `reference` is non-actionable knowledge. It may declare a category label; people are references with
   `category: person`, not a separate type.
 - `project` is an outcome whose body is a checklist. Each task-list item is a step.
+- `log` is a dated diary entry. Its `date` is its identity and its filename.
 
 A capture has no status; `status: inbox` is not valid because the folder is the queue.
+
+### 📓 Log entries
+
+A log entry is a dated page. Its `date` is also its identity: `2025.md`, `2025-10.md`, or
+`2025-10-12.md`, filed under `log/<year>/` or `log/<year>/<month>/`. Only one log entry may exist for
+each exact date. A log entry has no category, status, due date, or requester. Link to it with
+`<log:2025-10-12>`. Changing its date renames and moves it and rewrites inbound `log:` links; the
+heading stays as written.
+
+## 📅 Date
+
+Every note may declare a `date`. It is the day, month, or year the note belongs to in the archive and
+the Log section. Write it in ISO form; the number of parts selects the precision:
+
+```yaml
+date: "2025"          # the whole year
+date: "2025-10"       # the whole month
+date: "2025-10-12"    # one day
+```
+
+A date is a calendar value, not a timestamp. It never carries a time or timezone. A malformed value
+stays in the file, keeps the note visible as **Undated**, and shows a warning in the editor until it
+is corrected. `date` is independent of a project's `due_date`: the date says where the note belongs
+in the archive, while the due date says when the work is due.
 
 ## 🗂️ Category
 

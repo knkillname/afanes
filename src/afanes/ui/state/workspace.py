@@ -9,6 +9,7 @@ import afanes.core.templates
 import afanes.ui.strings
 from afanes.core.editing import PageDraftFactory
 from afanes.core.errors import AfanesError, ConfigurationError, VaultError
+from afanes.core.log import LogMode
 from afanes.core.settings import Settings, SettingsStore
 from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultSnapshot
@@ -90,7 +91,7 @@ class WorkspaceController:
                     logger.debug("Saved vault could not be opened", exc_info=True)
                     self._show_welcome(str(exc))
                     return
-                self._enter_vault(vault, snapshot)
+                self._enter_vault(vault, snapshot, settings.log_mode_for(vault.root))
             finally:
                 self.status.set_busy(busy=False)
 
@@ -160,6 +161,7 @@ class WorkspaceController:
         self.status.set_busy(busy=True)
         self.status.clear_message()
         try:
+            existing = await self._load_settings()
             try:
                 vault = await asyncio.to_thread(VaultOpener.open, path)
                 snapshot = await asyncio.to_thread(vault.scan)
@@ -171,13 +173,17 @@ class WorkspaceController:
                 try:
                     await asyncio.to_thread(
                         SettingsStore.default().save,
-                        Settings(vault=vault.root),
+                        self._settings_for(existing, vault.root),
                     )
                 except ConfigurationError as exc:
                     logger.debug("Vault selection could not be saved", exc_info=True)
                     self.status.show_message(afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail=str(exc)))
                     return
-            self._enter_vault(vault, snapshot)
+            self._enter_vault(
+                vault,
+                snapshot,
+                existing.log_mode_for(vault.root) if existing is not None else "entries",
+            )
         finally:
             self.status.set_busy(busy=False)
 
@@ -251,6 +257,7 @@ class WorkspaceController:
         self.status.set_busy(busy=True)
         self.status.clear_message()
         try:
+            existing = await self._load_settings()
             try:
                 creation = await asyncio.to_thread(VaultOpener.create, path, template=template)
                 snapshot = await asyncio.to_thread(creation.vault.scan)
@@ -262,25 +269,100 @@ class WorkspaceController:
             try:
                 await asyncio.to_thread(
                     SettingsStore.default().save,
-                    Settings(vault=creation.vault.root),
+                    self._settings_for(existing, creation.vault.root),
                 )
             except ConfigurationError as exc:
                 logger.debug("New vault could not be remembered", exc_info=True)
                 remember_failure = afanes.ui.strings.VAULT_CREATED_NOT_REMEMBERED.format(detail=str(exc))
-            self._enter_vault(creation.vault, snapshot)
+            self._enter_vault(
+                creation.vault,
+                snapshot,
+                existing.log_mode_for(creation.vault.root) if existing is not None else "entries",
+            )
             if remember_failure is not None:
                 self.status.show_message(remember_failure)
             return True
         finally:
             self.status.set_busy(busy=False)
 
-    def _enter_vault(self, vault: Vault, snapshot: VaultSnapshot) -> None:
+    async def set_log_mode(self, mode: str) -> None:
+        """Persist the Log workspace mode for the current vault.
+
+        Parameters
+        ----------
+        mode : str
+            ``entries`` or ``everything``. Any other value is stored as
+            ``entries``.
+
+        Notes
+        -----
+        The mode applies for this session even when the preferences file cannot
+        be written. Blocking file I/O runs in a worker thread.
+        """
+        async with self.command_lock:
+            try:
+                selected = LogMode(mode)
+            except ValueError:
+                selected = LogMode.ENTRIES
+            self.browser.set_log_mode(selected)
+            vault = self.session.vault
+            if vault is None:
+                return
+            existing = await self._load_settings()
+            try:
+                await asyncio.to_thread(
+                    SettingsStore.default().save,
+                    self._settings_for(existing, vault.root).with_log_mode(vault.root, selected.value),
+                )
+            except ConfigurationError as exc:
+                logger.debug("Log mode could not be saved", exc_info=True)
+                self.status.show_message(afanes.ui.strings.LOG_MODE_NOT_REMEMBERED.format(detail=str(exc)))
+
+    async def _load_settings(self) -> Settings | None:
+        """Load settings without failing the active command.
+
+        Returns
+        -------
+        Settings | None
+            Stored settings, or ``None`` when the file is missing or unreadable.
+        """
+        try:
+            return await asyncio.to_thread(SettingsStore.default().load)
+        except ConfigurationError:
+            logger.debug("Settings could not be read", exc_info=True)
+            return None
+
+    @staticmethod
+    def _settings_for(existing: Settings | None, vault: Path) -> Settings:
+        """Return settings pointing at a vault while preserving preferences.
+
+        Parameters
+        ----------
+        existing : Settings | None
+            Previously loaded settings, or ``None``.
+        vault : Path
+            Vault root to remember.
+
+        Returns
+        -------
+        Settings
+            Settings with the new vault and the previous Log modes.
+        """
+        if existing is None:
+            return Settings(vault=vault)
+        return dataclasses.replace(existing, vault=vault)
+
+    def _enter_vault(self, vault: Vault, snapshot: VaultSnapshot, log_mode: str = "entries") -> None:
         """Reset per-vault state and apply a freshly scanned snapshot."""
         self.session.vault = vault
         self.session.selected = None
         self.session.preview_body = None
         self.processing.clear()
         self.browser.reset()
+        try:
+            self.browser.set_log_mode(LogMode(log_mode))
+        except ValueError:
+            self.browser.set_log_mode(LogMode.ENTRIES)
         self.review.reset()
         self.navigation.reset()
         self.dialogs.clear()

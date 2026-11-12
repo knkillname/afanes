@@ -9,8 +9,8 @@ from afanes.models.link import NoteReference, ReferenceScheme
 
 
 class TestReferenceScheme:
-    def test_members_are_the_two_internal_namespaces(self) -> None:
-        assert {member.value for member in ReferenceScheme} == {"project", "note"}
+    def test_members_are_the_three_internal_namespaces(self) -> None:
+        assert {member.value for member in ReferenceScheme} == {"project", "note", "log"}
 
     def test_projects_resolve_through_the_project_scheme(self) -> None:
         assert ReferenceScheme.for_note("project") is ReferenceScheme.PROJECT

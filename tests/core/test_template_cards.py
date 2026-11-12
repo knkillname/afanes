@@ -6,6 +6,7 @@ import pytest
 
 import afanes.core.template_cards
 from afanes.core.errors import TemplateCardContentError
+from afanes.models.note import NoteType
 
 CARD_TEXT = """---
 type: reference
@@ -41,9 +42,36 @@ class TestCardParsing:
         card = listing.cards[0]
         assert card.title == "Person"
         assert card.description == "A contact."
+        assert card.note_type is NoteType.REFERENCE
+        assert card.category is not None
         assert card.category.value == "person"
         assert card.body == "## Contact\n\n- Email:"
         assert card.text == CARD_TEXT
+
+    def test_a_log_card_parses(self, tmp_path: Path) -> None:
+        _write(
+            tmp_path,
+            "daily.md",
+            "---\ntype: log\ntitle: Daily entry\n---\n\n## What happened\n",
+        )
+
+        card = _catalog(tmp_path).load().cards[0]
+
+        assert card.note_type is NoteType.LOG
+        assert card.category is None
+        assert card.title == "Daily entry"
+
+    def test_a_log_card_with_a_category_is_refused(self, tmp_path: Path) -> None:
+        _write(
+            tmp_path,
+            "daily.md",
+            "---\ntype: log\ncategory: personal\n---\n\n## What happened\n",
+        )
+
+        listing = _catalog(tmp_path).load()
+
+        assert listing.cards == ()
+        assert len(listing.issues) == 1
 
     def test_the_title_falls_back_to_the_file_stem(self, tmp_path: Path) -> None:
         _write(tmp_path, "vendor.md", "---\ntype: reference\ncategory: vendor\n---\n\n## Details\n")
@@ -180,10 +208,11 @@ class TestCardOrdering:
 
 
 class TestBundledCards:
-    def test_bundled_catalog_holds_the_seven_defaults(self) -> None:
+    def test_bundled_catalog_holds_the_eight_defaults(self) -> None:
         cards = afanes.core.template_cards.TemplateCardCatalog.bundled().strict_cards()
 
         assert [card.title for card in cards] == [
+            "Daily entry",
             "Organization",
             "Person",
             "Place",
@@ -192,7 +221,8 @@ class TestBundledCards:
             "Team",
             "Topic",
         ]
-        assert [card.category.value for card in cards] == [
+        assert [card.category.value if card.category is not None else None for card in cards] == [
+            None,
             "organization",
             "person",
             "place",
@@ -207,7 +237,7 @@ class TestBundledCards:
 
         assert all(card.description for card in cards)
         assert all(card.body for card in cards)
-        assert all("type: reference" in card.text for card in cards)
+        assert all(f"type: {card.note_type.value}" in card.text for card in cards)
 
     def test_a_broken_bundle_is_refused(self, tmp_path: Path) -> None:
         _write(tmp_path, "broken.md", "---\ntype: reference\n---\n")

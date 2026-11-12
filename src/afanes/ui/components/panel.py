@@ -46,7 +46,8 @@ class Panel:
             Surface container with the title, body, and action row.
         """
         return ft.Container(
-            bgcolor=afanes.ui.theme.SURFACE_CONTAINER_COLOR,
+            bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
+            border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
             border_radius=afanes.ui.theme.CARD_RADIUS,
             padding=afanes.ui.theme.ITEM_GAP,
             content=ft.Column(
@@ -90,7 +91,8 @@ class Card:
         return ft.Container(
             expand=True,
             padding=afanes.ui.theme.SECTION_GAP,
-            bgcolor=afanes.ui.theme.SURFACE_CONTAINER_COLOR,
+            bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
+            border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
             border_radius=afanes.ui.theme.CARD_RADIUS,
             content=self._body,
         )

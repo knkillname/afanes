@@ -122,6 +122,58 @@ class TestReadMode:
         assert view.edit_form.visible is True
         assert view.read_body.visible is False
         assert view.done_button.visible is True
+        assert view.content.visible is False
+        assert view.edit_form.expand is True
+        assert view.body_field.expand is True
+
+    def test_category_combobox_suggests_existing_labels(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        person = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", category="person"),
+        )
+        _write_note(
+            vault / "reference" / "places" / "Office.md",
+            _typed_note("reference", "# Office\n", category="place"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(person)
+            view.refresh()
+            await view.start_edit()
+
+        asyncio.run(scenario())
+
+        assert isinstance(view.category_field, ft.Dropdown)
+        assert view.category_field.editable is True
+        assert view.category_field.enable_filter is True
+        assert [option.key for option in view.category_field.options] == ["person", "place"]
+
+    def test_category_combobox_has_no_suggestions_without_labeled_references(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+
+        asyncio.run(scenario())
+
+        assert view.category_field.options == []
+        assert view.category_field.value == ""
 
     def test_back_button_returns_to_the_previous_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -426,6 +478,9 @@ class TestRawMode:
         assert view.raw_field.value == "---\ntype: refrence\n---\nBody\n"
         assert view.raw_warning.value
         assert view.edit_form.visible is False
+        assert view.content.visible is False
+        assert view.raw_panel.expand is True
+        assert view.raw_field.expand is True
 
     def test_raw_save_upgrades_the_view(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -614,6 +669,27 @@ class TestPanels:
         assert state.pages.page is None
         assert view.trash_panel.visible is False
 
+    def test_log_page_hides_rename_and_keeps_trash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        note = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            _typed_note("log", "# A quiet Tuesday\n", extra="date: 2025-10-12"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
+            view.refresh()
+
+        asyncio.run(scenario())
+
+        assert view.rename_button.visible is False
+        assert view.trash_button.visible is True
+
 
 class TestSteps:
     def _project(
@@ -757,7 +833,7 @@ class TestProjectMeta:
         assert view.meta_asked.visible is False
         assert view.meta_asked.value == ""
 
-    def test_note_page_has_no_meta_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_note_page_shows_only_the_date(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -770,7 +846,11 @@ class TestProjectMeta:
         asyncio.run(scenario())
         view = PageView(lambda: None)
 
-        assert view.meta_row.visible is False
+        assert view.meta_row.visible is True
+        assert view.meta_date.value == afanes.ui.strings.PAGE_NO_DATE
+        assert view.meta_status.visible is False
+        assert view.meta_due.visible is False
+        assert view.meta_due_button.visible is False
         assert view.meta_asked.visible is False
 
     def test_due_date_is_set_from_read_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -851,3 +931,110 @@ def _find_checkbox(control: ft.Control) -> ft.Control | None:
     if isinstance(content, ft.Control):
         return _find_checkbox(content)
     return None
+
+
+class TestPageDates:
+    def _open(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        path: Path,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(tmp_path / "vault")
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
+
+    def test_note_date_is_shown_in_the_meta_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "notes" / "Ada.md", _typed_note("note", "# Ada\n", extra="date: 2025-10"))
+        self._open(tmp_path, monkeypatch, path)
+        view = PageView(lambda: None)
+
+        assert view.meta_row.visible is True
+        assert view.meta_date.value == afanes.ui.strings.PAGE_DATE.format(date="2025-10")
+        assert view.meta_status.visible is False
+
+    def test_project_shows_both_dates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "projects" / "Launch.md",
+            _typed_note("project", "# Launch\n", extra="date: 2025-10"),
+        )
+        self._open(tmp_path, monkeypatch, path)
+        view = PageView(lambda: None)
+
+        assert afanes.ui.strings.PAGE_DATE.format(date="2025-10") == view.meta_date.value
+        assert view.meta_due.value == afanes.ui.strings.PAGE_PROJECT_NO_DUE
+
+    def test_log_form_hides_workflow_fields(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            _typed_note("log", "# Tuesday\n", extra="date: 2025-10-12"),
+        )
+        self._open(tmp_path, monkeypatch, path)
+        view = PageView(lambda: None)
+
+        asyncio.run(view.start_edit())
+
+        assert view.date_field.visible is True
+        assert view.category_field.visible is False
+        assert view.status_dropdown.visible is False
+        assert view.due_field.visible is False
+        assert view.asked_by_field.visible is False
+
+    def test_malformed_date_shows_a_warning(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "notes" / "Ada.md",
+            _typed_note("note", "# Ada\n", extra="date: last Tuesday"),
+        )
+        self._open(tmp_path, monkeypatch, path)
+        view = PageView(lambda: None)
+
+        asyncio.run(view.start_edit())
+
+        assert view.date_error.visible is True
+        assert view.date_error.value
+
+    def test_log_date_change_renames_and_moves(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            _typed_note("log", "# Tuesday\n", extra="date: 2025-10-12"),
+        )
+        self._open(tmp_path, monkeypatch, path)
+        view = PageView(lambda: None)
+        asyncio.run(view.start_edit())
+        view.date_field.value = "2025-10-13"
+
+        asyncio.run(view.commit_date())
+
+        target = vault / "log" / "2025" / "10" / "2025-10-13.md"
+        assert target.is_file()
+        assert not path.exists()
+        assert afanes.ui.state.app_state.pages.page is not None
+        assert afanes.ui.state.app_state.pages.page.path == target
+
+    def test_reference_date_change_updates_in_place(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "reference" / "Ada.md",
+            _typed_note("reference", "# Ada\n"),
+        )
+        self._open(tmp_path, monkeypatch, path)
+        view = PageView(lambda: None)
+        asyncio.run(view.start_edit())
+        view.date_field.value = "2025-10"
+
+        asyncio.run(view.commit_date())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.date is not None
+        assert document.date.text == "2025-10"
+        assert path.is_file()

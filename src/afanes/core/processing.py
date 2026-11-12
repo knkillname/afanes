@@ -7,11 +7,12 @@ import dataclasses
 import datetime
 from enum import StrEnum
 from pathlib import Path
+from types import MappingProxyType
 from typing import Self
 
 from afanes.core.errors import ProcessingError
 from afanes.core.frontmatter import NoteDocument
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
 
 class ProcessingOutcome(StrEnum):
@@ -31,6 +32,8 @@ class ProcessingOutcome(StrEnum):
         Add the capture as a step of an existing project and trash it.
     DONE_NOW : str
         Write a completed one-step project.
+    LOG : str
+        Turn the capture into a dated log entry.
     """
 
     TRASH = "trash"
@@ -39,6 +42,25 @@ class ProcessingOutcome(StrEnum):
     PROJECT = "project"
     APPEND_STEP = "append_step"
     DONE_NOW = "done_now"
+    LOG = "log"
+
+
+_FIXED_OUTCOME_STATUS = MappingProxyType(
+    {
+        ProcessingOutcome.LATER: Status.LATER,
+        ProcessingOutcome.REFERENCE: None,
+        ProcessingOutcome.DONE_NOW: Status.DONE,
+        ProcessingOutcome.LOG: None,
+    }
+)
+_FIXED_STATUS_MESSAGE = MappingProxyType(
+    {
+        ProcessingOutcome.LATER: "Later uses the later status",
+        ProcessingOutcome.REFERENCE: "Reference outcomes do not accept a status",
+        ProcessingOutcome.DONE_NOW: "Done now uses the done status",
+        ProcessingOutcome.LOG: "Log outcomes do not accept a status",
+    }
+)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -79,28 +101,52 @@ class ProcessingTarget:
             requested status, or the status is not valid for the target type.
         """
         if outcome is ProcessingOutcome.LATER:
-            if status not in (None, Status.LATER):
-                message = "Later uses the later status"
-                raise ProcessingError(message)
-            return cls(note_type=NoteType.REFERENCE, status=Status.LATER)
+            return cls(note_type=NoteType.REFERENCE, status=cls._validate_status(outcome, status))
         if outcome is ProcessingOutcome.REFERENCE:
-            if status is not None:
-                message = "Reference outcomes do not accept a status"
-                raise ProcessingError(message)
-            return cls(note_type=NoteType.REFERENCE, status=None)
+            return cls(note_type=NoteType.REFERENCE, status=cls._validate_status(outcome, status))
         if outcome is ProcessingOutcome.DONE_NOW:
-            if status not in (None, Status.DONE):
-                message = "Done now uses the done status"
-                raise ProcessingError(message)
-            return cls(note_type=NoteType.PROJECT, status=Status.DONE)
+            return cls(note_type=NoteType.PROJECT, status=cls._validate_status(outcome, status))
+        if outcome is ProcessingOutcome.PROJECT:
+            return cls(note_type=NoteType.PROJECT, status=cls._validate_status(outcome, status))
+        if outcome is ProcessingOutcome.LOG:
+            return cls(note_type=NoteType.LOG, status=cls._validate_status(outcome, status))
+        message = f"Outcome {outcome.value!r} does not target a note"
+        raise ProcessingError(message)
+
+    @staticmethod
+    def _validate_status(outcome: ProcessingOutcome, status: Status | None) -> Status | None:
+        """Return the validated status for a note-producing outcome.
+
+        Parameters
+        ----------
+        outcome : ProcessingOutcome
+            Selected clarification outcome.
+        status : Status | None
+            Requested status, or ``None``.
+
+        Returns
+        -------
+        Status | None
+            Status written to the target, or ``None``.
+
+        Raises
+        ------
+        ProcessingError
+            If the outcome does not accept the requested status.
+        """
         if outcome is ProcessingOutcome.PROJECT:
             target_status = status or Status.ACTIVE
             if target_status not in NoteType.PROJECT.allowed_statuses:
                 message = "Status is not valid for a project"
                 raise ProcessingError(message)
-            return cls(note_type=NoteType.PROJECT, status=target_status)
-        message = f"Outcome {outcome.value!r} does not target a note"
-        raise ProcessingError(message)
+            return target_status
+        if outcome not in _FIXED_OUTCOME_STATUS:
+            message = f"Outcome {outcome.value!r} does not target a note"
+            raise ProcessingError(message)
+        expected = _FIXED_OUTCOME_STATUS[outcome]
+        if status not in (None, expected):
+            raise ProcessingError(_FIXED_STATUS_MESSAGE[outcome])
+        return expected
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -139,6 +185,8 @@ class ProcessingPlan:
         Notes containing at least one inbound reference.
     changes_scheme : bool
         Whether the outcome moves the note to a different reference scheme.
+    target_date : NoteDate | None
+        Date written by a log outcome, or ``None`` for every other outcome.
 
     Notes
     -----
@@ -161,6 +209,7 @@ class ProcessingPlan:
     reference_count: int
     affected_notes: tuple[Path, ...]
     changes_scheme: bool
+    target_date: NoteDate | None = None
 
     def __post_init__(self) -> None:
         """Validate the plan's local invariants.
@@ -206,6 +255,13 @@ class ProcessingPlan:
             raw.pop("category", None)
         else:
             raw["category"] = self.category.value
+        if self.target_date is not None:
+            raw["date"] = self.target_date.to_yaml_value()
+        if self.target_type is NoteType.LOG:
+            raw.pop("category", None)
+            raw.pop("status", None)
+            raw.pop("due_date", None)
+            raw.pop("asked_by", None)
         body = document.body if self.body_override is None else self.body_override
         if self.scaffold is not None:
             body = self._append_scaffold(body, document.newline)
@@ -268,7 +324,28 @@ class ProcessingPlan:
         if self.outcome in (ProcessingOutcome.LATER, ProcessingOutcome.REFERENCE):
             self._validate_reference_outcome()
             return
+        if self.outcome is ProcessingOutcome.LOG:
+            self._validate_log_outcome()
+            return
         self._validate_project_outcome()
+
+    def _validate_log_outcome(self) -> None:
+        """Validate Log entry metadata."""
+        if self.target_type is not NoteType.LOG:
+            message = "Log outcomes must target a log note"
+            raise ProcessingError(message)
+        if self.target_status is not None:
+            message = "Log outcomes do not accept a status"
+            raise ProcessingError(message)
+        if self.target_date is None:
+            message = "Log outcomes need a date"
+            raise ProcessingError(message)
+        if self.due_date is not None:
+            message = "Log outcomes do not accept a due date"
+            raise ProcessingError(message)
+        if self.category is not None or self.scaffold is not None:
+            message = "Log outcomes do not accept a category or starter body"
+            raise ProcessingError(message)
 
     def _validate_reference_outcome(self) -> None:
         """Validate Later and Reference metadata."""

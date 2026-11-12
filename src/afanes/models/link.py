@@ -17,10 +17,13 @@ class ReferenceScheme(StrEnum):
     NOTE : str
         Namespace for the document family: ``note`` and ``reference`` notes in
         any category.
+    LOG : str
+        Namespace for dated ``log`` notes.
     """
 
     PROJECT = "project"
     NOTE = "note"
+    LOG = "log"
 
     @classmethod
     def for_note(cls, note_type: str) -> "ReferenceScheme":
@@ -37,8 +40,8 @@ class ReferenceScheme(StrEnum):
         Returns
         -------
         ReferenceScheme
-            ``project`` for a project note and ``note`` for every other note
-            type.
+            ``project`` for a project note, ``log`` for a log note, and ``note``
+            for every other note type.
 
         Notes
         -----
@@ -47,6 +50,8 @@ class ReferenceScheme(StrEnum):
         """
         if note_type == "project":
             return cls.PROJECT
+        if note_type == "log":
+            return cls.LOG
         return cls.NOTE
 
 

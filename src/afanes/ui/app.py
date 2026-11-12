@@ -17,7 +17,7 @@ import afanes.ui.theme
 import afanes.ui.views.inbox
 import afanes.ui.views.workspace
 from afanes.core.template_cards import TemplateCard, TemplateCardListing
-from afanes.models.note import CategoryLabel
+from afanes.models.note import CategoryLabel, NoteDate, NoteType
 
 # Public task name so the shell can be observed without exposing its fields.
 REFRESH_TASK_NAME = "workspace-refresh"
@@ -65,6 +65,9 @@ class _Shell:
         """Apply page chrome and create the native picker when available."""
         self.page.title = afanes.ui.strings.APP_TITLE
         self.page.theme_mode = ft.ThemeMode.SYSTEM
+        self.page.theme = afanes.ui.theme.THEME
+        self.page.dark_theme = afanes.ui.theme.THEME
+        self.page.bgcolor = afanes.ui.theme.PAGE_SURFACE_COLOR
         self.page.padding = afanes.ui.theme.PAGE_PADDING
         self.page.on_disconnect = self.release_session
         if not self.is_desktop:
@@ -169,6 +172,7 @@ class _Shell:
                 self.close_vault,
                 on_new_reference=self.show_new_reference_dialog,
                 pick_date=self.pick_date,
+                on_log_entry=self.show_log_entry_dialog,
             )
             self.workspace = workspace
             digest = self._due_digest()
@@ -210,7 +214,8 @@ class _Shell:
         )
         return ft.Container(
             key="launch-digest",
-            bgcolor=afanes.ui.theme.SURFACE_CONTAINER_COLOR,
+            bgcolor=afanes.ui.theme.NOTICE_SURFACE_COLOR,
+            border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.NOTICE_BORDER_COLOR),
             border_radius=afanes.ui.theme.CARD_RADIUS,
             padding=afanes.ui.theme.ITEM_GAP,
             content=ft.Row(
@@ -483,7 +488,7 @@ class _Shell:
         listing = await self.state.session.template_cards()
         if listing is None:
             listing = TemplateCardListing(cards=(), issues=())
-        choices, options = self._reference_template_options(listing.cards)
+        choices, options = self._reference_template_options(listing.for_type(NoteType.REFERENCE))
         name_field = ft.TextField(
             label=afanes.ui.strings.BROWSER_NAME_LABEL,
             autofocus=True,
@@ -536,7 +541,7 @@ class _Shell:
                 self._show_create_error(error, afanes.ui.strings.BROWSER_NAME_REQUIRED)
                 return
             card = choices.get(selector.value or "empty")
-            category = card.category if card is not None else CategoryLabel("general")
+            category = card.category if card is not None and card.category is not None else CategoryLabel("general")
             scaffold = card.body if card is not None and card.body.strip() else None
             if not await self.state.navigation.create_reference(name, category, scaffold):
                 self._show_create_error(error, self.state.status.message or afanes.ui.strings.BROWSER_NAME_REQUIRED)
@@ -573,6 +578,129 @@ class _Shell:
                         content=afanes.ui.strings.BROWSER_CREATE_ACTION,
                         on_click=submit,
                         key="new-reference-submit",
+                    ),
+                ],
+            ),
+        )
+        self.page.update()
+
+    async def show_log_entry_dialog(self, date: NoteDate) -> None:
+        """Open or create the log entry for one date.
+
+        Parameters
+        ----------
+        date : NoteDate
+            Entry date selected in the Log calendar or date tree.
+
+        Notes
+        -----
+        An occupied date opens its entry without showing a form. An empty date
+        shows a title-and-card form, writes the entry through the navigation
+        command, and opens it in edit mode. A blank title or a write failure is
+        reported inline and the dialog stays open.
+        """
+        snapshot = self.state.session.snapshot
+        existing = snapshot.log_entry(date) if snapshot is not None else None
+        if existing is not None:
+            await self.state.navigation.open_or_create_log_entry(date, "", None)
+            await self.render()
+            return
+
+        listing = await self.state.session.template_cards()
+        if listing is None:
+            listing = TemplateCardListing(cards=(), issues=())
+        choices, options = self._reference_template_options(listing.for_type(NoteType.LOG))
+        title_field = ft.TextField(
+            label=afanes.ui.strings.LOG_TITLE_LABEL,
+            autofocus=True,
+            key="new-log-title",
+        )
+        selector = ft.Dropdown(
+            label=afanes.ui.strings.LOG_CARD_LABEL,
+            options=options,
+            value="empty",
+            key="new-log-template",
+        )
+        description = ft.Text(
+            afanes.ui.strings.LOG_CARD_DESCRIPTION_EMPTY,
+            size=12,
+            color=afanes.ui.theme.MUTED_TEXT_COLOR,
+            selectable=True,
+        )
+        warning = ft.Text(
+            afanes.ui.strings.BROWSER_TEMPLATE_INVALID.format(
+                paths=", ".join(issue.relative_path.as_posix() for issue in listing.issues)
+            ),
+            color=afanes.ui.theme.ERROR_COLOR,
+            visible=bool(listing.issues),
+            key="new-log-template-warning",
+        )
+        error = ft.Text(
+            "",
+            color=afanes.ui.theme.ERROR_COLOR,
+            visible=False,
+            key="new-log-error",
+        )
+
+        def refresh_description(_event: object = None) -> None:
+            card = choices.get(selector.value or "empty")
+            if card is None or not card.description:
+                description.value = (
+                    afanes.ui.strings.LOG_CARD_DESCRIPTION_EMPTY
+                    if card is None
+                    else afanes.ui.strings.BROWSER_TEMPLATE_NO_DESCRIPTION
+                )
+            else:
+                description.value = card.description
+            self.page.update()
+
+        selector.on_select = refresh_description
+
+        async def submit() -> None:
+            title = (title_field.value or "").strip()
+            if not title:
+                self._show_create_error(error, afanes.ui.strings.LOG_TITLE_REQUIRED)
+                return
+            card = choices.get(selector.value or "empty")
+            scaffold = card.body if card is not None and card.body.strip() else None
+            if not await self.state.navigation.open_or_create_log_entry(date, title, scaffold):
+                self._show_create_error(
+                    error,
+                    self.state.status.message or afanes.ui.strings.LOG_TITLE_REQUIRED,
+                )
+                return
+            self.page.pop_dialog()
+            await self.render()
+
+        async def cancel() -> None:
+            self.page.pop_dialog()
+            self.page.update()
+
+        title_field.on_submit = submit
+        self.page.show_dialog(
+            ft.AlertDialog(
+                title=ft.Text(afanes.ui.strings.LOG_ENTRY_TITLE),
+                content=ft.Column(
+                    controls=[
+                        ft.Text(afanes.ui.strings.LOG_ENTRY_BODY.format(date=date.text)),
+                        title_field,
+                        selector,
+                        description,
+                        warning,
+                        error,
+                    ],
+                    tight=True,
+                ),
+                actions=[
+                    ft.TextButton(
+                        content=afanes.ui.strings.CANCEL_ACTION,
+                        on_click=cancel,
+                        key="new-log-cancel",
+                    ),
+                    ft.FilledButton(
+                        content=afanes.ui.strings.LOG_CREATE_ACTION,
+                        on_click=submit,
+                        key="new-log-submit",
                     ),
                 ],
             ),

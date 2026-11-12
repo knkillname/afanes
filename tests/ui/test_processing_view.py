@@ -77,6 +77,7 @@ def _card(
 ) -> afanes.core.template_cards.TemplateCard:
     return afanes.core.template_cards.TemplateCard(
         relative_path=Path(path),
+        note_type=NoteType.REFERENCE,
         category=CategoryLabel(category),
         title=title,
         description=description,
@@ -280,6 +281,7 @@ class TestProcessingView:
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Approve the invoice")
         card = afanes.core.template_cards.TemplateCard(
             relative_path=Path("process.md"),
+            note_type=NoteType.REFERENCE,
             category=CategoryLabel("process"),
             title="Process",
             description="A procedure.",

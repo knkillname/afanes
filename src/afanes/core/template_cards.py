@@ -1,13 +1,14 @@
 # SPDX-FileCopyrightText: 2026-present Mario Abarca <knkillname@gmail.com>
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Reference template cards stored in a vault ``templates/`` folder.
+"""Reference and log template cards stored in a vault ``templates/`` folder.
 
-A template card is a Markdown file whose frontmatter declares a reference
-category and whose body is a starter fragment. The catalog reads either the
-bundled defaults shipped inside the package or the cards found in a vault
-folder. Reading never writes and never raises for a single invalid user card;
-the caller receives every valid card plus an issue for each refused file.
+A template card is a Markdown file whose frontmatter declares its note type and
+whose body is a starter fragment. Reference cards also declare a category; log
+cards do not. The catalog reads either the bundled defaults shipped inside the
+package or the cards found in a vault folder. Reading never writes and never
+raises for a single invalid user card; the caller receives every valid card plus
+an issue for each refused file.
 """
 
 import dataclasses
@@ -31,15 +32,18 @@ NOTE_SUFFIX = ".md"
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class TemplateCard:
-    """One validated reference template card.
+    """One validated reference or log template card.
 
     Attributes
     ----------
     relative_path : pathlib.Path
         Card path relative to the ``templates/`` folder, used as a stable
         identity and to distinguish duplicate titles.
-    category : CategoryLabel
-        Reference category applied to a note created from this card.
+    note_type : NoteType
+        Note type the card creates: ``reference`` or ``log``.
+    category : CategoryLabel | None
+        Reference category applied to a note created from this card, or
+        ``None`` for a log card.
     title : str
         Display title shown in the pickers.
     description : str | None
@@ -53,7 +57,8 @@ class TemplateCard:
     """
 
     relative_path: Path
-    category: CategoryLabel
+    note_type: NoteType
+    category: CategoryLabel | None
     title: str
     description: str | None
     body: str
@@ -90,6 +95,22 @@ class TemplateCardListing:
 
     cards: tuple[TemplateCard, ...]
     issues: tuple[TemplateCardIssue, ...]
+
+    def for_type(self, note_type: NoteType) -> tuple[TemplateCard, ...]:
+        """Return the valid cards that create one note type.
+
+        Parameters
+        ----------
+        note_type : NoteType
+            Target type to filter by.
+
+        Returns
+        -------
+        tuple[TemplateCard, ...]
+            Cards whose :attr:`TemplateCard.note_type` matches, in listing
+            order.
+        """
+        return tuple(card for card in self.cards if card.note_type is note_type)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -223,21 +244,26 @@ class TemplateCardCatalog:
         Raises
         ------
         TemplateCardContentError
-            If the frontmatter cannot be parsed, the type is not
-            ``reference``, the category is missing, workflow keys are present,
-            the title or description has the wrong type, or the body contains
-            a level-1 heading.
+            If the frontmatter cannot be parsed, the type is not ``reference``
+            or ``log``, a reference category is missing, a log card declares a
+            category, workflow keys are present, the title or description has
+            the wrong type, or the body contains a level-1 heading.
         """
         try:
             document = NoteDocument.from_text(text)
         except AfanesError as exc:
             message = f"frontmatter cannot be parsed: {exc}"
             raise TemplateCardContentError(message) from exc
-        if document.note_type is not NoteType.REFERENCE:
-            message = "must declare type: reference"
+        note_type = document.note_type
+        if note_type not in (NoteType.REFERENCE, NoteType.LOG):
+            message = "must declare type: reference or log"
             raise TemplateCardContentError(message)
-        if document.category is None:
+        category = document.category
+        if note_type is NoteType.REFERENCE and category is None:
             message = "must declare a category"
+            raise TemplateCardContentError(message)
+        if note_type is NoteType.LOG and category is not None:
+            message = "a log card must not declare a category"
             raise TemplateCardContentError(message)
         cls._refuse_workflow_keys(document)
         title = cls._title(relative_path, document.raw)
@@ -248,7 +274,8 @@ class TemplateCardCatalog:
             raise TemplateCardContentError(message)
         return TemplateCard(
             relative_path=relative_path,
-            category=document.category,
+            note_type=note_type,
+            category=category,
             title=title,
             description=description,
             body=body,

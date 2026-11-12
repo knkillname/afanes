@@ -104,6 +104,7 @@ WORKSPACE_SECTION_LABELS = MappingProxyType(
         "inbox": "Inbox",
         "projects": "Projects",
         "references": "References",
+        "log": "Log",
         "needs_attention": "Needs attention",
     }
 )
@@ -224,6 +225,69 @@ VAULT_NOT_DIRECTORY = "That path is not a folder. Choose a vault to continue."
 VAULT_UNREADABLE = "That folder cannot be read. Choose a vault to continue."
 VAULT_NOT_EMPTY = "That folder is not empty. Choose an empty folder or an existing vault."
 VAULT_CREATED_NOT_REMEMBERED = "The vault was created, but it could not be remembered: {detail}"
+LOG_MODE_NOT_REMEMBERED = "The Log view was changed, but the preference could not be saved: {detail}"
+LOG_PLACEHOLDER = "The Log calendar and date tree appear here."
+LOG_MONTH_ENTRY_MARK = "This month has an entry."
+LOG_YEAR_ENTRY_MARK = "This year has an entry."
+LOG_PREVIOUS_MONTH = "Previous month"
+LOG_NEXT_MONTH = "Next month"
+LOG_EMPTY = "No entries yet."
+LOG_UNDATED = "Undated"
+LOG_NEW_MONTH_ENTRY = "Write an entry for {period}"
+LOG_NEW_YEAR_ENTRY = "Write an entry for {year}"
+LOG_OPEN_MONTH_ENTRY = "Open the {period} entry"
+LOG_OPEN_YEAR_ENTRY = "Open the {year} entry"
+LOG_CREATE_FAILED = "The log entry could not be created: {detail}"
+LOG_ENTRY_TITLE = "Log entry"
+LOG_ENTRY_BODY = "Write a dated entry for {date}."
+LOG_TITLE_LABEL = "Title"
+LOG_TITLE_REQUIRED = "Enter a title for the log entry."
+LOG_CARD_LABEL = "Starter"
+LOG_CARD_DESCRIPTION_EMPTY = "No starter body."
+LOG_CREATE_ACTION = "Write entry"
+LOG_TODAY_ENTRY = "Today's entry"
+LOG_MODE_ENTRIES = "Entries"
+LOG_MODE_EVERYTHING = "Everything"
+
+
+def log_entry_count(count: int) -> str:
+    """Return a compact entry count for a tree row.
+
+    Parameters
+    ----------
+    count : int
+        Number of notes at or below the row.
+
+    Returns
+    -------
+    str
+        Parenthesized count.
+    """
+    return f"({count})"
+
+
+def log_day_tooltip(day: int, count: int) -> str:
+    """Return the calendar day tooltip for an entry count.
+
+    Parameters
+    ----------
+    day : int
+        Calendar day.
+    count : int
+        Number of entries on that day.
+
+    Returns
+    -------
+    str
+        Tooltip naming the date and entry count.
+    """
+    if count == 0:
+        return f"{day}: no entries"
+    if count == 1:
+        return f"{day}: 1 entry"
+    return f"{day}: {count} entries"
+
+
 VAULT_PATH_REQUIRED = "Enter the folder path for the vault."
 SCAN_WARNING_ONE = "1 note could not be read: {paths}"
 SCAN_WARNING_MANY = "{count} notes could not be read: {paths}"
@@ -241,6 +305,12 @@ PAGE_TYPE_LABEL = "Type"
 PAGE_CATEGORY_LABEL = "Category"
 PAGE_STATUS_LABEL = "Status"
 PAGE_DUE_DATE_LABEL = "Due date (YYYY-MM-DD)"
+PAGE_DATE_LABEL = "Date (YYYY, YYYY-MM, or YYYY-MM-DD)"
+PAGE_DATE = "Date: {date}"
+PAGE_NO_DATE = "No date"
+PAGE_LOG_DATE_REQUIRED = "A log entry needs a date."
+PAGE_DATE_CHANGE_FAILED = "The date could not be changed: {detail}"
+PAGE_TYPE_CHANGE_FAILED = "The note type could not be changed: {detail}"
 PAGE_ASKED_BY_LABEL = "Asked by"
 PAGE_ASKED_BY_HINT = "Person or group that requested it"
 PAGE_RAW_WARNING = "This page's metadata cannot be read. Edit the text directly; labels return once it parses."
@@ -334,6 +404,7 @@ PAGE_TYPE_LABELS = MappingProxyType(
         "note": "Note",
         "project": "Project",
         "reference": "Reference",
+        "log": "Log",
     }
 )
 
