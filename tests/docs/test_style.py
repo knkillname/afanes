@@ -13,6 +13,7 @@ RUNTIME_PATTERN = re.compile(r'(?m)^mermaid_use_local = "([^"]*)"\s*$')
 BOX_ART_PATTERN = re.compile(r"\+-{3,}\+")
 ACCESS_TITLE_PATTERN = re.compile(r"(?m)^\s*accTitle:\s*\S")
 ACCESS_DESC_PATTERN = re.compile(r"(?m)^\s*accDescr:\s*\S")
+BARE_AUTOMODULE_PATTERN = re.compile(r"(?m)^\s*(?:```|:{3,})\{automodule\}")
 
 
 def _docs_pages() -> list[Path]:
@@ -96,4 +97,14 @@ class TestDiagramAuthoring:
                     continue
                 if ACCESS_TITLE_PATTERN.search(content) is None or ACCESS_DESC_PATTERN.search(content) is None:
                     offenders.append(str(path.relative_to(ROOT)))
+        assert offenders == []
+
+
+class TestApiReferenceAuthoring:
+    def test_automodule_directives_use_an_rst_fence(self) -> None:
+        offenders = [
+            str(path.relative_to(ROOT))
+            for path in sorted((DOCS_ROOT / "api").glob("*.md"))
+            if BARE_AUTOMODULE_PATTERN.search(path.read_text(encoding="utf-8"))
+        ]
         assert offenders == []

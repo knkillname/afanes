@@ -389,7 +389,7 @@ class TemplateCatalog:
         identifier : str | None
             Template identifier, or ``None`` to write only the guide note.
         locale : str | None
-            Requested locale. ``None`` uses :data:`BASE_LOCALE`. A locale
+            Requested locale. ``None`` uses ``BASE_LOCALE``. A locale
             without a tree falls back to the base locale.
         today : datetime.date | None
             Calendar date date placeholders and the date rules are measured

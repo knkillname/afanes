@@ -114,7 +114,7 @@ class VaultPages:
             Declared type for the new note.
         category : CategoryLabel | None
             Reference category. Only valid when ``note_type`` is
-            :attr:`NoteType.REFERENCE`; ``None`` creates an uncategorized
+            :attr:`afanes.models.note.NoteType.REFERENCE`; ``None`` creates an uncategorized
             reference.
         body : str
             Initial Markdown body used when ``text`` is ``None``.
@@ -143,7 +143,7 @@ class VaultPages:
 
         Notes
         -----
-        Unlike :meth:`create`, this method never changes the requested name. It
+        Unlike :meth:`afanes.core.vault.service.Vault.create`, this method never changes the requested name. It
         is used for pages created from unresolved links, where a suffix would
         leave the link unresolved. Collision checks run before the destination
         directory is created and before any file is written.

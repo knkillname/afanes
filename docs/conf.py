@@ -52,6 +52,18 @@ napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 nitpicky = True
 
+# The API reference documents the Afanes surface. Standard-library types appear
+# in annotations and prose, but the build is offline and uses no intersphinx
+# inventory, so those targets cannot resolve. Afanes targets stay strict.
+nitpick_ignore_regex = [
+    ("py:class", r"^(pathlib\.)?Path$"),
+    ("py:mod", r"^pathlib$"),
+    ("py:class", r"^datetime\.date$"),
+    ("py:attr", r"^datetime\.date\.\w+$"),
+    ("py:class", r"^enum\.StrEnum$"),
+    ("py:class", r"^(collections\.abc|importlib\.resources\.abc)\..+$"),
+]
+
 html_theme = "furo"
 html_title = "Afanes documentation"
 html_short_title = "Afanes"

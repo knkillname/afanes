@@ -70,6 +70,34 @@ Use the built-in MyST admonitions. Do not add custom CSS or a new admonition typ
 Keep them restrained: one `tl;dr` per page, warnings only for real risk, and `Remember` for rules that
 readers should carry into other pages.
 
+## 🧩 API reference
+
+`docs/api/` is generated from the NumPy-style docstrings under `src/afanes/`. MyST parses the body
+of a directive as Markdown, so wrap each autodoc directive in an `{eval-rst}` fence:
+
+````markdown
+```{eval-rst}
+.. automodule:: afanes.models.note
+   :members:
+```
+````
+
+A bare `{automodule}` fence renders the generated `.. py:class::` and `.. attribute::` lines as
+literal text. The docs style test rejects that form.
+
+`automodule` does not list public PEP 695 aliases. Add `.. autotype::` beside the module so the alias
+value and its cross-references render:
+
+````markdown
+```{eval-rst}
+.. autotype:: afanes.core.editing.PageDraft
+```
+````
+
+The documentation builds offline without an intersphinx inventory, so `docs/conf.py` ignores
+unresolved standard-library targets such as `pathlib.Path` and `datetime.date`. Afanes references
+stay strict; fix a broken one instead of adding an ignore.
+
 ## 📊 Diagrams
 
 Use a Mermaid diagram when a page explains relationships or a flow that a reader should grasp as a
@@ -171,6 +199,7 @@ references. `docs:serve` starts a live-reloading preview on `127.0.0.1` using on
 | --- | --- | --- |
 | Site build | `hatch run docs:build` | Internal references resolve and Sphinx reports no warnings |
 | Docs style | `hatch test tests/docs/test_style.py` | Headings start with emoji, long pages carry a `tl;dr`, diagrams carry accessibility metadata, and the Mermaid runtime is local |
+| API authoring | `hatch test tests/docs/test_style.py` | API pages wrap autodoc in `{eval-rst}` instead of rendering it as literal text |
 | Examples | `hatch test tests/core/test_integration.py::TestDocumentedExamples` | Documented examples still parse |
 | Repository gates | `hatch check` and `hatch test --cover` | The rest of the project still passes |
 

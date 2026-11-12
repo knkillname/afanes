@@ -7,78 +7,94 @@ settings, and templates. It imports `models` and the runtime libraries, never Fl
 
 ### 🧩 afanes.core.atomic
 
-```{automodule} afanes.core.atomic
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.atomic
+   :members:
 ```
 
 ### 🧩 afanes.core.errors
 
-```{automodule} afanes.core.errors
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.errors
+   :members:
 ```
 
 ### 🧩 afanes.core.names
 
-```{automodule} afanes.core.names
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.names
+   :members:
 ```
 
 ### 🧩 afanes.core.settings
 
-```{automodule} afanes.core.settings
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.settings
+   :members:
 ```
 
 ## 📄 Notes and links
 
 ### 🧩 afanes.core.frontmatter
 
-```{automodule} afanes.core.frontmatter
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.frontmatter
+   :members:
 ```
 
 ### 🧩 afanes.core.links
 
-```{automodule} afanes.core.links
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.links
+   :members:
 ```
 
 ### 🧩 afanes.core.editing
 
-```{automodule} afanes.core.editing
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.editing
+   :members:
+
+.. autotype:: afanes.core.editing.PageDraft
 ```
 
 ## 🧩 Steps and processing
 
 ### 🧩 afanes.core.steps
 
-```{automodule} afanes.core.steps
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.steps
+   :members:
 ```
 
 ### 🧩 afanes.core.project_body
 
-```{automodule} afanes.core.project_body
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.project_body
+   :members:
+
+.. autotype:: afanes.core.project_body.BodyBlock
 ```
 
 ### 🧩 afanes.core.processing
 
-```{automodule} afanes.core.processing
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.processing
+   :members:
 ```
 
 ## 🔍 Search and templates
 
 ### 🧩 afanes.core.search
 
-```{automodule} afanes.core.search
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.search
+   :members:
 ```
 
 ### 🧩 afanes.core.templates
 
-```{automodule} afanes.core.templates
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.templates
+   :members:
 ```

@@ -7,22 +7,25 @@ They are frozen dataclasses or enumerations and import only the standard library
 
 ### 🧩 afanes.models.note
 
-```{automodule} afanes.models.note
-:members:
+```{eval-rst}
+.. automodule:: afanes.models.note
+   :members:
 ```
 
 ## 🔗 References
 
 ### 🧩 afanes.models.link
 
-```{automodule} afanes.models.link
-:members:
+```{eval-rst}
+.. automodule:: afanes.models.link
+   :members:
 ```
 
 ## 🧩 Steps
 
 ### 🧩 afanes.models.step
 
-```{automodule} afanes.models.step
-:members:
+```{eval-rst}
+.. automodule:: afanes.models.step
+   :members:
 ```

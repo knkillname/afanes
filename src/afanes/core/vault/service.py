@@ -448,7 +448,7 @@ class Vault:
             Type of the note to file.
         category : CategoryLabel | None
             Reference category. Only valid when ``note_type`` is
-            :attr:`NoteType.REFERENCE`; ``None`` files directly under
+            :attr:`afanes.models.note.NoteType.REFERENCE`; ``None`` files directly under
             ``reference/``.
 
         Returns
@@ -534,7 +534,7 @@ class Vault:
         Notes
         -----
         A note with malformed frontmatter is returned as an
-        :class:`UnparsedPage` with a diagnostic in ``failure``. The raw text is
+        :class:`afanes.core.vault.snapshot.UnparsedPage` with a diagnostic in ``failure``. The raw text is
         preserved so the page can offer raw rescue mode. This method performs
         blocking file I/O and never writes.
         """
@@ -581,7 +581,7 @@ class Vault:
             Declared type for the new note.
         category : CategoryLabel | None
             Reference category. Only valid when ``note_type`` is
-            :attr:`NoteType.REFERENCE`; ``None`` creates an uncategorized
+            :attr:`afanes.models.note.NoteType.REFERENCE`; ``None`` creates an uncategorized
             reference.
         directory : Path | None
             Vault-relative or absolute classification directory. Defaults to

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- Reference template cards now let a new reference start from a reusable category and starter body. Processing and the browser's References section offer the seven seeded cards or Empty; `templates/` is reserved for cards and excluded from scans, the browser, name uniqueness, and reference resolution; invalid cards are named without blocking valid ones. **Breaking:** an existing vault that used `templates/` for ordinary notes stops showing those notes until they are moved. This implements the `template-cards` OpenSpec change.
 - A Sphinx documentation site under `docs/` with MyST Markdown, the Furo theme, getting-started, guide, reference, contributor, and API pages, four screenshots, a docs-style test, and local `hatch run docs:build` / `hatch run docs:serve` commands. The API reference covers all public `models/` and `core/` modules. This implements the `add-documentation-site` OpenSpec change.
 - A per-change documentation review rule in `AGENTS.md` and the OpenSpec archive guidance: every change updates the affected docs page or records why no user-facing documentation changed.
 - Project read mode now renders prose and accent-tinted step cards as one surface. Each step row shows checked state, text, owners, plan and actual dates, and tags, with always-visible calendar and person actions that set or clear the plan date and manage the owner list. A project meta row shows status and the optional due date, with a calendar action that sets or clears it from read mode. Step edits rewrite only the affected line and preserve completion, tags, unknown metadata, and frontmatter bytes. This implements the `step-aware-project-page` OpenSpec change.
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- The Python API reference now renders class, method, attribute, and type-alias entries instead of literal autodoc markup such as `.. py:class::` and `.. attribute::`. The API pages wrap autodoc in `{eval-rst}`, document the public type aliases with `autotype`, and ignore only unresolved standard-library targets, so Afanes references stay strict in the offline build. This implements the `fix-api-reference-rendering` OpenSpec change. `README.md` needs no change.
 - The README, run guide, browser mode, and troubleshooting pages now start Afanes from a source checkout with Hatch instead of showing package-index install commands and badges. Distribution is documented as local packaged builds for now. This implements the `document-local-install` OpenSpec change.
 - Review cards and project rows now render step text as Markdown outside edit mode, so links and emphasis no longer appear as raw source such as `[Incident notes](<note:Incident notes>)` or `**Bold** step`. Review summary links stay display-only while the project page keeps link navigation. This implements the `render-step-markdown` OpenSpec change.
 

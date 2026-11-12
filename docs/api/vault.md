@@ -7,38 +7,46 @@ rechecks containment and preserves the note bytes it did not intend to change.
 
 ### 🧩 afanes.core.vault.service
 
-```{automodule} afanes.core.vault.service
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.vault.service
+   :members:
 ```
 
 ### 🧩 afanes.core.vault.snapshot
 
-```{automodule} afanes.core.vault.snapshot
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.vault.snapshot
+   :members:
+
+.. autotype:: afanes.core.vault.snapshot.PageContent
 ```
 
 ## ✍️ Write services
 
 ### 🧩 afanes.core.vault.naming
 
-```{automodule} afanes.core.vault.naming
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.vault.naming
+   :members:
 ```
 
 ### 🧩 afanes.core.vault.pages
 
-```{automodule} afanes.core.vault.pages
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.vault.pages
+   :members:
 ```
 
 ### 🧩 afanes.core.vault.processing
 
-```{automodule} afanes.core.vault.processing
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.vault.processing
+   :members:
 ```
 
 ### 🧩 afanes.core.vault.steps
 
-```{automodule} afanes.core.vault.steps
-:members:
+```{eval-rst}
+.. automodule:: afanes.core.vault.steps
+   :members:
 ```
