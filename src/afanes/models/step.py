@@ -6,7 +6,47 @@
 import dataclasses
 import datetime
 from collections.abc import Mapping
+from enum import StrEnum
 from types import MappingProxyType
+
+
+class StepEditKind(StrEnum):
+    """Metadata field changed by one page step edit.
+
+    Attributes
+    ----------
+    PLAN : str
+        The step's ``plan`` date.
+    OWNERS : str
+        The step's full ``owners`` list.
+    """
+
+    PLAN = "plan"
+    OWNERS = "owners"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class StepEdit:
+    """One requested change to a step's metadata.
+
+    Attributes
+    ----------
+    line_index : int
+        Zero-based body line of the step.
+    kind : StepEditKind
+        Field to change.
+    plan : datetime.date | None
+        New plan date when :attr:`kind` is :attr:`StepEditKind.PLAN`. ``None``
+        clears the plan date.
+    owners : tuple[str, ...]
+        Complete owner list when :attr:`kind` is :attr:`StepEditKind.OWNERS`.
+        An empty tuple clears the owners.
+    """
+
+    line_index: int
+    kind: StepEditKind
+    plan: datetime.date | None = None
+    owners: tuple[str, ...] = ()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

@@ -73,6 +73,7 @@ class ProcessingView:
         self.capture_body = ft.Markdown(
             value="",
             selectable=True,
+            extension_set=ft.MarkdownExtensionSet.GITHUB_FLAVORED,
             auto_follow_links=False,
             on_tap_link=self._ignore_link,
         )

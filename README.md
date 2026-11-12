@@ -386,9 +386,19 @@ metadata. Category is offered only for references and accepts any label. The due
 only for projects. Status choices follow the selected type. There are no `people` or `project`
 fields.
 
-Read mode renders a project's steps as rows with the step text, checked state, owners, plan and
-actual dates, and tags. Metadata comments are hidden from the rendered text. Ticking or unticking a
-step rewrites only that line atomically and leaves every other byte of the file unchanged.
+Read mode renders a project as one step-aware body. Prose stays Markdown, and each contiguous task
+list becomes an accent card of step rows with the step text, checked state, owners, plan and actual
+dates, and tags. Metadata comments are hidden from the rendered text. A body shape that cannot be
+split safely, such as a mixed list or a task list inside a blockquote, stays ordinary Markdown, so
+nothing is dropped or rewritten.
+
+Every step row keeps a calendar action and a person action visible. Both are understated until hover
+or keyboard focus and remain reachable with touch. The calendar action sets or clears the step's
+plan date; the person action adds or removes owners, suggesting names from notes in the vault.
+Ticking or unticking a step, or editing its plan or owners, rewrites only that line atomically and
+leaves every other byte of the file unchanged. A project's own due date is not tied to any step:
+read mode shows the status and due date under the title, and its calendar action sets or clears
+`due_date` in the frontmatter without touching the body.
 
 Changing a reference's category previews its new folder and moves the file only after confirmation.
 The name, identity, and inbound references do not change. Cancelling leaves both the category and

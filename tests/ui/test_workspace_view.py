@@ -1,6 +1,7 @@
 """Tests for the workspace shell and type-grouped browser."""
 
 import asyncio
+import datetime
 import typing
 from collections.abc import Callable, Coroutine
 from pathlib import Path
@@ -357,6 +358,44 @@ class TestWorkspaceRefresh:
         view.refresh()
 
         assert view.root.key == "workspace-view"
+
+
+class TestDatePickerWiring:
+    def test_picker_callback_reaches_the_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        project = _write_note(
+            vault / "projects" / "Home.md",
+            note_type="project",
+            status="active",
+            body="# Home\n\n- [ ] Call\n",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        chosen = datetime.date(2026, 12, 1)
+        calls: list[datetime.date | None] = []
+
+        async def pick_date(current: datetime.date | None) -> datetime.date | None:
+            calls.append(current)
+            return chosen
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(project)
+
+        asyncio.run(scenario())
+        view = afanes.ui.views.workspace.WorkspaceView(
+            _noop,
+            _change_vault,
+            _create_vault,
+            _close_vault,
+            pick_date,
+        )
+
+        asyncio.run(view.page_view.choose_due_date())
+
+        assert calls == [None]
+        document = afanes.core.frontmatter.NoteDocument.from_text(project.read_text(encoding="utf-8"))
+        assert document.due_date == chosen
 
 
 def _row_for(browser: ft.ListView, title: str) -> ft.ListTile:

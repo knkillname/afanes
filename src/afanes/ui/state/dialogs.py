@@ -159,6 +159,46 @@ class PageDialogState:
         async with self.command_lock:
             await self._mutate_labels(lambda labels: labels.with_due_date_text(text))
 
+    async def save_page_due_date(self, text: str) -> bool:
+        """Set or clear a project due date from read mode.
+
+        Parameters
+        ----------
+        text : str
+            ISO date text, or an empty string to remove the due date.
+
+        Returns
+        -------
+        bool
+            ``True`` when the frontmatter was written.
+
+        Notes
+        -----
+        The change reuses the open draft, its baseline hash, the conflict
+        guard, and the atomic writer. An invalid value is reported and no file
+        is written. The draft is restored when the write fails.
+        """
+        page = self.pages.page
+        if not isinstance(page, NormalDraft) or page.labels.note_type is not NoteType.PROJECT:
+            return False
+        if self.pages.conflict is not None:
+            return False
+        try:
+            labels = page.labels.with_due_date_text(text)
+        except NoteParseError as exc:
+            self.status.show_message(str(exc))
+            return False
+        if labels.due_date_error is not None:
+            self.status.show_message(labels.due_date_error)
+            return False
+        previous = self.pages.page
+        self.pages.page = page.with_labels(labels)
+        if not await self.pages.autosave(force=True):
+            self.pages.page = previous
+            return False
+        await self.session.refresh_snapshot()
+        return True
+
     async def apply_category_move(self) -> bool:
         """Apply the pending category change and move the file.
 

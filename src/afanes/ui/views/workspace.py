@@ -55,6 +55,7 @@ class WorkspaceView:
         on_change_vault: Callable[[], Awaitable[None]],
         on_create_vault: Callable[[], Awaitable[None]],
         on_close_vault: Callable[[], Awaitable[None]],
+        pick_date: afanes.ui.views.page.PickDate | None = None,
     ) -> None:
         """Build the workspace controls against the shared application state.
 
@@ -68,12 +69,15 @@ class WorkspaceView:
             Command that creates a new vault.
         on_close_vault : Callable[[], Awaitable[None]]
             Command that closes the current vault.
+        pick_date : afanes.ui.views.page.PickDate | None
+            Command that opens the date picker for step and project dates.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
         self._on_change_vault = on_change_vault
         self._on_create_vault = on_create_vault
         self._on_close_vault = on_close_vault
+        self._pick_date = pick_date
         self._processing_view: afanes.ui.views.processing.ProcessingView | None = None
         self._processing_key: tuple[Path | None, Path | None] | None = None
         self._projects_view: afanes.ui.views.projects.ProjectsView | None = None
@@ -200,7 +204,11 @@ class WorkspaceView:
         )
 
         self.banners = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
-        self.page_view = afanes.ui.views.page.PageView(self._on_page_update, self._process_note)
+        self.page_view = afanes.ui.views.page.PageView(
+            self._on_page_update,
+            self._process_note,
+            self._pick_date,
+        )
         self.main_host = ft.Container(expand=True)
         self.header = ft.Row(
             controls=[

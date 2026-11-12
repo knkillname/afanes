@@ -572,20 +572,21 @@ class TestSteps:
         self._project(tmp_path, monkeypatch)
 
         view = PageView(lambda: None)
-        texts = _texts(view.steps_column)
+        texts = _texts(view.project_body.root)
 
-        assert view.steps_panel.visible is True
+        assert view.project_body.root.visible is True
+        assert view.read_body.visible is False
         assert "Call" in texts
         assert afanes.ui.strings.PAGE_STEP_OWNERS.format(owners="Ada") in texts
         assert afanes.ui.strings.PAGE_STEP_PLAN.format(date="2026-11-20") in texts
         assert afanes.ui.strings.PAGE_STEP_ACTUAL.format(date="2026-11-14") in texts
         assert afanes.ui.strings.PAGE_STEP_TAGS.format(tags="phone") in texts
-        assert "<!--" not in view.read_body.value
+        assert "<!--" not in " ".join(texts)
 
     def test_ticking_a_step_rewrites_only_its_line(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         path, _state = self._project(tmp_path, monkeypatch)
         view = PageView(lambda: None)
-        checkbox = _find_checkbox(view.steps_column)
+        checkbox = _find_checkbox(view.project_body.root)
         assert isinstance(checkbox, ft.Checkbox)
         checkbox.value = True
 
@@ -612,7 +613,7 @@ class TestSteps:
 
         asyncio.run(scenario())
         view = PageView(lambda: None)
-        checkbox = _find_checkbox(view.steps_column)
+        checkbox = _find_checkbox(view.project_body.root)
         assert isinstance(checkbox, ft.Checkbox)
         checkbox.value = False
 
@@ -624,12 +625,123 @@ class TestSteps:
         assert step.plan == datetime.date(2026, 11, 20)
 
 
+class TestProjectMeta:
+    def _project(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, due_date: str | None = "2026-12-01"
+    ) -> tuple[Path, afanes.ui.state.controller.AppState]:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "projects" / "Home.md",
+            _typed_note(
+                "project",
+                "# Home\n\n- [ ] Call\n",
+                extra="status: waiting" + (f"\ndue_date: {due_date}" if due_date else ""),
+            ),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
+        return path, state
+
+    def test_project_meta_row_shows_status_and_due_date(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._project(tmp_path, monkeypatch)
+
+        view = PageView(lambda: None)
+
+        assert view.meta_row.visible is True
+        assert view.meta_status.value == afanes.ui.strings.PROJECT_STATUS.format(status="Waiting")
+        assert view.meta_due.value == afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01")
+        assert view.meta_due_clear.visible is True
+        assert view.edit_form.visible is False
+
+    def test_project_without_due_date_offers_the_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._project(tmp_path, monkeypatch, due_date=None)
+
+        view = PageView(lambda: None)
+
+        assert view.meta_row.visible is True
+        assert view.meta_due.value == afanes.ui.strings.PAGE_PROJECT_NO_DUE
+        assert view.meta_due_clear.visible is False
+
+    def test_note_page_has_no_meta_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
+        view = PageView(lambda: None)
+
+        assert view.meta_row.visible is False
+
+    def test_due_date_is_set_from_read_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        path, _state = self._project(tmp_path, monkeypatch, due_date=None)
+        body_before = NoteDocument.from_text(path.read_text(encoding="utf-8")).body
+
+        async def pick_date(_current: datetime.date | None) -> datetime.date | None:
+            return datetime.date(2026, 12, 5)
+
+        view = PageView(lambda: None, pick_date=pick_date)
+        asyncio.run(view.choose_due_date())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.due_date == datetime.date(2026, 12, 5)
+        assert document.body == body_before
+
+    def test_due_date_is_cleared_from_read_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        path, _state = self._project(tmp_path, monkeypatch)
+        body_before = NoteDocument.from_text(path.read_text(encoding="utf-8")).body
+
+        view = PageView(lambda: None)
+        asyncio.run(view.clear_due_date())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.due_date is None
+        assert document.body == body_before
+
+    def test_edit_mode_keeps_the_due_field(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._project(tmp_path, monkeypatch)
+        view = PageView(lambda: None)
+
+        asyncio.run(view.start_edit())
+
+        assert view.meta_row.visible is False
+        assert view.due_field.visible is True
+        assert view.due_field.value == "2026-12-01"
+
+    def test_read_mode_uses_github_flavored_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\n- [ ] Task\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
+        view = PageView(lambda: None)
+
+        assert view.read_body.extension_set is ft.MarkdownExtensionSet.GITHUB_FLAVORED
+
+
 def _texts(control: ft.Control) -> list[str]:
     values: list[str] = []
     if isinstance(control, ft.Text):
         values.append(str(control.value))
     if isinstance(control, ft.Checkbox):
         values.append(str(control.label))
+    if isinstance(control, ft.Markdown):
+        values.append(str(control.value))
     for child in getattr(control, "controls", []) or []:
         values.extend(_texts(child))
     content = getattr(control, "content", None)

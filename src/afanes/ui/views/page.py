@@ -18,9 +18,9 @@ import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.editing import DraftMode, PageDraft
 from afanes.models.note import CategoryLabel, NoteType, Status
-from afanes.models.step import ProjectStep
 from afanes.ui.components.banner import Banner
 from afanes.ui.components.panel import Panel
+from afanes.ui.views.project_body import PickDate, ProjectBodyView
 
 
 class PageView:
@@ -39,6 +39,7 @@ class PageView:
         self,
         update: Callable[[], None],
         on_process: Callable[[Path], Awaitable[None]] | None = None,
+        pick_date: PickDate | None = None,
     ) -> None:
         """Build the page controls against the shared application state.
 
@@ -48,11 +49,13 @@ class PageView:
             Requests a repaint of the page.
         on_process : Callable[[Path], Awaitable[None]] | None
             Command that opens the Processing Wizard for an Inbox capture.
+        pick_date : PickDate | None
+            Command that opens the date picker for step and project dates.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
         self._on_process = on_process
-        self._suppress_suggestions = False
+        self._pick_date = pick_date
         self._rename_open = False
 
         self.back_button = ft.IconButton(
@@ -66,6 +69,39 @@ class PageView:
             size=12,
             color=afanes.ui.theme.MUTED_TEXT_COLOR,
             selectable=True,
+        )
+        self.meta_status = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
+        self.meta_due = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
+        self.meta_due_button = ft.IconButton(
+            icon=ft.Icons.CALENDAR_MONTH,
+            tooltip=afanes.ui.strings.PAGE_PROJECT_DUE_ADD,
+            icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
+            on_click=self.choose_due_date,
+            style=ft.ButtonStyle(
+                icon_color={
+                    ft.ControlState.HOVERED: afanes.ui.theme.TEXT_COLOR,
+                    ft.ControlState.FOCUSED: afanes.ui.theme.TEXT_COLOR,
+                },
+            ),
+        )
+        self.meta_due_clear = ft.IconButton(
+            icon=ft.Icons.EVENT_BUSY,
+            tooltip=afanes.ui.strings.PAGE_PROJECT_DUE_CLEAR,
+            icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
+            on_click=self.clear_due_date,
+            style=ft.ButtonStyle(
+                icon_color={
+                    ft.ControlState.HOVERED: afanes.ui.theme.TEXT_COLOR,
+                    ft.ControlState.FOCUSED: afanes.ui.theme.TEXT_COLOR,
+                },
+            ),
+        )
+        self.meta_row = ft.Row(
+            controls=[self.meta_status, self.meta_due, self.meta_due_button, self.meta_due_clear],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            visible=False,
+            key="project-meta",
         )
         self.progress = ft.ProgressRing(
             width=16,
@@ -109,7 +145,7 @@ class PageView:
         self.header = ft.Row(
             controls=[
                 self.back_button,
-                ft.Column(controls=[self.title, self.path], spacing=0, expand=True),
+                ft.Column(controls=[self.title, self.path, self.meta_row], spacing=0, expand=True),
                 self.progress,
                 self.status_text,
                 self.process_button,
@@ -130,19 +166,11 @@ class PageView:
         self.read_body = ft.Markdown(
             value="",
             selectable=True,
+            extension_set=ft.MarkdownExtensionSet.GITHUB_FLAVORED,
             auto_follow_links=False,
             on_tap_link=self.handle_link,
         )
-        self.steps_title = ft.Text(
-            afanes.ui.strings.PAGE_STEPS_TITLE,
-            theme_style=ft.TextThemeStyle.TITLE_MEDIUM,
-        )
-        self.steps_column = ft.Column(controls=[], spacing=0)
-        self.steps_panel = ft.Column(
-            controls=[self.steps_title, self.steps_column],
-            spacing=afanes.ui.theme.ITEM_GAP,
-            visible=False,
-        )
+        self.project_body = ProjectBodyView(self._update, self.follow, self._pick_date)
 
         self.identity_text = ft.Text("", selectable=True, size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
         self.body_field = ft.TextField(
@@ -394,7 +422,7 @@ class PageView:
             spacing=afanes.ui.theme.ITEM_GAP,
         )
         self.content = ft.Column(
-            controls=[self.empty_text, self.steps_panel, self.read_body, self.edit_form, self.raw_panel],
+            controls=[self.empty_text, self.project_body.build(), self.read_body, self.edit_form, self.raw_panel],
             spacing=afanes.ui.theme.ITEM_GAP,
             scroll=ft.ScrollMode.AUTO,
             expand=True,
@@ -451,6 +479,7 @@ class PageView:
         page = self._state.pages.page
         editing = self._state.pages.editing or self._state.pages.page_mode is DraftMode.RAW
         self._refresh_header(page, editing=editing)
+        self._refresh_meta(page, editing=editing)
         self._refresh_read(page, editing=editing)
         self._refresh_edit(page, editing=editing)
         self._refresh_raw(page)
@@ -485,14 +514,38 @@ class PageView:
             self.status_text.value = ""
 
     def _refresh_read(self, page: PageDraft | None, *, editing: bool) -> None:
-        """Refresh the rendered read mode and the project step rows."""
+        """Refresh the rendered read mode or the step-aware project body."""
         state = self._state
+        labels = state.pages.page_labels if page is not None else None
+        is_project = labels is not None and labels.note_type is NoteType.PROJECT
         visible = page is not None and not editing
         self.empty_text.visible = page is None
-        self.read_body.visible = visible
-        if visible and page is not None:
+        self.read_body.visible = visible and not is_project
+        self.project_body.refresh()
+        if visible and page is not None and not is_project:
             self.read_body.value = state.pages.page_read_text
-        self._refresh_steps(page, visible=visible)
+
+    def _refresh_meta(self, page: PageDraft | None, *, editing: bool) -> None:
+        """Refresh the project status and due-date row."""
+        state = self._state
+        labels = state.pages.page_labels if page is not None else None
+        visible = page is not None and not editing and labels is not None and labels.note_type is NoteType.PROJECT
+        self.meta_row.visible = visible
+        if not visible or labels is None:
+            return
+        status_label = (
+            afanes.ui.strings.PROCESSING_STATUS_LABELS[labels.status.value]
+            if labels.status is not None
+            else afanes.ui.strings.PAGE_PROJECT_NO_STATUS
+        )
+        self.meta_status.value = afanes.ui.strings.PROJECT_STATUS.format(status=status_label)
+        due_date = labels.due_date
+        self.meta_due.value = (
+            afanes.ui.strings.PROJECT_DUE.format(date=due_date.isoformat())
+            if due_date is not None
+            else afanes.ui.strings.PAGE_PROJECT_NO_DUE
+        )
+        self.meta_due_clear.visible = due_date is not None
 
     def _refresh_edit(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the body field and label form."""
@@ -626,78 +679,6 @@ class PageView:
             detail=afanes.ui.strings.reference_count(preview.reference_count, len(preview.affected_notes)),
         )
 
-    def _refresh_steps(self, page: PageDraft | None, *, visible: bool) -> None:
-        """Render the current project's steps as read-mode rows."""
-        steps = self._state.pages.page_steps if visible and page is not None else ()
-        self.steps_panel.visible = bool(steps)
-        self.steps_column.controls = [self._step_row(step) for step in steps]
-
-    def _step_row(self, step: ProjectStep) -> ft.Control:
-        """Build one step row with its metadata labels and toggle action."""
-        details: list[ft.Control] = []
-        if step.owners:
-            details.append(
-                ft.Text(
-                    afanes.ui.strings.PAGE_STEP_OWNERS.format(owners=", ".join(step.owners)),
-                    size=12,
-                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
-                )
-            )
-        if step.is_waiting:
-            details.append(
-                ft.Text(
-                    afanes.ui.strings.PAGE_STEP_WAITING,
-                    size=12,
-                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
-                )
-            )
-        if step.plan is not None:
-            details.append(
-                ft.Text(
-                    afanes.ui.strings.PAGE_STEP_PLAN.format(date=step.plan.isoformat()),
-                    size=12,
-                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
-                )
-            )
-        if step.actual is not None:
-            details.append(
-                ft.Text(
-                    afanes.ui.strings.PAGE_STEP_ACTUAL.format(date=step.actual.isoformat()),
-                    size=12,
-                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
-                )
-            )
-        if step.tags:
-            details.append(
-                ft.Text(
-                    afanes.ui.strings.PAGE_STEP_TAGS.format(tags=", ".join(step.tags)),
-                    size=12,
-                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
-                )
-            )
-        return ft.Row(
-            controls=[
-                ft.Checkbox(
-                    value=step.checked,
-                    label=step.text,
-                    on_change=self._toggle_step_handler(step),
-                ),
-                ft.Column(controls=details, spacing=0, expand=True),
-            ],
-            spacing=afanes.ui.theme.ITEM_GAP,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-
-    def _toggle_step_handler(self, step: ProjectStep) -> Callable[[ft.Event[ft.Checkbox]], Awaitable[None]]:
-        """Bind a checkbox event to the step line rewrite."""
-
-        async def handle(event: ft.Event[ft.Checkbox]) -> None:
-            await self._state.pages.toggle_page_step(step.line_index, checked=bool(event.control.value))
-            self.refresh()
-            self._update()
-
-        return handle
-
     def _refresh_category_move(self) -> None:
         """Refresh the category move confirmation panel."""
         preview = self._state.dialogs.category_move
@@ -783,6 +764,24 @@ class PageView:
     async def change_due_date(self) -> None:
         """Forward the due-date text."""
         await self._state.dialogs.set_page_due_date(self.due_field.value or "")
+        self.refresh()
+        self._update()
+
+    async def choose_due_date(self) -> None:
+        """Open the date picker and write the chosen project due date."""
+        labels = self._state.pages.page_labels
+        if labels is None or labels.note_type is not NoteType.PROJECT or self._pick_date is None:
+            return
+        chosen = await self._pick_date(labels.due_date)
+        if chosen is None:
+            return
+        await self._state.dialogs.save_page_due_date(chosen.isoformat())
+        self.refresh()
+        self._update()
+
+    async def clear_due_date(self) -> None:
+        """Remove the project due date from read mode."""
+        await self._state.dialogs.save_page_due_date("")
         self.refresh()
         self._update()
 

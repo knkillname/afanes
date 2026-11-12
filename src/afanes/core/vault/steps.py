@@ -237,15 +237,39 @@ class VaultSteps:
             message = "Changing a step requires explicit confirmation"
             raise VaultError(message)
         source = self.vault.contained(note_path)
-        document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
+        source_text = source.read_text(encoding="utf-8")
+        document = NoteDocument.from_text(source_text)
         if document.note_type is not NoteType.PROJECT:
             message = "Only project notes contain steps"
             raise VaultError(message)
         step_document = afanes.core.steps.StepDocument(document.body)
         body = step_document.append(text, detail)
-        text_out = document.with_body(body).to_text()
+        text_out = self._with_body_text(source_text, document, body)
         afanes.core.atomic.write_text_atomic(source, text_out)
         return hashlib.sha256(text_out.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _with_body_text(text: str, document: NoteDocument, body: str) -> str:
+        """Return the original text with only its body replaced.
+
+        Parameters
+        ----------
+        text : str
+            Complete file text that was parsed.
+        document : NoteDocument
+            Parsed document for ``text``.
+        body : str
+            New Markdown body.
+
+        Returns
+        -------
+        str
+            File text whose frontmatter prefix is byte-identical to ``text``.
+        """
+        if document.has_frontmatter and text.endswith(document.body):
+            prefix = text[: len(text) - len(document.body)]
+            return f"{prefix}{body}"
+        return document.with_body(body).to_text()
 
     def _write_step(
         self,
@@ -260,7 +284,8 @@ class VaultSteps:
             message = "Changing a step requires explicit confirmation"
             raise VaultError(message)
         source = self.vault.contained(note_path)
-        document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
+        text = source.read_text(encoding="utf-8")
+        document = NoteDocument.from_text(text)
         if document.note_type is not NoteType.PROJECT:
             message = "Only project notes contain steps"
             raise VaultError(message)
@@ -270,6 +295,6 @@ class VaultSteps:
             message = "The step line no longer exists in this project"
             raise VaultError(message)
         body = transform(step_document, step)
-        text_out = document.with_body(body).to_text()
+        text_out = self._with_body_text(text, document, body)
         afanes.core.atomic.write_text_atomic(source, text_out)
         return hashlib.sha256(text_out.encode("utf-8")).hexdigest()

@@ -2,6 +2,7 @@
 
 import asyncio
 import datetime
+import typing
 from pathlib import Path
 
 import pytest
@@ -19,12 +20,14 @@ from afanes.core.errors import ProcessingError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import ResolutionOutcome
 from afanes.core.processing import ProcessingOutcome
+from afanes.core.project_body import ProseBlock, StepListBlock
 from afanes.core.search import Browser, BrowserSection, ReviewPlanner
 from afanes.core.steps import StepDocument
 from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.step import StepEdit, StepEditKind
 
 TODAY = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
 TWO_OPEN_STEPS = 2
@@ -439,3 +442,156 @@ class TestDocumentedExamples:
         assert steps[1].owners == ("Ada Lovelace",)
         assert steps[2].checked is True
         assert steps[2].actual == datetime.date(2026, 11, 15)
+
+
+class TestStepAwareProjectPageIntegration:
+    @pytest.fixture(autouse=True)
+    def _reset(self) -> typing.Iterator[None]:
+        afanes.ui.state.app_state.reset()
+        yield
+        afanes.ui.state.app_state.reset()
+
+    def _open_project(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        body: str,
+    ) -> tuple[Path, afanes.ui.state.controller.AppState]:
+        root = tmp_path / "vault"
+        path = _write_note(
+            root,
+            "projects/Home.md",
+            f"---\ntype: project\nstatus: active\n---\n{body}",
+        )
+        monkeypatch.setattr(
+            afanes.core.settings.SettingsStore,
+            "settings_path",
+            classmethod(lambda _cls: tmp_path / "settings.json"),
+        )
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(root)
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
+        return path, state
+
+    def test_prose_and_steps_keep_document_order(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _path, state = self._open_project(
+            tmp_path,
+            monkeypatch,
+            "# Home\n\nIntro.\n\n- [ ] Call\n\nOutro.\n",
+        )
+
+        blocks = state.pages.page_body_blocks
+
+        assert isinstance(blocks[0], ProseBlock)
+        assert isinstance(blocks[1], ProseBlock)
+        assert isinstance(blocks[2], StepListBlock)
+        assert isinstance(blocks[3], ProseBlock)
+        assert "Intro." in blocks[1].source
+        assert blocks[2].entries[0].step.text == "Call"
+        assert "Outro." in blocks[3].source
+
+    def test_step_link_opens_its_target(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "---\ntype: reference\n---\n# Ada\n")
+        _path, state = self._open_project(
+            tmp_path,
+            monkeypatch,
+            "# Home\n\n- [ ] Call [Ada](<note:Ada>)\n",
+        )
+
+        asyncio.run(state.navigation.follow_link("note:Ada"))
+
+        assert state.pages.page is not None
+        assert state.pages.page.path == ada.resolve()
+
+    def test_owner_and_plan_edit_one_line(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        path, state = self._open_project(
+            tmp_path,
+            monkeypatch,
+            "# Home\n\n- [ ] One <!-- {actual: 2026-11-14, tags: [phone], priority: high} -->\n- [ ] Two\n",
+        )
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        steps = StepDocument(document.body).steps
+        second_line = document.body.splitlines()[3]
+
+        assert (
+            asyncio.run(
+                state.pages.edit_page_step_metadata(
+                    StepEdit(line_index=steps[0].line_index, kind=StepEditKind.PLAN, plan=datetime.date(2026, 12, 1))
+                )
+            )
+            is True
+        )
+        assert (
+            asyncio.run(
+                state.pages.edit_page_step_metadata(
+                    StepEdit(line_index=steps[0].line_index, kind=StepEditKind.OWNERS, owners=("Ada", "Grace"))
+                )
+            )
+            is True
+        )
+
+        written = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        rewritten = StepDocument(written.body).steps[0]
+        assert rewritten.plan == datetime.date(2026, 12, 1)
+        assert rewritten.owners == ("Ada", "Grace")
+        assert rewritten.actual == datetime.date(2026, 11, 14)
+        assert rewritten.tags == ("phone",)
+        assert rewritten.metadata.raw["priority"] == "high"
+        assert written.body.splitlines()[3] == second_line
+
+    def test_due_date_write_preserves_the_body(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        path, state = self._open_project(
+            tmp_path,
+            monkeypatch,
+            "# Home\n\n- [ ] Call\n",
+        )
+        body_before = NoteDocument.from_text(path.read_text(encoding="utf-8")).body
+
+        assert asyncio.run(state.dialogs.save_page_due_date("2026-12-01")) is True
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.due_date == datetime.date(2026, 12, 1)
+        assert document.body == body_before
+
+    def test_external_edit_reloads_the_blocks(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _path, state = self._open_project(
+            tmp_path,
+            monkeypatch,
+            "# Home\n\n- [ ] One\n",
+        )
+        _write_note(
+            tmp_path / "vault",
+            "projects/Home.md",
+            "---\ntype: project\nstatus: active\n---\n# Home\n\n- [ ] One\n- [ ] Two\n",
+        )
+
+        assert asyncio.run(state.workspace.refresh_workspace()) is True
+
+        blocks = state.pages.page_body_blocks
+        step_block = next(block for block in blocks if isinstance(block, StepListBlock))
+        assert [entry.step.text for entry in step_block.entries] == ["One", "Two"]

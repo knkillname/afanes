@@ -95,6 +95,22 @@ class TestStepWrites:
         assert "plan: 2026-12-01" in written.body
         assert "owners: [Ada]" in written.body
 
+    def test_frontmatter_bytes_survive_a_step_edit(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.service.Vault(root)
+        project = root / "projects" / "Home.md"
+        project.parent.mkdir()
+        prefix = "---\ntype: project   # keep this alignment\nstatus: active\n---\n"
+        project.write_text(f"{prefix}# Home\n\n- [ ] One\n", encoding="utf-8", newline="\n")
+        index = afanes.core.steps.StepDocument("# Home\n\n- [ ] One\n").steps[0].line_index
+
+        afanes.core.vault.steps.VaultSteps(vault).plan_step(project, index, datetime.date(2026, 12, 1), confirm=True)
+
+        written = project.read_text(encoding="utf-8")
+        assert written.startswith(prefix)
+        assert "plan: 2026-12-01" in written
+
     def test_step_writes_require_confirmation_and_a_project(self, tmp_path: Path) -> None:
         vault, project = self._project(tmp_path)
         reference = vault.create("Ref", NoteType.REFERENCE)

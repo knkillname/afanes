@@ -5,6 +5,7 @@
 
 import asyncio
 import contextlib
+import datetime
 from pathlib import Path
 
 import flet as ft
@@ -164,6 +165,7 @@ class _Shell:
                 self.choose_vault,
                 self.create_vault,
                 self.close_vault,
+                self.pick_date,
             )
             self.workspace = workspace
             digest = self._due_digest()
@@ -277,6 +279,46 @@ class _Shell:
             await self.render()
         elif self.state.session.vault_root is not None:
             self._start_refresh_loop()
+
+    async def pick_date(self, current: datetime.date | None) -> datetime.date | None:
+        """Ask for a calendar date and return it, or ``None`` when cancelled.
+
+        Parameters
+        ----------
+        current : datetime.date | None
+            Date to show in the picker, or ``None`` for no preselect.
+
+        Returns
+        -------
+        datetime.date | None
+            Chosen date, or ``None`` when the picker was dismissed.
+        """
+        loop = asyncio.get_running_loop()
+        result: asyncio.Future[datetime.date | None] = loop.create_future()
+
+        def settle(value: datetime.date | None) -> None:
+            if not result.done():
+                result.set_result(value)
+
+        def on_change(_event: object = None) -> None:
+            value = picker.value
+            if isinstance(value, datetime.datetime):
+                value = value.date()
+            settle(value if isinstance(value, datetime.date) else None)
+
+        def on_dismiss(_event: object = None) -> None:
+            settle(None)
+
+        picker = ft.DatePicker(
+            value=current,
+            first_date=datetime.date(1900, 1, 1),
+            last_date=datetime.date(2100, 12, 31),
+            on_change=on_change,
+            on_dismiss=on_dismiss,
+        )
+        self.page.show_dialog(picker)
+        self.page.update()
+        return await result
 
     async def show_create_dialog(self) -> None:
         """Ask for the vault path and starter content, then create the vault.

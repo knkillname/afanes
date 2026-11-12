@@ -9,6 +9,7 @@ from pathlib import Path
 
 import afanes.core.editing
 import afanes.core.names
+import afanes.core.project_body
 import afanes.core.steps
 import afanes.core.vault.naming
 import afanes.core.vault.pages
@@ -21,7 +22,7 @@ from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.models.link import NoteReference
 from afanes.models.note import NoteType
-from afanes.models.step import ProjectStep
+from afanes.models.step import ProjectStep, StepEdit, StepEditKind
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.session import VaultSession
 from afanes.ui.state.status import UiStatus
@@ -193,6 +194,24 @@ class PageEditorState:
         return () if note is None else note.steps
 
     @property
+    def page_body_blocks(self) -> tuple[afanes.core.project_body.BodyBlock, ...]:
+        """Return the current project body split into renderable blocks.
+
+        Returns
+        -------
+        tuple[ProseBlock | StepListBlock, ...]
+            Ordered blocks for a project page, or an empty tuple for a
+            non-project or unopened page.
+        """
+        page = self.page
+        if page is None:
+            return ()
+        labels = page.labels
+        if labels is None or labels.note_type is not NoteType.PROJECT:
+            return ()
+        return afanes.core.project_body.ProjectBody(self.page_body).blocks
+
+    @property
     def page_read_text(self) -> str:
         """Return the read-mode body, with step metadata comments hidden.
 
@@ -297,8 +316,14 @@ class PageEditorState:
             finally:
                 self.status.set_busy(busy=False)
 
-    async def autosave(self) -> bool:
-        """Write a dirty edit draft if the page is in edit mode.
+    async def autosave(self, *, force: bool = False) -> bool:
+        """Write a dirty draft when the page is in edit mode or forced.
+
+        Parameters
+        ----------
+        force : bool
+            Write a dirty draft even when edit mode is inactive. Read-mode
+            metadata commands use this for a single atomic frontmatter write.
 
         Returns
         -------
@@ -307,12 +332,15 @@ class PageEditorState:
 
         Notes
         -----
-        Autosave is skipped when no page is open, edit mode is inactive, the
-        draft is clean, or a disk conflict is unresolved.
+        Autosave is skipped when no page is open, the draft is clean, or a disk
+        conflict is unresolved. Without ``force`` it is also skipped when edit
+        mode is inactive.
         """
         async with self.command_lock:
             page = self.page
-            if not self.editing or page is None or self.conflict is not None:
+            if page is None or self.conflict is not None:
+                return False
+            if not force and not self.editing:
                 return False
             if not page.is_dirty:
                 return False
@@ -374,6 +402,61 @@ class PageEditorState:
                         )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Step toggle failed", exc_info=True)
+                    self.status.show_message(afanes.ui.strings.PAGE_STEP_FAILED.format(detail=str(exc)))
+                    return False
+                if not await self.load(page.path):
+                    return False
+                await self.session.refresh_snapshot()
+                return True
+            finally:
+                self.status.set_busy(busy=False)
+
+    async def edit_page_step_metadata(self, edit: StepEdit) -> bool:
+        """Change one step's plan date or owner list from the open page.
+
+        Parameters
+        ----------
+        edit : StepEdit
+            Step line and metadata field to change.
+
+        Returns
+        -------
+        bool
+            ``True`` when the line was rewritten and the page reloaded.
+
+        Notes
+        -----
+        Only the target line changes. The write is atomic, the page is reloaded
+        from disk, and the scan is refreshed so every workspace view sees the
+        new metadata.
+        """
+        async with self.command_lock:
+            page = self.page
+            vault = self.session.vault
+            if page is None or page.path is None or vault is None:
+                return False
+            self.status.set_busy(busy=True)
+            self.status.clear_message()
+            try:
+                try:
+                    if edit.kind is StepEditKind.PLAN:
+                        await asyncio.to_thread(
+                            afanes.core.vault.steps.VaultSteps(vault).plan_step,
+                            page.path,
+                            edit.line_index,
+                            edit.plan,
+                            confirm=True,
+                        )
+                    else:
+                        await asyncio.to_thread(
+                            afanes.core.vault.steps.VaultSteps(vault).set_step_owners,
+                            page.path,
+                            edit.line_index,
+                            edit.owners,
+                            confirm=True,
+                        )
+                except (AfanesError, OSError) as exc:
+                    logger.debug("Step metadata edit failed", exc_info=True)
                     self.status.show_message(afanes.ui.strings.PAGE_STEP_FAILED.format(detail=str(exc)))
                     return False
                 if not await self.load(page.path):

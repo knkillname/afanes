@@ -74,6 +74,7 @@ class TestProcessingView:
 
         assert view.capture_title.value == "Buy milk"
         assert view.capture_body.value == "Buy milk"
+        assert view.capture_body.extension_set is ft.MarkdownExtensionSet.GITHUB_FLAVORED
         assert [option.key for option in view.outcome.options] == [
             "project",
             "done_now",
