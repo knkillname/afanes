@@ -5,31 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-11-12
 
 ### Added
 
-- A fourth `log` note type whose identity is an ISO date, plus a Log workspace that presents entries through a month calendar and a collapsed year/month/day tree. Log entries are filed under `log/<year>/` or `log/<year>/<month>/`, one entry per exact date; **Today's entry**, an empty calendar day, or the plus on an empty month or year row writes `type: log` with its `date`; changing a date or converting a note into or out of `log` renames, moves, and rewrites inbound `log:` references; Rename is hidden for log pages and the Date field is the identity control. The Log switches between Entries and Everything, remembers the mode per vault, and filters both tree and calendar with the search query. This implements the `add-log-notes` OpenSpec change.
-- Every note now carries an editable ISO `date` (`YYYY`, `YYYY-MM`, or `YYYY-MM-DD`) independent of a project's `due_date`. New captures, references, projects, link-created pages, and bundled template notes are stamped with their creation date at day precision; a malformed value keeps the note readable, shows it as Undated, and reports the problem in the editor. Public API additions: `NoteDate`, `DatePrecision`, `NoteType.LOG`, `ReferenceScheme.LOG`, `Vault.log_directory`, `VaultPages.create_log_entry`, `LogTimeline`, and `LogConversions`. Public API moves with replacements: `afanes.core.editing.PageLabels` and `afanes.core.editing.DueDateText` are now `afanes.core.labels.PageLabels` and `afanes.core.labels.DueDateText`; `ReferenceRepairPreview`, `RenamePreview`, `RewriteFailure`, `RewriteReport`, `RenameReport`, `TrashPreview`, and `CategoryMovePreview` moved from `afanes.core.vault.naming` to `afanes.core.vault.naming_reports` under the same names.
-- Reference edit mode now offers an editable, filtered category combobox whose suggestions come from the category labels already used in the vault. Selecting a suggestion or typing a new label both work, and a new label still goes through the existing category validation and move preview. This implements the `category-suggestions` OpenSpec change.
-- Reference template cards now let a new reference start from a reusable category and starter body. Processing and the browser's References section offer the seven seeded cards or Empty; `templates/` is reserved for cards and excluded from scans, the browser, name uniqueness, and reference resolution; invalid cards are named without blocking valid ones. **Breaking:** an existing vault that used `templates/` for ordinary notes stops showing those notes until they are moved. This implements the `template-cards` OpenSpec change.
-- A Sphinx documentation site under `docs/` with MyST Markdown, the Furo theme, getting-started, guide, reference, contributor, and API pages, four screenshots, a docs-style test, and local `hatch run docs:build` / `hatch run docs:serve` commands. The API reference covers all public `models/` and `core/` modules. This implements the `add-documentation-site` OpenSpec change.
-- A per-change documentation review rule in `AGENTS.md` and the OpenSpec archive guidance: every change updates the affected docs page or records why no user-facing documentation changed.
-- Project read mode now renders prose and accent-tinted step cards as one surface. Each step row shows checked state, text, owners, plan and actual dates, and tags, with always-visible calendar and person actions that set or clear the plan date and manage the owner list. A project meta row shows status and the optional due date, with a calendar action that sets or clears it from read mode. Step edits rewrite only the affected line and preserve completion, tags, unknown metadata, and frontmatter bytes. This implements the `step-aware-project-page` OpenSpec change.
-- The documentation architecture page now renders its package-layer diagram from a Mermaid `flowchart` instead of ASCII box art, with `accTitle` and `accDescr` accessibility metadata, and `docs/develop/documentation.md` explains when to use a diagram, when to keep literal text, and the accessibility and offline rules. The Mermaid 11.12.1 ES module runtime is vendored under `docs/_static/vendor/mermaid/`, so `hatch run docs:build` and `hatch run docs:serve` stay local and need no Node.js or Chromium. The docs style test rejects ASCII box art, requires diagram accessibility metadata, and checks the vendored runtime. This implements the `render-docs-diagrams-with-mermaid` OpenSpec change. `README.md` needs no change.
-- Project pages now show an optional `asked_by` requester in the meta row and offer an **Asked by** field in edit mode. The value is a plain project-only frontmatter string, not a reference; it does not resolve, link, or affect status, grouping, rows, search, or review, and a type change clears it. This implements the `add-project-asked-by` OpenSpec change.
+- **Log notes.** A fourth note type for dated entries. A log lives under `log/<year>/` or
+  `log/<year>/<month>/`, holds one entry per exact date, and is created from **Today's entry**, an
+  empty calendar day, or the plus on an empty month or year row.
+- **Log workspace.** Entries appear in a month calendar and a collapsible year/month/day tree. The
+  Entries/Everything switch is remembered per vault, and search filters the tree and the calendar
+  together.
+- **Note dates.** Every note carries an editable ISO date (`YYYY`, `YYYY-MM`, or `YYYY-MM-DD`),
+  separate from a project's due date. New notes are stamped with their creation day; a malformed
+  date shows the note as Undated instead of hiding it.
+- **Automatic moves for dated notes.** Changing a log date, or converting a note to or from `log`,
+  renames the file, moves it to the matching folder, and updates inbound links.
+- **Project requester.** A project page shows an optional **Asked by** value.
+- **Step cards.** Project read mode shows steps as cards with owners, planned and actual dates, and
+  tags, plus date and owner actions directly on each step.
+- **Category suggestions.** Reference edit mode suggests category labels already used in the vault
+  and still accepts a new one.
+- **Reference template cards.** A new reference can start from a card that carries a category and a
+  starter body. Seven cards ship, and `templates/` is now reserved for them.
+- **Documentation site.** A local Sphinx manual covers installation, the guide, the vault format,
+  development, and the Python API.
 
 ### Changed
 
-- The interface now follows a white, boundary-separated visual identity in both light and dark mode: white note canvas and panels, neutral selected rows, a blue accent for selection and focus, green filled primary buttons, a warm due-work notice, and tinted browser-section icons. The Markdown body and raw editors fill the page pane, and the vault path plus vault actions moved into a bottom status bar. This implements the `interface-theme` OpenSpec change.
-- `README.md` is now a landing page; the user manual, vault format, build guide, and contributor material moved into `docs/`. Documentation headings in `README.md` and `docs/` use a curated emoji palette, with `tl;dr`, Tip, Warning, and Remember admonitions.
-- Development dependencies gain Sphinx 9.2.0, MyST-Parser 5.2.0, Furo 2025.12.19, sphinx-design 0.8.0, sphinx-copybutton 0.5.2, sphinx-autobuild 2025.8.25, and sphinxcontrib-mermaid 2.1.1. They are dev-only; the runtime dependency set is unchanged.
+- The interface uses a white, boundary-separated design in light and dark mode, with a blue accent,
+  green primary buttons, and a bottom status bar. The Markdown and raw editors fill the page pane.
+- `README.md` is now a landing page; the manual moved to `docs/` and builds with
+  `hatch run docs:build` or previews with `hatch run docs:serve`.
+- Development dependencies add Sphinx, MyST, Furo, and the Mermaid extension. Runtime dependencies
+  are unchanged.
+- **Breaking:** a vault that used `templates/` for ordinary notes stops showing those notes until
+  they are moved, because the folder now holds template cards.
+- Public Python API moves: `PageLabels` and `DueDateText` are in `afanes.core.labels`; the reference
+  repair, rename, rewrite, trash, and category-move preview and report types are in
+  `afanes.core.vault.naming_reports`.
 
 ### Fixed
 
-- The Python API reference now renders class, method, attribute, and type-alias entries instead of literal autodoc markup such as `.. py:class::` and `.. attribute::`. The API pages wrap autodoc in `{eval-rst}`, document the public type aliases with `autotype`, and ignore only unresolved standard-library targets, so Afanes references stay strict in the offline build. This implements the `fix-api-reference-rendering` OpenSpec change. `README.md` needs no change.
-- The README, run guide, browser mode, and troubleshooting pages now start Afanes from a source checkout with Hatch instead of showing package-index install commands and badges. Distribution is documented as local packaged builds for now. This implements the `document-local-install` OpenSpec change.
-- Review cards and project rows now render step text as Markdown outside edit mode, so links and emphasis no longer appear as raw source such as `[Incident notes](<note:Incident notes>)` or `**Bold** step`. Review summary links stay display-only while the project page keeps link navigation. This implements the `render-step-markdown` OpenSpec change.
+- The API reference renders classes, methods, attributes, and type aliases instead of raw autodoc
+  markup.
+- Review cards and project rows render step text as Markdown, so links and emphasis display
+  correctly outside edit mode.
+- The manual starts Afanes from a source checkout with Hatch instead of showing package-index
+  instructions.
 
 ## [0.5.2] - 2026-11-12
 
