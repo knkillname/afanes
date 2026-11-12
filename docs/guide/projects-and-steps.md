@@ -22,7 +22,9 @@ A project without a status is active. `done`, `cancelled`, and `archived` projec
 Closed group starts collapsed.
 
 Each project row shows its status, optional due date, count of open steps, and next step. An open step
-is an unchecked task-list item in the project body; checked steps are not counted.
+is an unchecked task-list item in the project body; checked steps are not counted. The next step is
+rendered Markdown, so links and emphasis appear as labels rather than raw source; raw Markdown appears
+only in edit mode.
 
 ## ➡️ The next step
 

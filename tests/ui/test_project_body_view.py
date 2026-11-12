@@ -177,6 +177,41 @@ class TestRendering:
         assert state.pages.page is not None
         assert state.pages.page.path == ada.resolve()
 
+    def test_step_text_keeps_markdown_and_links(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        ada = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", status=None),
+        )
+        body = "# Home\n\n- [ ] **Bold** [Ada](<note:Ada>)\n"
+        path = _write_note(vault / "projects" / "Home.md", _typed_note("project", body, status="active"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        followed: list[str] = []
+
+        async def follow(destination: str) -> None:
+            followed.append(destination)
+            await state.navigation.follow_link(destination)
+
+        async def pick_date(_current: datetime.date | None) -> datetime.date | None:
+            return None
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
+        view = ProjectBodyView(lambda: None, follow, pick_date)
+        linked = next(control for control in _markdown(view.root) if "Bold" in control.value)
+
+        assert isinstance(linked, ft.Markdown)
+        assert linked.value == "**Bold** [Ada](<note:Ada>)"
+        _run(linked.on_tap_link, ft.Event(name="tap", control=linked, data="note:Ada"))
+
+        assert followed == ["note:Ada"]
+        assert state.pages.page is not None
+        assert state.pages.page.path == ada.resolve()
+
 
 class TestActions:
     def test_every_step_has_visible_muted_actions(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

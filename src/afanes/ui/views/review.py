@@ -22,6 +22,7 @@ from afanes.core.search import ProjectSummary, ReviewItem
 from afanes.ui.components.banner import Banner
 from afanes.ui.components.panel import Card
 from afanes.ui.components.status import StatusLabel
+from afanes.ui.components.step_text import StepText
 
 
 class ReviewView:
@@ -173,7 +174,7 @@ class ReviewView:
         controls: list[ft.Control] = [
             ft.Text(title, theme_style=ft.TextThemeStyle.LABEL_LARGE),
             ft.Text(summary.note.title, theme_style=ft.TextThemeStyle.TITLE_MEDIUM, selectable=True),
-            ft.Text(step.text, theme_style=ft.TextThemeStyle.HEADLINE_SMALL, selectable=True),
+            StepText(step.text, afanes.ui.theme.STEP_HEADLINE_TEXT_STYLE, selectable=True).build(),
         ]
         if step.owners:
             controls.append(
@@ -331,11 +332,12 @@ class ReviewView:
                 )
             )
             return controls
+        body_style = ft.TextStyle(color=afanes.ui.theme.TEXT_COLOR)
         controls.append(
             ft.Column(
                 controls=[
                     ft.Text(afanes.ui.strings.REVIEW_NEXT_STEP, theme_style=ft.TextThemeStyle.LABEL_LARGE),
-                    ft.Text(summary.next_step.text, selectable=True),
+                    StepText(summary.next_step.text, body_style, selectable=True).build(),
                 ],
                 spacing=0,
             )
@@ -343,7 +345,7 @@ class ReviewView:
         remaining = summary.open_steps[1:]
         if remaining:
             controls.append(ft.Text(afanes.ui.strings.REVIEW_OTHER_STEPS, theme_style=ft.TextThemeStyle.LABEL_LARGE))
-            controls.extend(ft.Text(step.text, selectable=True) for step in remaining)
+            controls.extend(StepText(step.text, body_style, selectable=True).build() for step in remaining)
         return controls
 
     def _broken_card(self, item: ReviewItem) -> ft.Control:

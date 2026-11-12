@@ -75,7 +75,7 @@ def _find_by_key(control: ft.Control, key: str) -> ft.Control | None:
 
 def _texts(control: ft.Control) -> list[str]:
     values: list[str] = []
-    if isinstance(control, ft.Text) and isinstance(control.value, str):
+    if isinstance(control, (ft.Text, ft.Markdown)) and isinstance(control.value, str):
         values.append(control.value)
     content_value = getattr(control, "content", None)
     if isinstance(content_value, str):
@@ -86,6 +86,30 @@ def _texts(control: ft.Control) -> list[str]:
     if isinstance(content, ft.Control):
         values.extend(_texts(content))
     return values
+
+
+def _plain_texts(control: ft.Control) -> list[str]:
+    values: list[str] = []
+    if isinstance(control, ft.Text) and isinstance(control.value, str):
+        values.append(control.value)
+    for child in getattr(control, "controls", []) or []:
+        values.extend(_plain_texts(child))
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        values.extend(_plain_texts(content))
+    return values
+
+
+def _markdown(control: ft.Control) -> list[ft.Markdown]:
+    found: list[ft.Markdown] = []
+    if isinstance(control, ft.Markdown):
+        found.append(control)
+    for child in getattr(control, "controls", []) or []:
+        found.extend(_markdown(child))
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        found.extend(_markdown(content))
+    return found
 
 
 def _handler(control: ft.Control | None) -> Handler:
@@ -160,6 +184,29 @@ class TestDueStepCard:
         assert afanes.ui.strings.REVIEW_DUE_STEP_TITLE in texts
         assert "Call the plumber" in texts
         assert afanes.ui.strings.PAGE_STEP_PLAN.format(date=TODAY.isoformat()) in texts
+
+    def test_card_renders_step_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "projects" / "Home.md",
+            "project",
+            status="active",
+            body=(
+                "# Home\n\n"
+                f"- [ ] **Bold** [Incident notes](<note:Incident notes>) <!-- {{plan: {TODAY.isoformat()}}} -->\n"
+            ),
+        )
+        _start(tmp_path, monkeypatch)
+        before = path.read_bytes()
+        view = afanes.ui.views.review.ReviewView(_noop)
+
+        rendered = [control for control in _markdown(view.root) if "Bold" in control.value]
+
+        assert len(rendered) == 1
+        assert rendered[0].value == "**Bold** [Incident notes](<note:Incident notes>)"
+        assert rendered[0].on_tap_link is None
+        assert all("](" not in text and "**" not in text for text in _plain_texts(view.root))
+        assert path.read_bytes() == before
 
     def test_do_it_now_checks_the_step(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._due_step(tmp_path, monkeypatch)
@@ -253,6 +300,23 @@ class TestWaitingStepCard:
         assert afanes.ui.strings.REVIEW_WAITING_STEP_TITLE in _texts(view.root)
         assert afanes.ui.strings.REVIEW_STEP_OWNERS.format(owners="Ada") in _texts(view.root)
 
+    def test_card_renders_step_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(
+            vault / "projects" / "Home.md",
+            "project",
+            status="active",
+            body="# Home\n\n- [ ] **Waiting** [Incident notes](<note:Incident notes>) <!-- {owners: [Ada]} -->\n",
+        )
+        _start(tmp_path, monkeypatch)
+        view = afanes.ui.views.review.ReviewView(_noop)
+
+        rendered = [control for control in _markdown(view.root) if "Waiting" in control.value]
+
+        assert len(rendered) == 1
+        assert rendered[0].value == "**Waiting** [Incident notes](<note:Incident notes>)"
+        assert all("](" not in text and "**" not in text for text in _plain_texts(view.root))
+
     def test_reassign_replaces_the_owner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._waiting_step(tmp_path, monkeypatch)
         view = afanes.ui.views.review.ReviewView(_noop)
@@ -297,6 +361,23 @@ class TestProjectReviewCard:
         assert "Write copy" in texts
         assert afanes.ui.strings.REVIEW_OTHER_STEPS in texts
         assert "Update site" in texts
+
+    def test_next_and_other_steps_render_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(
+            vault / "projects" / "Launch.md",
+            "project",
+            status="active",
+            body=("# Launch\n\n- [ ] **Write** [copy](<note:Copy>)\n- [ ] **Update** [site](<note:Site>)\n"),
+        )
+        _start(tmp_path, monkeypatch)
+        view = afanes.ui.views.review.ReviewView(_noop)
+
+        values = [control.value for control in _markdown(view.root)]
+
+        assert "**Write** [copy](<note:Copy>)" in values
+        assert "**Update** [site](<note:Site>)" in values
+        assert all("](" not in text and "**" not in text for text in _plain_texts(view.root))
 
     def test_open_project_opens_the_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

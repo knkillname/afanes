@@ -18,6 +18,7 @@ import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.search import ProjectGroup, ProjectStage, ProjectSummary
 from afanes.ui.components.status import StatusLabel
+from afanes.ui.components.step_text import StepText
 
 
 class ProjectsView:
@@ -131,10 +132,15 @@ class ProjectsView:
             )
         )
         if summary.next_step is None:
-            next_text = afanes.ui.strings.PROJECT_NO_NEXT_STEP
+            details.append(ft.Text(afanes.ui.strings.PROJECT_NO_NEXT_STEP, size=12, selectable=True))
         else:
-            next_text = afanes.ui.strings.PROJECT_NEXT_STEP.format(title=summary.next_step.text)
-        details.append(ft.Text(next_text, size=12, selectable=True))
+            details.append(
+                StepText(
+                    afanes.ui.strings.PROJECT_NEXT_STEP.format(title=summary.next_step.text),
+                    ft.TextStyle(size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR),
+                    selectable=True,
+                ).build()
+            )
         page = self._state.pages.page
         return ft.ListTile(
             title=note.title,

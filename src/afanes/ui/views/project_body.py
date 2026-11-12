@@ -22,6 +22,7 @@ from afanes.core.project_body import ProseBlock, StepEntry, StepListBlock
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import NoteType
 from afanes.models.step import ProjectStep, StepEdit, StepEditKind
+from afanes.ui.components.step_text import StepText
 
 type PickDate = Callable[[datetime.date | None], Awaitable[datetime.date | None]]
 
@@ -174,6 +175,7 @@ class ProjectBodyView:
         """Render one step with its text, metadata, and actions."""
         step = entry.step
         details = self._details(step)
+        text_style = ft.TextStyle(color=afanes.ui.theme.STEP_TEXT_COLOR)
         row = ft.Row(
             controls=[
                 ft.Checkbox(
@@ -182,15 +184,12 @@ class ProjectBodyView:
                     semantics_label=step.text,
                     active_color=afanes.ui.theme.STEP_TEXT_COLOR,
                 ),
-                ft.Markdown(
-                    value=step.text,
-                    selectable=False,
-                    extension_set=ft.MarkdownExtensionSet.GITHUB_FLAVORED,
-                    auto_follow_links=False,
-                    on_tap_link=self._follow_link,
+                StepText(
+                    step.text,
+                    text_style,
                     expand=True,
-                    md_style_sheet=self._step_style_sheet(),
-                ),
+                    on_tap_link=self._follow_link,
+                ).build(),
                 self._step_action(
                     ft.Icons.CALENDAR_MONTH,
                     afanes.ui.strings.PAGE_STEP_PLAN_ACTION,
@@ -219,14 +218,11 @@ class ProjectBodyView:
         controls: list[ft.Control] = [row]
         if entry.detail:
             controls.append(
-                ft.Markdown(
-                    value=entry.detail,
-                    selectable=False,
-                    extension_set=ft.MarkdownExtensionSet.GITHUB_FLAVORED,
-                    auto_follow_links=False,
+                StepText(
+                    entry.detail,
+                    text_style,
                     on_tap_link=self._follow_link,
-                    md_style_sheet=self._step_style_sheet(),
-                )
+                ).build()
             )
         if details:
             controls.append(
@@ -261,19 +257,6 @@ class ProjectBodyView:
             text,
             size=12,
             color=afanes.ui.theme.STEP_TEXT_COLOR,
-        )
-
-    @staticmethod
-    def _step_style_sheet() -> ft.MarkdownStyleSheet:
-        """Return the step text style for the accent surface."""
-        return ft.MarkdownStyleSheet(
-            p_text_style=ft.TextStyle(color=afanes.ui.theme.STEP_TEXT_COLOR),
-            a_text_style=ft.TextStyle(
-                color=afanes.ui.theme.STEP_TEXT_COLOR,
-                decoration=ft.TextDecoration.UNDERLINE,
-            ),
-            p_padding=0,
-            block_spacing=0,
         )
 
     def _step_action(

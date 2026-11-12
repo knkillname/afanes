@@ -293,9 +293,13 @@ class TestSerializeDocument:
 
 @hypothesis.given(
     note_type=hypothesis.strategies.sampled_from(list(NoteType)),
+    # CategoryLabel rejects "." and ".." as traversal segments; keep generated
+    # labels inside the accepted contract.
     category=hypothesis.strategies.one_of(
         hypothesis.strategies.none(),
-        hypothesis.strategies.from_regex(r"[^\s:/\\]{1,10}", fullmatch=True),
+        hypothesis.strategies.from_regex(r"[^\s:/\\]{1,10}", fullmatch=True).filter(
+            lambda label: label not in {".", ".."}
+        ),
     ),
     status=hypothesis.strategies.one_of(hypothesis.strategies.none(), hypothesis.strategies.sampled_from(list(Status))),
     due_date=hypothesis.strategies.one_of(hypothesis.strategies.none(), hypothesis.strategies.dates()),

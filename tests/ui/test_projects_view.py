@@ -76,7 +76,7 @@ def _project_tiles(view: afanes.ui.views.projects.ProjectsView, stage: str) -> l
 def _details(tile: ft.ListTile) -> list[str]:
     subtitle = tile.subtitle
     assert isinstance(subtitle, ft.Column)
-    return [control.value for control in subtitle.controls if isinstance(control, ft.Text)]
+    return [control.value for control in subtitle.controls if isinstance(control, (ft.Text, ft.Markdown))]
 
 
 def _handler(control: ft.Control) -> Handler:
@@ -156,6 +156,25 @@ class TestProjectRows:
 
         assert "0 open steps" in details
         assert "No next step" in details
+
+    def test_next_step_renders_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(
+            vault / "projects" / "Launch.md",
+            status="active",
+            body="# Launch\n\n- [ ] **Write** [copy](<note:Copy>)\n",
+        )
+        view = _open_view(tmp_path, monkeypatch)
+        tile = _project_tiles(view, "active")[0]
+        subtitle = tile.subtitle
+        assert isinstance(subtitle, ft.Column)
+
+        rendered = [control for control in subtitle.controls if isinstance(control, ft.Markdown)]
+        plain = [control.value for control in subtitle.controls if isinstance(control, ft.Text)]
+
+        assert [control.value for control in rendered] == ["Next: **Write** [copy](<note:Copy>)"]
+        assert rendered[0].on_tap_link is None
+        assert all("](" not in text and "**" not in text for text in plain)
 
     def test_remaining_open_steps_are_counted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

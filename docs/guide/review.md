@@ -58,6 +58,10 @@ steps. **Open project** opens the page. For a project with no open step, the car
 step, marking the project done, deferring it to `later`, or skipping. Adding a step requires text and
 appends a task-list item to the project body. Marking done and deferring both require confirmation.
 
+Step text in every review card is rendered Markdown, so links and emphasis appear the same way they do
+on the project page. Raw Markdown source appears only in edit mode. A link label inside a card is
+display-only; opening the project remains an explicit action.
+
 :::{warning}
 **Skip** leaves the project or step exactly as it was, so it remains in the next session's pending
 count. Skipping is not a way to clear an item permanently.
