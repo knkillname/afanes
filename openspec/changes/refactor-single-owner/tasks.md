@@ -28,24 +28,24 @@
 
 ## 2. Canonical template card picker
 
-- [ ] 2.1 Add `ui/components/template_cards.py` with `TemplateCardContext`, `TemplateCardPhrases`,
+- [x] 2.1 Add `ui/components/template_cards.py` with `TemplateCardContext`, `TemplateCardPhrases`,
   and `TemplateCardPicker`, with strict docstrings and unit tests for option keys/order, Empty last,
   duplicate titles, selection fallback, descriptions, and invalid-card warnings; verify the new
   component tests pass.
-- [ ] 2.2 Route `ProcessingView` through the picker while keeping `template`,
+- [x] 2.2 Route `ProcessingView` through the picker while keeping `template`,
   `template_description`, and `template_warning` as public aliases; add a view-level test that the
   picker options are populated after entering processing from review; verify
   `hatch test tests/ui/test_processing_view.py` passes.
-- [ ] 2.3 Route `show_new_reference_dialog` through the picker while preserving
+- [x] 2.3 Route `show_new_reference_dialog` through the picker while preserving
   `new-reference-template` and `new-reference-template-warning`; verify
   `hatch test tests/ui/test_app.py` passes.
-- [ ] 2.4 Route `show_log_entry_dialog` through the log picker context, add `LOG_CARD_EMPTY`, and add
+- [x] 2.4 Route `show_log_entry_dialog` through the log picker context, add `LOG_CARD_EMPTY`, and add
   a regression test that the log Empty option says no starter body and does not mention a reference
   category; verify `hatch test tests/ui/test_app.py` passes.
-- [ ] 2.5 Add the architecture tripwire that rejects `_template_options`, `_template_option_text`,
+- [x] 2.5 Add the architecture tripwire that rejects `_template_options`, `_template_option_text`,
   `_reference_template_options`, or `_reference_template_text` outside the shared component; verify
   `hatch test tests/core/test_architecture.py` passes.
-- [ ] 2.6 Update `CHANGELOG.md` under `Unreleased` with the canonical-owner change and the log Empty
+- [x] 2.6 Update `CHANGELOG.md` under `Unreleased` with the canonical-owner change and the log Empty
   wording fix; confirm whether any docs page describes the old wording and record
   `Docs: no change required` if none does; verify the entry names this change.
 

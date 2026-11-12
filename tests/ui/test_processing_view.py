@@ -152,6 +152,34 @@ class TestProcessingView:
         assert view.template.visible is True
         assert view.template_description.visible is True
 
+    def test_review_entry_populates_the_template_options(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        versioned(root)
+        card = root / "templates" / "person.md"
+        card.parent.mkdir(parents=True, exist_ok=True)
+        card.write_text(
+            "---\ntype: reference\ncategory: person\ntitle: Person\n---\n\n## Contact\n",
+            encoding="utf-8",
+        )
+        capture = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).capture("Buy milk")
+        monkeypatch.setattr(
+            afanes.core.settings.SettingsStore,
+            "settings_path",
+            classmethod(lambda _cls: root.parent / "settings.json"),
+        )
+        state = afanes.ui.state.app_state
+        assert capture.is_file()
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(root)
+            return await state.review.start()
+
+        assert asyncio.run(scenario()) is True
+
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+
+        assert [option.key for option in view.template.options] == ["card:person.md", "empty"]
+
     def test_later_outcome_reveals_the_template_picker(self) -> None:
         _open_capture()
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)

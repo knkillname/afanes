@@ -63,6 +63,12 @@ SECTION_HEADING_PATTERN = re.compile(r"^#{2,3}\s+(\d+(?:\.\d+)?)\b", re.MULTILIN
 SECTION_CITATION_PATTERN = re.compile(r"[Ss]ections?\s+(\d+(?:\.\d+)?)|(?:see|through)\s+(\d+(?:\.\d+)?)")
 APP_STATE_SURFACE_BUDGET = 10
 DOMAIN_CONTROLLER_SURFACE_BUDGET = 25
+LABEL_KEYS = frozenset({"type", "category", "status", "due_date", "asked_by", "date"})
+LABEL_OWNER_MODULES = frozenset({"core/labels.py", "core/frontmatter.py"})
+TEMPLATE_OPTION_HELPERS = frozenset(
+    {"_template_options", "_template_option_text", "_reference_template_options", "_reference_template_text"}
+)
+TEMPLATE_OPTION_OWNER = "ui/components/template_cards.py"
 
 
 def _state_paths() -> list[Path]:
@@ -168,6 +174,39 @@ def _relative_source_path(path: Path) -> str:
 def _module_functions(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     return {node.name for node in tree.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)}
+
+
+def _defined_functions(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return {node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)}
+
+
+def _subscript_key(node: ast.AST) -> str | None:
+    if not isinstance(node, ast.Subscript):
+        return None
+    if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+        return node.slice.value
+    return None
+
+
+def _label_key_writes(path: Path) -> list[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    writes: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store):
+            key = _subscript_key(node)
+            if key in LABEL_KEYS:
+                writes.append(f"line {node.lineno}: assignment to {key!r}")
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "pop"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and node.args[0].value in LABEL_KEYS
+        ):
+            writes.append(f"line {node.lineno}: pop of {node.args[0].value!r}")
+    return writes
 
 
 def _module_name(path: Path) -> str:
@@ -440,6 +479,45 @@ class TestObjectOwnership:
     def test_vault_does_not_import_its_sibling_services(self) -> None:
         path = CORE_ROOT / "vault" / "service.py"
         assert VAULT_SIBLING_MODULES.isdisjoint(_first_party_imports(path))
+
+
+class TestLabelOwnership:
+    def test_label_keys_have_one_writer(self) -> None:
+        offenders: list[str] = []
+        for path in _python_files(SOURCE_ROOT):
+            relative = _relative_source_path(path)
+            if relative in LABEL_OWNER_MODULES:
+                continue
+            offenders.extend(f"{relative}: {write}" for write in _label_key_writes(path))
+        assert offenders == []
+
+    def test_a_label_write_outside_the_owner_is_reported(self, tmp_path: Path) -> None:
+        path = tmp_path / "writer.py"
+        path.write_text('raw = {}\nraw["status"] = "done"\nraw.pop("date", None)\n', encoding="utf-8")
+
+        assert _label_key_writes(path) == [
+            "line 2: assignment to 'status'",
+            "line 3: pop of 'date'",
+        ]
+
+
+class TestTemplateOptionOwnership:
+    def test_template_option_helpers_have_one_owner(self) -> None:
+        offenders: list[str] = []
+        for path in _python_files(SOURCE_ROOT):
+            relative = _relative_source_path(path)
+            if relative == TEMPLATE_OPTION_OWNER:
+                continue
+            offenders.extend(
+                f"{relative}: {name}" for name in sorted(_defined_functions(path) & TEMPLATE_OPTION_HELPERS)
+            )
+        assert offenders == []
+
+    def test_a_template_option_helper_outside_the_owner_is_reported(self, tmp_path: Path) -> None:
+        path = tmp_path / "view.py"
+        path.write_text("def _template_options():\n    return []\n", encoding="utf-8")
+
+        assert _defined_functions(path) & TEMPLATE_OPTION_HELPERS == {"_template_options"}
 
 
 class TestStateSurface:

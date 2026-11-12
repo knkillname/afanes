@@ -21,9 +21,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - **Breaking:** a folder without a valid `afanes.yaml` is no longer opened as a vault. Invalid or unsupported
   settings files are refused and preserved byte for byte; a newer schema asks the user to update Afanes.
+- **One owner for page labels and template cards.** Editable frontmatter labels are written only by
+  `PageLabels.apply_to`, and the processing, reference, and log forms share one template card picker. Vault files
+  keep their unknown keys and newline style, and parsed note values are unchanged. This implements the
+  `refactor-single-owner` OpenSpec change.
 
 ### Fixed
 
+- The log entry picker describes Empty as a log entry with no starter body instead of offering a reference
+  category. This implements the `refactor-single-owner` OpenSpec change.
 - The workspace sidebar recovers from a stale presentation freeze marker, so switching browser sections no longer
   raises `Frozen controls cannot be updated`. This implements the `fix-frozen-sidebar-controls` OpenSpec change.
 - Guided review opens the Processing Wizard with the same reference template cards as processing from the Inbox:

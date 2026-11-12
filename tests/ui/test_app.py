@@ -221,6 +221,36 @@ class TestAppShell:
         assert _find_by_key(page.controls[0], "process-note") is not None
 
 
+class TestLogEntryDialog:
+    def test_empty_option_describes_a_log_entry_without_a_reference_category(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        versioned(vault)
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
+        page = FakePage()
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            section = _typed(_find_by_key(page.controls[0], "section-log"), ft.ListTile)
+            await typing.cast("Handler", section.on_click)()
+            today = _typed(_find_by_key(page.controls[0], "log-today-entry"), ft.FilledButton)
+            await typing.cast("Handler", today.on_click)()
+
+        asyncio.run(scenario())
+
+        selector = _typed(_find_by_key(page.dialogs[-1], "new-log-template"), ft.Dropdown)
+        empty = selector.options[-1]
+        assert empty.text == afanes.ui.strings.LOG_CARD_EMPTY
+        assert "starter body" in (empty.text or "")
+        assert "category" not in (empty.text or "").casefold()
+        description = _typed(_find_by_key(page.dialogs[-1], "new-log-template-description"), ft.Text)
+        assert description.value == afanes.ui.strings.LOG_CARD_DESCRIPTION_EMPTY
+        assert "category" not in (description.value or "").casefold()
+
+
 class TestAdoptionPanel:
     def test_adoptable_remembered_folder_shows_the_panel(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = _adoptable(tmp_path / "vault")
