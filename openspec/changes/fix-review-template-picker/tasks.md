@@ -8,7 +8,7 @@
 
 ## 2. Template picker refresh
 
-- [ ] 2.1 Rebuild `ProcessingView.template.options` from the current catalog in `_refresh_dynamic()`, preserve a still-valid selection, and fall back to Empty when the selected card disappeared; verify the existing processing view tests pass with `hatch test tests/ui/test_processing_view.py`.
+- [x] 2.1 Rebuild `ProcessingView.template.options` from the current catalog in `_refresh_dynamic()`, preserve a still-valid selection, and fall back to Empty when the selected card disappeared; verify the existing processing view tests pass with `hatch test tests/ui/test_processing_view.py`.
 - [ ] 2.2 Add view tests for card changes on refresh, selection preservation, and the Empty fallback; verify `hatch test tests/ui/test_processing_view.py` passes.
 
 ## 3. Integration checks

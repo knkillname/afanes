@@ -151,7 +151,7 @@ class ProcessingView:
         self._template_choices: dict[str, TemplateCard | None] = {}
         self.template = ft.Dropdown(
             label=afanes.ui.strings.PROCESSING_TEMPLATE_LABEL,
-            options=self._template_options(),
+            options=[],
             value="empty",
             on_select=self._invalidate_plan,
             width=420,
@@ -330,6 +330,14 @@ class ProcessingView:
         options.append(ft.dropdown.Option(key="empty", text=afanes.ui.strings.PROCESSING_TEMPLATE_EMPTY))
         return options
 
+    def _refresh_template(self) -> None:
+        """Rebuild the template options and keep the selection valid."""
+        selected = self.template.value
+        self.template.options = self._template_options()
+        if selected not in self._template_choices:
+            selected = "empty"
+        self.template.value = selected
+
     @staticmethod
     def _template_option_text(card: TemplateCard, counts: dict[str, int]) -> str:
         """Return the display text for one card option."""
@@ -461,6 +469,7 @@ class ProcessingView:
     def _refresh_dynamic(self) -> None:
         """Refresh visibility, plan details, and banners from application state."""
         state = self._state
+        self._refresh_template()
         self.capture_title.value = (
             state.session.note_title(state.processing.note) if state.processing.note is not None else ""
         )
