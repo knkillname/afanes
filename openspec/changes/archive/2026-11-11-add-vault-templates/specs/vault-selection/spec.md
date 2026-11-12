@@ -6,10 +6,9 @@
 
 From the welcome state and from the change-vault action, the user SHALL be able to create a vault at
 a path that does not exist or is an empty directory. Creation SHALL create the path and any missing
-intermediate folders, seed the default folders, write the guide note, write the notes of the chosen
-template when one is chosen, remember the vault, and open it. A path that exists and is not an empty
-directory MUST be refused. Creation MUST stay explicit: no open, scan, or recovery step may create a
-vault.
+intermediate folders, seed the default folders, write the guide and any chosen template's notes,
+remember the vault, and open it. A non-empty directory MUST be refused, and no open, scan, or
+recovery step may create a vault.
 
 #### Scenario: Missing path is created and opened
 

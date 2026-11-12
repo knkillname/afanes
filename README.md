@@ -61,22 +61,31 @@ headless commands, which never open a window and never import the interface:
 
 ```console
 afanes vault create ~/Notes/Afanes
+afanes vault create ~/Notes/Work --template work
+afanes vault templates
 ```
 
-`vault create` creates the directory, seeds the default folders, prints what it created, and makes
-the new vault the one Afanes opens next launch. Missing folders in the path are created too, and the
+`vault create` creates the directory, seeds the default folders, writes the `Getting started` guide,
+and writes the notes of `--template` when one is supplied. It prints what it created and makes the
+new vault the one Afanes opens next launch. Missing folders in the path are created too, and the
 report names them:
 
 ```text
-Created vault /home/you/Notes/Afanes
+Created vault /home/you/Notes/Work
 Parent folders created: /home/you/Notes
 Seeded: inbox/, trash/, reference/, projects/
+Template: work
+Notes written: reference/Getting started.md, projects/Quarterly planning.md, ...
 Remembered as the vault to open next launch.
 ```
 
+- `--template ID` applies a bundled template; omit it to create a vault with only the guide note.
+- `vault templates` lists the bundled templates with their identifiers and descriptions without
+  opening a vault or writing a file.
 - `--no-remember` creates the vault without changing which vault Afanes opens next launch.
-- The command refuses a folder that is not empty, a path that is a file, and a vault that cannot
-  be created. Every created folder is named, so a mistyped path is visible immediately.
+- The command refuses a folder that is not empty, a path that is a file, an unknown template, and a
+  vault that cannot be created. Every created folder is named, so a mistyped path is visible
+  immediately.
 - Exit codes: `0` success, `1` expected failure, `2` usage error. Reports go to standard output and
   failures to standard error.
 
@@ -111,17 +120,18 @@ If a browser tab shows a spinner with "Working…", the tab has lost its Python 
 because the server process exited. Start the server again and reload the tab. Closing a tab releases
 its session, so Afanes can be reopened in a new one.
 
-On first launch, choose an existing folder or create a new vault. **New vault** opens the system
-folder chooser on desktop, where you can create the folder you want, or asks for a folder path in a
-browser session. It then seeds `inbox/`, `trash/`, `reference/`, and `projects/`, and remembers the result in the platform configuration directory.
-Afanes reopens that vault next time, and the [workspace browser](#workspace-browser) lists every note
-in it, opening on the [Inbox](#inbox) group.
+On first launch, choose an existing folder or create a new vault. **New vault** opens a form with
+the folder path, a **Choose folder** button on desktop, the starter-content choice, and a preview. It
+writes `reference/Getting started.md` plus the notes of the chosen template, seeds `inbox/`,
+`trash/`, `reference/`, and `projects/`, and remembers the result in the platform configuration
+directory. Afanes reopens that vault next time, and the [workspace browser](#workspace-browser)
+lists every note in it, opening on the [Inbox](#inbox) group.
 
-The same choice is available from the **Change vault** action while a vault is open, so a second
-vault can be created without closing the application. Only the New vault action seeds the default
-folders: opening an existing empty folder through Choose vault leaves it unseeded, and Afanes creates
-each folder only when a write needs it. Opening or scanning a vault never creates a folder or a
-file.
+The same choice is available from **Change vault → Create a new vault** while a vault is open, so a
+second vault can be created without closing the application. Only the create action seeds the
+default folders and writes starter content: opening an existing empty folder through **Open another
+vault** leaves it unseeded, and Afanes creates each folder only when a write needs it. Opening or
+scanning a vault never creates a folder or a file.
 
 ## Vault format
 
@@ -187,10 +197,12 @@ vault/
 ```
 
 These folders are conveniences, not requirements. Existing notes anywhere in the vault still
-resolve. Folders are created only when a write needs them. A categorized reference is filed under
-`reference/<category-folder>/`, where the folder is derived from the label through the
-cross-platform filename policy and an existing case variant is reused. Notes under `trash/` are
-excluded from scans, name uniqueness, and reference resolution; moving a note back restores it.
+resolve. Folders are created only when a write needs them. A newly created vault also contains the
+`Getting started` guide, and a chosen template's notes; a vault opened later is never seeded or
+repaired. A categorized reference is filed under `reference/<category-folder>/`, where the folder is
+derived from the label through the cross-platform filename policy and an existing case variant is
+reused. Notes under `trash/` are excluded from scans, name uniqueness, and reference resolution;
+moving a note back restores it.
 
 ### Step metadata
 

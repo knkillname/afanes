@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- New vaults can start from bundled **Personal**, **Work**, or **Study** starter content, or from a blank vault that still receives a `Getting started` guide note. Creation shows the templates with descriptions and a preview in both presentations, and `afanes vault create --template ID` reproduces the choice headlessly. Dates in starter content are relative to creation, so examples stay current while a new vault still opens with nothing to review. `afanes vault templates` lists the catalog. This implements the `add-vault-templates` OpenSpec change.
+
 ### Changed
 
 - Releases are now versioned for pre-1.0 development: `0.5.0` is the current milestone and `1.0.0` is reserved for the first usable MVP. Earlier entries were renumbered from the previous `1.x`–`4.x` labels, which never corresponded to a tag or a shipped release.

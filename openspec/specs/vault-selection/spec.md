@@ -62,8 +62,8 @@ The application SHALL accept any existing, readable directory as a vault, includ
 
 From the welcome state and from the change-vault action, the user SHALL be able to create a vault at
 a path that does not exist or is an empty directory. Creation SHALL create the path and any missing
-intermediate folders, seed the default folders, remember the vault, and open it. A path that exists
-and is not an empty directory MUST be refused. Creation MUST stay explicit: no open, scan, or
+intermediate folders, seed the default folders, write the guide and any chosen template's notes,
+remember the vault, and open it. A non-empty directory MUST be refused, and no open, scan, or
 recovery step may create a vault.
 
 #### Scenario: Missing path is created and opened
@@ -95,7 +95,8 @@ recovery step may create a vault.
 #### Scenario: Browser creation names what it will write
 
 - **WHEN** a browser session user opens the creation action
-- **THEN** it names the default folders that will be created before anything is written
+- **THEN** it names the default folders and the notes that will be created before anything is
+  written
 
 #### Scenario: Cancelling creation writes nothing
 
@@ -142,6 +143,61 @@ recovery step may create a vault.
 
 - **WHEN** a vault is opened or scanned, including a remembered path that no longer exists
 - **THEN** no directory or file is created
+
+#### Scenario: Chosen template is written
+
+- **WHEN** the user creates a vault and selects a template
+- **THEN** the template's notes are written into the new vault, the guide note is written, and the
+  workspace opens
+
+### Requirement: Creation offers the bundled templates
+
+The creation action SHALL offer the bundled templates and an option to create the vault without
+starter content. The no-template option SHALL be preselected on every creation, including the first
+one. The choice SHALL be available in both presentations and from both the welcome state and the
+change-vault action, and the vault MUST be created exactly as previewed.
+
+#### Scenario: Blank is preselected on first launch
+
+- **WHEN** the creation action opens with no vault previously opened
+- **THEN** creating without starter content is the selected option
+
+#### Scenario: Blank is preselected later
+
+- **WHEN** the creation action opens while a vault is already open
+- **THEN** creating without starter content is still the selected option
+
+#### Scenario: Templates are described in the picker
+
+- **WHEN** the picker is shown
+- **THEN** every template is listed with its label and one-sentence description
+
+#### Scenario: Preview names notes as well as folders
+
+- **WHEN** the user chooses a template
+- **THEN** the preview names the folders and how many notes will be written, and choosing no template
+  previews the guide note only
+
+#### Scenario: Choosing a template changes nothing until confirmed
+
+- **WHEN** the user selects a template and then cancels
+- **THEN** no directory, folder, or note is written and the previous screen remains
+
+#### Scenario: Both presentations offer the same choice
+
+- **WHEN** creation runs in a desktop window or in a browser session
+- **THEN** the same templates and the same preselected option are offered
+
+#### Scenario: Desktop shows the choice before the folder dialog
+
+- **WHEN** the desktop user opens the creation action
+- **THEN** the starter-content form is shown with a path field and a browse action, and the folder
+  dialog opens only when the browse action is used
+
+#### Scenario: Desktop browse fills the folder
+
+- **WHEN** the desktop user chooses a folder from the form's browse action
+- **THEN** the path field shows the selected folder and creation uses it
 
 ### Requirement: The chosen vault is remembered
 
