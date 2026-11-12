@@ -18,7 +18,7 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.page
-from afanes.core.vault import VaultFailure, VaultNote
+from afanes.core.vault.snapshot import VaultFailure, VaultNote
 from afanes.ui.components.banner import Banner
 
 
@@ -105,7 +105,7 @@ class WelcomeView:
                 text_align=ft.TextAlign.CENTER,
             ),
         )
-        message = afanes.ui.state.app_state.message
+        message = afanes.ui.state.app_state.status.message
         if message is not None:
             controls.append(Banner(message).build())
         return ft.Container(
@@ -343,7 +343,7 @@ class InboxView:
         text = self.composer.value or ""
         self._set_working(working=True)
         try:
-            path = await self._state.capture(text)
+            path = await self._state.session.capture(text)
         finally:
             self._set_working(working=False)
         if path is not None:
@@ -355,7 +355,7 @@ class InboxView:
         """Re-read the vault and update the view."""
         self._set_working(working=True)
         try:
-            await self._state.refresh()
+            await self._state.workspace.refresh()
         finally:
             self._set_working(working=False)
         self._refresh_dynamic()
@@ -365,7 +365,7 @@ class InboxView:
         """Open a note in the page pane and update the view."""
         self._set_working(working=True)
         try:
-            await self._state.open_page(path)
+            await self._state.navigation.open_page(path)
         finally:
             self._set_working(working=False)
         self._refresh_dynamic()
@@ -392,17 +392,17 @@ class InboxView:
     def _refresh_dynamic(self) -> None:
         """Refresh the list, banners, count, and page pane from application state."""
         state = self._state
-        self.count_text.value = afanes.ui.strings.note_count(len(state.notes))
-        self.vault_text.value = str(state.vault_root) if state.vault_root is not None else ""
-        if state.notes:
-            self.list_view.controls = [self._note_row(note) for note in state.notes]
+        self.count_text.value = afanes.ui.strings.note_count(len(state.session.notes))
+        self.vault_text.value = str(state.session.vault_root) if state.session.vault_root is not None else ""
+        if state.session.notes:
+            self.list_view.controls = [self._note_row(note) for note in state.session.notes]
         else:
             self.list_view.controls = [self._empty_state()]
         banners: list[ft.Control] = []
-        if state.message is not None:
-            banners.append(Banner(state.message).build())
-        if state.failures:
-            banners.append(self._failure_banner(state.failures))
+        if state.status.message is not None:
+            banners.append(Banner(state.status.message).build())
+        if state.session.failures:
+            banners.append(self._failure_banner(state.session.failures))
         self.banners.controls = banners
         self.banners.visible = bool(banners)
         self.page_view.refresh()
@@ -442,7 +442,7 @@ class InboxView:
         """Bind a no-argument async handler that opens one unreadable note."""
 
         async def handle() -> None:
-            await self._state.open_failure(path)
+            await self._state.navigation.open_failure(path)
             self._refresh_dynamic()
             self._update()
 
@@ -450,7 +450,7 @@ class InboxView:
 
     def _note_row(self, note: VaultNote) -> ft.Control:
         """Build one clickable note row."""
-        page = self._state.page
+        page = self._state.pages.page
         selected = page is not None and page.path == note.path
         return ft.ListTile(
             title=note.title,

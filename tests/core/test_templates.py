@@ -11,7 +11,7 @@ import afanes.core.links
 import afanes.core.search
 import afanes.core.steps
 import afanes.core.templates
-import afanes.core.vault
+import afanes.core.vault.service
 from afanes.core.errors import TemplateContentError, TemplateWriteError, UnknownTemplateError
 from afanes.models.note import NoteType, Status
 
@@ -426,7 +426,7 @@ class TestBundledContent:
         tmp_path: Path,
         fixed_today: datetime.date,
     ) -> None:
-        creation = afanes.core.vault.Vault.create_directory(tmp_path / "vault", template=identifier)
+        creation = afanes.core.vault.service.Vault.create_directory(tmp_path / "vault", template=identifier)
         snapshot = creation.vault.scan()
 
         planner = afanes.core.search.ReviewPlanner(snapshot, today=fixed_today)
@@ -455,7 +455,7 @@ class TestBundledContent:
         assert fixed_today == TODAY
         root = tmp_path / "vault"
 
-        afanes.core.vault.Vault.create_directory(root, template=identifier)
+        afanes.core.vault.service.Vault.create_directory(root, template=identifier)
 
         for path in root.rglob("*.md"):
             assert "{{" not in path.read_text(encoding="utf-8"), path
@@ -467,7 +467,7 @@ class TestBundledContent:
     ) -> None:
         root = tmp_path / "vault"
 
-        afanes.core.vault.Vault.create_directory(root, template="personal")
+        afanes.core.vault.service.Vault.create_directory(root, template="personal")
 
         document = afanes.core.frontmatter.NoteDocument.from_text(
             (root / "projects" / "Home insurance.md").read_text(encoding="utf-8"),
@@ -616,7 +616,7 @@ class TestCreationWritesBundledContent:
     def test_blank_creation_writes_only_the_guide(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
 
-        creation = afanes.core.vault.Vault.create_directory(root)
+        creation = afanes.core.vault.service.Vault.create_directory(root)
 
         files = sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
         assert files == ["reference/Getting started.md"]
@@ -626,7 +626,7 @@ class TestCreationWritesBundledContent:
     def test_templated_creation_writes_the_guide_first(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
 
-        creation = afanes.core.vault.Vault.create_directory(root, template="personal")
+        creation = afanes.core.vault.service.Vault.create_directory(root, template="personal")
 
         relative = [path.relative_to(root).as_posix() for path in creation.written_notes]
         assert creation.template == "personal"
@@ -636,7 +636,7 @@ class TestCreationWritesBundledContent:
     def test_nested_category_notes_land_in_their_folder(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
 
-        afanes.core.vault.Vault.create_directory(root, template="personal")
+        afanes.core.vault.service.Vault.create_directory(root, template="personal")
 
         assert (root / "reference" / "person" / "Sam Rivera.md").is_file()
         assert (root / "reference" / "place" / "The corner garage.md").is_file()
@@ -644,14 +644,14 @@ class TestCreationWritesBundledContent:
     def test_written_notes_stay_inside_the_vault(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
 
-        creation = afanes.core.vault.Vault.create_directory(root, template="study")
+        creation = afanes.core.vault.service.Vault.create_directory(root, template="study")
 
         assert all(path.is_relative_to(creation.vault.root) for path in creation.written_notes)
 
     def test_missing_locale_still_creates_the_vault(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
 
-        creation = afanes.core.vault.Vault.create_directory(root, template="work", locale="fr")
+        creation = afanes.core.vault.service.Vault.create_directory(root, template="work", locale="fr")
 
         assert creation.template == "work"
         assert (root / "reference" / "Getting started.md").is_file()
@@ -673,7 +673,7 @@ class TestCreationWritesBundledContent:
         target = tmp_path / "vault"
 
         with pytest.raises(TemplateContentError):
-            afanes.core.vault.Vault.create_directory(target, template="personal")
+            afanes.core.vault.service.Vault.create_directory(target, template="personal")
 
         assert not target.exists()
 
@@ -695,7 +695,7 @@ class TestCreationWritesBundledContent:
         target.mkdir()
 
         with pytest.raises(TemplateContentError):
-            afanes.core.vault.Vault.create_directory(target, template="personal")
+            afanes.core.vault.service.Vault.create_directory(target, template="personal")
 
         assert list(target.iterdir()) == []
 
@@ -718,7 +718,7 @@ class TestCreationWritesBundledContent:
         root = tmp_path / "vault"
 
         with pytest.raises(TemplateWriteError) as info:
-            afanes.core.vault.Vault.create_directory(root, template="personal")
+            afanes.core.vault.service.Vault.create_directory(root, template="personal")
 
         message = str(info.value)
         assert calls[3].name == "Monthly budget.md"

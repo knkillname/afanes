@@ -5,7 +5,7 @@
 
 The services in this module never read or write files. They derive browser
 groups, project summaries, and review queues from an already scanned
-:class:`afanes.core.vault.VaultSnapshot`, keeping classification rules out of
+:class:`afanes.core.vault.service.VaultSnapshot`, keeping classification rules out of
 the interface layer.
 """
 
@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Self
 
 import afanes.core.names
-from afanes.core.vault import NoteOrder, VaultFailure, VaultNote, VaultSnapshot
+from afanes.core.vault.snapshot import NoteOrder, VaultFailure, VaultNote, VaultSnapshot
 from afanes.models.note import CategoryLabel, NoteType, Status
 from afanes.models.step import ProjectStep
 

@@ -442,14 +442,14 @@ class PageView:
         destination : str
             Destination exactly as written in the link.
         """
-        await self._state.follow_link(destination)
+        await self._state.navigation.follow_link(destination)
         self.refresh()
         self._update()
 
     def refresh(self) -> None:
         """Refresh every control from the shared application state."""
-        page = self._state.page
-        editing = self._state.editing or self._state.page_mode is DraftMode.RAW
+        page = self._state.pages.page
+        editing = self._state.pages.editing or self._state.pages.page_mode is DraftMode.RAW
         self._refresh_header(page, editing=editing)
         self._refresh_read(page, editing=editing)
         self._refresh_edit(page, editing=editing)
@@ -466,18 +466,20 @@ class PageView:
     def _refresh_header(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the header, mode buttons, and write status."""
         state = self._state
-        self.title.value = state.page_title if page is not None else ""
-        self.path.value = state.page_path_label
-        self.back_button.disabled = page is None and not state.history
-        self.edit_button.visible = page is not None and not editing and self._state.page_mode is DraftMode.NORMAL
+        self.title.value = state.pages.page_title if page is not None else ""
+        self.path.value = state.pages.page_path_label
+        self.back_button.disabled = page is None and not state.navigation.history
+        self.edit_button.visible = page is not None and not editing and self._state.pages.page_mode is DraftMode.NORMAL
         self.done_button.visible = page is not None and editing
-        self.rename_button.visible = page is not None and not editing and self._state.page_mode is DraftMode.NORMAL
+        self.rename_button.visible = (
+            page is not None and not editing and self._state.pages.page_mode is DraftMode.NORMAL
+        )
         self.trash_button.visible = page is not None and not editing
         self.process_button.visible = page is not None and not editing and self._is_inbox_page(page)
-        self.progress.visible = state.busy or state.saving
-        if state.saving:
+        self.progress.visible = state.status.busy or state.pages.saving
+        if state.pages.saving:
             self.status_text.value = afanes.ui.strings.PAGE_SAVING
-        elif page is not None and editing and state.page_is_dirty:
+        elif page is not None and editing and state.pages.page_is_dirty:
             self.status_text.value = afanes.ui.strings.PAGE_UNSAVED
         else:
             self.status_text.value = ""
@@ -489,19 +491,19 @@ class PageView:
         self.empty_text.visible = page is None
         self.read_body.visible = visible
         if visible and page is not None:
-            self.read_body.value = state.page_read_text
+            self.read_body.value = state.pages.page_read_text
         self._refresh_steps(page, visible=visible)
 
     def _refresh_edit(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the body field and label form."""
         state = self._state
-        labels = state.page_labels if page is not None else None
-        visible = page is not None and editing and state.page_mode is DraftMode.NORMAL and labels is not None
+        labels = state.pages.page_labels if page is not None else None
+        visible = page is not None and editing and state.pages.page_mode is DraftMode.NORMAL and labels is not None
         self.edit_form.visible = visible
         if not visible or page is None or labels is None:
             return
 
-        body = state.page_body
+        body = state.pages.page_body
         if self.body_field.value != body:
             self.body_field.value = body
         self.identity_text.value = f"{afanes.ui.strings.PAGE_IDENTITY_LABEL}: {page.identity}"
@@ -533,21 +535,21 @@ class PageView:
     def _refresh_raw(self, page: PageDraft | None) -> None:
         """Refresh raw rescue mode."""
         state = self._state
-        visible = page is not None and state.page_mode is DraftMode.RAW
+        visible = page is not None and state.pages.page_mode is DraftMode.RAW
         self.raw_panel.visible = visible
-        if visible and page is not None and self.raw_field.value != state.page_raw_text:
-            self.raw_field.value = state.page_raw_text
-        self.raw_save_button.disabled = self._state.busy or self._state.saving
+        if visible and page is not None and self.raw_field.value != state.pages.page_raw_text:
+            self.raw_field.value = state.pages.page_raw_text
+        self.raw_save_button.disabled = self._state.status.busy or self._state.pages.saving
 
     def _refresh_banners(self) -> None:
         """Refresh the message banner."""
-        message = self._state.message
+        message = self._state.status.message
         self.banners.controls = [] if message is None else [Banner(message).build()]
         self.banners.visible = message is not None
 
     def _refresh_conflict(self) -> None:
         """Refresh the conflict recovery panel."""
-        conflict = self._state.conflict
+        conflict = self._state.pages.conflict
         self.conflict_panel.visible = conflict is not None
         changed = conflict == "changed"
         self.conflict_text.value = (
@@ -561,20 +563,20 @@ class PageView:
     def _refresh_ambiguity(self) -> None:
         """Refresh the candidate picker."""
         state = self._state
-        self.ambiguous_panel.visible = bool(state.ambiguous)
+        self.ambiguous_panel.visible = bool(state.navigation.ambiguous)
         self.ambiguous_list.controls = [
             ft.ListTile(
-                title=state.note_title(path),
+                title=state.session.note_title(path),
                 subtitle=path.as_posix(),
                 dense=True,
                 on_click=self._candidate_handler(path),
             )
-            for path in state.ambiguous
+            for path in state.navigation.ambiguous
         ]
 
     def _refresh_repair(self) -> None:
         """Refresh the unsafe-reference repair panel."""
-        preview = self._state.repair_preview
+        preview = self._state.pages.repair_preview
         self.repair_panel.visible = preview is not None
         if preview is None:
             return
@@ -588,8 +590,8 @@ class PageView:
 
     def _refresh_type_change(self) -> None:
         """Refresh the scheme-change confirmation panel."""
-        labels = self._state.pending_labels
-        sites = self._state.type_change_sites
+        labels = self._state.dialogs.pending_labels
+        sites = self._state.dialogs.type_change_sites
         self.type_change_panel.visible = labels is not None and bool(sites)
         if labels is None or not sites:
             return
@@ -600,7 +602,7 @@ class PageView:
 
     def _refresh_rename(self) -> None:
         """Refresh the rename panel."""
-        preview = self._state.rename_preview
+        preview = self._state.dialogs.rename_preview
         self.rename_panel.visible = self._rename_open or preview is not None
         self.rename_field.visible = preview is None
         self.rename_preview_button.visible = preview is None
@@ -615,7 +617,7 @@ class PageView:
 
     def _refresh_trash(self) -> None:
         """Refresh the trash confirmation panel."""
-        preview = self._state.trash_preview
+        preview = self._state.dialogs.trash_preview
         self.trash_panel.visible = preview is not None
         if preview is None:
             return
@@ -626,7 +628,7 @@ class PageView:
 
     def _refresh_steps(self, page: PageDraft | None, *, visible: bool) -> None:
         """Render the current project's steps as read-mode rows."""
-        steps = self._state.page_steps if visible and page is not None else ()
+        steps = self._state.pages.page_steps if visible and page is not None else ()
         self.steps_panel.visible = bool(steps)
         self.steps_column.controls = [self._step_row(step) for step in steps]
 
@@ -690,7 +692,7 @@ class PageView:
         """Bind a checkbox event to the step line rewrite."""
 
         async def handle(event: ft.Event[ft.Checkbox]) -> None:
-            await self._state.toggle_page_step(step.line_index, checked=bool(event.control.value))
+            await self._state.pages.toggle_page_step(step.line_index, checked=bool(event.control.value))
             self.refresh()
             self._update()
 
@@ -698,7 +700,7 @@ class PageView:
 
     def _refresh_category_move(self) -> None:
         """Refresh the category move confirmation panel."""
-        preview = self._state.category_move
+        preview = self._state.dialogs.category_move
         self.category_move_panel.visible = preview is not None
         if preview is None:
             return
@@ -708,43 +710,43 @@ class PageView:
 
     def _is_inbox_page(self, page: PageDraft) -> bool:
         """Return whether the open page is an Inbox capture."""
-        return page.path is not None and any(note.path == page.path for note in self._state.notes)
+        return page.path is not None and any(note.path == page.path for note in self._state.session.notes)
 
     async def go_back(self) -> None:
         """Return to the previous page."""
         self._rename_open = False
-        await self._state.back()
+        await self._state.navigation.back()
         self.refresh()
         self._update()
 
     async def start_edit(self) -> None:
         """Switch to edit mode."""
-        self._state.edit_page()
+        self._state.pages.edit_page()
         self.refresh()
         self._update()
 
     async def finish_edit(self) -> None:
         """Commit the draft and return to read mode."""
-        await self._state.done_editing()
+        await self._state.pages.done_editing()
         self.refresh()
         self._update()
 
     async def change_body(self) -> None:
         """Forward the body field to the draft."""
-        await self._state.set_page_body(self.body_field.value or "")
+        await self._state.pages.set_page_body(self.body_field.value or "")
         self.refresh()
         self._update()
 
     async def change_raw_text(self) -> None:
         """Forward raw rescue text to the draft."""
-        await self._state.set_page_raw_text(self.raw_field.value or "")
+        await self._state.pages.set_page_raw_text(self.raw_field.value or "")
         self.refresh()
         self._update()
 
     async def save_raw(self) -> None:
         """Write raw rescue text from the current field."""
-        await self._state.set_page_raw_text(self.raw_field.value or "")
-        await self._state.autosave()
+        await self._state.pages.set_page_raw_text(self.raw_field.value or "")
+        await self._state.pages.autosave()
         self.refresh()
         self._update()
 
@@ -752,7 +754,7 @@ class PageView:
         """Forward the selected type."""
         value = self.type_dropdown.value
         if value:
-            await self._state.set_page_type(NoteType(value))
+            await self._state.dialogs.set_page_type(NoteType(value))
         self.refresh()
         self._update()
 
@@ -762,11 +764,11 @@ class PageView:
         try:
             category = CategoryLabel(value) if value else None
         except ValueError:
-            self._state.message = afanes.ui.strings.PAGE_CATEGORY_INVALID
+            self._state.status.show_message(afanes.ui.strings.PAGE_CATEGORY_INVALID)
             self.refresh()
             self._update()
             return
-        await self._state.set_page_category(category)
+        await self._state.dialogs.set_page_category(category)
         self.refresh()
         self._update()
 
@@ -774,19 +776,19 @@ class PageView:
         """Forward the selected status."""
         value = self.status_dropdown.value
         status = Status(value) if value else None
-        await self._state.set_page_status(status)
+        await self._state.dialogs.set_page_status(status)
         self.refresh()
         self._update()
 
     async def change_due_date(self) -> None:
         """Forward the due-date text."""
-        await self._state.set_page_due_date(self.due_field.value or "")
+        await self._state.dialogs.set_page_due_date(self.due_field.value or "")
         self.refresh()
         self._update()
 
     async def process_current(self) -> None:
         """Open the Processing Wizard for the current Inbox capture."""
-        page = self._state.page
+        page = self._state.pages.page
         if page is None or page.path is None or self._on_process is None:
             return
         await self._on_process(page.path)
@@ -794,7 +796,7 @@ class PageView:
     async def choose_page(self, path: Path) -> None:
         """Open one candidate from the picker."""
         self._rename_open = False
-        await self._state.choose_candidate(path)
+        await self._state.navigation.choose_candidate(path)
         self.refresh()
         self._update()
 
@@ -808,84 +810,85 @@ class PageView:
 
     async def clear_ambiguous(self) -> None:
         """Close the candidate picker."""
-        await self._state.clear_ambiguous()
+        await self._state.navigation.clear_ambiguous()
         self.refresh()
         self._update()
 
     async def reload_page(self) -> None:
         """Reload the conflicted file from disk."""
-        await self._state.reload_page()
+        await self._state.dialogs.reload_page()
         self.refresh()
         self._update()
 
     async def overwrite_page(self) -> None:
         """Overwrite the conflicted file with the draft."""
-        await self._state.overwrite_page()
+        await self._state.dialogs.overwrite_page()
         self.refresh()
         self._update()
 
     async def recreate_page(self) -> None:
         """Recreate a vanished page from the draft."""
-        await self._state.recreate_page()
+        await self._state.dialogs.recreate_page()
         self.refresh()
         self._update()
 
     async def discard_draft(self) -> None:
         """Discard the draft without writing."""
-        await self._state.discard_draft()
+        self._state.pages.clear()
+        self._state.status.clear_message()
         self.refresh()
         self._update()
 
     async def rewrite_links(self) -> None:
         """Apply the unsafe-reference repair."""
-        await self._state.apply_repair()
+        await self._state.dialogs.apply_repair()
         self.refresh()
         self._update()
 
     async def keep_links(self) -> None:
         """Leave unsafe references unchanged."""
-        await self._state.keep_repair()
+        await self._state.dialogs.keep_repair()
         self.refresh()
         self._update()
 
     async def cancel_repair(self) -> None:
         """Cancel the creation that triggered a repair."""
-        await self._state.cancel_repair()
+        await self._state.dialogs.cancel_repair()
         self.refresh()
         self._update()
 
     async def confirm_type_change(self) -> None:
         """Apply the pending type or category change."""
-        await self._state.apply_type_change()
+        await self._state.dialogs.apply_type_change()
         self.refresh()
         self._update()
 
     async def cancel_type_change(self) -> None:
         """Revert the pending type or category change."""
-        await self._state.cancel_type_change()
+        await self._state.dialogs.cancel_type_change()
         self.refresh()
         self._update()
 
     async def confirm_category_move(self) -> None:
         """Apply the pending category change and move the file."""
-        await self._state.apply_category_move()
+        await self._state.dialogs.apply_category_move()
         self.refresh()
         self._update()
 
     async def cancel_category_move(self) -> None:
         """Keep the category and the file location unchanged."""
-        await self._state.cancel_category_move()
+        await self._state.dialogs.cancel_category_move()
         self.refresh()
         self._update()
 
     async def begin_rename(self) -> None:
         """Open the rename panel."""
-        page = self._state.page
+        page = self._state.pages.page
         if page is None:
             return
         self._rename_open = True
         self.rename_field.value = page.identity
-        await self._state.cancel_rename()
+        await self._state.dialogs.cancel_rename()
         self.refresh()
         self._update()
 
@@ -893,42 +896,42 @@ class PageView:
         """Plan the rename and show its reference counts."""
         title = (self.rename_field.value or "").strip()
         if not title:
-            self._state.message = afanes.ui.strings.PAGE_RENAME_LABEL
+            self._state.status.show_message(afanes.ui.strings.PAGE_RENAME_LABEL)
             self.refresh()
             self._update()
             return
-        await self._state.begin_rename(title)
+        await self._state.dialogs.begin_rename(title)
         self.refresh()
         self._update()
 
     async def confirm_rename(self) -> None:
         """Apply the retained rename preview."""
-        await self._state.apply_rename()
+        await self._state.dialogs.apply_rename()
         self._rename_open = False
         self.refresh()
         self._update()
 
     async def cancel_rename(self) -> None:
         """Close the rename panel without changing the page."""
-        await self._state.cancel_rename()
+        await self._state.dialogs.cancel_rename()
         self._rename_open = False
         self.refresh()
         self._update()
 
     async def begin_trash(self) -> None:
         """Plan moving the page to trash."""
-        await self._state.begin_trash()
+        await self._state.dialogs.begin_trash()
         self.refresh()
         self._update()
 
     async def confirm_trash(self) -> None:
         """Move the page to trash."""
-        await self._state.apply_trash()
+        await self._state.dialogs.apply_trash()
         self.refresh()
         self._update()
 
     async def cancel_trash(self) -> None:
         """Close the trash panel without moving the page."""
-        await self._state.cancel_trash()
+        await self._state.dialogs.cancel_trash()
         self.refresh()
         self._update()

@@ -49,14 +49,14 @@ def _write_note(
     return path
 
 
-def _choose_vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.AppState:
+def _choose_vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.controller.AppState:
     monkeypatch.setattr(
         afanes.core.settings.SettingsStore,
         "settings_path",
         classmethod(lambda _cls: tmp_path / "settings.json"),
     )
     state = afanes.ui.state.app_state
-    asyncio.run(state.choose_vault(tmp_path / "vault"))
+    asyncio.run(state.workspace.choose_vault(tmp_path / "vault"))
     return state
 
 
@@ -97,9 +97,9 @@ def _change_handler(control: ft.Control) -> Handler:
     return typing.cast("Handler", control.__getattribute__("on_change"))
 
 
-def _start(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.AppState:
+def _start(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.controller.AppState:
     state = _choose_vault(tmp_path, monkeypatch)
-    asyncio.run(state.start_review())
+    asyncio.run(state.review.start())
     return state
 
 
@@ -108,11 +108,11 @@ class TestReviewEntry:
         vault = tmp_path / "vault"
         vault.mkdir()
         state = _choose_vault(tmp_path, monkeypatch)
-        asyncio.run(state.start_review())
+        asyncio.run(state.review.start())
 
         view = afanes.ui.views.review.ReviewView(_noop)
 
-        assert state.review_session is None
+        assert state.review.review_session is None
         assert afanes.ui.strings.REVIEW_ZERO_TITLE in _texts(view.root)
 
     def test_start_card_shows_the_pending_count(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -136,12 +136,12 @@ class TestReviewEntry:
         skip = _find_by_key(view.root, "review-skip")
         assert skip is not None
         asyncio.run(_handler(skip)())
-        assert state.review_session is not None
-        assert state.review_session.skipped_count == 1
+        assert state.review.review_session is not None
+        assert state.review.review_session.skipped_count == 1
 
 
 class TestDueStepCard:
-    def _due_step(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.AppState:
+    def _due_step(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.controller.AppState:
         vault = tmp_path / "vault"
         _write_note(
             vault / "projects" / "Home.md",
@@ -235,7 +235,7 @@ class TestDueStepCard:
 
 
 class TestWaitingStepCard:
-    def _waiting_step(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.AppState:
+    def _waiting_step(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.controller.AppState:
         vault = tmp_path / "vault"
         _write_note(
             vault / "projects" / "Home.md",
@@ -311,8 +311,8 @@ class TestProjectReviewCard:
 
         asyncio.run(_handler(_find_by_key(view.root, "review-open-project"))())
 
-        assert state.page is not None
-        assert state.page.path == project
+        assert state.pages.page is not None
+        assert state.pages.page.path == project
 
     def test_next_advances_the_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -322,12 +322,12 @@ class TestProjectReviewCard:
 
         asyncio.run(_handler(_find_by_key(view.root, "review-next"))())
 
-        assert state.review_session is not None
-        assert state.review_session.reviewed_count == 1
+        assert state.review.review_session is not None
+        assert state.review.review_session.reviewed_count == 1
 
 
 class TestStalledProject:
-    def _stalled(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.AppState:
+    def _stalled(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.controller.AppState:
         vault = tmp_path / "vault"
         _write_note(vault / "projects" / "Launch.md", "project", status="active", body="# Launch\n")
         return _start(tmp_path, monkeypatch)

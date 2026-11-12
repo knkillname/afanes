@@ -136,7 +136,7 @@ class ProcessingPlan:
 
     Notes
     -----
-    Build plans through ``Vault.plan_processing``. Direct construction is
+    Build plans through ``VaultProcessing.plan_processing``. Direct construction is
     validated for local invariants so a malformed plan cannot reach the apply
     step. Append step uses :class:`AppendStepPlan` instead.
     """
@@ -274,7 +274,7 @@ class AppendStepPlan:
 
     Notes
     -----
-    Build plans through ``Vault.plan_append_step``. Apply writes the project
+    Build plans through ``VaultProcessing.plan_append_step``. Apply writes the project
     first and trashes the capture second, so a failure never loses the step.
     """
 

@@ -5,10 +5,11 @@ schema: spec-driven
 # cannot infer from the code.
 context: |
   Afanes is offline-only: no runtime network access, accounts, telemetry, or
-  cloud storage. Durable user data lives in the Markdown vault; the SQLite index
-  is a disposable cache.
+  cloud storage. Durable user data lives in the Markdown vault. Each vault is
+  scanned into an in-memory snapshot; there is no persistent index, and adding
+  one requires an approved change.
   Code, UI copy, specs, and commits use neutral, original vocabulary; see
-  AGENTS.md section 4.2 for the prohibited terms.
+  AGENTS.md section 4.1 for the prohibited terms.
   Public Python APIs require strict NumPy-style docstrings that document every
   parameter, return value, raised exception, and public attribute.
   Every change must preserve macOS, Linux, and Windows parity.
@@ -17,7 +18,7 @@ context: |
 operations:
   archive:
     guidance:
-      - "After the archive succeeds, run the post-archive release workflow in AGENTS.md section 5.8 before reporting completion."
+      - "After the archive succeeds, run the post-archive release workflow in AGENTS.md section 5.3 before reporting completion."
       - "Bump the version only when the archive completes a coherent milestone: 1.0.0 is reserved for the first MVP, and incompatible changes to unreleased APIs are MINOR or PATCH bumps. Use hatch version patch, hatch version minor, or hatch version major; never edit src/afanes/__about__.py by hand."
       - "Update CHANGELOG.md following Keep a Changelog: move Unreleased entries under the new version and date, add a fresh Unreleased section, and omit comparison links unless release tags exist."
       - "Review README.md and update it when the change affects installation, usage, features, platforms, configuration, or documented behavior. Record when no update is required."

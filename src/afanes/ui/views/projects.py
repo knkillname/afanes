@@ -69,8 +69,8 @@ class ProjectsView:
         Search matching uses the shared browser query. This method performs no
         file I/O and never changes a project.
         """
-        query = self._state.browser_query
-        groups = self._state.project_groups
+        query = self._state.browser.query
+        groups = self._state.browser.project_groups()
         controls: list[ft.Control] = []
         total = 0
         for group in groups:
@@ -135,7 +135,7 @@ class ProjectsView:
         else:
             next_text = afanes.ui.strings.PROJECT_NEXT_STEP.format(title=summary.next_step.text)
         details.append(ft.Text(next_text, size=12, selectable=True))
-        page = self._state.page
+        page = self._state.pages.page
         return ft.ListTile(
             title=note.title,
             subtitle=ft.Column(controls=details, spacing=0),

@@ -8,11 +8,13 @@ from pathlib import Path
 import pytest
 
 import afanes.core.settings
+import afanes.core.vault.naming
 import afanes.ui.state
 from afanes.core.editing import DraftMode, DueDateText, NormalDraft, PageDraftFactory, RawDraft
 from afanes.core.errors import InvalidReferenceError, NoteParseError, VaultError
 from afanes.core.frontmatter import NoteDocument
-from afanes.core.vault import PageContent, PageFile, ParsedPage, UnparsedPage, Vault
+from afanes.core.vault.service import Vault
+from afanes.core.vault.snapshot import PageContent, PageFile, ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType, Status
 
@@ -347,8 +349,8 @@ class TestCategoryMoveAndTypeChange:
         path = self._reference(root)
         vault = Vault(root)
 
-        preview = vault.plan_category_move(path, CategoryLabel("place"))
-        target = vault.apply_category_move(preview, confirm=True)
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_category_move(path, CategoryLabel("place"))
+        target = afanes.core.vault.naming.VaultNaming(vault).apply_category_move(preview, confirm=True)
 
         assert preview.target_path == root / "reference" / "place" / "Ada.md"
         assert target == root / "reference" / "place" / "Ada.md"
@@ -362,8 +364,8 @@ class TestCategoryMoveAndTypeChange:
         path = self._reference(root, "reference/place/Ada.md", category="place")
         vault = Vault(root)
 
-        preview = vault.plan_category_move(path, None)
-        target = vault.apply_category_move(preview, confirm=True)
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_category_move(path, None)
+        target = afanes.core.vault.naming.VaultNaming(vault).apply_category_move(preview, confirm=True)
 
         assert target == root / "reference" / "Ada.md"
         assert "category:" not in target.read_text(encoding="utf-8")
@@ -384,10 +386,10 @@ class TestCategoryMoveAndTypeChange:
         state.reset()
 
         async def scenario() -> None:
-            await state.choose_vault(root)
-            await state.open_page(path)
-            await state.set_page_category(CategoryLabel("place"))
-            await state.cancel_category_move()
+            await state.workspace.choose_vault(root)
+            await state.navigation.open_page(path)
+            await state.dialogs.set_page_category(CategoryLabel("place"))
+            await state.dialogs.cancel_category_move()
 
         try:
             asyncio.run(scenario())
@@ -404,7 +406,7 @@ class TestCategoryMoveAndTypeChange:
         root.mkdir()
         path = self._reference(root)
         vault = Vault(root)
-        preview = vault.plan_category_move(path, CategoryLabel("place"))
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_category_move(path, CategoryLabel("place"))
 
         original_replace = Path.replace
 
@@ -416,7 +418,7 @@ class TestCategoryMoveAndTypeChange:
 
         monkeypatch.setattr(Path, "replace", fail_replace)
         with pytest.raises(VaultError):
-            vault.apply_category_move(preview, confirm=True)
+            afanes.core.vault.naming.VaultNaming(vault).apply_category_move(preview, confirm=True)
 
         assert path.is_file()
         assert "category: place" in path.read_text(encoding="utf-8")
@@ -440,11 +442,11 @@ class TestCategoryMoveAndTypeChange:
         state.reset()
 
         async def scenario() -> tuple[bool, bool]:
-            await state.choose_vault(root)
-            await state.open_page(reference)
-            applied = await state.set_page_type(NoteType.PROJECT)
-            pending = state.pending_labels is not None
-            await state.cancel_type_change()
+            await state.workspace.choose_vault(root)
+            await state.navigation.open_page(reference)
+            applied = await state.dialogs.set_page_type(NoteType.PROJECT)
+            pending = state.dialogs.pending_labels is not None
+            await state.dialogs.cancel_type_change()
             return applied, pending
 
         try:
@@ -470,9 +472,9 @@ class TestCategoryMoveAndTypeChange:
         state.reset()
 
         async def scenario() -> bool:
-            await state.choose_vault(root)
-            await state.open_page(reference)
-            return await state.set_page_type(NoteType.NOTE)
+            await state.workspace.choose_vault(root)
+            await state.navigation.open_page(reference)
+            return await state.dialogs.set_page_type(NoteType.NOTE)
 
         try:
             applied = asyncio.run(scenario())

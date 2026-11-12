@@ -10,7 +10,7 @@ import afanes.cli
 import afanes.cli.main
 import afanes.core.atomic
 import afanes.core.settings
-import afanes.core.vault
+import afanes.core.vault.service
 from afanes.core.errors import ConfigurationError
 from afanes.core.settings import Settings
 

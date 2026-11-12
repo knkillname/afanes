@@ -4,7 +4,7 @@
 """The ``afanes vault`` command group.
 
 The command is a thin adapter: it validates nothing itself, delegating vault
-policy to :class:`afanes.core.vault.Vault` and preferences to
+policy to :class:`afanes.core.vault.service.Vault` and preferences to
 :class:`afanes.core.settings.SettingsStore`. Results go to standard output and
 failures to standard error, so scripts can rely on the exit status and the
 streams.
@@ -16,10 +16,10 @@ from pathlib import Path
 import afanes.cli.strings
 import afanes.core.settings
 import afanes.core.templates
-import afanes.core.vault
+import afanes.core.vault.service
 from afanes.core.errors import ConfigurationError, VaultError
 from afanes.core.settings import Settings
-from afanes.core.vault import VaultCreation
+from afanes.core.vault.service import VaultCreation
 
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -95,7 +95,7 @@ class VaultCommand:
         blocking filesystem I/O and never opens the interface.
         """
         try:
-            creation = afanes.core.vault.Vault.create_directory(path, template=template)
+            creation = afanes.core.vault.service.Vault.create_directory(path, template=template)
         except VaultError as exc:
             CommandOutput.error(afanes.cli.strings.CREATE_FAILED.format(detail=exc))
             return EXIT_FAILURE

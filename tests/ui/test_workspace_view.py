@@ -11,7 +11,7 @@ import pytest
 import afanes.core.atomic
 import afanes.core.search
 import afanes.core.settings
-import afanes.core.vault
+import afanes.core.vault.service
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.views.workspace
@@ -67,7 +67,7 @@ def _write_note(
 
 def _open_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.views.workspace.WorkspaceView:
     _use_settings_file(monkeypatch, tmp_path / "settings.json")
-    asyncio.run(afanes.ui.state.app_state.choose_vault(tmp_path / "vault"))
+    asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(tmp_path / "vault"))
     return afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
 
 
@@ -84,7 +84,7 @@ class TestWorkspaceShell:
         vault = tmp_path / "vault"
         vault.mkdir()
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
-        asyncio.run(afanes.ui.state.app_state.choose_vault(vault))
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
         view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
 
         assert view.root.key == "workspace-view"
@@ -102,7 +102,7 @@ class TestWorkspaceShell:
         vault = tmp_path / "vault"
         vault.mkdir()
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
-        asyncio.run(afanes.ui.state.app_state.choose_vault(vault))
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
         calls: list[str] = []
 
         async def close() -> None:
@@ -130,8 +130,8 @@ class TestWorkspaceShell:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(note)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
 
         asyncio.run(scenario())
         view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
@@ -148,16 +148,16 @@ class TestWorkspaceShell:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(note)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
 
         asyncio.run(scenario())
         view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
-        handler = _handler(view.section_tiles[afanes.ui.state.WorkspaceSection.PROJECTS])
+        handler = _handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.PROJECTS])
 
         asyncio.run(handler())
 
-        assert state.active_section is afanes.ui.state.WorkspaceSection.PROJECTS
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.PROJECTS
         assert view.page_view.title.value == "Buy milk"
         projects_root = next(
             control for control in view.browser_list.controls if getattr(control, "key", None) == "projects-view"
@@ -179,10 +179,10 @@ class TestWorkspaceShell:
         _write_note(vault / "reference" / "people" / "Ada.md", note_type="reference", category="person")
         view = _open_workspace(tmp_path, monkeypatch)
 
-        assert view.section_counts[afanes.ui.state.WorkspaceSection.INBOX].value == "2"
-        assert view.section_counts[afanes.ui.state.WorkspaceSection.PROJECTS].value == "1"
-        assert view.section_counts[afanes.ui.state.WorkspaceSection.REFERENCES].value == "1"
-        assert view.section_counts[afanes.ui.state.WorkspaceSection.NEEDS_ATTENTION].value == "0"
+        assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.INBOX].value == "2"
+        assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.PROJECTS].value == "1"
+        assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.REFERENCES].value == "1"
+        assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION].value == "0"
         assert "3 pending" in view.review_count.value
 
     def test_capture_appears_only_under_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -191,18 +191,20 @@ class TestWorkspaceShell:
         view = _open_workspace(tmp_path, monkeypatch)
         state = afanes.ui.state.app_state
 
-        assert view.section_counts[afanes.ui.state.WorkspaceSection.INBOX].value == "1"
-        assert view.section_counts[afanes.ui.state.WorkspaceSection.NEEDS_ATTENTION].value == "0"
+        assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.INBOX].value == "1"
+        assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION].value == "0"
 
-        asyncio.run(_handler(view.section_tiles[afanes.ui.state.WorkspaceSection.NEEDS_ATTENTION])())
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION])())
 
         empty = view.browser_list.controls[0]
         assert isinstance(empty, ft.Container)
         content = empty.content
         assert isinstance(content, ft.Text)
         assert content.value == afanes.ui.strings.BROWSER_EMPTY
-        assert state.browser_listing is not None
-        assert state.browser_listing.group(afanes.core.search.BrowserSection.NEEDS_ATTENTION).notes == ()
+        assert state.browser.listing() is not None
+        listing = state.browser.listing()
+        assert listing is not None
+        assert listing.group(afanes.core.search.BrowserSection.NEEDS_ATTENTION).notes == ()
         assert note.is_file()
 
     def test_unreadable_note_is_listed_and_opens_in_rescue_mode(
@@ -222,8 +224,8 @@ class TestWorkspaceShell:
         )
         asyncio.run(_handler(tile)())
 
-        assert afanes.ui.state.app_state.page is not None
-        assert afanes.ui.state.app_state.page.mode is DraftMode.RAW
+        assert afanes.ui.state.app_state.pages.page is not None
+        assert afanes.ui.state.app_state.pages.page.mode is DraftMode.RAW
         assert view.page_view.raw_panel.visible is True
 
 
@@ -238,7 +240,7 @@ class TestCaptureBar:
 
         assert (vault / "inbox" / "Buy milk.md").is_file()
         assert view.capture_field.value == ""
-        assert view.section_counts[afanes.ui.state.WorkspaceSection.INBOX].value == "1"
+        assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.INBOX].value == "1"
 
     def test_empty_capture_keeps_the_field_and_reports(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -249,7 +251,7 @@ class TestCaptureBar:
         asyncio.run(_handler(view.capture_button)())
 
         assert view.capture_field.value == "   "
-        assert afanes.ui.state.app_state.message == afanes.ui.strings.CAPTURE_EMPTY
+        assert afanes.ui.state.app_state.status.message == afanes.ui.strings.CAPTURE_EMPTY
         assert list((vault / "inbox").glob("*.md")) == []
 
 
@@ -259,7 +261,7 @@ class TestBrowserSearch:
         _write_note(vault / "reference" / "Ada.md", note_type="reference", body="# Ada, Countess of Lovelace")
         _write_note(vault / "reference" / "Grace.md", note_type="reference", body="# Grace Hopper")
         view = _open_workspace(tmp_path, monkeypatch)
-        asyncio.run(_handler(view.section_tiles[afanes.ui.state.WorkspaceSection.REFERENCES])())
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.REFERENCES])())
 
         view.search_field.value = "countess"
         asyncio.run(_change_handler(view.search_field)())
@@ -271,12 +273,12 @@ class TestBrowserSearch:
         vault = tmp_path / "vault"
         _write_note(vault / "reference" / "Ada, Lovelace.md", note_type="reference", body="# A person")
         view = _open_workspace(tmp_path, monkeypatch)
-        asyncio.run(_handler(view.section_tiles[afanes.ui.state.WorkspaceSection.REFERENCES])())
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.REFERENCES])())
 
         view.search_field.value = "Ada,   Lovelace"
         asyncio.run(_change_handler(view.search_field)())
 
-        assert afanes.ui.state.app_state.browser_query == "Ada,   Lovelace"
+        assert afanes.ui.state.app_state.browser.query == "Ada,   Lovelace"
         titles = [control.title for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
         assert titles == ["A person"]
 
@@ -284,7 +286,7 @@ class TestBrowserSearch:
         vault = tmp_path / "vault"
         _write_note(vault / "reference" / "Ada.md", note_type="reference", body="# Ada\n\nAnalytical engine")
         view = _open_workspace(tmp_path, monkeypatch)
-        asyncio.run(_handler(view.section_tiles[afanes.ui.state.WorkspaceSection.REFERENCES])())
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.REFERENCES])())
 
         view.search_field.value = "analytical"
         asyncio.run(_change_handler(view.search_field)())
@@ -298,14 +300,14 @@ class TestBrowserHistory:
         first = _write_note(vault / "reference" / "Ada.md", note_type="reference", body="# Ada")
         _write_note(vault / "reference" / "Grace.md", note_type="reference", body="# Grace")
         view = _open_workspace(tmp_path, monkeypatch)
-        asyncio.run(_handler(view.section_tiles[afanes.ui.state.WorkspaceSection.REFERENCES])())
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.REFERENCES])())
 
         asyncio.run(_handler(_row_for(view.browser_list, "Ada"))())
         asyncio.run(_handler(_row_for(view.browser_list, "Grace"))())
         asyncio.run(view.page_view.go_back())
 
-        assert afanes.ui.state.app_state.page is not None
-        assert afanes.ui.state.app_state.page.path == first
+        assert afanes.ui.state.app_state.pages.page is not None
+        assert afanes.ui.state.app_state.pages.page.path == first
         assert view.page_view.title.value == "Ada"
 
 
@@ -319,7 +321,7 @@ class TestWorkspaceRefresh:
         vault.mkdir()
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        asyncio.run(state.choose_vault(vault))
+        asyncio.run(state.workspace.choose_vault(vault))
         repaints: list[int] = []
         view = afanes.ui.views.workspace.WorkspaceView(
             lambda: repaints.append(1),
@@ -328,7 +330,7 @@ class TestWorkspaceRefresh:
             _close_vault,
         )
         _write_note(vault / "inbox" / "External.md", body="# External")
-        asyncio.run(state.refresh())
+        asyncio.run(state.workspace.refresh())
         repaints.clear()
 
         view.refresh()
@@ -340,16 +342,16 @@ class TestWorkspaceRefresh:
         vault = tmp_path / "vault"
         vault.mkdir()
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
-        asyncio.run(afanes.ui.state.app_state.choose_vault(vault))
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
         view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
 
         def fail(*_args: object, **_kwargs: object) -> None:
             message = "the workspace refresh must not touch the filesystem"
             raise AssertionError(message)
 
-        monkeypatch.setattr(afanes.core.vault.Vault, "scan", fail)
-        monkeypatch.setattr(afanes.core.vault.Vault, "read_body", fail)
-        monkeypatch.setattr(afanes.core.vault.Vault, "read_page", fail)
+        monkeypatch.setattr(afanes.core.vault.service.Vault, "scan", fail)
+        monkeypatch.setattr(afanes.core.vault.service.Vault, "read_body", fail)
+        monkeypatch.setattr(afanes.core.vault.service.Vault, "read_page", fail)
         monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail)
 
         view.refresh()

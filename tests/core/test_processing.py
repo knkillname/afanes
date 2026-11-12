@@ -8,7 +8,10 @@ import pytest
 
 import afanes.core.atomic
 import afanes.core.processing
-import afanes.core.vault
+import afanes.core.vault.naming
+import afanes.core.vault.pages
+import afanes.core.vault.processing
+import afanes.core.vault.service
 from afanes.core.errors import NameCollisionError, ProcessingError, VaultError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan, ProcessingTarget
@@ -50,7 +53,7 @@ def _plan(
 
 
 def _capture(root: Path, text: str = "Call Ada") -> Path:
-    return afanes.core.vault.Vault(root).capture(text)
+    return afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).capture(text)
 
 
 def _tree_state(root: Path) -> dict[str, bytes]:
@@ -318,7 +321,9 @@ class TestPlanProcessing:
         root.mkdir()
         source = _capture(root)
 
-        plan = afanes.core.vault.Vault(root).plan_processing(source, ProcessingOutcome.PROJECT)
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source, ProcessingOutcome.PROJECT
+        )
 
         assert isinstance(plan, ProcessingPlan)
         assert plan.target_type is NoteType.PROJECT
@@ -330,7 +335,7 @@ class TestPlanProcessing:
         root.mkdir()
         source = _capture(root)
 
-        plan = afanes.core.vault.Vault(root).plan_processing(
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
             source,
             ProcessingOutcome.PROJECT,
             due_date=PLAN_DATE,
@@ -344,7 +349,9 @@ class TestPlanProcessing:
         root.mkdir()
         source = _capture(root)
 
-        plan = afanes.core.vault.Vault(root).plan_processing(source, ProcessingOutcome.REFERENCE)
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source, ProcessingOutcome.REFERENCE
+        )
 
         assert isinstance(plan, ProcessingPlan)
         assert plan.target_type is NoteType.REFERENCE
@@ -355,7 +362,9 @@ class TestPlanProcessing:
         root.mkdir()
         source = _capture(root)
 
-        plan = afanes.core.vault.Vault(root).plan_processing(source, ProcessingOutcome.LATER)
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source, ProcessingOutcome.LATER
+        )
 
         assert isinstance(plan, ProcessingPlan)
         assert plan.target_status is Status.LATER
@@ -365,7 +374,7 @@ class TestPlanProcessing:
         root.mkdir()
         source = _capture(root, "Call the plumber\n\nAsk about the boiler")
 
-        plan = afanes.core.vault.Vault(root).plan_processing(
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
             source,
             ProcessingOutcome.DONE_NOW,
             today=TODAY,
@@ -384,7 +393,9 @@ class TestPlanProcessing:
         root.mkdir()
         source = _capture(root)
 
-        plan = afanes.core.vault.Vault(root).plan_processing(source, ProcessingOutcome.TRASH)
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source, ProcessingOutcome.TRASH
+        )
 
         assert isinstance(plan, ProcessingPlan)
         assert plan.target_path == root / "trash" / source.name
@@ -394,7 +405,9 @@ class TestPlanProcessing:
         root.mkdir()
         source = _capture(root)
 
-        plan = afanes.core.vault.Vault(root).plan_processing(source, ProcessingOutcome.PROJECT)
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source, ProcessingOutcome.PROJECT
+        )
 
         assert isinstance(plan, ProcessingPlan)
         assert plan.changes_scheme is True
@@ -405,7 +418,9 @@ class TestPlanProcessing:
         source = _capture(root)
         before = _tree_state(root)
 
-        afanes.core.vault.Vault(root).plan_processing(source, ProcessingOutcome.PROJECT)
+        afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source, ProcessingOutcome.PROJECT
+        )
 
         assert _tree_state(root) == before
 
@@ -417,19 +432,21 @@ class TestPlanProcessing:
         source.write_text("---\ntype: note\n---\n# Call\n", encoding="utf-8")
 
         with pytest.raises(ProcessingError):
-            afanes.core.vault.Vault(root).plan_processing(source, ProcessingOutcome.PROJECT)
+            afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+                source, ProcessingOutcome.PROJECT
+            )
 
     def test_rejects_an_existing_note_scheme_name(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        vault = afanes.core.vault.Vault(root)
-        vault.create_page("Other", NoteType.REFERENCE)
+        vault = afanes.core.vault.service.Vault(root)
+        afanes.core.vault.pages.VaultPages(vault).create_page("Other", NoteType.REFERENCE)
         source = root / "inbox" / "Other.md"
         source.parent.mkdir()
         source.write_text("---\ntype: note\n---\n# Other\n", encoding="utf-8")
 
         with pytest.raises(NameCollisionError):
-            vault.plan_processing(source, ProcessingOutcome.REFERENCE)
+            afanes.core.vault.processing.VaultProcessing(vault).plan_processing(source, ProcessingOutcome.REFERENCE)
 
     def test_rejects_an_existing_project_file(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -440,7 +457,9 @@ class TestPlanProcessing:
         target.write_text("---\ntype: project\n---\n", encoding="utf-8")
 
         with pytest.raises(NameCollisionError):
-            afanes.core.vault.Vault(root).plan_processing(source, ProcessingOutcome.PROJECT)
+            afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+                source, ProcessingOutcome.PROJECT
+            )
 
     def test_rejects_a_due_date_on_a_reference_plan(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -448,7 +467,7 @@ class TestPlanProcessing:
         source = _capture(root)
 
         with pytest.raises(ProcessingError):
-            afanes.core.vault.Vault(root).plan_processing(
+            afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
                 source,
                 ProcessingOutcome.REFERENCE,
                 due_date=PLAN_DATE,
@@ -459,7 +478,9 @@ class TestPlanProcessing:
         root.mkdir()
         source = _capture(root)
 
-        plan = afanes.core.vault.Vault(root).plan_processing(source, ProcessingOutcome.PROJECT)
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source, ProcessingOutcome.PROJECT
+        )
 
         assert isinstance(plan, ProcessingPlan)
         assert plan.source_hash == hashlib.sha256(source.read_bytes()).hexdigest()
@@ -472,10 +493,12 @@ class TestPlanAppend:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root, "Call the plumber\n\nAsk about the boiler")
-        vault = afanes.core.vault.Vault(root)
-        project = vault.create_page("Home", NoteType.PROJECT, body="# Home\n")
+        vault = afanes.core.vault.service.Vault(root)
+        project = afanes.core.vault.pages.VaultPages(vault).create_page("Home", NoteType.PROJECT, body="# Home\n")
 
-        plan = vault.plan_processing(source, ProcessingOutcome.APPEND_STEP, project="home")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            source, ProcessingOutcome.APPEND_STEP, project="home"
+        )
 
         assert isinstance(plan, AppendStepPlan)
         assert plan.project_path == project
@@ -488,7 +511,7 @@ class TestPlanAppend:
         source = _capture(root)
 
         with pytest.raises(ProcessingError):
-            afanes.core.vault.Vault(root).plan_processing(
+            afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
                 source,
                 ProcessingOutcome.APPEND_STEP,
                 project="Missing",
@@ -500,7 +523,9 @@ class TestPlanAppend:
         source = _capture(root)
 
         with pytest.raises(ProcessingError):
-            afanes.core.vault.Vault(root).plan_processing(source, ProcessingOutcome.APPEND_STEP)
+            afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+                source, ProcessingOutcome.APPEND_STEP
+            )
 
     def test_rejects_an_ambiguous_target(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -511,7 +536,7 @@ class TestPlanAppend:
         (root / "projects" / "home.md").write_text("---\ntype: project\n---\n", encoding="utf-8")
 
         with pytest.raises(NameCollisionError):
-            afanes.core.vault.Vault(root).plan_processing(
+            afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
                 source,
                 ProcessingOutcome.APPEND_STEP,
                 project="Home",
@@ -523,10 +548,12 @@ class TestApplyProcessing:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        vault = afanes.core.vault.Vault(root)
-        plan = vault.plan_processing(source, ProcessingOutcome.PROJECT, due_date=PLAN_DATE)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            source, ProcessingOutcome.PROJECT, due_date=PLAN_DATE
+        )
 
-        target = vault.apply_processing(plan, confirm=True)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
         assert target == root / "projects" / source.name
@@ -540,11 +567,11 @@ class TestApplyProcessing:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        vault = afanes.core.vault.Vault(root)
-        plan = vault.plan_processing(source, ProcessingOutcome.PROJECT)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(source, ProcessingOutcome.PROJECT)
 
         with pytest.raises(ProcessingError):
-            vault.apply_processing(plan)
+            afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan)
 
         assert source.exists()
 
@@ -552,32 +579,32 @@ class TestApplyProcessing:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        vault = afanes.core.vault.Vault(root)
-        plan = vault.plan_processing(source, ProcessingOutcome.PROJECT)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(source, ProcessingOutcome.PROJECT)
         source.write_text("---\ntype: note\n---\n# Changed\n", encoding="utf-8")
 
         with pytest.raises(ProcessingError):
-            vault.apply_processing(plan, confirm=True)
+            afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
     def test_rejects_a_destination_that_appeared(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        vault = afanes.core.vault.Vault(root)
-        plan = vault.plan_processing(source, ProcessingOutcome.PROJECT)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(source, ProcessingOutcome.PROJECT)
         assert isinstance(plan, ProcessingPlan)
         plan.target_path.parent.mkdir(parents=True)
         plan.target_path.write_text("---\ntype: project\n---\n", encoding="utf-8")
 
         with pytest.raises(NameCollisionError):
-            vault.apply_processing(plan, confirm=True)
+            afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
     def test_write_failure_leaves_the_source(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        vault = afanes.core.vault.Vault(root)
-        plan = vault.plan_processing(source, ProcessingOutcome.PROJECT)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(source, ProcessingOutcome.PROJECT)
         before = source.read_bytes()
 
         def fail_write(_path: Path, _text: str) -> None:
@@ -586,7 +613,7 @@ class TestApplyProcessing:
 
         monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail_write)
         with pytest.raises(OSError, match="disk full"):
-            vault.apply_processing(plan, confirm=True)
+            afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert source.read_bytes() == before
         assert not (root / "projects").exists()
@@ -595,8 +622,8 @@ class TestApplyProcessing:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        vault = afanes.core.vault.Vault(root)
-        plan = vault.plan_processing(source, ProcessingOutcome.PROJECT)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(source, ProcessingOutcome.PROJECT)
         original_replace = Path.replace
 
         def fail_replace(self_path: Path, target: Path) -> Path:
@@ -607,11 +634,11 @@ class TestApplyProcessing:
 
         monkeypatch.setattr(Path, "replace", fail_replace)
         with pytest.raises(ProcessingError):
-            vault.apply_processing(plan, confirm=True)
+            afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert source.exists()
         monkeypatch.setattr(Path, "replace", original_replace)
-        target = vault.apply_processing(plan, confirm=True)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
         assert target.exists()
         assert not source.exists()
 
@@ -619,10 +646,12 @@ class TestApplyProcessing:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root, "Call the plumber")
-        vault = afanes.core.vault.Vault(root)
-        plan = vault.plan_processing(source, ProcessingOutcome.DONE_NOW, today=TODAY)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            source, ProcessingOutcome.DONE_NOW, today=TODAY
+        )
 
-        target = vault.apply_processing(plan, confirm=True)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
         steps = StepDocument(document.body).steps
@@ -635,10 +664,10 @@ class TestApplyProcessing:
         root.mkdir()
         source = _capture(root)
         before = source.read_bytes()
-        vault = afanes.core.vault.Vault(root)
-        plan = vault.plan_processing(source, ProcessingOutcome.TRASH)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(source, ProcessingOutcome.TRASH)
 
-        target = vault.apply_processing(plan, confirm=True)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert target == root / "trash" / source.name
         assert target.read_bytes() == before
@@ -647,10 +676,10 @@ class TestApplyProcessing:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        vault = afanes.core.vault.Vault(root)
-        plan = vault.plan_processing(source, ProcessingOutcome.REFERENCE)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(source, ProcessingOutcome.REFERENCE)
 
-        target = vault.apply_processing(plan, confirm=True)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
         assert target == root / "reference" / source.name
@@ -661,10 +690,10 @@ class TestApplyProcessing:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        vault = afanes.core.vault.Vault(root)
-        plan = vault.plan_processing(source, ProcessingOutcome.LATER)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(source, ProcessingOutcome.LATER)
 
-        target = vault.apply_processing(plan, confirm=True)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert NoteDocument.from_text(target.read_text(encoding="utf-8")).status is Status.LATER
 
@@ -676,10 +705,10 @@ class TestApplyProcessing:
         referring.parent.mkdir()
         referring.write_text("---\ntype: reference\n---\n[Call](<note:Call Ada>)\n", encoding="utf-8")
         before = referring.read_bytes()
-        vault = afanes.core.vault.Vault(root)
-        plan = vault.plan_processing(source, ProcessingOutcome.TRASH)
+        vault = afanes.core.vault.service.Vault(root)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(source, ProcessingOutcome.TRASH)
 
-        vault.apply_processing(plan, confirm=True)
+        afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert referring.read_bytes() == before
 
@@ -689,11 +718,13 @@ class TestApplyAppend:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root, "Call the plumber\n\nAsk about the boiler")
-        vault = afanes.core.vault.Vault(root)
-        project = vault.create_page("Home", NoteType.PROJECT, body="# Home\n")
-        plan = vault.plan_processing(source, ProcessingOutcome.APPEND_STEP, project="Home")
+        vault = afanes.core.vault.service.Vault(root)
+        project = afanes.core.vault.pages.VaultPages(vault).create_page("Home", NoteType.PROJECT, body="# Home\n")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            source, ProcessingOutcome.APPEND_STEP, project="Home"
+        )
 
-        target = vault.apply_processing(plan, confirm=True)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
         steps = StepDocument(document.body).steps
@@ -707,14 +738,16 @@ class TestApplyAppend:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        vault = afanes.core.vault.Vault(root)
-        project = vault.create_page("Home", NoteType.PROJECT, body="# Home\n")
-        plan = vault.plan_processing(source, ProcessingOutcome.APPEND_STEP, project="Home")
+        vault = afanes.core.vault.service.Vault(root)
+        project = afanes.core.vault.pages.VaultPages(vault).create_page("Home", NoteType.PROJECT, body="# Home\n")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            source, ProcessingOutcome.APPEND_STEP, project="Home"
+        )
         project.write_text("---\ntype: project\n---\n# Home\n\nChanged.\n", encoding="utf-8")
         before = project.read_bytes()
 
         with pytest.raises(ProcessingError):
-            vault.apply_processing(plan, confirm=True)
+            afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert source.exists()
         assert project.read_bytes() == before
@@ -723,21 +756,23 @@ class TestApplyAppend:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        vault = afanes.core.vault.Vault(root)
-        project = vault.create_page("Home", NoteType.PROJECT, body="# Home\n")
-        plan = vault.plan_processing(source, ProcessingOutcome.APPEND_STEP, project="Home")
+        vault = afanes.core.vault.service.Vault(root)
+        project = afanes.core.vault.pages.VaultPages(vault).create_page("Home", NoteType.PROJECT, body="# Home\n")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            source, ProcessingOutcome.APPEND_STEP, project="Home"
+        )
 
-        def fail_trash(_self: afanes.core.vault.Vault, *_args: object, **_kwargs: object) -> int:
+        def fail_trash(_self: afanes.core.vault.naming.VaultNaming, *_args: object, **_kwargs: object) -> int:
             message = "busy"
             raise VaultError(message)
 
-        monkeypatch.setattr(afanes.core.vault.Vault, "trash", fail_trash)
+        monkeypatch.setattr(afanes.core.vault.naming.VaultNaming, "trash", fail_trash)
         with pytest.raises(ProcessingError):
-            vault.apply_processing(plan, confirm=True)
+            afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
         assert source.exists()
 
         monkeypatch.undo()
-        vault.apply_processing(plan, confirm=True)
+        afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         steps = StepDocument(NoteDocument.from_text(project.read_text(encoding="utf-8")).body).steps
         assert [step.text for step in steps] == ["Call Ada"]
@@ -747,12 +782,14 @@ class TestApplyAppend:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        vault = afanes.core.vault.Vault(root)
-        project = vault.create_page("Home", NoteType.PROJECT, body="# Home\n")
-        plan = vault.plan_processing(source, ProcessingOutcome.APPEND_STEP, project="Home")
+        vault = afanes.core.vault.service.Vault(root)
+        project = afanes.core.vault.pages.VaultPages(vault).create_page("Home", NoteType.PROJECT, body="# Home\n")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            source, ProcessingOutcome.APPEND_STEP, project="Home"
+        )
 
         project.unlink()
         with pytest.raises(ProcessingError):
-            vault.apply_processing(plan, confirm=True)
+            afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert source.exists()

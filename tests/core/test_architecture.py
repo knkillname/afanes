@@ -1,7 +1,7 @@
 """Architecture tests for layering, imports, and object ownership.
 
 The ownership gate enforces the end state described in ``AGENTS.md`` section
-4.3. During ``refactor-object-ownership`` the gate carries a temporary
+4.2. During ``refactor-object-ownership`` the gate carries a temporary
 allowlist; each phase removes its entries until only the final entries remain:
 
 - ``core/names.py`` (name and filename policy)
@@ -18,10 +18,12 @@ phase passes.
 """
 
 import ast
+import re
 from ast import Import, ImportFrom
 from pathlib import Path
 
-SOURCE_ROOT = Path(__file__).resolve().parents[2] / "src" / "afanes"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SOURCE_ROOT = REPO_ROOT / "src" / "afanes"
 MODEL_ROOT = SOURCE_ROOT / "models"
 CORE_ROOT = SOURCE_ROOT / "core"
 CLI_ROOT = SOURCE_ROOT / "cli"
@@ -47,6 +49,112 @@ TEMPORARY_FIELD_BUDGET_ALLOWLIST: frozenset[str] = frozenset()
 
 DUPLICATE_VIEW_HELPERS = frozenset({"_banner", "_status_label", "_panel", "_card"})
 APP_STATE_FIELD_BUDGET = 10
+CORE_SERVICE_METHOD_BUDGET = 20
+CORE_MODULE_LINE_BUDGET = 900
+VAULT_SIBLING_MODULES = frozenset(
+    {
+        "afanes.core.vault.naming",
+        "afanes.core.vault.pages",
+        "afanes.core.vault.processing",
+        "afanes.core.vault.steps",
+    }
+)
+SECTION_HEADING_PATTERN = re.compile(r"^#{2,3}\s+(\d+(?:\.\d+)?)\b", re.MULTILINE)
+SECTION_CITATION_PATTERN = re.compile(r"[Ss]ections?\s+(\d+(?:\.\d+)?)|(?:see|through)\s+(\d+(?:\.\d+)?)")
+APP_STATE_SURFACE_BUDGET = 10
+DOMAIN_CONTROLLER_SURFACE_BUDGET = 25
+
+
+def _state_paths() -> list[Path]:
+    package = UI_ROOT / "state"
+    if package.is_dir():
+        return sorted(package.rglob("*.py"))
+    return [UI_ROOT / "state.py"]
+
+
+def _class_surface(members: list[ast.stmt]) -> int:
+    names = {
+        member.name
+        for member in members
+        if isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef) and not member.name.startswith("_")
+    }
+    return len(names)
+
+
+def _class_commands(members: list[ast.stmt]) -> int:
+    commands: set[str] = set()
+    for member in members:
+        if not isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef) or member.name.startswith("_"):
+            continue
+        decorated_as_property = any(
+            (isinstance(decorator, ast.Name) and decorator.id == "property")
+            or (isinstance(decorator, ast.Attribute) and decorator.attr == "setter")
+            for decorator in member.decorator_list
+        )
+        if not decorated_as_property:
+            commands.add(member.name)
+    return len(commands)
+
+
+def _state_shapes() -> list[tuple[Path, str, bool, int]]:
+    shapes: list[tuple[Path, str, bool, int]] = []
+    for path in _state_paths():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef):
+                continue
+            fields = any(isinstance(member, ast.AnnAssign) for member in node.body)
+            shapes.append((path, node.name, fields, _class_commands(node.body)))
+    return shapes
+
+
+def _numbered_sections(text: str) -> set[str]:
+    return set(SECTION_HEADING_PATTERN.findall(text))
+
+
+def _section_citations(text: str) -> set[str]:
+    citations: set[str] = set()
+    for plural, single in SECTION_CITATION_PATTERN.findall(text):
+        citations.add(plural or single)
+    return citations
+
+
+def _unresolved_citations(name: str, text: str, sections: set[str]) -> list[str]:
+    return [f"{name}: section {number}" for number in sorted(_section_citations(text) - sections)]
+
+
+def _live_documents() -> list[Path]:
+    documents = [REPO_ROOT / "AGENTS.md", REPO_ROOT / "README.md", REPO_ROOT / "CHANGELOG.md"]
+    documents.extend(sorted((REPO_ROOT / "openspec" / "specs").rglob("*.md")))
+    documents.extend(sorted((REPO_ROOT / "openspec" / "config.yaml").parent.glob("config.yaml")))
+    documents.extend(sorted((REPO_ROOT / "src").rglob("*.py")))
+    documents.extend(sorted((REPO_ROOT / "tests").rglob("*.py")))
+    return [path for path in documents if path.is_file()]
+
+
+def _state_surfaces() -> list[tuple[Path, str, int]]:
+    surfaces: list[tuple[Path, str, int]] = []
+    for path in _state_paths():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        surfaces.extend(
+            (path, node.name, _class_surface(node.body)) for node in tree.body if isinstance(node, ast.ClassDef)
+        )
+    return surfaces
+
+
+def _public_methods(path: Path) -> list[tuple[str, int]]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    counts: list[tuple[str, int]] = []
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        methods = [
+            member
+            for member in node.body
+            if isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef) and not member.name.startswith("_")
+        ]
+        counts.append((node.name, len(methods)))
+    return counts
 
 
 def _python_files(root: Path) -> list[Path]:
@@ -150,7 +258,7 @@ class TestImportBoundaries:
     def test_settings_does_not_import_the_vault_module(self) -> None:
         path = CORE_ROOT / "settings.py"
         assert path.is_file()
-        assert "afanes.core.vault" not in _first_party_imports(path)
+        assert "afanes.core.vault.service" not in _first_party_imports(path)
 
     def test_models_do_not_import_the_names_module(self) -> None:
         assert all("afanes.core.names" not in _first_party_imports(path) for path in _python_files(MODEL_ROOT))
@@ -209,9 +317,12 @@ class TestUiLayering:
         assert offenders == []
 
     def test_state_does_not_import_views_or_components(self) -> None:
-        path = UI_ROOT / "state.py"
         forbidden = ("afanes.ui.views", "afanes.ui.components")
-        offenders = [module for module in _first_party_imports(path) if module.startswith(forbidden)]
+        offenders: list[str] = []
+        for path in _state_paths():
+            offenders.extend(
+                f"{path.name}: {module}" for module in _first_party_imports(path) if module.startswith(forbidden)
+            )
         assert offenders == []
 
     def test_theme_and_strings_are_import_leaves(self) -> None:
@@ -220,6 +331,31 @@ class TestUiLayering:
             path = UI_ROOT / name
             offenders.extend(f"{path.name}: {module}" for module in _first_party_imports(path))
         assert offenders == []
+
+
+class TestDocumentationCitations:
+    def test_every_live_section_citation_resolves(self) -> None:
+        sections = _numbered_sections((REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8"))
+        offenders: list[str] = []
+        for path in _live_documents():
+            offenders.extend(
+                _unresolved_citations(
+                    path.relative_to(REPO_ROOT).as_posix(),
+                    path.read_text(encoding="utf-8"),
+                    sections,
+                )
+            )
+        assert offenders == []
+
+    def test_a_missing_section_is_reported(self) -> None:
+        sections = _numbered_sections("## 1. One\n\n### 1.1 Detail\n")
+        missing = "9.9"
+        present = "1.1"
+        text = f"See section {missing} and section {present}."
+
+        failures = _unresolved_citations("guide.md", text, sections)
+
+        assert failures == [f"guide.md: section {missing}"]
 
 
 class TestObjectOwnership:
@@ -268,7 +404,7 @@ class TestObjectOwnership:
         relative = "ui/state.py"
         if relative in TEMPORARY_FIELD_BUDGET_ALLOWLIST:
             return
-        path = UI_ROOT / "state.py"
+        path = UI_ROOT / "state" / "controller.py"
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         state_class = next(
             (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "AppState"),
@@ -281,3 +417,64 @@ class TestObjectOwnership:
             if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
         ]
         assert len(fields) <= APP_STATE_FIELD_BUDGET, [field.id for field in fields]
+
+    def test_core_classes_respect_the_public_method_budget(self) -> None:
+        offenders: list[str] = []
+        for path in _python_files(CORE_ROOT):
+            relative = path.relative_to(SOURCE_ROOT).as_posix()
+            offenders.extend(
+                f"{relative}: {name} defines {count} public methods"
+                for name, count in _public_methods(path)
+                if count > CORE_SERVICE_METHOD_BUDGET
+            )
+        assert offenders == []
+
+    def test_core_modules_respect_the_line_ceiling(self) -> None:
+        offenders = [
+            f"{path.relative_to(SOURCE_ROOT).as_posix()}: {len(path.read_text(encoding='utf-8').splitlines())} lines"
+            for path in _python_files(CORE_ROOT)
+            if len(path.read_text(encoding="utf-8").splitlines()) > CORE_MODULE_LINE_BUDGET
+        ]
+        assert offenders == []
+
+    def test_vault_does_not_import_its_sibling_services(self) -> None:
+        path = CORE_ROOT / "vault" / "service.py"
+        assert VAULT_SIBLING_MODULES.isdisjoint(_first_party_imports(path))
+
+
+class TestStateSurface:
+    def test_state_classes_respect_their_public_surface_budget(self) -> None:
+        offenders: list[str] = []
+        for _path, class_name, surface in _state_surfaces():
+            budget = APP_STATE_SURFACE_BUDGET if class_name == "AppState" else DOMAIN_CONTROLLER_SURFACE_BUDGET
+            if surface > budget:
+                offenders.append(f"{class_name} defines {surface} public names (budget {budget})")
+        assert offenders == []
+
+    def test_state_classes_with_fields_define_a_command(self) -> None:
+        offenders: list[str] = []
+        for _path, class_name, fields, commands in _state_shapes():
+            if fields and commands == 0:
+                offenders.append(f"{class_name} declares state fields but no public command")
+        assert offenders == []
+
+    def test_app_state_respects_the_combined_facade_budget(self) -> None:
+        path = UI_ROOT / "state" / "controller.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        state_class = next(
+            (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "AppState"),
+            None,
+        )
+        assert state_class is not None
+        public_fields = [
+            node.target.id
+            for node in state_class.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and not node.target.id.startswith("_")
+        ]
+        commands = _class_commands(state_class.body)
+        assert len(public_fields) + commands <= APP_STATE_SURFACE_BUDGET, [
+            *public_fields,
+            f"{commands} commands",
+        ]

@@ -22,14 +22,14 @@ import afanes.ui.views.page
 import afanes.ui.views.processing
 import afanes.ui.views.projects
 import afanes.ui.views.review
-from afanes.core.vault import VaultFailure, VaultNote
+from afanes.core.vault.snapshot import VaultFailure, VaultNote
 from afanes.ui.components.banner import Banner
 
 _SECTION_ICONS = {
-    afanes.ui.state.WorkspaceSection.INBOX: ft.Icons.INBOX,
-    afanes.ui.state.WorkspaceSection.PROJECTS: ft.Icons.FOLDER,
-    afanes.ui.state.WorkspaceSection.REFERENCES: ft.Icons.BOOK,
-    afanes.ui.state.WorkspaceSection.NEEDS_ATTENTION: ft.Icons.WARNING_AMBER,
+    afanes.ui.state.browser.WorkspaceSection.INBOX: ft.Icons.INBOX,
+    afanes.ui.state.browser.WorkspaceSection.PROJECTS: ft.Icons.FOLDER,
+    afanes.ui.state.browser.WorkspaceSection.REFERENCES: ft.Icons.BOOK,
+    afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION: ft.Icons.WARNING_AMBER,
 }
 
 
@@ -149,10 +149,10 @@ class WorkspaceView:
             on_click=self._select_review,
             key="review-entry",
         )
-        self.section_counts: dict[afanes.ui.state.WorkspaceSection, ft.Text] = {}
-        self.section_tiles: dict[afanes.ui.state.WorkspaceSection, ft.ListTile] = {}
-        for section in afanes.ui.state.WorkspaceSection:
-            if section is afanes.ui.state.WorkspaceSection.REVIEW:
+        self.section_counts: dict[afanes.ui.state.browser.WorkspaceSection, ft.Text] = {}
+        self.section_tiles: dict[afanes.ui.state.browser.WorkspaceSection, ft.ListTile] = {}
+        for section in afanes.ui.state.browser.WorkspaceSection:
+            if section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
                 continue
             self.section_counts[section] = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
             self.section_tiles[section] = ft.ListTile(
@@ -266,7 +266,7 @@ class WorkspaceView:
         text = self.capture_field.value or ""
         self._set_working(working=True)
         try:
-            path = await self._state.capture(text)
+            path = await self._state.session.capture(text)
         finally:
             self._set_working(working=False)
         if path is not None:
@@ -278,7 +278,7 @@ class WorkspaceView:
         """Re-read the vault and refresh the browser."""
         self._set_working(working=True)
         try:
-            await self._state.refresh()
+            await self._state.workspace.refresh()
         finally:
             self._set_working(working=False)
         self._refresh_dynamic()
@@ -312,46 +312,46 @@ class WorkspaceView:
         """Open one browser entry in the page pane."""
         self._set_working(working=True)
         try:
-            await self._state.open_page(path)
+            await self._state.navigation.open_page(path)
         finally:
             self._set_working(working=False)
         self._refresh_dynamic()
         self._update()
 
-    async def _select_section(self, section: afanes.ui.state.WorkspaceSection) -> None:
+    async def _select_section(self, section: afanes.ui.state.browser.WorkspaceSection) -> None:
         """Switch the browser to one section."""
-        await self._state.set_section(section)
+        await self._state.browser.set_section(section)
         self._refresh_dynamic()
         self._update()
 
     async def _select_review(self) -> None:
         """Open the review destination."""
-        await self._state.set_section(afanes.ui.state.WorkspaceSection.REVIEW)
+        await self._state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.REVIEW)
         self._refresh_dynamic()
         self._update()
 
     async def _search(self) -> None:
         """Apply the browser search text."""
-        await self._state.set_browser_query(self.search_field.value or "")
+        await self._state.browser.set_query(self.search_field.value or "")
         self._refresh_dynamic()
         self._update()
 
     async def _process_note(self, path: Path) -> None:
         """Open the Processing Wizard for one inbox capture."""
-        opened = await self._state.begin_processing(path)
+        opened = await self._state.processing.begin(path)
         if opened:
             self._refresh_dynamic()
             self._update()
 
     async def _cancel_processing(self) -> None:
         """Close the Processing Wizard without writing."""
-        self._state.cancel_processing()
+        self._state.processing.cancel()
         self._refresh_dynamic()
         self._update()
 
     async def _finish_processing(self) -> None:
         """Close the Processing Wizard success state."""
-        self._state.finish_processing()
+        self._state.processing.finish()
         self._refresh_dynamic()
         self._update()
 
@@ -389,23 +389,23 @@ class WorkspaceView:
     def _refresh_dynamic(self) -> None:
         """Refresh counts, browser entries, banners, and the main area."""
         state = self._state
-        self.vault_text.value = str(state.vault_root) if state.vault_root is not None else ""
-        listing = state.browser_listing
+        self.vault_text.value = str(state.session.vault_root) if state.session.vault_root is not None else ""
+        listing = state.browser.listing()
         for section, tile in self.section_tiles.items():
             browser_section = section.browser_section
             count = 0
             if listing is not None and browser_section is not None:
                 count = sum(len(group.notes) for group in listing.groups_for(browser_section))
             self.section_counts[section].value = str(count)
-            tile.selected = state.active_section is section
-        self.review_count.value = afanes.ui.strings.review_pending(state.review_pending_count)
-        self.review_tile.selected = state.active_section is afanes.ui.state.WorkspaceSection.REVIEW
-        self.search_field.value = state.browser_query
+            tile.selected = state.browser.active_section is section
+        self.review_count.value = afanes.ui.strings.review_pending(state.browser.pending_count())
+        self.review_tile.selected = state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW
+        self.search_field.value = state.browser.query
         self.browser_list.controls = self._browser_controls(listing)
         self._refresh_failures()
         self._refresh_banners()
         self._refresh_main()
-        self.progress.visible = state.busy
+        self.progress.visible = state.status.busy
 
     def _browser_controls(
         self,
@@ -413,22 +413,22 @@ class WorkspaceView:
     ) -> list[ft.Control]:
         """Build the sidebar entries for the active section."""
         state = self._state
-        if state.active_section is afanes.ui.state.WorkspaceSection.REVIEW:
+        if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
             return [
                 ft.Container(
                     padding=afanes.ui.theme.ITEM_GAP,
                     content=ft.Text(
-                        afanes.ui.strings.review_pending(state.review_pending_count),
+                        afanes.ui.strings.review_pending(state.browser.pending_count()),
                         color=afanes.ui.theme.MUTED_TEXT_COLOR,
                     ),
                 )
             ]
-        if state.active_section is afanes.ui.state.WorkspaceSection.PROJECTS:
+        if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.PROJECTS:
             if self._projects_view is None:
                 self._projects_view = afanes.ui.views.projects.ProjectsView(self._update, self._select)
             self._projects_view.refresh()
             return [self._projects_view.root]
-        section = state.active_section.browser_section
+        section = state.browser.active_section.browser_section
         if listing is None or section is None:
             return []
         groups = listing.groups_for(section)
@@ -455,7 +455,7 @@ class WorkspaceView:
             groups_empty = not notes
         if groups_empty:
             message = (
-                afanes.ui.strings.BROWSER_NO_MATCH if state.browser_query.strip() else afanes.ui.strings.BROWSER_EMPTY
+                afanes.ui.strings.BROWSER_NO_MATCH if state.browser.query.strip() else afanes.ui.strings.BROWSER_EMPTY
             )
             return [
                 ft.Container(
@@ -467,7 +467,7 @@ class WorkspaceView:
 
     def _note_row(self, note: VaultNote) -> ft.Control:
         """Build one clickable browser entry."""
-        page = self._state.page
+        page = self._state.pages.page
         selected = page is not None and page.path == note.path
         return ft.ListTile(
             title=note.title,
@@ -488,7 +488,7 @@ class WorkspaceView:
 
     def _section_handler(
         self,
-        section: afanes.ui.state.WorkspaceSection,
+        section: afanes.ui.state.browser.WorkspaceSection,
     ) -> Callable[[], Awaitable[None]]:
         """Bind a no-argument async handler to one section."""
 
@@ -499,7 +499,7 @@ class WorkspaceView:
 
     def _refresh_failures(self) -> None:
         """Refresh the unreadable-notes section."""
-        failures = self._state.failures
+        failures = self._state.session.failures
         if not failures:
             self.failures_column.controls = []
             self.failures_column.visible = False
@@ -529,7 +529,7 @@ class WorkspaceView:
         """Bind a no-argument async handler that opens one unreadable note."""
 
         async def handle() -> None:
-            await self._state.open_failure(path)
+            await self._state.navigation.open_failure(path)
             self._refresh_dynamic()
             self._update()
 
@@ -538,7 +538,7 @@ class WorkspaceView:
     def _refresh_banners(self) -> None:
         """Refresh the warning banners."""
         banners: list[ft.Control] = []
-        message = self._state.message
+        message = self._state.status.message
         if message is not None:
             banners.append(Banner(message).build())
         self.banners.controls = banners
@@ -547,8 +547,8 @@ class WorkspaceView:
     def _refresh_main(self) -> None:
         """Show the page pane, the Processing Wizard, or the review area."""
         state = self._state
-        if state.processing_note is not None or state.processing_result is not None:
-            key = (state.processing_note, state.processing_result)
+        if state.processing.note is not None or state.processing.result is not None:
+            key = (state.processing.note, state.processing.result)
             if self._processing_view is None or key != self._processing_key:
                 self._processing_view = afanes.ui.views.processing.ProcessingView(
                     self._on_processing_update,
@@ -560,7 +560,7 @@ class WorkspaceView:
             return
         self._processing_view = None
         self._processing_key = None
-        if state.active_section is afanes.ui.state.WorkspaceSection.REVIEW:
+        if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
             if self._review_view is None:
                 self._review_view = afanes.ui.views.review.ReviewView(self._on_review_update)
             self._review_view.refresh()

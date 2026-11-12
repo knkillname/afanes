@@ -9,7 +9,7 @@ from pathlib import Path
 
 import flet as ft
 
-import afanes.core.vault
+import afanes.core.vault.service
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
@@ -52,7 +52,7 @@ class _Shell:
     async def start(self) -> None:
         """Configure the page, claim the session, and open the first state."""
         self._configure()
-        if not self.state.begin_session():
+        if not self.state.status.begin_session():
             self.page.add(afanes.ui.views.inbox.SessionNotice(self.retry_session).build())
             self.page.update()
             return
@@ -76,14 +76,14 @@ class _Shell:
     async def _start_workspace(self) -> None:
         """Open the launch or remembered vault and render the result."""
         if self.launch_vault is None:
-            await self.state.start()
+            await self.state.workspace.start()
         else:
-            await self.state.open_vault_for_run(self.launch_vault)
+            await self.state.workspace.open_vault_for_run(self.launch_vault)
         await self.render()
 
     async def retry_session(self) -> None:
         """Try to claim the session again after another window disconnects."""
-        if not self.state.begin_session():
+        if not self.state.status.begin_session():
             self.page.update()
             return
         await self._start_workspace()
@@ -98,7 +98,7 @@ class _Shell:
         task.
         """
         self._cancel_refresh_loop()
-        self.state.release_session()
+        self.state.status.release_session()
 
     def _start_refresh_loop(self) -> None:
         """Start the single background refresh loop when none is running."""
@@ -128,14 +128,14 @@ class _Shell:
 
         Notes
         -----
-        The loop reads only :data:`afanes.ui.state.REFRESH_SECONDS`. Each tick
+        The loop reads only :data:`afanes.ui.state.session.REFRESH_SECONDS`. Each tick
         asks the controller for a changed scan and repaints only when one was
         applied. Cancellation closes the loop on vault close, session release,
         and workspace replacement.
         """
         while True:
-            await asyncio.sleep(afanes.ui.state.REFRESH_SECONDS)
-            if await self.state.refresh_workspace() and self.workspace is not None:
+            await asyncio.sleep(afanes.ui.state.session.REFRESH_SECONDS)
+            if await self.state.workspace.refresh_workspace() and self.workspace is not None:
                 self.workspace.refresh()
 
     async def render(self) -> None:
@@ -143,7 +143,7 @@ class _Shell:
         await self._stop_refresh_loop()
         self.workspace = None
         self.page.controls.clear()
-        if self.state.vault_root is None:
+        if self.state.session.vault_root is None:
             if self.is_desktop:
                 self.page.add(
                     afanes.ui.views.inbox.WelcomeView(
@@ -178,7 +178,7 @@ class _Shell:
                     )
                 )
         self.page.update()
-        if self.state.vault_root is not None:
+        if self.state.session.vault_root is not None:
             self._start_refresh_loop()
 
     def _due_digest(self) -> ft.Control | None:
@@ -195,8 +195,8 @@ class _Shell:
         Building the digest reads the latest scan only. It never creates,
         changes, or removes a note.
         """
-        count = self.state.review_due_count
-        if count == 0 or self.state.review_session is not None:
+        count = self.state.browser.due_count()
+        if count == 0 or self.state.review.review_session is not None:
             return None
         message = (
             afanes.ui.strings.REVIEW_LAUNCH_DIGEST_ONE
@@ -225,12 +225,12 @@ class _Shell:
 
     async def start_launch_review(self) -> None:
         """Start the guided review from the launch digest and repaint."""
-        await self.state.start_review()
+        await self.state.review.start()
         await self.render()
 
     async def open_path(self, text: str) -> None:
         """Open the vault named by typed text and repaint."""
-        await self.state.open_vault_path(text)
+        await self.state.workspace.open_vault_path(text)
         await self.render()
 
     async def choose_vault(self) -> None:
@@ -244,10 +244,10 @@ class _Shell:
         if selected is None:
             return
         path = Path(selected)
-        if self.state.vault_root is None:
-            await self.state.choose_vault(path)
+        if self.state.session.vault_root is None:
+            await self.state.workspace.choose_vault(path)
         else:
-            await self.state.change_vault(path)
+            await self.state.workspace.change_vault(path)
         await self.render()
 
     async def create_vault(self) -> None:
@@ -273,9 +273,9 @@ class _Shell:
         banner reports the reason.
         """
         await self._stop_refresh_loop()
-        if await self.state.close_vault():
+        if await self.state.workspace.close_vault():
             await self.render()
-        elif self.state.vault_root is not None:
+        elif self.state.session.vault_root is not None:
             self._start_refresh_loop()
 
     async def show_create_dialog(self) -> None:
@@ -289,7 +289,7 @@ class _Shell:
         content instead of failing to open. A desktop session can type the path
         or use the browse action, which opens the native directory dialog.
         """
-        summaries = await self.state.template_summaries()
+        summaries = await self.state.session.template_summaries()
         by_identifier = {summary.identifier: summary for summary in summaries or ()}
         field = ft.TextField(
             label=afanes.ui.strings.NEW_VAULT_PATH_LABEL,
@@ -340,7 +340,7 @@ class _Shell:
             visible=summaries is None,
             key="create-vault-templates-error",
         )
-        folders = ", ".join(f"{folder.as_posix()}/" for folder in afanes.core.vault.Vault.default_layout())
+        folders = ", ".join(f"{folder.as_posix()}/" for folder in afanes.core.vault.service.Vault.default_layout())
         preview = ft.Text(
             afanes.ui.strings.NEW_VAULT_PREVIEW_GUIDE.format(folders=folders),
             size=12,
@@ -373,8 +373,8 @@ class _Shell:
             if not text:
                 self._show_create_error(error, afanes.ui.strings.VAULT_PATH_REQUIRED)
                 return
-            if not await self.state.create_vault(Path(text), template=selector.value or None):
-                self._show_create_error(error, self.state.message or afanes.ui.strings.VAULT_PATH_REQUIRED)
+            if not await self.state.workspace.create_vault(Path(text), template=selector.value or None):
+                self._show_create_error(error, self.state.status.message or afanes.ui.strings.VAULT_PATH_REQUIRED)
                 return
             self.page.pop_dialog()
             await self.render()
@@ -429,7 +429,7 @@ class _Shell:
         field = ft.TextField(
             label=afanes.ui.strings.WELCOME_PATH_LABEL,
             hint_text=afanes.ui.strings.WELCOME_PATH_HINT,
-            value="" if self.state.vault_root is None else str(self.state.vault_root),
+            value="" if self.state.session.vault_root is None else str(self.state.session.vault_root),
             autofocus=True,
             key="change-vault-path",
         )

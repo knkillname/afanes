@@ -12,7 +12,7 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
-from afanes.core.vault import VaultNote
+from afanes.core.vault.snapshot import VaultNote
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import Status
 from afanes.ui.components.banner import Banner
@@ -53,7 +53,7 @@ class ProcessingView:
         self._on_cancel = on_cancel
         self._on_finish = on_finish
         self._working = False
-        self._plan_hidden = self._state.processing_plan is None
+        self._plan_hidden = self._state.processing.plan is None
         self._suppress_suggestions = False
 
         self.progress = ft.ProgressRing(
@@ -317,7 +317,7 @@ class ProcessingView:
         self.form_error.visible = False
         self._set_working(working=True)
         try:
-            plan = await self._state.plan_processing(
+            plan = await self._state.processing.build_plan(
                 outcome,
                 status=status,
                 due_date=due_date,
@@ -333,7 +333,9 @@ class ProcessingView:
         """Apply the current plan after confirmation."""
         self._set_working(working=True)
         try:
-            await self._state.apply_processing()
+            target = await self._state.processing.apply()
+            if target is not None:
+                await self._state.review.record_processed()
         finally:
             self._set_working(working=False)
         self._refresh_dynamic()
@@ -367,8 +369,10 @@ class ProcessingView:
     def _refresh_dynamic(self) -> None:
         """Refresh visibility, plan details, and banners from application state."""
         state = self._state
-        self.capture_title.value = state.note_title(state.processing_note) if state.processing_note is not None else ""
-        self.capture_body.value = state.processing_body or ""
+        self.capture_title.value = (
+            state.session.note_title(state.processing.note) if state.processing.note is not None else ""
+        )
+        self.capture_body.value = state.processing.body or ""
 
         outcome = self._selected_outcome()
         self.status.visible = outcome is ProcessingOutcome.PROJECT
@@ -376,26 +380,26 @@ class ProcessingView:
         self.project.visible = outcome is ProcessingOutcome.APPEND_STEP
         self._refresh_suggestions()
 
-        success = state.processing_result is not None
+        success = state.processing.result is not None
         self.form.visible = not success
         self.success_panel.visible = success
         self.cancel_button.visible = not success
         self.done_button.visible = success
-        if state.processing_result is not None:
-            self.success_text.value = afanes.ui.strings.PROCESSING_SUCCESS_BODY.format(path=state.processing_result)
+        if state.processing.result is not None:
+            self.success_text.value = afanes.ui.strings.PROCESSING_SUCCESS_BODY.format(path=state.processing.result)
 
-        plan = state.processing_plan
+        plan = state.processing.plan
         show_plan = plan is not None and not self._plan_hidden and not success
         self.plan_panel.visible = show_plan
         if show_plan:
             self._populate_plan(plan)
 
         banners: list[ft.Control] = []
-        if state.message is not None:
-            banners.append(Banner(state.message).build())
+        if state.status.message is not None:
+            banners.append(Banner(state.status.message).build())
         self.banners.controls = banners
         self.banners.visible = bool(banners)
-        self.progress.visible = self._working or state.busy
+        self.progress.visible = self._working or state.status.busy
 
     def _populate_plan(self, plan: ProcessingPlan | AppendStepPlan) -> None:
         """Fill the preview panel from a validated plan."""
@@ -464,7 +468,7 @@ class ProcessingView:
         if not visible or not query:
             self._clear_suggestions(column)
             return
-        candidates = self._state.assignment_candidates(scheme, query)
+        candidates = self._state.session.assignment_candidates(scheme, query)
         column.controls = [self._suggestion_tile(note, apply) for note in candidates]
         column.visible = bool(column.controls)
 

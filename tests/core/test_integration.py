@@ -8,7 +8,11 @@ import pytest
 
 import afanes.core.search
 import afanes.core.settings
-import afanes.core.vault
+import afanes.core.vault.naming
+import afanes.core.vault.pages
+import afanes.core.vault.processing
+import afanes.core.vault.service
+import afanes.core.vault.steps
 import afanes.ui.state
 from afanes.core.editing import PageDraftFactory
 from afanes.core.errors import ProcessingError
@@ -17,7 +21,8 @@ from afanes.core.links import ResolutionOutcome
 from afanes.core.processing import ProcessingOutcome
 from afanes.core.search import Browser, BrowserSection, ReviewPlanner
 from afanes.core.steps import StepDocument
-from afanes.core.vault import UnparsedPage, Vault
+from afanes.core.vault.service import Vault
+from afanes.core.vault.snapshot import UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType, Status
 
@@ -43,11 +48,11 @@ class TestReferenceLifecycle:
         reference = NoteReference(scheme=ReferenceScheme.NOTE, name="Ada Lovelace")
         assert vault.scan().catalog.resolve(reference).targets == (ada,)
 
-        moved = vault.move(ada, Path("work"), confirm=True)
+        moved = afanes.core.vault.naming.VaultNaming(vault).move(ada, Path("work"), confirm=True)
         assert vault.scan().catalog.resolve(reference).targets == (moved,)
 
-        preview = vault.plan_rename(moved, "Ada King")
-        report = vault.apply_rename(preview, confirm=True)
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_rename(moved, "Ada King")
+        report = afanes.core.vault.naming.VaultNaming(vault).apply_rename(preview, confirm=True)
 
         assert report.failed == ()
         assert "[Ada King](<note:Ada King>)" in note.read_text(encoding="utf-8")
@@ -78,7 +83,7 @@ class TestVaultLayoutAndTrash:
         referring = vault.create("Note", NoteType.NOTE, body="[Ada](<note:Ada>)\n")
         reference = NoteReference(scheme=ReferenceScheme.NOTE, name="Ada")
 
-        count = vault.trash(ada, confirm=True)
+        count = afanes.core.vault.naming.VaultNaming(vault).trash(ada, confirm=True)
 
         assert count == 1
         assert not ada.exists()
@@ -97,10 +102,10 @@ class TestProcessingLifecycle:
         root = tmp_path / "vault"
         root.mkdir()
         vault = Vault(root)
-        capture = vault.capture("Read the manual")
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Read the manual")
 
-        plan = vault.plan_processing(capture, ProcessingOutcome.REFERENCE)
-        target = vault.apply_processing(plan, confirm=True)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.REFERENCE)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert target == root / "reference" / "Read the manual.md"
         assert NoteDocument.from_text(target.read_text(encoding="utf-8")).note_type is NoteType.REFERENCE
@@ -110,10 +115,10 @@ class TestProcessingLifecycle:
         root = tmp_path / "vault"
         root.mkdir()
         vault = Vault(root)
-        capture = vault.capture("Read the manual")
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Read the manual")
 
-        plan = vault.plan_processing(capture, ProcessingOutcome.LATER)
-        target = vault.apply_processing(plan, confirm=True)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.LATER)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert NoteDocument.from_text(target.read_text(encoding="utf-8")).status is Status.LATER
 
@@ -121,10 +126,12 @@ class TestProcessingLifecycle:
         root = tmp_path / "vault"
         root.mkdir()
         vault = Vault(root)
-        capture = vault.capture("Launch\n\n- [ ] Call the printer\n- [ ] Book the room\n")
+        capture = afanes.core.vault.pages.VaultPages(vault).capture(
+            "Launch\n\n- [ ] Call the printer\n- [ ] Book the room\n"
+        )
 
-        plan = vault.plan_processing(capture, ProcessingOutcome.PROJECT)
-        target = vault.apply_processing(plan, confirm=True)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
         note = vault.scan().find_note(target)
 
         assert note is not None
@@ -136,10 +143,12 @@ class TestProcessingLifecycle:
         root = tmp_path / "vault"
         root.mkdir()
         vault = Vault(root)
-        capture = vault.capture("Send the invoice")
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Send the invoice")
 
-        plan = vault.plan_processing(capture, ProcessingOutcome.DONE_NOW, today=TODAY)
-        target = vault.apply_processing(plan, confirm=True)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            capture, ProcessingOutcome.DONE_NOW, today=TODAY
+        )
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
         document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
         steps = StepDocument(document.body).steps
 
@@ -152,10 +161,12 @@ class TestProcessingLifecycle:
         root.mkdir()
         vault = Vault(root)
         project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
-        capture = vault.capture("Call the plumber\n\nAsk about the boiler")
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Call the plumber\n\nAsk about the boiler")
 
-        plan = vault.plan_processing(capture, ProcessingOutcome.APPEND_STEP, project="Home")
-        target = vault.apply_processing(plan, confirm=True)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            capture, ProcessingOutcome.APPEND_STEP, project="Home"
+        )
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert target == project
         document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
@@ -168,10 +179,10 @@ class TestProcessingLifecycle:
         root = tmp_path / "vault"
         root.mkdir()
         vault = Vault(root)
-        capture = vault.capture("Obsolete")
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Obsolete")
 
-        plan = vault.plan_processing(capture, ProcessingOutcome.TRASH)
-        target = vault.apply_processing(plan, confirm=True)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.TRASH)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert target == root / "trash" / "Obsolete.md"
         assert not capture.exists()
@@ -185,7 +196,7 @@ class TestInboxCapture:
         root.mkdir()
         vault = Vault(root)
 
-        path = vault.capture("Call Ada\n\nAbout the report.")
+        path = afanes.core.vault.pages.VaultPages(vault).capture("Call Ada\n\nAbout the report.")
 
         snapshot = vault.scan()
         assert [note.path for note in snapshot.inbox_notes()] == [path]
@@ -215,21 +226,21 @@ class TestPageEditingLifecycle:
         state.reset()
 
         async def scenario() -> None:
-            await state.choose_vault(root)
-            await state.open_page(capture)
-            await state.follow_link("note:Ada")
-            assert state.page is not None
-            assert state.page.path == ada.resolve()
-            await state.back()
-            assert state.page is not None
-            assert state.page.path == capture.resolve()
-            await state.follow_link("note:Budget")
-            await state.set_page_body("# Budget\n\nDraft the budget.\n")
-            await state.set_page_type(NoteType.PROJECT)
-            await state.set_page_status(Status.ACTIVE)
-            await state.set_page_due_date("2026-12-01")
-            assert await state.autosave() is True
-            assert await state.done_editing() is True
+            await state.workspace.choose_vault(root)
+            await state.navigation.open_page(capture)
+            await state.navigation.follow_link("note:Ada")
+            assert state.pages.page is not None
+            assert state.pages.page.path == ada.resolve()
+            await state.navigation.back()
+            assert state.pages.page is not None
+            assert state.pages.page.path == capture.resolve()
+            await state.navigation.follow_link("note:Budget")
+            await state.pages.set_page_body("# Budget\n\nDraft the budget.\n")
+            await state.dialogs.set_page_type(NoteType.PROJECT)
+            await state.dialogs.set_page_status(Status.ACTIVE)
+            await state.dialogs.set_page_due_date("2026-12-01")
+            assert await state.pages.autosave() is True
+            assert await state.pages.done_editing() is True
 
         try:
             asyncio.run(scenario())
@@ -284,7 +295,7 @@ class TestMisplacedNote:
 
         assert listing.group(BrowserSection.NEEDS_ATTENTION).notes[0].path == path
         with pytest.raises(ProcessingError):
-            vault.plan_processing(path, ProcessingOutcome.PROJECT)
+            afanes.core.vault.processing.VaultProcessing(vault).plan_processing(path, ProcessingOutcome.PROJECT)
 
 
 class TestReviewWorkflow:
@@ -296,18 +307,20 @@ class TestReviewWorkflow:
         root = tmp_path / "vault"
         root.mkdir()
         vault = Vault(root)
-        capture = vault.capture("Launch the site")
-        plan = vault.plan_processing(capture, ProcessingOutcome.PROJECT)
-        project = vault.apply_processing(plan, confirm=True)
-        vault.append_step(project, "Call the printer", confirm=True)
-        vault.append_step(project, "Book the room", confirm=True)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Launch the site")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
+        project = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
+        afanes.core.vault.steps.VaultSteps(vault).append_step(project, "Call the printer", confirm=True)
+        afanes.core.vault.steps.VaultSteps(vault).append_step(project, "Book the room", confirm=True)
         snapshot = vault.scan()
         note = snapshot.find_note(project)
         assert note is not None
         first = note.steps[0]
         second = note.steps[1]
-        vault.tick_step(project, first.line_index, TODAY, confirm=True)
-        vault.plan_step(project, second.line_index, TODAY - datetime.timedelta(days=1), confirm=True)
+        afanes.core.vault.steps.VaultSteps(vault).tick_step(project, first.line_index, TODAY, confirm=True)
+        afanes.core.vault.steps.VaultSteps(vault).plan_step(
+            project, second.line_index, TODAY - datetime.timedelta(days=1), confirm=True
+        )
 
         assert len(Browser(vault.scan()).filter("printer").group(BrowserSection.PROJECTS).notes) == 1
 
@@ -320,10 +333,10 @@ class TestReviewWorkflow:
         state.reset()
 
         async def scenario() -> None:
-            await state.choose_vault(root)
-            assert state.review_due_count == 1
-            assert await state.start_review() is True
-            assert await state.review_delegate("Ada") is True
+            await state.workspace.choose_vault(root)
+            assert state.browser.due_count() == 1
+            assert await state.review.start() is True
+            assert await state.review.delegate("Ada") is True
 
         try:
             asyncio.run(scenario())
@@ -343,11 +356,11 @@ class TestCreatedVaultWorkflow:
         self,
         tmp_path: Path,
     ) -> None:
-        creation = afanes.core.vault.Vault.create_directory(tmp_path / "vault")
+        creation = afanes.core.vault.service.Vault.create_directory(tmp_path / "vault")
         vault = creation.vault
-        capture = vault.capture("Draft the plan")
-        plan = vault.plan_processing(capture, ProcessingOutcome.REFERENCE)
-        target = vault.apply_processing(plan, confirm=True)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Draft the plan")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.REFERENCE)
+        target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert target.is_file()
         assert vault.scan().inbox_notes() == ()
@@ -378,8 +391,8 @@ class TestWorkspaceLiveness:
         state.reset()
 
         async def scenario() -> tuple[list[str], int, str | None]:
-            await state.choose_vault(root)
-            capture = await state.capture("Old title")
+            await state.workspace.choose_vault(root)
+            capture = await state.session.capture("Old title")
             assert capture is not None
             _write_note(root, "inbox/Old title.md", "---\ntype: note\n---\n\n# New title\n")
             _write_note(
@@ -387,11 +400,11 @@ class TestWorkspaceLiveness:
                 "projects/Launch.md",
                 "---\ntype: project\n---\n\n# Launch\n\n- [ ] Fresh step\n- [ ] Second step\n",
             )
-            assert await state.refresh_workspace() is True
-            listing = state.browser_listing
+            assert await state.workspace.refresh_workspace() is True
+            listing = state.browser.listing()
             assert listing is not None
             inbox = [note.title for note in listing.group(BrowserSection.INBOX).notes]
-            summaries = [summary for group in state.project_groups for summary in group.projects]
+            summaries = [summary for group in state.browser.project_groups() for summary in group.projects]
             launch = next(summary for summary in summaries if summary.note.name == "Launch")
             next_text = None if launch.next_step is None else launch.next_step.text
             return inbox, launch.open_count, next_text

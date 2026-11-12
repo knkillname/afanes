@@ -58,8 +58,8 @@ class TestReadMode:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(path)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
 
         asyncio.run(scenario())
         view = PageView(lambda: None)
@@ -93,14 +93,14 @@ class TestReadMode:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
+            await state.workspace.choose_vault(vault)
             event = ft.Event(name="tap", control=ft.Markdown(), data="note:Ada")
             await view.handle_link(event)
 
         asyncio.run(scenario())
 
-        assert state.page is not None
-        assert state.page.path == person.resolve()
+        assert state.pages.page is not None
+        assert state.pages.page.path == person.resolve()
 
     def test_edit_button_switches_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -111,14 +111,14 @@ class TestReadMode:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(path)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
             view.refresh()
             await view.start_edit()
 
         asyncio.run(scenario())
 
-        assert state.editing is True
+        assert state.pages.editing is True
         assert view.edit_form.visible is True
         assert view.read_body.visible is False
         assert view.done_button.visible is True
@@ -133,16 +133,16 @@ class TestReadMode:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(first)
-            await state.open_page(second)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(first)
+            await state.navigation.open_page(second)
             view.refresh()
             await view.go_back()
 
         asyncio.run(scenario())
 
-        assert state.page is not None
-        assert state.page.path == first.resolve()
+        assert state.pages.page is not None
+        assert state.pages.page.path == first.resolve()
         assert view.title.value == "First"
 
 
@@ -163,8 +163,8 @@ class TestEditMode:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(path)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
             view.refresh()
             await view.start_edit()
 
@@ -191,8 +191,8 @@ class TestEditMode:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(path)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
             view.refresh()
             await view.start_edit()
 
@@ -210,8 +210,8 @@ class TestEditMode:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(path)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
             view.refresh()
             await view.start_edit()
             view.body_field.value = "# Ada\n\nChanged.\n"
@@ -219,9 +219,9 @@ class TestEditMode:
 
         asyncio.run(scenario())
 
-        assert state.page is not None
-        assert state.page.body == "# Ada\n\nChanged.\n"
-        assert state.page.is_dirty is True
+        assert state.pages.page is not None
+        assert state.pages.page.body == "# Ada\n\nChanged.\n"
+        assert state.pages.page.is_dirty is True
 
     def test_invalid_due_date_is_shown_inline(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -232,8 +232,8 @@ class TestEditMode:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(path)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
             view.refresh()
             await view.start_edit()
             view.due_field.value = "January"
@@ -256,8 +256,8 @@ class TestEditMode:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(path)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
             view.refresh()
             await view.start_edit()
             view.category_field.value = "person"
@@ -271,10 +271,10 @@ class TestEditMode:
         moved = vault / "reference" / "person" / "Ada.md"
         assert moved.is_file()
         assert not path.exists()
-        assert state.page is not None
-        assert state.page.labels is not None
-        assert state.page.labels.category is not None
-        assert state.page.labels.category.value == "person"
+        assert state.pages.page is not None
+        assert state.pages.page.labels is not None
+        assert state.pages.page.labels.category is not None
+        assert state.pages.page.labels.category.value == "person"
 
     def test_type_change_opens_the_confirmation_panel(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -289,21 +289,21 @@ class TestEditMode:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(person)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(person)
             view.refresh()
             await view.start_edit()
             view.type_dropdown.value = "project"
             await view.change_type()
             assert view.type_change_panel.visible is True
-            assert state.pending_labels is not None
+            assert state.dialogs.pending_labels is not None
             await view.confirm_type_change()
 
         asyncio.run(scenario())
 
-        assert state.page is not None
-        assert state.page.labels is not None
-        assert state.page.labels.note_type is NoteType.PROJECT
+        assert state.pages.page is not None
+        assert state.pages.page.labels is not None
+        assert state.pages.page.labels.note_type is NoteType.PROJECT
         assert view.type_change_panel.visible is False
 
     def test_cancelling_a_type_change_keeps_the_original(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -319,8 +319,8 @@ class TestEditMode:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(person)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(person)
             view.refresh()
             await view.start_edit()
             view.type_dropdown.value = "project"
@@ -329,9 +329,9 @@ class TestEditMode:
 
         asyncio.run(scenario())
 
-        assert state.page is not None
-        assert state.page.labels is not None
-        assert state.page.labels.scheme is ReferenceScheme.NOTE
+        assert state.pages.page is not None
+        assert state.pages.page.labels is not None
+        assert state.pages.page.labels.scheme is ReferenceScheme.NOTE
         assert view.type_change_panel.visible is False
 
 
@@ -345,14 +345,14 @@ class TestRawMode:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_failure(Path("reference/Broken.md"))
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_failure(Path("reference/Broken.md"))
             view.refresh()
 
         asyncio.run(scenario())
 
-        assert state.page is not None
-        assert state.page.mode is DraftMode.RAW
+        assert state.pages.page is not None
+        assert state.pages.page.mode is DraftMode.RAW
         assert view.raw_panel.visible is True
         assert view.raw_field.value == "---\ntype: refrence\n---\nBody\n"
         assert view.raw_warning.value
@@ -368,16 +368,16 @@ class TestRawMode:
         fixed = "---\ntype: note\n---\n\n# Fixed\nBody.\n"
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_failure(Path("reference/Broken.md"))
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_failure(Path("reference/Broken.md"))
             view.refresh()
             view.raw_field.value = fixed
             await view.save_raw()
 
         asyncio.run(scenario())
 
-        assert state.page is not None
-        assert state.page.mode is DraftMode.NORMAL
+        assert state.pages.page is not None
+        assert state.pages.page.mode is DraftMode.NORMAL
         assert view.raw_panel.visible is False
         assert view.edit_form.visible is True
 
@@ -392,14 +392,14 @@ class TestPanels:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(path)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
             view.refresh()
             await view.start_edit()
             view.body_field.value = "# Ada\n\nMy edit.\n"
             await view.change_body()
             path.write_text(_note_text("# Ada\n\nExternal.\n"), encoding="utf-8", newline="\n")
-            await state.autosave()
+            await state.pages.autosave()
             view.refresh()
             assert view.conflict_panel.visible is True
             assert view.reload_button.visible is True
@@ -409,7 +409,7 @@ class TestPanels:
 
         asyncio.run(scenario())
 
-        assert state.conflict is None
+        assert state.pages.conflict is None
         assert view.conflict_panel.visible is False
 
     def test_missing_conflict_offers_recreate(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -421,14 +421,14 @@ class TestPanels:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(path)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
             view.refresh()
             await view.start_edit()
             view.body_field.value = "# Ada\n\nMy edit.\n"
             await view.change_body()
             path.unlink()
-            await state.autosave()
+            await state.pages.autosave()
             view.refresh()
             assert view.recreate_button.visible is True
             await view.recreate_page()
@@ -436,7 +436,7 @@ class TestPanels:
         asyncio.run(scenario())
 
         assert path.exists()
-        assert state.conflict is None
+        assert state.pages.conflict is None
 
     def test_ambiguity_picker_lists_and_opens_candidates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -454,8 +454,8 @@ class TestPanels:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.follow_link("note:Ada")
+            await state.workspace.choose_vault(vault)
+            await state.navigation.follow_link("note:Ada")
             view.refresh()
             assert view.ambiguous_panel.visible is True
             assert len(view.ambiguous_list.controls) == TWO_CANDIDATES
@@ -467,9 +467,9 @@ class TestPanels:
 
         asyncio.run(scenario())
 
-        assert state.ambiguous == ()
-        assert state.page is not None
-        assert state.page.path in {first.resolve(), second.resolve()}
+        assert state.navigation.ambiguous == ()
+        assert state.pages.page is not None
+        assert state.pages.page.path in {first.resolve(), second.resolve()}
         assert view.ambiguous_panel.visible is False
 
     def test_repair_panel_rewrites_the_links(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -481,11 +481,11 @@ class TestPanels:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.follow_link("note:Q1: Planning?")
+            await state.workspace.choose_vault(vault)
+            await state.navigation.follow_link("note:Q1: Planning?")
             view.refresh()
-            await state.set_page_body("# Q1: Planning?\n\nDraft.\n")
-            await state.autosave()
+            await state.pages.set_page_body("# Q1: Planning?\n\nDraft.\n")
+            await state.pages.autosave()
             view.refresh()
             assert view.repair_panel.visible is True
             assert view.repair_text.value
@@ -505,8 +505,8 @@ class TestPanels:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(note)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
             view.refresh()
             await view.begin_rename()
             assert view.rename_panel.visible is True
@@ -530,8 +530,8 @@ class TestPanels:
         view = PageView(lambda: None)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(note)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
             view.refresh()
             await view.begin_trash()
             assert view.trash_panel.visible is True
@@ -542,12 +542,14 @@ class TestPanels:
 
         assert not note.exists()
         assert (vault / "trash" / "Ada.md").exists()
-        assert state.page is None
+        assert state.pages.page is None
         assert view.trash_panel.visible is False
 
 
 class TestSteps:
-    def _project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, afanes.ui.state.AppState]:
+    def _project(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> tuple[Path, afanes.ui.state.controller.AppState]:
         vault = tmp_path / "vault"
         path = _write_note(
             vault / "projects" / "Home.md",
@@ -560,8 +562,8 @@ class TestSteps:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(path)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
 
         asyncio.run(scenario())
         return path, state
@@ -605,8 +607,8 @@ class TestSteps:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await state.choose_vault(tmp_path / "vault")
-            await state.open_page(path)
+            await state.workspace.choose_vault(tmp_path / "vault")
+            await state.navigation.open_page(path)
 
         asyncio.run(scenario())
         view = PageView(lambda: None)

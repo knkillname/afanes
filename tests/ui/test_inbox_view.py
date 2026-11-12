@@ -12,7 +12,7 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.views.inbox
 from afanes.core.editing import DraftMode
-from afanes.core.vault import VaultFailure
+from afanes.core.vault.snapshot import VaultFailure
 
 TWO_BANNERS = 2
 
@@ -56,7 +56,7 @@ class TestWelcomeView:
         assert buttons[0].content == afanes.ui.strings.WELCOME_CHOOSE
 
     def test_welcome_shows_the_startup_message(self) -> None:
-        afanes.ui.state.app_state.message = afanes.ui.strings.SETTINGS_UNREADABLE
+        afanes.ui.state.app_state.status.message = afanes.ui.strings.SETTINGS_UNREADABLE
 
         control = afanes.ui.views.inbox.WelcomeView(_change_vault).build()
         assert isinstance(control, ft.Container)
@@ -113,9 +113,9 @@ class TestInboxView:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.capture("Buy milk")
-            await state.open_page(state.notes[0].path)
+            await state.workspace.choose_vault(vault)
+            await state.session.capture("Buy milk")
+            await state.navigation.open_page(state.session.notes[0].path)
 
         asyncio.run(scenario())
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
@@ -139,7 +139,7 @@ class TestInboxView:
         )
         state = afanes.ui.state.app_state
 
-        asyncio.run(state.choose_vault(vault))
+        asyncio.run(state.workspace.choose_vault(vault))
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
 
         row = view.list_view.controls[0]
@@ -157,7 +157,7 @@ class TestInboxView:
         )
         state = afanes.ui.state.app_state
 
-        asyncio.run(state.choose_vault(vault))
+        asyncio.run(state.workspace.choose_vault(vault))
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
 
         row = view.list_view.controls[0]
@@ -175,7 +175,7 @@ class TestInboxView:
         )
         state = afanes.ui.state.app_state
 
-        asyncio.run(state.choose_vault(vault))
+        asyncio.run(state.workspace.choose_vault(vault))
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
 
         rows = [control for control in view.list_view.controls if isinstance(control, ft.ListTile)]
@@ -193,8 +193,8 @@ class TestInboxView:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(note)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
 
         asyncio.run(scenario())
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
@@ -213,8 +213,8 @@ class TestInboxView:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.open_page(note)
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
 
         asyncio.run(scenario())
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
@@ -236,9 +236,9 @@ class TestInboxView:
             calls.append(path)
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
-            await state.capture("Buy milk")
-            await state.open_page(state.notes[0].path)
+            await state.workspace.choose_vault(vault)
+            await state.session.capture("Buy milk")
+            await state.navigation.open_page(state.session.notes[0].path)
 
         asyncio.run(scenario())
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, process)
@@ -247,13 +247,13 @@ class TestInboxView:
         handler = typing.cast("typing.Any", view.page_view.process_button.on_click)
         asyncio.run(handler())
 
-        assert state.page is not None
-        assert calls == [state.page.path]
+        assert state.pages.page is not None
+        assert calls == [state.pages.page.path]
 
     def test_shows_message_and_scan_banners(self) -> None:
         state = afanes.ui.state.app_state
-        state.message = "boom"
-        state.failures = (VaultFailure(path=Path("inbox/Bad.md"), message="bad"),)
+        state.status.message = "boom"
+        state.session.failures = (VaultFailure(path=Path("inbox/Bad.md"), message="bad"),)
 
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
 
@@ -274,7 +274,7 @@ class TestInboxView:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await state.choose_vault(vault)
+            await state.workspace.choose_vault(vault)
 
         asyncio.run(scenario())
         view = afanes.ui.views.inbox.InboxView(_noop, _change_vault, _process)
@@ -287,6 +287,6 @@ class TestInboxView:
         handler = typing.cast("typing.Any", button.on_click)
         asyncio.run(handler())
 
-        assert state.page is not None
-        assert state.page.mode is DraftMode.RAW
+        assert state.pages.page is not None
+        assert state.pages.page.mode is DraftMode.RAW
         assert view.page_view.raw_panel.visible is True

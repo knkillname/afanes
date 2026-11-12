@@ -84,7 +84,8 @@ directory. Build-time dependency resolution is the only network activity; the pa
 makes no request at startup.
 
 Artifacts are unsigned local builds. Code signing, notarization, auto-update, and a release pipeline
-are not part of this project yet.
+are not part of this project yet. The release-readiness checklist, platform evidence, and version path
+are in [RELEASE.md](RELEASE.md).
 
 ### Check the offline start
 
@@ -95,7 +96,8 @@ one a source run writes. Confirm the artifact metadata reports the same version 
 Packaged artifacts are checked on the platform that produces them. Linux is verified locally: the
 artifact built, started with no remote connection, and wrote the same note as a source run. The
 automated suite also covers the workspace refresh behavior. The macOS and Windows artifact,
-offline-start, capture, and refresh checks are performed by the maintainer on those machines.
+offline-start, capture, and refresh checks remain pending in
+[RELEASE.md](RELEASE.md) until the maintainer records them on those machines.
 
 ## Command line
 
@@ -482,7 +484,8 @@ count is always recomputed from the vault.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the release history.
+See [CHANGELOG.md](CHANGELOG.md) for the release history and
+[RELEASE.md](RELEASE.md) for the `1.0.0` readiness checklist and version path.
 
 ## License
 

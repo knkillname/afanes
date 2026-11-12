@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import NoReturn
 
 import afanes.cli.main
-import afanes.core.vault
+import afanes.core.vault.service
 import afanes.ui.strings
 from afanes.core.errors import VaultError
 
@@ -218,7 +218,7 @@ class Launcher:
         if path is None:
             return None
         try:
-            return afanes.core.vault.Vault.open(path).root
+            return afanes.core.vault.service.Vault.open(path).root
         except (VaultError, OSError) as exc:
             Launcher.fail(afanes.ui.strings.LAUNCH_VAULT_INVALID.format(path=path, detail=exc))
 

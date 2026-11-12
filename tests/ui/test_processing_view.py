@@ -9,7 +9,9 @@ import flet as ft
 import pytest
 
 import afanes.core.settings
-import afanes.core.vault
+import afanes.core.vault.pages
+import afanes.core.vault.processing
+import afanes.core.vault.service
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.views.processing
@@ -44,10 +46,10 @@ def _trigger(handler: object) -> None:
     typing.cast("typing.Any", handler)()
 
 
-def _open_capture(body: str = "Buy milk") -> afanes.ui.state.AppState:
+def _open_capture(body: str = "Buy milk") -> afanes.ui.state.controller.AppState:
     state = afanes.ui.state.app_state
-    state.processing_note = Path("/vault/inbox/Buy milk.md")
-    state.processing_body = body
+    state.processing.note = Path("/vault/inbox/Buy milk.md")
+    state.processing.body = body
     return state
 
 
@@ -58,8 +60,8 @@ def _open_vault_capture(root: Path, capture: Path, monkeypatch: pytest.MonkeyPat
     state = afanes.ui.state.app_state
 
     async def scenario() -> None:
-        await state.choose_vault(root)
-        await state.begin_processing(capture)
+        await state.workspace.choose_vault(root)
+        await state.processing.begin(capture)
 
     asyncio.run(scenario())
 
@@ -86,7 +88,7 @@ class TestProcessingView:
     def test_capture_panel_shows_the_heading_title(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        capture = afanes.core.vault.Vault(root).capture("Q1: Planning?")
+        capture = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).capture("Q1: Planning?")
         _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
@@ -140,13 +142,13 @@ class TestProcessingView:
     def test_plan_preview_shows_the_destination(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        vault = afanes.core.vault.Vault(root)
-        capture = vault.capture("Buy milk")
-        plan = vault.plan_processing(capture, ProcessingOutcome.PROJECT)
+        vault = afanes.core.vault.service.Vault(root)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
         assert isinstance(plan, ProcessingPlan)
         state = _open_capture()
 
-        state.processing_plan = plan
+        state.processing.plan = plan
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
         assert view.plan_panel.visible is True
@@ -156,14 +158,14 @@ class TestProcessingView:
     def test_plan_preview_shows_the_scheme_warning(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        vault = afanes.core.vault.Vault(root)
+        vault = afanes.core.vault.service.Vault(root)
         note = vault.create("Note", NoteType.REFERENCE, body="[Launch](<note:Launch>)\n")
-        capture = vault.capture("Launch")
-        plan = vault.plan_processing(capture, ProcessingOutcome.PROJECT)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Launch")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
         state = _open_capture("Launch")
         assert note.is_file()
 
-        state.processing_plan = plan
+        state.processing.plan = plan
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
         assert view.plan_warnings.visible is True
@@ -173,13 +175,15 @@ class TestProcessingView:
     def test_append_preview_shows_the_project_and_step(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        vault = afanes.core.vault.Vault(root)
+        vault = afanes.core.vault.service.Vault(root)
         project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
-        capture = vault.capture("Call the plumber")
-        plan = vault.plan_processing(capture, ProcessingOutcome.APPEND_STEP, project="Home")
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Call the plumber")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            capture, ProcessingOutcome.APPEND_STEP, project="Home"
+        )
         state = _open_capture("Call the plumber")
 
-        state.processing_plan = plan
+        state.processing.plan = plan
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
         assert str(project) in view.plan_destination.value
@@ -188,7 +192,7 @@ class TestProcessingView:
     def test_success_panel_replaces_the_form(self, tmp_path: Path) -> None:
         state = _open_capture()
         target = tmp_path / "projects" / "Buy milk.md"
-        state.processing_result = target
+        state.processing.result = target
 
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
@@ -200,7 +204,7 @@ class TestProcessingView:
 
     def test_message_is_shown_in_a_banner(self) -> None:
         state = _open_capture()
-        state.message = "boom"
+        state.status.message = "boom"
 
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
@@ -219,7 +223,7 @@ class TestProcessingView:
 
         assert view.form_error.visible is True
         assert view.form_error.value == afanes.ui.strings.PROCESSING_INVALID_DATE
-        assert afanes.ui.state.app_state.processing_plan is None
+        assert afanes.ui.state.app_state.processing.plan is None
 
     def test_preview_passes_parsed_values_to_the_controller(
         self,
@@ -229,13 +233,13 @@ class TestProcessingView:
         calls: list[tuple[ProcessingOutcome, dict[str, object]]] = []
 
         async def fake_plan(
-            _self: afanes.ui.state.AppState,
+            _self: afanes.ui.state.processing.ProcessingState,
             outcome: ProcessingOutcome,
             **kwargs: object,
         ) -> None:
             calls.append((outcome, kwargs))
 
-        monkeypatch.setattr(afanes.ui.state.AppState, "plan_processing", fake_plan)
+        monkeypatch.setattr(afanes.ui.state.processing.ProcessingState, "build_plan", fake_plan)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
         view.outcome.value = ProcessingOutcome.PROJECT.value
         _select_outcome(view)
@@ -262,13 +266,13 @@ class TestProcessingView:
         calls: list[tuple[ProcessingOutcome, dict[str, object]]] = []
 
         async def fake_plan(
-            _self: afanes.ui.state.AppState,
+            _self: afanes.ui.state.processing.ProcessingState,
             outcome: ProcessingOutcome,
             **kwargs: object,
         ) -> None:
             calls.append((outcome, kwargs))
 
-        monkeypatch.setattr(afanes.ui.state.AppState, "plan_processing", fake_plan)
+        monkeypatch.setattr(afanes.ui.state.processing.ProcessingState, "build_plan", fake_plan)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
         view.outcome.value = ProcessingOutcome.APPEND_STEP.value
         _select_outcome(view)
@@ -282,9 +286,9 @@ class TestProcessingView:
     def test_project_suggestions_store_the_identity(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        vault = afanes.core.vault.Vault(root)
+        vault = afanes.core.vault.service.Vault(root)
         vault.create("Launch", NoteType.PROJECT, body="# Launch the product\n")
-        capture = vault.capture("Plan")
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Plan")
         _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
         view.outcome.value = ProcessingOutcome.APPEND_STEP.value
@@ -307,10 +311,10 @@ class TestProcessingView:
     ) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        vault = afanes.core.vault.Vault(root)
+        vault = afanes.core.vault.service.Vault(root)
         vault.create("Home", NoteType.PROJECT, body="# Home improvements\n")
         vault.create("Cabin", NoteType.PROJECT, body="# Home improvements\n")
-        capture = vault.capture("Plan")
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Plan")
         _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
         view.outcome.value = ProcessingOutcome.APPEND_STEP.value

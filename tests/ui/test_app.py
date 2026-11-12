@@ -11,7 +11,9 @@ import pytest
 
 import afanes.core.settings
 import afanes.core.templates
-import afanes.core.vault
+import afanes.core.vault.pages
+import afanes.core.vault.service
+import afanes.core.vault.snapshot
 import afanes.ui.app
 import afanes.ui.state
 import afanes.ui.strings
@@ -114,7 +116,7 @@ class TestAppShell:
         asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
 
         assert isinstance(page.controls[0], ft.Container)
-        assert afanes.ui.state.app_state.vault_root is None
+        assert afanes.ui.state.app_state.session.vault_root is None
 
     def test_choosing_a_vault_opens_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -133,7 +135,7 @@ class TestAppShell:
 
         asyncio.run(scenario())
 
-        assert afanes.ui.state.app_state.vault_root == vault.resolve()
+        assert afanes.ui.state.app_state.session.vault_root == vault.resolve()
         assert isinstance(page.controls[0], ft.Column)
         assert settings.is_file()
 
@@ -152,7 +154,7 @@ class TestAppShell:
 
         asyncio.run(scenario())
 
-        assert afanes.ui.state.app_state.vault_root is None
+        assert afanes.ui.state.app_state.session.vault_root is None
         assert isinstance(page.controls[0], ft.Container)
         assert not settings.exists()
 
@@ -166,7 +168,7 @@ class TestAppShell:
 
         asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
 
-        assert afanes.ui.state.app_state.vault_root == vault.resolve()
+        assert afanes.ui.state.app_state.session.vault_root == vault.resolve()
         assert isinstance(page.controls[0], ft.Column)
 
     def test_process_action_opens_the_wizard_and_cancel_returns(
@@ -177,19 +179,19 @@ class TestAppShell:
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
-        afanes.core.vault.Vault(vault).capture("Buy milk")
+        afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(vault)).capture("Buy milk")
         page = FakePage()
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
-            await state.open_page(state.notes[0].path)
+            await state.navigation.open_page(state.session.notes[0].path)
             process_button = _find_by_key(page.controls[0], "process-note")
             assert isinstance(process_button, ft.TextButton)
             process_handler = typing.cast("Handler", process_button.on_click)
             await process_handler()
 
-            assert state.processing_note is not None
+            assert state.processing.note is not None
             assert _find_by_key(page.controls[0], "processing-view") is not None
 
             cancel_button = _find_by_key(page.controls[0], "processing-cancel")
@@ -199,7 +201,7 @@ class TestAppShell:
 
         asyncio.run(scenario())
 
-        assert state.processing_note is None
+        assert state.processing.note is None
         assert _find_by_key(page.controls[0], "processing-view") is None
         assert _find_by_key(page.controls[0], "process-note") is not None
 
@@ -254,7 +256,7 @@ class TestWebPresentation:
         vault.mkdir()
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
-        afanes.core.vault.Vault(vault).capture("Buy milk")
+        afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(vault)).capture("Buy milk")
         page = FakePage(web=True)
         state = afanes.ui.state.app_state
 
@@ -268,8 +270,8 @@ class TestWebPresentation:
 
         asyncio.run(scenario())
 
-        assert state.vault_root == vault.resolve()
-        assert [note.name for note in state.notes] == ["Buy milk"]
+        assert state.session.vault_root == vault.resolve()
+        assert [note.name for note in state.session.notes] == ["Buy milk"]
         assert isinstance(page.controls[0], ft.Column)
         assert settings.is_file()
 
@@ -289,8 +291,8 @@ class TestWebPresentation:
 
         asyncio.run(scenario())
 
-        assert state.vault_root is None
-        assert state.message == afanes.ui.strings.VAULT_MISSING
+        assert state.session.vault_root is None
+        assert state.status.message == afanes.ui.strings.VAULT_MISSING
         assert isinstance(page.controls[0], ft.Container)
         assert not settings.exists()
 
@@ -320,7 +322,7 @@ class TestWebPresentation:
 
         asyncio.run(scenario())
 
-        assert state.vault_root == second.resolve()
+        assert state.session.vault_root == second.resolve()
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(second.resolve())
 
     def test_change_vault_dialog_cancel_keeps_the_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -344,7 +346,7 @@ class TestWebPresentation:
         asyncio.run(scenario())
 
         assert page.dialogs == []
-        assert state.vault_root == first.resolve()
+        assert state.session.vault_root == first.resolve()
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(first.resolve())
 
 
@@ -362,7 +364,7 @@ class TestLaunchVault:
 
         asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page), launch_vault=supplied))
 
-        assert state.vault_root == supplied.resolve()
+        assert state.session.vault_root == supplied.resolve()
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(remembered.resolve())
 
 
@@ -373,7 +375,7 @@ class TestSessionGuard:
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
-        afanes.core.vault.Vault(vault).capture("Buy milk")
+        afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(vault)).capture("Buy milk")
         first = FakePage()
         second = FakePage(web=True)
         state = afanes.ui.state.app_state
@@ -384,8 +386,8 @@ class TestSessionGuard:
 
         asyncio.run(scenario())
 
-        assert state.session_active is True
-        assert [note.name for note in state.notes] == ["Buy milk"]
+        assert state.status.session_active is True
+        assert [note.name for note in state.session.notes] == ["Buy milk"]
         assert _find_by_key(second.controls[0], "session-retry") is not None
         assert _find_by_key(second.controls[0], "welcome-path") is None
 
@@ -407,7 +409,7 @@ class TestSessionGuard:
 
         asyncio.run(scenario())
 
-        assert state.session_active is True
+        assert state.status.session_active is True
         assert _find_by_key(second.controls[0], "session-retry") is None
         assert isinstance(second.controls[0], ft.Container)
 
@@ -473,18 +475,18 @@ class TestRefreshLoop:
         first = FakePage()
         second = FakePage(web=True)
         scans = 0
-        original = afanes.core.vault.Vault.scan
+        original = afanes.core.vault.service.Vault.scan
 
         async def scenario() -> None:
             nonlocal scans
             await afanes.ui.app.main(typing.cast("ft.Page", first))
 
-            def counting_scan(current: afanes.core.vault.Vault) -> afanes.core.vault.VaultSnapshot:
+            def counting_scan(current: afanes.core.vault.service.Vault) -> afanes.core.vault.snapshot.VaultSnapshot:
                 nonlocal scans
                 scans += 1
                 return original(current)
 
-            monkeypatch.setattr(afanes.core.vault.Vault, "scan", counting_scan)
+            monkeypatch.setattr(afanes.core.vault.service.Vault, "scan", counting_scan)
             await afanes.ui.app.main(typing.cast("ft.Page", second))
 
         asyncio.run(scenario())
@@ -513,7 +515,7 @@ class TestRefreshLoop:
             return len(_refresh_tasks())
 
         assert asyncio.run(scenario()) == 0
-        assert state.vault_root is None
+        assert state.session.vault_root is None
 
 
 async def _submit_creation(page: FakePage, path_text: Path | None = None) -> None:
@@ -607,7 +609,7 @@ class TestCreation:
         asyncio.run(scenario())
 
         assert picker.calls == 1
-        assert state.vault_root == target.resolve()
+        assert state.session.vault_root == target.resolve()
         assert (target / "inbox").is_dir()
         assert (target / "reference").is_dir()
         assert (target / "projects").is_dir()
@@ -641,7 +643,7 @@ class TestCreation:
         asyncio.run(scenario())
 
         assert picker.calls == 1
-        assert state.vault_root is None
+        assert state.session.vault_root is None
         assert not settings.exists()
         assert page.dialogs == []
         assert isinstance(page.controls[0], ft.Container)
@@ -670,8 +672,8 @@ class TestCreation:
 
         asyncio.run(scenario())
 
-        assert state.vault_root is None
-        assert state.message == afanes.ui.strings.VAULT_NOT_EMPTY
+        assert state.session.vault_root is None
+        assert state.status.message == afanes.ui.strings.VAULT_NOT_EMPTY
         assert not settings.exists()
         assert len(page.dialogs) == 1
         error = _typed(_find_by_key(page.dialogs[0], "create-vault-error"), ft.Text)
@@ -707,7 +709,7 @@ class TestCreation:
 
         asyncio.run(scenario())
 
-        assert state.vault_root == target.resolve()
+        assert state.session.vault_root == target.resolve()
         assert (target / "inbox").is_dir()
         assert page.dialogs == []
         assert isinstance(page.controls[0], ft.Column)
@@ -734,7 +736,7 @@ class TestCreation:
 
         asyncio.run(scenario())
 
-        assert state.vault_root is None
+        assert state.session.vault_root is None
         assert len(page.dialogs) == 1
         error = _typed(_find_by_key(page.dialogs[0], "create-vault-error"), ft.Text)
         assert error.visible is True
@@ -761,7 +763,7 @@ class TestCreation:
         asyncio.run(scenario())
 
         assert page.dialogs == []
-        assert state.vault_root is None
+        assert state.session.vault_root is None
         assert not settings.exists()
 
     def test_creation_preselects_no_starter_content(
@@ -814,7 +816,7 @@ class TestCreation:
 
         asyncio.run(scenario())
 
-        assert state.vault_root == target.resolve()
+        assert state.session.vault_root == target.resolve()
         assert (target / "reference" / "Getting started.md").is_file()
         assert (target / "projects" / "Home insurance.md").is_file()
         assert (target / "reference" / "person" / "Sam Rivera.md").is_file()
@@ -847,7 +849,7 @@ class TestCreation:
 
         asyncio.run(scenario())
 
-        assert state.vault_root == target.resolve()
+        assert state.session.vault_root == target.resolve()
         assert (target / "reference" / "Getting started.md").is_file()
         assert [path.name for path in (target / "projects").iterdir()] == []
 
@@ -879,7 +881,7 @@ class TestCreation:
         asyncio.run(scenario())
 
         assert picker.calls == 1
-        assert state.vault_root == second.resolve()
+        assert state.session.vault_root == second.resolve()
         assert (second / "inbox").is_dir()
         assert (second / "projects" / "Research essay.md").is_file()
         assert not (first / "inbox").exists()
@@ -905,7 +907,7 @@ class TestCreation:
 
         asyncio.run(scenario())
 
-        assert state.vault_root is None
+        assert state.session.vault_root is None
         assert not settings.exists()
         assert isinstance(page.controls[0], ft.Container)
         assert _welcome_button(page.controls[0], "welcome-create") is not None
@@ -943,7 +945,7 @@ class TestLaunchDigest:
 
         after = {path.relative_to(vault).as_posix(): path.read_bytes() for path in vault.rglob("*") if path.is_file()}
         assert after == before
-        assert state.review_session is not None
+        assert state.review.review_session is not None
 
     def test_no_digest_without_due_work(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")

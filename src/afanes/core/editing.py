@@ -19,7 +19,7 @@ import afanes.core.links
 import afanes.core.names
 from afanes.core.errors import AfanesError, NoteParseError
 from afanes.core.frontmatter import NoteDocument
-from afanes.core.vault import PageContent, ParsedPage, UnparsedPage
+from afanes.core.vault.snapshot import PageContent, ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType, Status
 

@@ -4,9 +4,10 @@ import datetime
 from pathlib import Path
 
 import afanes.core.search
-import afanes.core.vault
+import afanes.core.vault.service
+import afanes.core.vault.snapshot
 from afanes.core.search import Browser, BrowserSection, ProjectBoard, ProjectStage, ReviewItemKind, ReviewPlanner
-from afanes.core.vault import Vault
+from afanes.core.vault.service import Vault
 from afanes.models.note import CategoryLabel
 
 TODAY = datetime.date(2026, 11, 14)
@@ -39,7 +40,7 @@ def _write_note(
     return path
 
 
-def _snapshot(root: Path) -> afanes.core.vault.VaultSnapshot:
+def _snapshot(root: Path) -> afanes.core.vault.snapshot.VaultSnapshot:
     return Vault(root).scan()
 
 

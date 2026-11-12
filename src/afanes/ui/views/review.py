@@ -62,10 +62,10 @@ class ReviewView:
 
     def refresh(self) -> None:
         """Rebuild the review controls from the current session."""
-        session = self._state.review_session
+        session = self._state.review.review_session
         controls: list[ft.Control] = []
-        if self._state.message is not None:
-            controls.append(Banner(self._state.message).build())
+        if self._state.status.message is not None:
+            controls.append(Banner(self._state.status.message).build())
         if session is None:
             controls.append(self._start_card())
         elif session.complete:
@@ -84,7 +84,7 @@ class ReviewView:
 
     def _start_card(self) -> ft.Control:
         """Build the review entry card or its zero state."""
-        count = self._state.review_pending_count
+        count = self._state.browser.pending_count()
         if count == 0:
             body = ft.Column(
                 controls=[
@@ -135,7 +135,7 @@ class ReviewView:
 
     def _capture_card(self, item: ReviewItem) -> ft.Control:
         """Build the card for an inbox capture awaiting processing."""
-        title = self._state.note_title(item.path)
+        title = self._state.session.note_title(item.path)
         body = ft.Column(
             controls=[
                 ft.Text(afanes.ui.strings.REVIEW_CAPTURE_TITLE, theme_style=ft.TextThemeStyle.LABEL_LARGE),
@@ -448,47 +448,47 @@ class ReviewView:
 
     async def _start(self) -> None:
         """Start a review session."""
-        await self._state.start_review()
+        await self._state.review.start()
         self._reset_local_state()
         self.refresh()
         self._update()
 
     async def _finish(self) -> None:
         """Close the session and return to the browser."""
-        await self._state.finish_review()
+        await self._state.review.finish()
         self._reset_local_state()
         self.refresh()
         self._update()
 
     async def _next(self) -> None:
         """Advance past the current project."""
-        await self._state.review_next()
+        await self._state.review.next()
         self._reset_local_state()
         self.refresh()
         self._update()
 
     async def _skip(self) -> None:
         """Skip the current item without changing it."""
-        await self._state.review_skip()
+        await self._state.review.skip()
         self._reset_local_state()
         self.refresh()
         self._update()
 
     async def _process_capture(self, path: Path) -> None:
         """Open the Processing Wizard for one review capture."""
-        await self._state.begin_processing(path)
+        await self._state.processing.begin(path)
         self.refresh()
         self._update()
 
     async def _open_project(self) -> None:
         """Open the current item's project page."""
-        await self._state.review_open_project()
+        await self._state.review.open_project()
         self.refresh()
         self._update()
 
     async def _do_now(self) -> None:
         """Complete the current due step."""
-        await self._state.review_do_now()
+        await self._state.review.do_now()
         self._reset_local_state()
         self.refresh()
         self._update()
@@ -559,19 +559,19 @@ class ReviewView:
                 self.refresh()
                 self._update()
                 return
-            changed = await self._state.review_postpone(plan)
+            changed = await self._state.review.postpone(plan)
         elif self._form_mode == "delegate":
-            changed = await self._state.review_delegate(value)
+            changed = await self._state.review.delegate(value)
         elif self._form_mode == "reassign":
-            changed = await self._state.review_reassign(value)
+            changed = await self._state.review.reassign(value)
         elif self._form_mode == "add_step":
-            changed = await self._state.add_review_step(value) is not None
+            changed = await self._state.review.add_step(value) is not None
         if changed:
             self._form_mode = None
             self._typed = ""
             self._form_error = None
         else:
-            self._form_error = self._state.message
+            self._form_error = self._state.status.message
         self.refresh()
         self._update()
 
@@ -598,9 +598,9 @@ class ReviewView:
     async def _confirm_status(self) -> None:
         """Apply the confirmed project status change."""
         if self._confirmation == "done":
-            changed = await self._state.mark_review_project_done()
+            changed = await self._state.review.mark_project_done()
         elif self._confirmation == "later":
-            changed = await self._state.defer_review_project()
+            changed = await self._state.review.defer_project()
         else:
             changed = False
         if changed:

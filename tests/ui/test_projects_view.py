@@ -57,7 +57,7 @@ def _open_view(
     monkeypatch.setattr(
         afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: tmp_path / "settings.json")
     )
-    asyncio.run(afanes.ui.state.app_state.choose_vault(tmp_path / "vault"))
+    asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(tmp_path / "vault"))
     return afanes.ui.views.projects.ProjectsView(_noop, on_select)
 
 
@@ -178,14 +178,14 @@ class TestProjectSelection:
         state = afanes.ui.state.app_state
 
         async def open_page(path: Path) -> None:
-            await state.open_page(path)
+            await state.navigation.open_page(path)
 
         view = _open_view(tmp_path, monkeypatch, on_select=open_page)
 
         asyncio.run(_handler(_project_tiles(view, "active")[0])())
 
-        assert state.page is not None
-        assert state.page.path == project
+        assert state.pages.page is not None
+        assert state.pages.page.path == project
 
     def test_selection_uses_the_supplied_callback(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -219,7 +219,7 @@ class TestProjectRefresh:
             status="active",
             body="# Launch\n\n- [x] Write copy\n",
         )
-        asyncio.run(afanes.ui.state.app_state.refresh())
+        asyncio.run(afanes.ui.state.app_state.workspace.refresh())
         view.refresh()
 
         details = _details(_project_tiles(view, "active")[0])
@@ -231,7 +231,7 @@ class TestProjectRefresh:
         _write_note(vault / "projects" / "Launch.md", status="active")
         _write_note(vault / "projects" / "Archive.md", status="active")
         view = _open_view(tmp_path, monkeypatch)
-        asyncio.run(afanes.ui.state.app_state.set_browser_query("launch"))
+        asyncio.run(afanes.ui.state.app_state.browser.set_query("launch"))
 
         view.refresh()
 

@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-12
+
+### Added
+
+- The first usable MVP now has one release-readiness definition: the five required flows, the capability spec and automated test behind each, the macOS, Linux, and Windows manual evidence, the excluded scope, and the `0.6.0` checkpoint before `1.0.0`. `README.md`, `AGENTS.md` section 5.3, and this changelog point at `RELEASE.md` instead of restating the criteria. This implements the `define-mvp-release` OpenSpec change.
+- The no-index decision now has a measured baseline. `scripts/scan_benchmark.py` generates representative vaults and reports open, cold scan, and fingerprint timings with the environment that produced them; the 10,000-note cold-scan median on the reference machine is 12.0 seconds against a 15-second pass line, so the cold-scan question is closed for that size while refresh latency remains an observed cost. This implements the `measure-vault-scan` OpenSpec change.
+
+### Changed
+
+- The repository guide now uses contiguous section numbers and a citation test that fails when a live document points at a missing section. The type-checking, error and logging, and concurrency rules that tooling cannot enforce are restored, and `openspec/config.yaml` describes the in-memory snapshot instead of a SQLite cache that does not exist. This implements the `reconcile-repository-guide` OpenSpec change.
+- The oversized `Vault` service is split into one service per write concern. Each service takes a `Vault` and shares its containment, layout, and atomic-write primitives; `Vault` keeps only open, create, layout, containment, scan, and read. Public Python API migrations:
+  - `Vault.capture(text)` is `VaultPages(vault).capture(text)`.
+  - `Vault.create_page(...)` is `VaultPages(vault).create_page(...)`.
+  - `Vault.write_page(...)` is `VaultPages(vault).write_page(...)`.
+  - `Vault.recreate_page(...)` is `VaultPages(vault).recreate_page(...)`.
+  - `Vault.set_status(...)` is `VaultPages(vault).set_status(...)`.
+  - `Vault.tick_step(...)` is `VaultSteps(vault).tick_step(...)`.
+  - `Vault.untick_step(...)` is `VaultSteps(vault).untick_step(...)`.
+  - `Vault.plan_step(...)` is `VaultSteps(vault).plan_step(...)`.
+  - `Vault.set_step_owners(...)` is `VaultSteps(vault).set_step_owners(...)`.
+  - `Vault.append_step(...)` is `VaultSteps(vault).append_step(...)`.
+  - `Vault.plan_processing(...)` is `VaultProcessing(vault).plan_processing(...)`.
+  - `Vault.plan_append_step(...)` is `VaultProcessing(vault).plan_append_step(...)`.
+  - `Vault.apply_processing(...)` is `VaultProcessing(vault).apply_processing(...)`.
+  - `Vault.move(...)` is `VaultNaming(vault).move(...)`.
+  - `Vault.plan_category_move(...)` is `VaultNaming(vault).plan_category_move(...)`.
+  - `Vault.apply_category_move(...)` is `VaultNaming(vault).apply_category_move(...)`.
+  - `Vault.plan_rename(...)` is `VaultNaming(vault).plan_rename(...)`.
+  - `Vault.apply_rename(...)` is `VaultNaming(vault).apply_rename(...)`.
+  - `Vault.plan_reference_repair(...)` is `VaultNaming(vault).plan_reference_repair(...)`.
+  - `Vault.apply_reference_repair(...)` is `VaultNaming(vault).apply_reference_repair(...)`.
+  - `Vault.plan_trash(...)` is `VaultNaming(vault).plan_trash(...)`.
+  - `Vault.trash(...)` is `VaultNaming(vault).trash(...)`.
+- Snapshot value types moved to `afanes.core.vault.snapshot`: `VaultNote`, `VaultFailure`, `VaultSnapshot`, `LinkTarget`, `LinkOutcome`, `ReferenceSite`, `NoteOrder`, `InboxOrder`, `VaultPath`, `NotePath`, `PageFile`, `ParsedPage`, `UnparsedPage`, and `PageContent`.
+- Naming preview and report types moved to `afanes.core.vault.naming`: `ReferenceRepairPreview`, `RenamePreview`, `RewriteFailure`, `RewriteReport`, `RenameReport`, `TrashPreview`, and `CategoryMovePreview`.
+- The vault services now live under the `afanes.core.vault` package: `Vault` and `VaultCreation` are in `afanes.core.vault.service`, and the snapshot, naming, pages, steps, and processing concerns keep their current names under `afanes.core.vault.{snapshot,naming,pages,steps,processing}`. The flat `core/vault.py` and `core/vault_*.py` modules are removed; imports change from `afanes.core.vault_naming` to `afanes.core.vault.naming` and from `afanes.core.vault.Vault` to `afanes.core.vault.service.Vault`. This implements the `nest-vault-package` OpenSpec change.
+- `afanes.ui.state` is now a package. `app_state` keeps its path, but the `AppState` type moves to `afanes.ui.state.controller`, and the commands move to the controller that owns the data. Public Python API migrations:
+  - `AppState` is imported from `afanes.ui.state.controller`; `afanes.ui.state.app_state` is unchanged.
+  - `app_state.start/choose_vault/open_vault_path/open_vault_for_run/create_vault/close_vault/change_vault/refresh/refresh_workspace(...)` are `app_state.workspace.*(...)`.
+  - `app_state.capture/select_note/note_title/assignment_candidates/template_summaries(...)` are `app_state.session.*(...)`.
+  - `app_state.set_section/set_browser_query(...)` are `app_state.browser.set_section/set_query(...)`; `browser_listing`, `project_groups`, `review_pending_count`, and `review_due_count` are `app_state.browser.listing()`, `project_groups()`, `pending_count()`, and `due_count()`.
+  - `app_state.open_page/back/follow_link/choose_candidate/clear_ambiguous/open_failure(...)` are `app_state.navigation.*(...)`; the history stack and ambiguous candidates move with them.
+  - `app_state.page_*` queries, `edit_page`, `done_editing`, `autosave`, `set_page_body`, `toggle_page_step`, and `set_page_raw_text(...)` are `app_state.pages.*(...)`.
+  - `app_state.set_page_type/set_page_category/set_page_status/set_page_due_date`, the category and type confirmations, `apply_repair`, the rename commands, and the trash commands are `app_state.dialogs.*(...)`; `reload_page`, `overwrite_page`, and `recreate_page` also live there.
+  - `app_state.begin_processing/plan_processing/apply_processing/cancel_processing/finish_processing(...)` are `app_state.processing.begin/build_plan/apply/cancel/finish(...)`. A review caller records a processed capture with `app_state.review.record_processed()`.
+  - `app_state.start_review/review_next/review_skip/...` are `app_state.review.start/next/skip/...(...)`.
+  - `app_state.message`, `busy`, and `session_active` are `app_state.status.*`; writes go through `show_message`, `clear_message`, `set_busy`, `begin_session`, and `release_session`.
+  - `page_is_new` is removed; `preview_body`, `selected`, `notes`, and `failures` are read through `app_state.session`.
+  - The architecture gate now enforces a 10-name combined `AppState` facade, 25 public commands per domain controller, and a command on every class that declares state fields. This implements the `widen-app-state-gate` OpenSpec change.
+
+
 ## [0.5.1] - 2026-11-11
 
 ### Added
