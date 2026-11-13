@@ -24,9 +24,28 @@ hatch run afanes --web
 ```
 
 The first desktop run downloads and caches the Flet client once under `~/.flet/client/`. The running
-application makes no network request. To build a local desktop artifact instead, follow the
+application makes no network request. To build a desktop artifact instead, follow the
 [release guide](https://github.com/knkillname/afanes/blob/main/docs/develop/releasing.md); a packaged
 build bundles the client.
+
+## 🖥️ Platform support
+
+- **Linux.** Native desktop builds are supported and tested, and Linux is the only `1.0.0` release
+  gate. Download the build from the [releases page](https://github.com/knkillname/afanes/releases).
+- **macOS and Windows.** Install the released wheel with `pipx` and start the browser presentation:
+
+  ```console
+  pipx install "/path/to/afanes-<version>-py3-none-any.whl[web]"
+  afanes --web
+  ```
+
+  Download the wheel from the releases page first and pass its path. macOS and Windows native
+  binaries may also appear on that page; they are experimental, untested at runtime, unsigned, and
+  unsupported.
+
+Only Linux carries release evidence. The browser presentation binds loopback only, serves local
+assets, and allows one session at a time; see the
+[browser mode guide](https://github.com/knkillname/afanes/blob/main/docs/guide/browser-mode.md).
 
 ## 🚀 First five minutes
 
@@ -63,11 +82,11 @@ change; the links above work on GitHub today.
 
 ## 🧭 Project status
 
-Afanes is pre-1.0. The first usable MVP is defined in
+Afanes is pre-1.0. The unified `1.0.0` gate is defined in
 [RELEASE.md](https://github.com/knkillname/afanes/blob/main/RELEASE.md), and the release history is in
-[CHANGELOG.md](https://github.com/knkillname/afanes/blob/main/CHANGELOG.md). Packaged desktop builds
-are unsigned local artifacts; code signing, notarization, auto-update, and a publishing pipeline are
-not part of the project yet.
+[CHANGELOG.md](https://github.com/knkillname/afanes/blob/main/CHANGELOG.md). Linux native builds are
+supported and tested; macOS and Windows use the released wheel and `afanes --web`. Every artifact is
+unsigned; code signing, notarization, and auto-update are not part of the project.
 
 ## 🛠️ Build and contribute
 

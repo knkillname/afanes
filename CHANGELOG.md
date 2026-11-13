@@ -9,11 +9,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
-- **Roadmap record.** `RELEASE.md` now records the candidate themes after the 1.0 gate (HIG
-  conformance completion, internationalization, and note reminders), the open scope decisions, and
-  the explicit non-goals and reversed plans; the stale `0.6.0` checkpoint is retired. This
-  implements the `define-roadmap` OpenSpec change. README: no change required. Docs: no change
-  required.
+- **Unified MVP gate.** `RELEASE.md` now defines `1.0.0` as a single gate: the existing six flows
+  plus strict HIG conformance, English and Spanish, and note reminders. Linux native is the only
+  release gate; macOS and Windows use the released wheel and `afanes --web`, and nightly
+  `hatch check`, `hatch test`, and native builds are advisory and never blocking. An experimental
+  native binary reaches the release page only when that platform's nightly tests and build both
+  pass; it remains untested at runtime, unsigned, and unsupported. Artifacts are attached manually,
+  with no PyPI publication, code signing, notarization, or auto-update. This implements the
+  `unify-mvp-gate` OpenSpec change. README: updated. Docs: updated.
 - **Global search has its own browser row.** The browser header now holds only the destination title,
   refresh, and destination actions, with a permanent full-width search row beneath it and a clear
   action. While a query is active the title reads **Search results**, destination-specific controls

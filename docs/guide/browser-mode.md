@@ -1,17 +1,30 @@
 # 🌐 Browser mode
 
-Machines that block the native Flet client can serve the same interface to a browser. The desktop
-window stays the default; `--web` is the explicit opt-in, and Afanes never switches presentation on its
-own.
+Machines that block the native Flet client can serve the same interface to a browser. On macOS and
+Windows this is the supported path: install the released wheel and run `afanes --web`. The desktop
+window stays the default everywhere; `--web` is the explicit opt-in, and Afanes never switches
+presentation on its own.
 
 :::{admonition} tl;dr
 :class: note
 
-Run `hatch run afanes --web` from a source checkout. The server binds loopback only, serves local
-assets, and allows one browser session at a time.
+Install the released wheel with `pipx`, then run `afanes --web`; from a source checkout, run
+`hatch run afanes --web`. The server binds loopback only, serves local assets, and allows one browser
+session at a time.
 :::
 
-## 🚀 Start the server
+## 🚀 Install and start
+
+On macOS and Windows, download the wheel from the
+[releases page](https://github.com/knkillname/afanes/releases) and install it with the browser extra:
+
+```console
+pipx install "/path/to/afanes-<version>-py3-none-any.whl[web]"
+afanes --web
+```
+
+The `[web]` extra installs the browser runtime in its own environment, outside any project checkout.
+From a source checkout, the development path is:
 
 ```console
 hatch env create
@@ -19,7 +32,12 @@ hatch run afanes --web
 ```
 
 The module form, `hatch run python -m afanes --web`, works the same. Every interface asset comes from
-the local environment, so a session works with no network access after the environment is created.
+the local environment or the installed wheel, so a session works with no network access after
+installation. Afanes checks that the wheel path starts with networking unavailable; if a release
+needs extra client provisioning, its notes say so.
+
+Linux users normally run the native build instead. The browser presentation remains available there
+too.
 
 ## ⚙️ Options
 
