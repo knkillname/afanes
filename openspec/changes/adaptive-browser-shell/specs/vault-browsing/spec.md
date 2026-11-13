@@ -268,29 +268,39 @@ The workspace SHALL show the vault identity in the navigation region and SHALL o
 
 ### Requirement: Review shows its snapshot queue in the browser
 
-While Review is active, the browser SHALL show the session's snapshot queue in review order and SHALL mark the current item. The detail SHALL show the current review card and its actions. Showing the queue MUST NOT reorder it, add new work to it, or change review state.
+While Review is active, the browser SHALL show the session's snapshot queue in review order as selectable cards and SHALL mark the current item. Selecting a card SHALL make that item current in the detail without reviewing, skipping, or reordering any item. Showing the queue MUST NOT reorder it, add new work to it, or change review records.
 
 #### Scenario: The queue is shown in order
 
 - **WHEN** a review session starts with Inbox items, due steps, and projects
-- **THEN** the browser lists them in the session's order
+- **THEN** the browser lists them as cards in the session's order
 
 #### Scenario: The current item is marked
 
 - **WHEN** the review session advances
-- **THEN** the browser marks the new current item
+- **THEN** the browser marks the new current card
+
+#### Scenario: Selecting a card shows that item
+
+- **WHEN** the user selects a card in the browser queue
+- **THEN** the detail shows that item and its actions
+
+#### Scenario: Selecting a card changes no review record
+
+- **WHEN** the user selects a card in the browser queue
+- **THEN** no item is reviewed or skipped and the queue order is unchanged
 
 #### Scenario: New work waits for the next session
 
 - **WHEN** a note is created during the session
 - **THEN** the browser queue does not show it
 
-#### Scenario: The queue does not change review state
+#### Scenario: Viewing the queue changes no review state
 
-- **WHEN** the user views the browser queue
+- **WHEN** the user views the browser queue without selecting a card
 - **THEN** no item is reviewed, skipped, or reordered
 
 #### Scenario: A completed session shows its outcome
 
 - **WHEN** every queue item has been passed
-- **THEN** the browser no longer shows an active item and the detail shows the completion summary
+- **THEN** the browser no longer marks an active card and the detail shows the completion summary

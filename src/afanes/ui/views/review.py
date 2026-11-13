@@ -48,7 +48,13 @@ class ReviewView:
         self._typed = ""
         self._form_error: str | None = None
         self._confirmation: str | None = None
-        self.root = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP, expand=True, key="review-view")
+        self.root = ft.Column(
+            controls=[],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            expand=True,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+            key="review-view",
+        )
         self.refresh()
 
     def build(self) -> ft.Control:
@@ -60,6 +66,10 @@ class ReviewView:
             Composed review layout.
         """
         return self.root
+
+    def reset_transient_state(self) -> None:
+        """Clear an open form or confirmation between review items."""
+        self._reset_local_state()
 
     def refresh(self) -> None:
         """Rebuild the review controls from the current session."""

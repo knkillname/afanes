@@ -27,8 +27,8 @@ search, and adaptivity before the remaining HIG waves.
   About Afanes. Remove the status bar; the vault identity moves to the navigation region.
 - Move the capture composer to the top of the Inbox browser column. A New Capture action (Ctrl+N)
   switches to Inbox and focuses the composer from any other destination.
-- Show the guided-review snapshot queue in the browser column while Review is active; the review
-  card keeps its current actions in the detail pane.
+- Show the guided-review snapshot queue in the browser column while Review is active as selectable
+  cards; selecting one makes it current, and the review actions stay in the detail pane.
 - Replace the fixed width with three columns and a breakpoint ladder: navigation + browser + detail
   at 1100 px and above; browser + detail with the navigation behind a toggle at 1024-1099; a
   browse-to-detail stack below 1024 (web). Raise the minimum window to 1024x600, the HIG desktop

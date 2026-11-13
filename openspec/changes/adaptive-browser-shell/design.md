@@ -157,12 +157,15 @@ pattern, and the vault path is better placed with the vault identity.
 ### 7. Review queue
 
 While Review is active, the browser shows the session's snapshot queue from
-`review.review_session.items`, in order, with the current item marked by the neutral selected-row
-token. Rows are read-only: review actions stay in the detail card. This gives the Review
-destination a browser body without adding queue navigation or changing review state.
+`review.review_session.items` as selectable cards, in order, with the current item marked by the
+neutral selected-row token and a text label. Selecting a card moves the session index and shows that
+item in the detail; the review actions stay in the detail card. Selecting changes no reviewed or
+skipped record and never reorders the queue. This gives the Review destination a reactive browser
+without adding automatic review or queue rearrangement.
 
-*Alternative rejected:* make queue rows jump to an item. That is a new review behavior and needs
-its own spec and state command; it is better as a later guided-review change.
+*Alternative rejected:* plain read-only rows. They are simpler, but the queue does not respond to
+the user and the cards give the Review destination the same visual weight as the other browsing
+surfaces.
 
 ### 8. Surfaces and chrome
 

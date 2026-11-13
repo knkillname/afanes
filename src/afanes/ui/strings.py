@@ -120,6 +120,15 @@ REVIEW_STEP_FAILED = "Could not update this step: {detail}"
 REVIEW_PROJECT_FAILED = "Could not update this project: {detail}"
 REVIEW_CAPTURE_READ_FAILED = "Could not read this capture: {detail}"
 REVIEW_DUE = "Due {date}"
+REVIEW_CURRENT = "Current"
+REVIEW_KIND_LABELS = MappingProxyType(
+    {
+        "inbox": "Capture",
+        "due_step": "Due step",
+        "waiting_step": "Waiting step",
+        "project": "Project",
+    }
+)
 WORKSPACE_SECTION_LABELS = MappingProxyType(
     {
         "inbox": "Inbox",

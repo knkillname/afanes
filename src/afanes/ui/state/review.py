@@ -255,6 +255,35 @@ class ReviewState:
             await self._enter_current_review_item()
             return True
 
+    async def select(self, index: int) -> bool:
+        """Make one queue item current without reviewing or skipping it.
+
+        Parameters
+        ----------
+        index : int
+            Position in the snapshot queue.
+
+        Returns
+        -------
+        bool
+            ``True`` when the session moved to that item.
+
+        Notes
+        -----
+        Only the current position changes. The reviewed and skipped records and
+        the queue order stay untouched.
+        """
+        async with self.command_lock:
+            session = self.review_session
+            if session is None or not 0 <= index < len(session.items):
+                return False
+            if index == session.index:
+                return True
+            self.review_session = dataclasses.replace(session, index=index)
+            self.status.clear_message()
+            await self._enter_current_review_item()
+            return True
+
     async def add_step(self, text: str) -> Path | None:
         """Append the next step to the current stalled project.
 

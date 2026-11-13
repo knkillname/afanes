@@ -83,10 +83,10 @@
   and the other browser actions regular buttons. Verify a workspace test covers switching to Inbox
   and focusing the composer from another destination, and that the composer's Capture button is the
   only suggested action in the workspace.
-- [x] 4.5 Show the Review session's snapshot queue in the browser, in order, with the current item
-  marked and no click or review-state change. Verify review and workspace tests cover the order,
-  the current mark, a completed session, and a note created during the session not joining the
-  queue.
+- [x] 4.5 Show the Review session's snapshot queue in the browser as selectable cards, in order,
+  with the current item marked; selecting a card changes only the current item. Verify review and
+  workspace tests cover the order, the current mark, card selection, a completed session, and a note
+  created during the session not joining the queue.
 - [x] 4.6 Update the `WorkspaceView` and `AppShell` baseline entries in
   `tests/ui/test_conformance.py` for the new menu, capture, and review controls. Verify
   `hatch test tests/ui/test_conformance.py` passes.

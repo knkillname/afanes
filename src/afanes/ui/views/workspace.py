@@ -921,7 +921,7 @@ class WorkspaceView:
         )
 
     def _review_queue_controls(self) -> list[ft.Control]:
-        """Build the read-only snapshot queue for the active review session."""
+        """Build the selectable snapshot queue for the active review session."""
         state = self._state
         session = state.review.review_session
         if session is None:
@@ -935,13 +935,62 @@ class WorkspaceView:
                 )
             ]
         return [
-            ft.ListTile(
-                title=self._review_item_title(item),
-                selected=index == session.index,
-                key=f"review-queue-{index}",
-            )
-            for index, item in enumerate(session.items)
+            self._review_card(index, item, current=index == session.index) for index, item in enumerate(session.items)
         ]
+
+    def _review_card(
+        self,
+        index: int,
+        item: afanes.core.search.ReviewItem,
+        *,
+        current: bool,
+    ) -> ft.Control:
+        """Build one clickable review queue card."""
+        kind = afanes.ui.strings.REVIEW_KIND_LABELS[item.kind.value]
+        details: list[ft.Control] = [
+            ft.Text(kind, style=afanes.ui.theme.TEXT_ROLES["caption"]),
+        ]
+        if current:
+            details.append(
+                ft.Text(
+                    afanes.ui.strings.REVIEW_CURRENT,
+                    style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
+                )
+            )
+        return ft.Container(
+            key=f"review-queue-{index}",
+            bgcolor=afanes.ui.theme.SELECTED_ROW_COLOR if current else afanes.ui.theme.SURFACE_CONTAINER_COLOR,
+            border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
+            padding=afanes.ui.theme.ITEM_GAP,
+            on_click=self._review_select_handler(index),
+            content=ft.Column(
+                controls=[
+                    ft.Text(self._review_item_title(item), style=afanes.ui.theme.TEXT_ROLES["heading"]),
+                    ft.Row(
+                        controls=details,
+                        spacing=afanes.ui.theme.ITEM_GAP,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                ],
+                spacing=afanes.ui.theme.BORDER_WIDTH,
+            ),
+        )
+
+    def _review_select_handler(self, index: int) -> Callable[[], Awaitable[None]]:
+        """Bind a no-argument async handler that makes one queue item current."""
+
+        async def handle() -> None:
+            selected = await self._state.review.select(index)
+            if selected:
+                self._show_detail = True
+                self._render_shell()
+                if self._review_view is not None:
+                    self._review_view.reset_transient_state()
+            self._refresh_dynamic()
+            self._update()
+
+        return handle
 
     def _review_item_title(self, item: afanes.core.search.ReviewItem) -> str:
         """Return the display title for one review queue item."""

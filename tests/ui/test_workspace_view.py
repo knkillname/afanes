@@ -819,8 +819,15 @@ class TestReviewQueue:
         asyncio.run(scenario())
         return afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
 
+    def _queue_cards(self, view: afanes.ui.views.workspace.WorkspaceView) -> list[ft.Container]:
+        return [
+            control
+            for control in view.browser_list.controls
+            if isinstance(control, ft.Container) and str(control.key or "").startswith("review-queue-")
+        ]
+
     def _queue_titles(self, view: afanes.ui.views.workspace.WorkspaceView) -> list[str]:
-        return [str(control.title) for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        return [_texts(card)[0] for card in self._queue_cards(view)]
 
     def test_the_queue_follows_the_session_order(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = self._open_review(tmp_path, monkeypatch)
@@ -832,17 +839,36 @@ class TestReviewQueue:
 
     def test_the_current_item_is_marked(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = self._open_review(tmp_path, monkeypatch)
-        rows = [control for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        cards = self._queue_cards(view)
 
-        assert rows[0].selected is True
-        assert not any(row.selected for row in rows[1:])
+        assert cards[0].bgcolor == afanes.ui.theme.SELECTED_ROW_COLOR
+        assert afanes.ui.strings.REVIEW_CURRENT in _texts(cards[0])
+        assert all(card.bgcolor == afanes.ui.theme.SURFACE_CONTAINER_COLOR for card in cards[1:])
 
         asyncio.run(afanes.ui.state.app_state.review.skip())
         view.refresh()
-        rows = [control for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        cards = self._queue_cards(view)
 
-        assert rows[0].selected is False
-        assert rows[1].selected is True
+        assert cards[0].bgcolor == afanes.ui.theme.SURFACE_CONTAINER_COLOR
+        assert cards[1].bgcolor == afanes.ui.theme.SELECTED_ROW_COLOR
+        assert afanes.ui.strings.REVIEW_CURRENT not in _texts(cards[0])
+        assert afanes.ui.strings.REVIEW_CURRENT in _texts(cards[1])
+
+    def test_selecting_a_card_makes_it_current(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = self._open_review(tmp_path, monkeypatch)
+        state = afanes.ui.state.app_state
+        cards = self._queue_cards(view)
+
+        asyncio.run(_handler(cards[1])())
+
+        session = state.review.review_session
+        assert session is not None
+        assert session.index == 1
+        assert session.reviewed_count == 0
+        assert session.skipped_count == 0
+        cards = self._queue_cards(view)
+        assert cards[1].bgcolor == afanes.ui.theme.SELECTED_ROW_COLOR
+        assert afanes.ui.strings.REVIEW_CURRENT in _texts(cards[1])
 
     def test_new_work_waits_for_the_next_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = self._open_review(tmp_path, monkeypatch)
@@ -870,10 +896,11 @@ class TestReviewQueue:
 
         asyncio.run(scenario())
         view.refresh()
-        rows = [control for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        cards = self._queue_cards(view)
 
-        assert rows
-        assert not any(row.selected for row in rows)
+        assert cards
+        assert all(card.bgcolor == afanes.ui.theme.SURFACE_CONTAINER_COLOR for card in cards)
+        assert all(afanes.ui.strings.REVIEW_CURRENT not in _texts(card) for card in cards)
 
     @staticmethod
     def _review_title(item: afanes.core.search.ReviewItem) -> str:

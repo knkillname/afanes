@@ -465,3 +465,11 @@ class TestStalledProject:
 
         document = NoteDocument.from_text((tmp_path / "vault" / "projects" / "Launch.md").read_text(encoding="utf-8"))
         assert document.status is Status.LATER
+
+
+class TestLayout:
+    def test_the_review_area_stretches_its_card(self) -> None:
+        view = afanes.ui.views.review.ReviewView(_noop)
+
+        assert isinstance(view.root, ft.Column)
+        assert view.root.horizontal_alignment == ft.CrossAxisAlignment.STRETCH
