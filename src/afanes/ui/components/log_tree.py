@@ -114,7 +114,7 @@ class LogTree:
                     ft.Text(str(year.year)),
                     ft.Text(
                         afanes.ui.strings.log_entry_count(year.count),
-                        theme_style=ft.TextThemeStyle.LABEL_SMALL,
+                        style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                     control,
                 ],
@@ -150,7 +150,7 @@ class LogTree:
                     ft.Text(name),
                     ft.Text(
                         afanes.ui.strings.log_entry_count(month.count),
-                        theme_style=ft.TextThemeStyle.LABEL_SMALL,
+                        style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                     control,
                 ],
@@ -183,7 +183,7 @@ class LogTree:
                     ft.Text(str(day.day)),
                     ft.Text(
                         afanes.ui.strings.log_entry_count(day.count),
-                        theme_style=ft.TextThemeStyle.LABEL_SMALL,
+                        style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                 ],
                 spacing=4,
@@ -202,7 +202,7 @@ class LogTree:
         row = ft.ListTile(
             title=note.title,
             subtitle=note.relative_path.as_posix(),
-            leading=ft.Icons.DESCRIPTION,
+            leading=ft.Icons.DESCRIPTION_OUTLINED,
             dense=True,
             on_click=self._select_handler(note.path),
             key=f"log-entry-{note.relative_path.as_posix()}",
@@ -218,7 +218,7 @@ class LogTree:
                     ft.Text(afanes.ui.strings.LOG_UNDATED),
                     ft.Text(
                         afanes.ui.strings.log_entry_count(len(notes)),
-                        theme_style=ft.TextThemeStyle.LABEL_SMALL,
+                        style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                 ]
             ),
@@ -241,7 +241,7 @@ class LogTree:
         """Build the plus or open control for a year or month row."""
         if has_entry and entry is not None:
             button = ft.IconButton(
-                icon=ft.Icons.EVENT_AVAILABLE,
+                icon=ft.Icons.EVENT_AVAILABLE_OUTLINED,
                 tooltip=tooltip_open,
                 on_click=self._open_handler(entry.path),
                 icon_size=16,
@@ -250,7 +250,7 @@ class LogTree:
             self.open_buttons[key] = button
             return button
         button = ft.IconButton(
-            icon=ft.Icons.ADD,
+            icon=ft.Icons.ADD_OUTLINED,
             tooltip=tooltip_create,
             on_click=self._create_handler(year, month),
             icon_size=16,

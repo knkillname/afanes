@@ -89,7 +89,7 @@ class ReviewView:
         if count == 0:
             body = ft.Column(
                 controls=[
-                    ft.Text(afanes.ui.strings.REVIEW_ZERO_TITLE, theme_style=ft.TextThemeStyle.TITLE_LARGE),
+                    ft.Text(afanes.ui.strings.REVIEW_ZERO_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-3"]),
                     ft.Text(
                         afanes.ui.strings.REVIEW_ZERO_BODY,
                         color=afanes.ui.theme.MUTED_TEXT_COLOR,
@@ -101,11 +101,11 @@ class ReviewView:
             return Card(body).build()
         body = ft.Column(
             controls=[
-                ft.Text(afanes.ui.strings.REVIEW_TITLE, theme_style=ft.TextThemeStyle.HEADLINE_SMALL),
+                ft.Text(afanes.ui.strings.REVIEW_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-2"]),
                 ft.Text(afanes.ui.strings.review_pending(count), selectable=True),
                 ft.FilledButton(
                     content=afanes.ui.strings.REVIEW_START_ACTION,
-                    icon=ft.Icons.PLAY_ARROW,
+                    icon=ft.Icons.PLAY_ARROW_OUTLINED,
                     on_click=self._start,
                     key="review-start",
                 ),
@@ -118,14 +118,14 @@ class ReviewView:
         """Build the end-of-session summary."""
         body = ft.Column(
             controls=[
-                ft.Text(afanes.ui.strings.REVIEW_COMPLETE_TITLE, theme_style=ft.TextThemeStyle.HEADLINE_SMALL),
+                ft.Text(afanes.ui.strings.REVIEW_COMPLETE_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-2"]),
                 ft.Text(
                     afanes.ui.strings.REVIEW_COMPLETE_BODY.format(reviewed=reviewed, skipped=skipped),
                     selectable=True,
                 ),
                 ft.FilledButton(
                     content=afanes.ui.strings.REVIEW_BACK_TO_BROWSER,
-                    icon=ft.Icons.ARROW_BACK,
+                    icon=ft.Icons.ARROW_BACK_OUTLINED,
                     on_click=self._finish,
                     key="review-finish",
                 ),
@@ -139,13 +139,13 @@ class ReviewView:
         title = self._state.session.note_title(item.path)
         body = ft.Column(
             controls=[
-                ft.Text(afanes.ui.strings.REVIEW_CAPTURE_TITLE, theme_style=ft.TextThemeStyle.LABEL_LARGE),
-                ft.Text(title, theme_style=ft.TextThemeStyle.HEADLINE_SMALL, selectable=True),
+                ft.Text(afanes.ui.strings.REVIEW_CAPTURE_TITLE, style=afanes.ui.theme.TEXT_ROLES["heading"]),
+                ft.Text(title, style=afanes.ui.theme.TEXT_ROLES["title-2"], selectable=True),
                 ft.Row(
                     controls=[
                         ft.FilledButton(
                             content=afanes.ui.strings.REVIEW_PROCESS_ACTION,
-                            icon=ft.Icons.PLAY_ARROW,
+                            icon=ft.Icons.PLAY_ARROW_OUTLINED,
                             on_click=self._process_handler(item.path),
                             key="review-process-capture",
                         ),
@@ -172,9 +172,9 @@ class ReviewView:
         due = item.kind is afanes.core.search.ReviewItemKind.DUE_STEP
         title = afanes.ui.strings.REVIEW_DUE_STEP_TITLE if due else afanes.ui.strings.REVIEW_WAITING_STEP_TITLE
         controls: list[ft.Control] = [
-            ft.Text(title, theme_style=ft.TextThemeStyle.LABEL_LARGE),
-            ft.Text(summary.note.title, theme_style=ft.TextThemeStyle.TITLE_MEDIUM, selectable=True),
-            StepText(step.text, afanes.ui.theme.STEP_MARKDOWN_TEXT_STYLE, selectable=True).build(),
+            ft.Text(title, style=afanes.ui.theme.TEXT_ROLES["heading"]),
+            ft.Text(summary.note.title, style=afanes.ui.theme.TEXT_ROLES["title-4"], selectable=True),
+            StepText(step.text, afanes.ui.theme.TEXT_ROLES["title-2"], selectable=True).build(),
         ]
         if step.owners:
             controls.append(
@@ -202,7 +202,7 @@ class ReviewView:
                 [
                     ft.FilledButton(
                         content=afanes.ui.strings.REVIEW_DO_NOW,
-                        icon=ft.Icons.CHECK,
+                        icon=ft.Icons.CHECK_OUTLINED,
                         on_click=self._do_now,
                         key="review-do-now",
                     ),
@@ -230,7 +230,7 @@ class ReviewView:
             [
                 ft.TextButton(
                     content=afanes.ui.strings.REVIEW_OPEN_PROJECT,
-                    icon=ft.Icons.OPEN_IN_NEW,
+                    icon=ft.Icons.OPEN_IN_NEW_OUTLINED,
                     on_click=self._open_project,
                     key="review-open-project",
                 ),
@@ -249,8 +249,8 @@ class ReviewView:
         if summary is None:
             return self._broken_card(item)
         controls: list[ft.Control] = [
-            ft.Text(afanes.ui.strings.REVIEW_TITLE, theme_style=ft.TextThemeStyle.LABEL_LARGE),
-            ft.Text(summary.note.title, theme_style=ft.TextThemeStyle.HEADLINE_SMALL, selectable=True),
+            ft.Text(afanes.ui.strings.REVIEW_TITLE, style=afanes.ui.theme.TEXT_ROLES["heading"]),
+            ft.Text(summary.note.title, style=afanes.ui.theme.TEXT_ROLES["title-2"], selectable=True),
             ft.Text(
                 afanes.ui.strings.PROJECT_STATUS.format(status=StatusLabel(summary.note.status).text),
                 color=afanes.ui.theme.MUTED_TEXT_COLOR,
@@ -272,19 +272,19 @@ class ReviewView:
                     controls=[
                         ft.OutlinedButton(
                             content=afanes.ui.strings.REVIEW_CREATE_STEP,
-                            icon=ft.Icons.ADD,
+                            icon=ft.Icons.ADD_OUTLINED,
                             on_click=self._open_add_step,
                             key="review-create",
                         ),
                         ft.OutlinedButton(
                             content=afanes.ui.strings.REVIEW_MARK_DONE,
-                            icon=ft.Icons.CHECK,
+                            icon=ft.Icons.CHECK_OUTLINED,
                             on_click=self._confirm_done,
                             key="review-mark-done",
                         ),
                         ft.OutlinedButton(
                             content=afanes.ui.strings.REVIEW_DEFER,
-                            icon=ft.Icons.SCHEDULE,
+                            icon=ft.Icons.SCHEDULE_OUTLINED,
                             on_click=self._confirm_defer,
                             key="review-defer",
                         ),
@@ -298,13 +298,13 @@ class ReviewView:
                 controls=[
                     ft.TextButton(
                         content=afanes.ui.strings.REVIEW_OPEN_PROJECT,
-                        icon=ft.Icons.OPEN_IN_NEW,
+                        icon=ft.Icons.OPEN_IN_NEW_OUTLINED,
                         on_click=self._open_project,
                         key="review-open-project",
                     ),
                     ft.FilledButton(
                         content=afanes.ui.strings.REVIEW_NEXT,
-                        icon=ft.Icons.ARROW_FORWARD,
+                        icon=ft.Icons.ARROW_FORWARD_OUTLINED,
                         on_click=self._next,
                         key="review-next",
                     ),
@@ -336,7 +336,7 @@ class ReviewView:
         controls.append(
             ft.Column(
                 controls=[
-                    ft.Text(afanes.ui.strings.REVIEW_NEXT_STEP, theme_style=ft.TextThemeStyle.LABEL_LARGE),
+                    ft.Text(afanes.ui.strings.REVIEW_NEXT_STEP, style=afanes.ui.theme.TEXT_ROLES["heading"]),
                     StepText(summary.next_step.text, body_style, selectable=True).build(),
                 ],
                 spacing=0,
@@ -344,7 +344,7 @@ class ReviewView:
         )
         remaining = summary.open_steps[1:]
         if remaining:
-            controls.append(ft.Text(afanes.ui.strings.REVIEW_OTHER_STEPS, theme_style=ft.TextThemeStyle.LABEL_LARGE))
+            controls.append(ft.Text(afanes.ui.strings.REVIEW_OTHER_STEPS, style=afanes.ui.theme.TEXT_ROLES["heading"]))
             controls.extend(StepText(step.text, body_style, selectable=True).build() for step in remaining)
         return controls
 
@@ -386,7 +386,7 @@ class ReviewView:
                     controls=[
                         ft.FilledButton(
                             content=afanes.ui.strings.REVIEW_CONFIRM,
-                            icon=ft.Icons.CHECK,
+                            icon=ft.Icons.CHECK_OUTLINED,
                             on_click=self._submit_form,
                             key="review-form-submit",
                         ),

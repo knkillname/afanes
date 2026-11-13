@@ -1,121 +1,158 @@
 # 🎛️ Interface standard
 
-Afanes follows the GNOME interface guidelines as its reference design language. The guidelines assume
-GTK and libadwaita; Afanes runs on Flet and Flutter, so conformance means a bounded version of that
-language: the palette, depth, typography, and icon rules are ours, while toolkit internals and two
-unavailable mechanisms are declared differences. This page is the durable reference for that standard.
+Afanes follows the GNOME Human Interface Guidelines strictly, using libadwaita 1.8.0 as the
+reference implementation. The guidelines assume GTK and libadwaita; Afanes runs on Flet and
+Flutter, so four toolkit limits are declared rather than treated as design choices. Everything
+else — palette, depth, selection, typography, and icon treatment — follows the reference.
 
 :::{admonition} tl;dr
 :class: note
 
 Every interface value comes from `src/afanes/ui/theme.py`. A test gate fails when a view hardcodes a
-color, a layout number, an extra filled button, an icon-plus-label button, or a dense row. Existing
-exceptions live in a baseline that may only shrink.
+color, a layout number, a font size, a Material text role, a filled icon, or an extra suggested or
+destructive action. Existing exceptions live in a baseline that may only shrink.
 :::
 
 ## 🪜 Conformance levels
 
 The standard has five levels, in the order a reviewer should check them:
 
-1. **Palette and contrast.** Light and dark each define an independent palette. Body text, muted text,
-   and accent text meet 4.5:1 against their surface; accent fills, icons, and control boundaries meet
-   3:1.
-2. **Surfaces.** The page, structural regions such as the sidebar, and content cards resolve to three
-   distinct values in each mode. In light mode the note canvas is the brightest surface; in dark mode it
-   is darker than the chrome, matching how depth flips.
-3. **Accent, actions, and selection.** One accent supplies the suggested-action fill, selection tint,
-   focus indicator, and active-section mark. Accent text is a separate, contrast-checked role.
-   Destructive actions use a destructive style.
-4. **Typography.** One platform font family and one text theme. Views select a named role
-   (`HEADLINE_MEDIUM`, `BODY_SMALL`, `LABEL_MEDIUM`, and so on) instead of setting a size or weight.
-5. **Control values and the ratchet.** Every color, radius, spacing value, and dimension comes from the
-   token module, and the conformance gate keeps it that way.
+1. **Palette and contrast.** Light and dark each define the Adwaita 1.8.0 tokens independently.
+   Body and muted text meet 4.5:1 on every neutral surface; accent text meets 4.5:1 on the note
+   view; accent fills, icons, and control boundaries meet 3:1.
+2. **Surfaces and depth.** The window, sidebar, note view, and secondary container resolve to four
+   distinct values in each mode. Light raises the note view; dark recesses it below the window and
+   sidebar, as the reference does.
+3. **Accent, actions, and selection.** One accent supplies suggested actions, focus, and links.
+   Selection uses the neutral navigation-sidebar row, not the accent. Destructive actions use the
+   reference destructive fill. The active section keeps a non-hue cue.
+4. **Typography.** One platform font family and the GNOME standard styles — `title-1` through
+   `title-4`, `heading`, `body`, `caption`, and `caption-heading` — expressed as relative
+   percentages of one base size.
+5. **Control values and the ratchet.** Every color, radius, spacing, dimension, icon size, and
+   minimum-window value comes from the token module, and the conformance gate keeps it that way.
 
 ## 🎨 Palette roles
 
-| Role | Light | Dark | Use |
-| --- | --- | --- | --- |
-| Page surface | `#FAFAFA` | `#242424` | Window background |
-| Region surface | `#EBEBEB` | `#303030` | Sidebar and chrome |
-| Card surface | `#FFFFFF` | `#1E1E1E` | Note canvas and cards |
-| Container surface | `#F6F5F4` | `#303030` | Panel inside a card |
-| Accent fill | `#3584E4` | `#3584E4` | Suggested actions, focus, selection tint |
-| Accent text | `#1C71D8` | `#99C1F1` | Links and small accent labels |
-| Destructive | `#C01C28` | `#C01C28` | Actions that move or discard a note |
+| Role | Light | Dark | Reference token | Use |
+| --- | --- | --- | --- | --- |
+| Window | `#FAFAFB` | `#222226` | `--window-bg-color` | Window background |
+| Sidebar | `#EBEBED` | `#2E2E32` | `--sidebar-bg-color` | Browser sidebar and chrome |
+| Note view | `#FFFFFF` | `#1D1D20` | `--view-bg-color` | Markdown canvas and content cards |
+| Secondary container | `#F3F3F5` | `#28282C` | `--secondary-sidebar-bg-color` | Panel inside a view |
+| Body text | `#333334` | `#FFFFFF` | `--window-fg-color` | Prose and control labels |
+| Muted text | `#5E5C64` | `#C0BFBC` | contrast-checked neutral | Metadata and captions |
+| Accent fill | `#3584E4` | `#3584E4` | `--accent-bg-color` | Suggested actions, focus |
+| Accent text | `#1C71D8` | `#99C1F1` | `--accent-color` | Links and small accent labels |
+| On accent | `#FFFFFF` | `#FFFFFF` | `--accent-fg-color` | Text on an accent or destructive fill |
+| Destructive | `#E01B24` (Red 3) | `#C01C28` (Red 4) | `--destructive-bg-color` | Actions that move or discard a note |
+| Error text | `#4A0008` | `#FFD9D4` | `--error-fg-color` | Inline errors and banner text |
 
-The accent exposes a fill role and a text role because the fill fails the 4.5:1 text threshold on light
-surfaces. Selection is a 15% accent tint plus the 3px active edge; the tint is never the only signal.
-Log marks use the accent. Unreadable notes and errors use the status error role, which is red in light
-mode and a lighter red in dark mode so it stays readable.
+The muted text role uses a contrast-checked neutral instead of the reference's dim opacity, because
+the dimmed token does not clear 4.5:1 for small text. Error text uses the error-container foreground
+so it stays readable on both the note view and the error banner.
 
 ## 🌓 Surfaces and depth
 
-Light mode raises content: the card is brighter than the page, and the page is brighter than the
-sidebar. Dark mode does the opposite, as Adwaita does: the card is darker than the page and the chrome
-is lighter, so a panel reads as recessed rather than raised. Separation may combine a value step with
-the 1px outline; the value step alone must be visible.
+Light mode raises content: the note view is brighter than the window, and the window is brighter
+than the sidebar. Dark mode does the opposite: the note view is darker than the window, and the
+sidebar is lighter than the window. The secondary container is a neutral step between the view and
+the window for panels inside a view. Separation may combine a value step with the 1px outline; the
+value step alone must be visible.
 
-## 🏷️ Monochrome sections
+The note canvas uses `--view-bg-color`, not the reference's translucent dark card token, so the
+reading surface stays a solid, testable value. The in-view panel uses the secondary-sidebar token
+for the same reason.
 
-The browser does not assign a color to each section. Every section icon uses the muted text tint, and
-the active section takes the accent in its icon, its edge, and its row tint. The label and the icon
-identify the section when color is not perceived. This retires the earlier per-section hue treatment,
-which could not clear the 3:1 icon-contrast rule across the palette.
+## 🎯 Accent, actions, and selection
 
-## 🔤 Text theme
+The accent supplies suggested-action fills, focus rings, and links. It is not the selection color.
+A selected navigation row uses a neutral 10% `ON_SURFACE` shade with no accent tint and no accent
+edge, matching libadwaita's `.navigation-sidebar` treatment. The label and icon remain the identity
+of the row; the value step is the selection cue.
 
-`theme.TEXT_THEME` defines all fifteen standard roles. The ones in use:
+Destructive actions use Red 3 in light mode and Red 4 in dark mode. The header trash action and the
+confirmation action both carry the destructive style. The accent is never used to distinguish one
+browser section from another; log marks use the accent.
 
-| Role | Size / weight | Use |
-| --- | --- | --- |
-| `HEADLINE_MEDIUM` | 28 / 700 | Page title |
-| `HEADLINE_SMALL` | 24 / 700 | Step headline and welcome |
-| `TITLE_LARGE` | 22 / 600 | Page headings |
-| `TITLE_MEDIUM` | 16 / 600 | Panels and groups |
-| `TITLE_SMALL` | 15 / 600 | Compact headings |
-| `BODY_MEDIUM` | 14 / 400 | Prose |
-| `BODY_SMALL` | 12 / 400 | Metadata and captions, muted |
-| `LABEL_LARGE` | 14 / 600 | Control labels |
-| `LABEL_MEDIUM` | 12 / 700 | Section captions, muted |
-| `LABEL_SMALL` | 11 / 500 | Dense labels, muted |
+## 🔤 Typography
 
-Views use `theme_style=ft.TextThemeStyle.<role>`. Markdown surfaces that cannot take a theme role pass
-the style object that backs the role from the same text theme. A view does not set its own font size;
-the conformance gate rejects `ft.Text(size=...)` outside the theme.
+`BASE_FONT_SIZE` is 15 logical pixels (about 11 pt). Every role is a percentage of that base, so the
+whole hierarchy scales together.
+
+| GNOME style | Base % | Size / weight | Use |
+| --- | --- | --- | --- |
+| `title-1` | 181% | 27 / 800 | Page title |
+| `title-2` | 136% | 20 / 800 | Step headline and welcome |
+| `title-3` | 136% | 20 / 700 | Page and section headings |
+| `title-4` | 118% | 18 / 700 | Panels and groups |
+| `heading` | 100% | 15 / 700 | Compact headings and control labels |
+| `body` | 100% | 15 / 400 | Prose |
+| `caption` | 82% | 12 / 400 | Metadata and captions |
+| `caption-heading` | 82% | 12 / 700 | Section captions |
+
+Views select a role from `theme.TEXT_ROLES` with `style=`. The Material `theme_style` names are not
+part of the standard; the gate rejects them. The application does not bundle a font file: the
+theme leaves the family unset so Flutter resolves the platform font, and the resolved family is
+checked per platform at release.
+
+## 🖼️ Icons
+
+Interface icons use monochrome symbolic or outlined glyphs at `ICON_SIZE` (16) or
+`ICON_SIZE_LARGE` (32). A filled glyph is not used when an outlined variant exists. The toolkit's
+Material icon set stands in for Adwaita's symbolic set; no custom SVG icon set ships.
 
 ## 🔀 Bounded differences
 
-The standard is strict, but it cannot be identical to GNOME's own implementation. These differences are
-declared, not accidental; adding another one requires a change that updates this table and the
-`interface-theme` spec.
+These four differences are toolkit limits, not design preferences. Adding another one requires a
+change that updates this table and the `interface-theme` spec.
 
 | Reference behavior | Afanes | Status | Why |
 | --- | --- | --- | --- |
-| Adwaita Sans | Platform typeface | Permanent, guideline-preferred | The typography guideline asks for the system font; the family differs from GNOME's packaged default |
-| Adwaita symbolic icons | Toolkit monochrome icon set, tinted in code | Permanent, asset-free | No bundled icon set; parity across platforms |
-| libadwaita widget rendering | Toolkit internals: field labels, ink feedback, scrollbars, overlay chrome | Temporary, shrinking | Toolkit boundary; the theme now sets feedback colors, radii, and density |
-| Access-key mnemonics | No underlined Alt shortcuts | Permanent, toolkit limit | Flutter exposes no mnemonic mechanism |
-| High-contrast style | No separate high-contrast palette | Permanent, toolkit limit | Flutter exposes no high-contrast theme hook |
+| Adwaita symbolic icons | Material symbolic/outlined glyphs, tinted in code | Permanent, asset-free | no bundled SVG set; platform parity |
+| libadwaita widget rendering | Flet/Material widget internals: field labels, ink feedback, scrollbars, overlay chrome | Temporary, shrinking | Flet boundary; feedback colors, radii, and density are set centrally |
+| Access-key mnemonics | No underlined Alt shortcuts | Permanent, Flet limit | Flet exposes no mnemonic API |
+| High-contrast style | No separate high-contrast input | Permanent, Flet limit | Flet exposes no high-contrast input; Flutter exposes one |
 
-Screen-reader coverage is not a declared difference: Flet exposes semantics labels, so missing labels
-are a gap to fix rather than a toolkit limit.
+The platform typeface is **not** a difference: the typography guideline requires the system font.
+The remaining obligation is to confirm the resolved family on each platform. If Flutter resolves to
+Roboto instead of the platform family, the platform family is set explicitly or the platform
+variation is recorded separately.
+
+## ♿ Accessibility notes
+
+Body, muted, and accent text meet 4.5:1 on their neutral surfaces. Two reference-inherited tensions
+are documented rather than hidden:
+
+- white on the `#3584E4` suggested fill is 3.77:1, so a label on that fill is treated as control
+  text at 3:1, not as body text;
+- the Red 4 dark destructive fill is 2.75:1 against the dark note view; the white label on it is
+  6.1:1, and the action is identified by its label and shape as well as its fill.
+
+High-contrast mode and access keys cannot be exercised through Flet today; both are declared
+limits above. Large-text robustness and accessible names are tracked in wave 5.
 
 ## 🚦 The conformance gate
 
-`tests/ui/test_conformance.py` scans `src/afanes/ui` and compares six measurements with an embedded
-baseline:
+`tests/ui/test_conformance.py` scans `src/afanes/ui` and compares nine measurements with an
+embedded baseline:
 
 - color literals and `ft.Colors.*` outside the token module;
+- hardcoded `ft.Text(size=...)`, `ft.TextStyle(size=...)`, or `font_size`;
+- Material `ft.TextThemeStyle` role names;
+- arbitrary `ft.Icon(size=...)` literals;
+- filled icon glyphs that have an outlined variant;
 - numeric layout literals outside the token module;
-- `ft.FilledButton` calls per module;
+- suggested or destructive actions per view class;
 - controls carrying both an icon and a label;
-- `dense=True` rows;
-- hardcoded `ft.Text(size=...)`, `ft.TextStyle(size=...)`, or `font_size` outside the token module.
+- `dense=True` rows.
 
-The comparison fails in both directions. A count above its baseline entry is a new violation; a
-baseline entry above the measured count is stale and must be deleted in the same change. The baseline
-is a debt ledger: it starts at the values measured when the gate landed and must reach empty before the
-standard is considered complete. Never add an entry to make a change pass.
+The value rules count per module; the button rules count within each class scope, so a module with
+several dialogs is measured per view. The comparison fails in both directions. A count above its
+baseline entry is a new violation; a baseline entry above the measured count is stale and must be
+deleted in the same change. The baseline is a debt ledger: it starts at the values measured when
+the gate landed and must reach empty before the standard is complete. Never add an entry to make a
+change pass.
 
 ## 🧭 Migration waves
 
@@ -123,21 +160,28 @@ Wave 0 landed with the change that introduced this standard. Later waves are sep
 their own spec deltas:
 
 ```text
-WAVE 0  tokens, two palettes, surfaces, accent roles, selection tint,
-        action styles, monochrome sections, text theme, gate
-WAVE 1  shell composition: chrome frame, sidebar as chrome, spacing sweep
-WAVE 2  control hierarchy: one suggested action per view, icon XOR label,
-        row density
+WAVE 0  tokens, two palettes, four surfaces, neutral selection, GNOME type
+        scale, outlined icons, 1024x600 minimum, expanded gate
+WAVE 1  shell composition: header bar and chrome frame, sidebar as chrome,
+        max content width, panel/radius/spacing sweep
+WAVE 2  control hierarchy: one suggested or destructive action per view,
+        icon XOR label, dense rows, insensitive invalid actions instead of
+        error-on-click
 WAVE 3  writing style: header capitalization, ellipses, final periods,
-        second person, typographic apostrophes
-WAVE 4  feedback: undo over confirmation, overlay policy
+        neutral tone (avoid you/my), typographic apostrophes and ellipsis,
+        copy gate, AGENTS.md 4.6
+WAVE 4  feedback: undo over confirmation, toasts for one-time events,
+        banners only for persistent states, overlays
 WAVE 5  keyboard and accessibility: shortcut map, focus order, semantics
         labels, large-text robustness
-WAVE 6  adaptivity: breakpoints, collapsible sidebar
-WAVE 7  identity: app icon, final palette pass, empty baseline
+WAVE 6  adaptivity: breakpoints, collapsible sidebar, narrow and large-window
+        behavior
+WAVE 7  identity: app icon, placeholder pages, final palette pass, empty
+        baseline
 ```
 
-Waves are ordering, not exemptions. The target remains strict conformance.
+Waves are ordering, not exemptions. The target remains strict conformance; the four Flet limits
+above are the only permanent exceptions.
 
 ## ✅ Changing the standard
 

@@ -68,7 +68,7 @@ class WelcomeView:
         controls: list[ft.Control] = [
             ft.Text(
                 afanes.ui.strings.WELCOME_TITLE,
-                theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM,
+                style=afanes.ui.theme.TEXT_ROLES["title-1"],
                 text_align=ft.TextAlign.CENTER,
             ),
             ft.Text(afanes.ui.strings.WELCOME_BODY, text_align=ft.TextAlign.CENTER),
@@ -77,7 +77,7 @@ class WelcomeView:
             controls.append(
                 ft.FilledButton(
                     content=afanes.ui.strings.WELCOME_CHOOSE,
-                    icon=ft.Icons.FOLDER_OPEN,
+                    icon=ft.Icons.FOLDER_OPEN_OUTLINED,
                     on_click=self._on_choose,
                     autofocus=True,
                     key="welcome-choose",
@@ -89,7 +89,7 @@ class WelcomeView:
             controls.append(
                 ft.FilledButton(
                     content=afanes.ui.strings.NEW_VAULT_ACTION,
-                    icon=ft.Icons.CREATE_NEW_FOLDER,
+                    icon=ft.Icons.CREATE_NEW_FOLDER_OUTLINED,
                     on_click=self._on_create,
                     key="welcome-create",
                 ),
@@ -97,7 +97,7 @@ class WelcomeView:
         controls.append(
             ft.Text(
                 afanes.ui.strings.WELCOME_NOTE,
-                theme_style=ft.TextThemeStyle.BODY_SMALL,
+                style=afanes.ui.theme.TEXT_ROLES["caption"],
                 text_align=ft.TextAlign.CENTER,
             ),
         )
@@ -132,7 +132,7 @@ class WelcomeView:
         field.on_submit = open_typed_path
         button = ft.FilledButton(
             content=afanes.ui.strings.WELCOME_OPEN,
-            icon=ft.Icons.FOLDER_OPEN,
+            icon=ft.Icons.FOLDER_OPEN_OUTLINED,
             on_click=open_typed_path,
             key="welcome-open",
         )
@@ -167,7 +167,7 @@ class SessionNotice:
                 controls=[
                     ft.Text(
                         afanes.ui.strings.SESSION_ACTIVE_TITLE,
-                        theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM,
+                        style=afanes.ui.theme.TEXT_ROLES["title-1"],
                         text_align=ft.TextAlign.CENTER,
                     ),
                     ft.Text(afanes.ui.strings.SESSION_ACTIVE_BODY, text_align=ft.TextAlign.CENTER),

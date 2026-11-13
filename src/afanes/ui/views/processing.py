@@ -65,11 +65,11 @@ class ProcessingView:
         )
         self.title = ft.Text(
             afanes.ui.strings.PROCESSING_TITLE,
-            theme_style=ft.TextThemeStyle.HEADLINE_SMALL,
+            style=afanes.ui.theme.TEXT_ROLES["title-2"],
         )
         self.capture_title = ft.Text(
             "",
-            theme_style=ft.TextThemeStyle.TITLE_LARGE,
+            style=afanes.ui.theme.TEXT_ROLES["title-3"],
         )
         self.capture_body = ft.Markdown(
             value="",
@@ -178,7 +178,7 @@ class ProcessingView:
         self.project_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.preview_button = ft.FilledButton(
             content=afanes.ui.strings.PROCESSING_PREVIEW_ACTION,
-            icon=ft.Icons.VISIBILITY,
+            icon=ft.Icons.VISIBILITY_OUTLINED,
             on_click=self._preview,
         )
         self.cancel_button = ft.TextButton(
@@ -190,7 +190,7 @@ class ProcessingView:
             controls=[
                 ft.Text(
                     afanes.ui.strings.PROCESSING_OUTCOME_LABEL,
-                    theme_style=ft.TextThemeStyle.TITLE_MEDIUM,
+                    style=afanes.ui.theme.TEXT_ROLES["title-4"],
                 ),
                 ft.Row(
                     controls=[self.outcome, self.status],
@@ -223,7 +223,7 @@ class ProcessingView:
         self.plan_warnings = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
         self.confirm_button = ft.FilledButton(
             content=afanes.ui.strings.PROCESSING_CONFIRM_ACTION,
-            icon=ft.Icons.CHECK,
+            icon=ft.Icons.CHECK_OUTLINED,
             on_click=self._confirm,
         )
         self.plan_panel = ft.Container(
@@ -236,7 +236,7 @@ class ProcessingView:
                 controls=[
                     ft.Text(
                         afanes.ui.strings.PROCESSING_PLAN_TITLE,
-                        theme_style=ft.TextThemeStyle.TITLE_MEDIUM,
+                        style=afanes.ui.theme.TEXT_ROLES["title-4"],
                     ),
                     self.plan_destination,
                     self.plan_details,
@@ -249,7 +249,7 @@ class ProcessingView:
 
         self.success_title = ft.Text(
             afanes.ui.strings.PROCESSING_SUCCESS_TITLE,
-            theme_style=ft.TextThemeStyle.TITLE_LARGE,
+            style=afanes.ui.theme.TEXT_ROLES["title-3"],
         )
         self.success_text = ft.Text("", selectable=True)
         self.done_button = ft.FilledButton(

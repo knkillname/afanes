@@ -36,11 +36,11 @@ from afanes.ui.components.frozen import FrozenControlRecovery
 _MONTHS_IN_YEAR = 12
 
 _SECTION_ICONS = {
-    afanes.ui.state.browser.WorkspaceSection.INBOX: ft.Icons.INBOX,
-    afanes.ui.state.browser.WorkspaceSection.PROJECTS: ft.Icons.FOLDER,
-    afanes.ui.state.browser.WorkspaceSection.REFERENCES: ft.Icons.BOOK,
-    afanes.ui.state.browser.WorkspaceSection.LOG: ft.Icons.CALENDAR_MONTH,
-    afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION: ft.Icons.WARNING_AMBER,
+    afanes.ui.state.browser.WorkspaceSection.INBOX: ft.Icons.INBOX_OUTLINED,
+    afanes.ui.state.browser.WorkspaceSection.PROJECTS: ft.Icons.FOLDER_OUTLINED,
+    afanes.ui.state.browser.WorkspaceSection.REFERENCES: ft.Icons.BOOK_OUTLINED,
+    afanes.ui.state.browser.WorkspaceSection.LOG: ft.Icons.CALENDAR_MONTH_OUTLINED,
+    afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION: ft.Icons.WARNING_AMBER_OUTLINED,
 }
 
 
@@ -130,24 +130,24 @@ class WorkspaceView:
         )
         self.vault_text = ft.Text(
             "",
-            theme_style=ft.TextThemeStyle.BODY_SMALL,
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
             selectable=True,
         )
         self.refresh_button = ft.IconButton(
-            icon=ft.Icons.REFRESH,
+            icon=ft.Icons.REFRESH_OUTLINED,
             tooltip=afanes.ui.strings.REFRESH_ACTION,
             on_click=self._refresh,
             key="workspace-refresh",
         )
         self.new_reference_button = ft.FilledButton(
             content=afanes.ui.strings.BROWSER_NEW_REFERENCE,
-            icon=ft.Icons.ADD,
+            icon=ft.Icons.ADD_OUTLINED,
             on_click=self._new_reference,
             key="browser-new-reference",
         )
         self.change_button = ft.PopupMenuButton(
             content=ft.Text(afanes.ui.strings.CHANGE_VAULT_ACTION),
-            icon=ft.Icons.FOLDER_OPEN,
+            icon=ft.Icons.FOLDER_OPEN_OUTLINED,
             tooltip=afanes.ui.strings.CHANGE_VAULT_ACTION,
             items=[
                 ft.PopupMenuItem(
@@ -181,13 +181,13 @@ class WorkspaceView:
         )
         self.capture_button = ft.FilledButton(
             content=afanes.ui.strings.CAPTURE_ACTION,
-            icon=ft.Icons.SEND,
+            icon=ft.Icons.SEND_OUTLINED,
             on_click=self._capture,
             key="workspace-capture-button",
         )
 
-        self.review_count = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
-        self.review_icon = ft.Icon(ft.Icons.PLAY_ARROW, color=afanes.ui.theme.SECTION_ICON_COLOR)
+        self.review_count = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
+        self.review_icon = ft.Icon(ft.Icons.PLAY_ARROW_OUTLINED, color=afanes.ui.theme.SECTION_ICON_COLOR)
         self.review_tile = ft.ListTile(
             title=afanes.ui.strings.REVIEW_TITLE,
             leading=self.review_icon,
@@ -205,7 +205,7 @@ class WorkspaceView:
         for section in afanes.ui.state.browser.WorkspaceSection:
             if section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
                 continue
-            self.section_counts[section] = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
+            self.section_counts[section] = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
             self.section_icons[section] = ft.Icon(_SECTION_ICONS[section], color=afanes.ui.theme.SECTION_ICON_COLOR)
             tile = ft.ListTile(
                 title=afanes.ui.strings.WORKSPACE_SECTION_LABELS[section.value],
@@ -480,9 +480,6 @@ class WorkspaceView:
         state = self._state
         self.vault_text.value = str(state.session.vault_root) if state.session.vault_root is not None else ""
         listing = state.browser.listing()
-        edge = ft.Border(
-            left=ft.BorderSide(afanes.ui.theme.SECTION_EDGE_WIDTH, afanes.ui.theme.ACCENT_FILL),
-        )
         for section, tile in self.section_tiles.items():
             browser_section = section.browser_section
             count = 0
@@ -494,15 +491,11 @@ class WorkspaceView:
             self.section_counts[section].value = str(count)
             active = state.browser.active_section is section
             tile.selected = active
-            self.section_icons[section].color = (
-                afanes.ui.theme.ACCENT_FILL if active else afanes.ui.theme.SECTION_ICON_COLOR
-            )
-            self.section_edges[section].border = edge if active else None
+            self.section_icons[section].color = afanes.ui.theme.SECTION_ICON_COLOR
         review_active = state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW
         self.review_count.value = afanes.ui.strings.review_pending(state.browser.pending_count())
         self.review_tile.selected = review_active
-        self.review_icon.color = afanes.ui.theme.ACCENT_FILL if review_active else afanes.ui.theme.SECTION_ICON_COLOR
-        self.review_edge.border = edge if review_active else None
+        self.review_icon.color = afanes.ui.theme.SECTION_ICON_COLOR
         self.search_field.value = state.browser.query
         self.browser_list.controls = self._browser_controls(listing)
         self._refresh_failures()
@@ -553,7 +546,7 @@ class WorkspaceView:
                         padding=afanes.ui.theme.ITEM_GAP,
                         content=ft.Text(
                             group.title,
-                            theme_style=ft.TextThemeStyle.LABEL_MEDIUM,
+                            style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
                         ),
                     )
                 )
@@ -665,7 +658,7 @@ class WorkspaceView:
         )
         self.log_today_button = ft.FilledButton(
             content=afanes.ui.strings.LOG_TODAY_ENTRY,
-            icon=ft.Icons.TODAY,
+            icon=ft.Icons.TODAY_OUTLINED,
             on_click=self._log_today,
             key="log-today-entry",
         )
@@ -819,7 +812,7 @@ class WorkspaceView:
         return ft.ListTile(
             title=note.title,
             subtitle=note.relative_path.as_posix(),
-            leading=ft.Icons.DESCRIPTION,
+            leading=ft.Icons.DESCRIPTION_OUTLINED,
             selected=selected,
             dense=True,
             on_click=self._select_handler(note.path),
@@ -855,7 +848,7 @@ class WorkspaceView:
             ft.Divider(height=1),
             ft.Text(
                 afanes.ui.strings.BROWSER_FAILURES,
-                theme_style=ft.TextThemeStyle.BODY_SMALL,
+                style=afanes.ui.theme.TEXT_ROLES["caption"],
                 color=afanes.ui.theme.ERROR_TEXT_COLOR,
             ),
         ]

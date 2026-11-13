@@ -79,20 +79,20 @@ class PageView:
         self._role_suggestion_field: str | None = None
 
         self.back_button = ft.IconButton(
-            icon=ft.Icons.ARROW_BACK,
+            icon=ft.Icons.ARROW_BACK_OUTLINED,
             tooltip=afanes.ui.strings.PAGE_BACK,
             on_click=self.go_back,
         )
-        self.title = ft.Text("", theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM)
+        self.title = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["title-1"])
         self.path = ft.Text(
             "",
-            theme_style=ft.TextThemeStyle.BODY_SMALL,
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
             selectable=True,
         )
-        self.meta_status = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
-        self.meta_owner = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
+        self.meta_status = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
+        self.meta_owner = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.meta_owner_button = ft.IconButton(
-            icon=ft.Icons.PERSON_ADD,
+            icon=ft.Icons.PERSON_ADD_OUTLINED,
             tooltip=afanes.ui.strings.PAGE_OWNER_SET,
             icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
             on_click=self.choose_owner,
@@ -104,9 +104,9 @@ class PageView:
             ),
             key="page-owner-set",
         )
-        self.meta_asked = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
+        self.meta_asked = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.meta_asked_button = ft.IconButton(
-            icon=ft.Icons.PERSON_SEARCH,
+            icon=ft.Icons.PERSON_SEARCH_OUTLINED,
             tooltip=afanes.ui.strings.PAGE_ASKED_BY_SET,
             icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
             on_click=self.choose_asked_by,
@@ -118,10 +118,10 @@ class PageView:
             ),
             key="page-asked-by-set",
         )
-        self.meta_due = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
-        self.meta_date = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
+        self.meta_due = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
+        self.meta_date = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.meta_due_button = ft.IconButton(
-            icon=ft.Icons.CALENDAR_MONTH,
+            icon=ft.Icons.CALENDAR_MONTH_OUTLINED,
             tooltip=afanes.ui.strings.PAGE_PROJECT_DUE_ADD,
             icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
             on_click=self.choose_due_date,
@@ -133,7 +133,7 @@ class PageView:
             ),
         )
         self.meta_due_clear = ft.IconButton(
-            icon=ft.Icons.EVENT_BUSY,
+            icon=ft.Icons.EVENT_BUSY_OUTLINED,
             tooltip=afanes.ui.strings.PAGE_PROJECT_DUE_CLEAR,
             icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
             on_click=self.clear_due_date,
@@ -169,23 +169,23 @@ class PageView:
         )
         self.status_text = ft.Text(
             "",
-            theme_style=ft.TextThemeStyle.BODY_SMALL,
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
         )
         self.process_button = ft.TextButton(
             content=afanes.ui.strings.PROCESS_ACTION,
-            icon=ft.Icons.PLAY_ARROW,
+            icon=ft.Icons.PLAY_ARROW_OUTLINED,
             on_click=self.process_current,
             visible=False,
             key="process-note",
         )
         self.edit_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_EDIT,
-            icon=ft.Icons.EDIT,
+            icon=ft.Icons.EDIT_OUTLINED,
             on_click=self.start_edit,
         )
         self.done_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_DONE,
-            icon=ft.Icons.CHECK,
+            icon=ft.Icons.CHECK_OUTLINED,
             on_click=self.finish_edit,
             visible=False,
         )
@@ -256,7 +256,7 @@ class PageView:
         ).build()
         self.connections_panel.visible = False
 
-        self.identity_text = ft.Text("", selectable=True, theme_style=ft.TextThemeStyle.BODY_SMALL)
+        self.identity_text = ft.Text("", selectable=True, style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.body_field = ft.TextField(
             label=afanes.ui.strings.PAGE_BODY_LABEL,
             multiline=True,
@@ -310,7 +310,7 @@ class PageView:
         )
         self.date_error = ft.Text(
             "",
-            theme_style=ft.TextThemeStyle.BODY_SMALL,
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
             color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=False,
             selectable=True,
@@ -332,7 +332,7 @@ class PageView:
         self.name_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.due_error = ft.Text(
             "",
-            theme_style=ft.TextThemeStyle.BODY_SMALL,
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
             color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=False,
             selectable=True,
@@ -381,7 +381,7 @@ class PageView:
         )
         self.raw_save_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_RAW_SAVE,
-            icon=ft.Icons.SAVE,
+            icon=ft.Icons.SAVE_OUTLINED,
             on_click=self.save_raw,
         )
         self.raw_panel = ft.Column(
@@ -395,17 +395,17 @@ class PageView:
         self.conflict_text = ft.Text("", selectable=True)
         self.reload_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_CONFLICT_RELOAD,
-            icon=ft.Icons.SYNC,
+            icon=ft.Icons.SYNC_OUTLINED,
             on_click=self.reload_page,
         )
         self.overwrite_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_CONFLICT_OVERWRITE,
-            icon=ft.Icons.SAVE,
+            icon=ft.Icons.SAVE_OUTLINED,
             on_click=self.overwrite_page,
         )
         self.recreate_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_CONFLICT_RECREATE,
-            icon=ft.Icons.ADD,
+            icon=ft.Icons.ADD_OUTLINED,
             on_click=self.recreate_page,
         )
         self.discard_button = ft.TextButton(
@@ -440,7 +440,7 @@ class PageView:
         self.repair_text = ft.Text("", selectable=True)
         self.repair_rewrite_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_REPAIR_REWRITE,
-            icon=ft.Icons.LINK,
+            icon=ft.Icons.LINK_OUTLINED,
             on_click=self.rewrite_links,
         )
         self.repair_keep_button = ft.TextButton(
@@ -461,7 +461,7 @@ class PageView:
         self.type_change_text = ft.Text("", selectable=True)
         self.type_change_confirm_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_TYPE_CHANGE_CONFIRM,
-            icon=ft.Icons.CHECK,
+            icon=ft.Icons.CHECK_OUTLINED,
             on_click=self.confirm_type_change,
         )
         self.type_change_cancel_button = ft.TextButton(
@@ -499,12 +499,12 @@ class PageView:
         self.rename_preview_text = ft.Text("", selectable=True)
         self.rename_preview_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_RENAME,
-            icon=ft.Icons.VISIBILITY,
+            icon=ft.Icons.VISIBILITY_OUTLINED,
             on_click=self.preview_rename,
         )
         self.rename_confirm_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_RENAME_CONFIRM,
-            icon=ft.Icons.CHECK,
+            icon=ft.Icons.CHECK_OUTLINED,
             on_click=self.confirm_rename,
         )
         self.rename_cancel_button = ft.TextButton(
@@ -519,7 +519,7 @@ class PageView:
             visible=False,
             content=ft.Column(
                 controls=[
-                    ft.Text(afanes.ui.strings.PAGE_RENAME_TITLE, theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
+                    ft.Text(afanes.ui.strings.PAGE_RENAME_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-4"]),
                     self.rename_field,
                     self.rename_preview_text,
                     ft.Row(
@@ -801,7 +801,7 @@ class PageView:
         """Build one labeled group of connection rows."""
         return ft.Column(
             controls=[
-                ft.Text(title, theme_style=ft.TextThemeStyle.LABEL_MEDIUM),
+                ft.Text(title, style=afanes.ui.theme.TEXT_ROLES["caption-heading"]),
                 *rows,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
@@ -841,7 +841,7 @@ class PageView:
                 continue
             rows.append(
                 ft.TextButton(
-                    content=ft.Text(owned.project.title, theme_style=ft.TextThemeStyle.BODY_SMALL),
+                    content=ft.Text(owned.project.title, style=afanes.ui.theme.TEXT_ROLES["caption"]),
                     on_click=self._connection_handler(owned.project.path),
                 )
             )

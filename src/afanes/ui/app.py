@@ -292,7 +292,7 @@ class _Shell:
                     ft.Text(message, expand=True, selectable=True),
                     ft.FilledButton(
                         content=afanes.ui.strings.REVIEW_LAUNCH_DIGEST_ACTION,
-                        icon=ft.Icons.PLAY_ARROW,
+                        icon=ft.Icons.PLAY_ARROW_OUTLINED,
                         on_click=self.start_launch_review,
                         key="launch-digest-start",
                     ),
@@ -430,7 +430,7 @@ class _Shell:
 
         browse_button = ft.TextButton(
             content=afanes.ui.strings.NEW_VAULT_BROWSE,
-            icon=ft.Icons.FOLDER_OPEN,
+            icon=ft.Icons.FOLDER_OPEN_OUTLINED,
             on_click=browse,
             visible=self.is_desktop,
             key="create-vault-browse",
@@ -455,20 +455,20 @@ class _Shell:
         )
         unavailable = ft.Text(
             afanes.ui.strings.NEW_VAULT_TEMPLATE_UNAVAILABLE,
-            color=afanes.ui.theme.ERROR_COLOR,
+            color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=summaries is None,
             key="create-vault-templates-error",
         )
         folders = ", ".join(f"{folder.as_posix()}/" for folder in afanes.core.vault.service.Vault.default_layout())
         preview = ft.Text(
             afanes.ui.strings.NEW_VAULT_PREVIEW_GUIDE.format(folders=folders),
-            theme_style=ft.TextThemeStyle.BODY_SMALL,
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
             selectable=True,
             key="create-vault-preview",
         )
         error = ft.Text(
             "",
-            color=afanes.ui.theme.ERROR_COLOR,
+            color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=False,
             key="create-vault-error",
         )
@@ -565,7 +565,7 @@ class _Shell:
         )
         error = ft.Text(
             "",
-            color=afanes.ui.theme.ERROR_COLOR,
+            color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=False,
             key="new-reference-error",
         )
@@ -738,7 +738,7 @@ class _Shell:
         )
         error = ft.Text(
             "",
-            color=afanes.ui.theme.ERROR_COLOR,
+            color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=False,
             key="new-log-error",
         )

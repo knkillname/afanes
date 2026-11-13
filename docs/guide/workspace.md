@@ -62,17 +62,19 @@ first non-blank line becomes the filename and heading, and the note is written u
 ## 🎨 Appearance
 
 The interface follows the operating system's light or dark appearance and has no separate in-app
-switch. Each mode has its own palette. In light mode the note canvas is the brightest surface, the
-window sits below it, and the browser sidebar recedes one more step. In dark mode the canvas is darker
-than the chrome, so a panel reads as recessed rather than raised. A thin outline keeps the steps visible
-in both modes.
+switch. Each mode uses the Adwaita palette. In light mode the note view is the brightest surface, the
+window sits below it, and the browser sidebar recedes one more step. In dark mode the note view is
+darker than the window, and the sidebar is lighter than the window, so a panel reads as recessed
+rather than raised. A thin outline keeps the steps visible in both modes. The window fits the
+1024x600 desktop minimum.
 
-One blue accent marks suggested actions, selection, links, keyboard focus, and the active browser
-section. Selection adds a light accent tint and a 3px accent edge, so it stays readable without relying
-on color. Actions that move a note to the trash use a red destructive style. Due-work notices use a warm
-attention surface. Every browser section icon uses one muted tint; only the active section takes the
-accent, and its label and icon still identify the section when color is not perceived. Typography uses
-the platform font family in one hierarchy driven by the shared text theme.
+One blue accent marks suggested actions, links, keyboard focus, and log entries. Selection uses a
+neutral row shade, not the accent, matching the GNOME navigation sidebar. Section icons are
+monochrome; the label, icon, and neutral fill identify the active section without relying on color.
+Actions that move a note to the trash use the red destructive style. Due-work notices use a warm
+attention surface. Typography uses the platform font family and the GNOME standard styles: title-1
+for the page title, title-2 for a step headline, heading for compact headings, body for prose, and
+caption for metadata.
 
 ## 🧭 See also
 

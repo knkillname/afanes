@@ -212,38 +212,31 @@ class TestWorkspaceShell:
         assert view.change_button in view.status_bar.content.controls
         assert afanes.ui.strings.APP_TITLE not in _texts(view.root)
 
-    def test_inactive_sections_share_one_icon_tint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_sections_share_one_icon_tint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
         review_icon = typing.cast("ft.Icon", view.review_tile.leading)
-        active = afanes.ui.state.browser.WorkspaceSection.INBOX
 
-        inactive = [icon for section, icon in view.section_icons.items() if section is not active]
-        assert len(inactive) == len(view.section_icons) - 1
-        assert len({icon.color for icon in inactive}) == 1
-        assert inactive[0].color == afanes.ui.theme.SECTION_ICON_COLOR
-        assert view.section_icons[active].color == afanes.ui.theme.ACCENT_FILL
+        assert all(icon.color == afanes.ui.theme.SECTION_ICON_COLOR for icon in view.section_icons.values())
         assert review_icon.color == afanes.ui.theme.SECTION_ICON_COLOR
 
-    def test_only_the_active_section_shows_an_accent_edge(
+    def test_selection_uses_a_neutral_row_without_an_accent_edge(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
         inbox = afanes.ui.state.browser.WorkspaceSection.INBOX
-        edge = view.section_edges[inbox].border
 
-        assert edge is not None
-        assert edge.left is not None
-        assert edge.left.width == afanes.ui.theme.SECTION_EDGE_WIDTH
-        assert edge.left.color == afanes.ui.theme.ACCENT_FILL
+        assert view.section_tiles[inbox].selected is True
+        assert view.section_edges[inbox].border is None
         assert view.review_edge.border is None
-        assert all(edge.border is None for section, edge in view.section_edges.items() if section is not inbox)
+        assert all(edge.border is None for edge in view.section_edges.values())
 
         asyncio.run(_handler(view.review_tile)())
 
-        assert view.review_edge.border is not None
         assert view.review_tile.selected is True
+        assert view.section_tiles[inbox].selected is False
+        assert view.review_edge.border is None
         assert view.section_edges[inbox].border is None
 
     def test_switching_sections_keeps_the_open_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

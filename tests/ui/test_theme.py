@@ -1,6 +1,5 @@
 """Tests for the shared visual theme tokens."""
 
-import re
 from pathlib import Path
 
 import flet as ft
@@ -54,9 +53,9 @@ MODE_SPECIFIC_ROLES = frozenset(
         "accent_text",
         "accent_container",
         "on_accent_container",
+        "destructive",
         "border",
         "error",
-        "on_error",
         "error_container",
         "on_error_container",
         "inverse_surface",
@@ -65,16 +64,27 @@ MODE_SPECIFIC_ROLES = frozenset(
     }
 )
 SURFACES = ("page", "region", "card", "container")
-TEXT_ROLES = ("text", "muted_text", "accent_text")
 TEXT_CONTRAST = 4.5
 NON_TEXT_CONTRAST = 3.0
 SURFACE_RADIUS_VALUE = 12
-CONTROL_RADIUS_VALUE = 8
+CONTROL_RADIUS_VALUE = 9
 ITEM_GAP_VALUE = 12
 SECTION_GAP_VALUE = 18
 PAGE_PADDING_VALUE = 24
-SELECTION_TINT = 0.15
+ICON_SIZE_VALUE = 16
+ICON_SIZE_LARGE_VALUE = 32
+LIST_ROW_MIN_HEIGHT = 36
+WINDOW_MIN_WIDTH_VALUE = 1024
+WINDOW_MIN_HEIGHT_VALUE = 600
+SELECTION_TINT = 0.10
 LOG_TINT = 0.18
+BASE_FONT_SIZE_VALUE = 15
+SUGGESTED_LABEL_CONTRAST = 3.77
+TITLE_1_RATIO = 1.81
+TITLE_2_RATIO = 1.36
+TITLE_3_RATIO = 1.36
+TITLE_4_RATIO = 1.18
+CAPTION_RATIO = 0.82
 SRGB_LINEAR_THRESHOLD = 0.04045
 
 
@@ -96,6 +106,12 @@ def _contrast(foreground: str, background: str) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
+def _role_size(role: str) -> float:
+    style = afanes.ui.theme.TEXT_ROLES[role]
+    assert style.size is not None
+    return style.size
+
+
 class TestPalette:
     def test_every_required_role_exists_in_both_modes(self) -> None:
         for palette in (afanes.ui.theme.LIGHT_PALETTE, afanes.ui.theme.DARK_PALETTE):
@@ -107,6 +123,19 @@ class TestPalette:
 
         for role in MODE_SPECIFIC_ROLES:
             assert light[role] != dark[role], role
+
+    def test_reference_surfaces_are_pinned(self) -> None:
+        light = afanes.ui.theme.LIGHT_PALETTE
+        dark = afanes.ui.theme.DARK_PALETTE
+
+        assert light["page"] == "#FAFAFB"
+        assert light["region"] == "#EBEBED"
+        assert light["card"] == "#FFFFFF"
+        assert light["container"] == "#F3F3F5"
+        assert dark["page"] == "#222226"
+        assert dark["region"] == "#2E2E32"
+        assert dark["card"] == "#1D1D20"
+        assert dark["container"] == "#28282C"
 
     def test_body_text_meets_text_contrast_on_every_surface(self) -> None:
         for palette in (afanes.ui.theme.LIGHT_PALETTE, afanes.ui.theme.DARK_PALETTE):
@@ -133,14 +162,18 @@ class TestPalette:
                 assert _contrast(palette["control_border"], palette[surface]) >= NON_TEXT_CONTRAST
 
     def test_text_on_the_accent_fill_and_destructive_fill_is_legible(self) -> None:
-        palette = afanes.ui.theme.LIGHT_PALETTE
+        for palette in (afanes.ui.theme.LIGHT_PALETTE, afanes.ui.theme.DARK_PALETTE):
+            assert _contrast(palette["on_accent"], palette["accent_fill"]) >= NON_TEXT_CONTRAST
+            assert _contrast(palette["on_error"], palette["destructive"]) >= TEXT_CONTRAST
 
-        assert _contrast(palette["on_accent"], palette["accent_fill"]) >= NON_TEXT_CONTRAST
-        assert _contrast(palette["on_accent"], palette["destructive"]) >= TEXT_CONTRAST
+    def test_suggested_fill_label_contrast_is_the_inherited_reference(self) -> None:
+        for palette in (afanes.ui.theme.LIGHT_PALETTE, afanes.ui.theme.DARK_PALETTE):
+            assert round(_contrast(palette["on_accent"], palette["accent_fill"]), 2) == SUGGESTED_LABEL_CONTRAST
 
     def test_status_text_meets_text_contrast(self) -> None:
         for palette in (afanes.ui.theme.LIGHT_PALETTE, afanes.ui.theme.DARK_PALETTE):
-            assert _contrast(palette["error"], palette["card"]) >= TEXT_CONTRAST
+            assert _contrast(palette["on_error_container"], palette["card"]) >= TEXT_CONTRAST
+            assert _contrast(palette["on_error_container"], palette["error_container"]) >= TEXT_CONTRAST
 
 
 class TestTheme:
@@ -162,24 +195,30 @@ class TestTheme:
         assert dark.surface == afanes.ui.theme.DARK_PALETTE["page"]
         assert light.tertiary == afanes.ui.theme.LIGHT_PALETTE["accent_text"]
         assert dark.tertiary == afanes.ui.theme.DARK_PALETTE["accent_text"]
+        assert light.error == afanes.ui.theme.LIGHT_PALETTE["error"]
+        assert dark.error == afanes.ui.theme.DARK_PALETTE["error"]
 
     def test_surfaces_use_neutral_theme_surfaces(self) -> None:
         assert afanes.ui.theme.LIGHT_THEME.surfaces == ft.ThemeSurfaces.NEUTRAL
         assert afanes.ui.theme.DARK_THEME.surfaces == ft.ThemeSurfaces.NEUTRAL
 
-    def test_surface_roles_differ_pairwise(self) -> None:
+    def test_four_surface_roles_differ_pairwise(self) -> None:
         for palette in (afanes.ui.theme.LIGHT_PALETTE, afanes.ui.theme.DARK_PALETTE):
-            page, region, card = (palette[role] for role in ("page", "region", "card"))
+            values = {palette[role] for role in SURFACES}
 
-            assert page != region
-            assert region != card
-            assert card != page
+            assert len(values) == len(SURFACES)
 
-    def test_the_note_canvas_is_the_brightest_light_surface(self) -> None:
+    def test_light_depth_raises_the_note_canvas(self) -> None:
         palette = afanes.ui.theme.LIGHT_PALETTE
 
         assert _luminance(palette["card"]) > _luminance(palette["page"])
         assert _luminance(palette["page"]) > _luminance(palette["region"])
+
+    def test_dark_depth_recesses_the_note_canvas(self) -> None:
+        palette = afanes.ui.theme.DARK_PALETTE
+
+        assert _luminance(palette["card"]) < _luminance(palette["page"])
+        assert _luminance(palette["page"]) < _luminance(palette["region"])
 
     def test_action_and_selection_colors_are_configured(self) -> None:
         for theme in (afanes.ui.theme.LIGHT_THEME, afanes.ui.theme.DARK_THEME):
@@ -192,7 +231,11 @@ class TestTheme:
             assert tiles is not None
             assert tiles.selected_tile_color == afanes.ui.theme.SELECTED_ROW_COLOR
 
-    def test_controls_take_the_standard_corner_radius(self) -> None:
+    def test_destructive_style_uses_the_error_fill(self) -> None:
+        assert afanes.ui.theme.DESTRUCTIVE == ft.Colors.ERROR
+        assert afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE.bgcolor == ft.Colors.ERROR
+
+    def test_controls_take_the_reference_corner_radius(self) -> None:
         filled = afanes.ui.theme.FILLED_BUTTON_THEME.style
         text = afanes.ui.theme.TEXT_BUTTON_THEME.style
         border = afanes.ui.theme.INPUT_DECORATION_THEME.border
@@ -217,21 +260,44 @@ class TestTheme:
         assert theme.focus_color == afanes.ui.theme.FOCUS_COLOR
         assert theme.visual_density == ft.VisualDensity.STANDARD
 
+    def test_hover_and_highlight_are_neutral_while_focus_is_accent(self) -> None:
+        assert ft.Colors.with_opacity(0.05, ft.Colors.ON_SURFACE) == afanes.ui.theme.HOVER_COLOR
+        assert ft.Colors.with_opacity(0.08, ft.Colors.ON_SURFACE) == afanes.ui.theme.HIGHLIGHT_COLOR
+        assert ft.Colors.with_opacity(0.08, ft.Colors.ON_SURFACE) == afanes.ui.theme.SPLASH_COLOR
+        assert ft.Colors.with_opacity(0.15, ft.Colors.PRIMARY) == afanes.ui.theme.FOCUS_COLOR
+
+    def test_icons_use_the_reference_size_tokens(self) -> None:
+        assert afanes.ui.theme.ICON_SIZE == ICON_SIZE_VALUE
+        assert afanes.ui.theme.ICON_SIZE_LARGE == ICON_SIZE_LARGE_VALUE
+        for theme in (afanes.ui.theme.LIGHT_THEME, afanes.ui.theme.DARK_THEME):
+            icon_theme = theme.icon_theme
+
+            assert icon_theme is not None
+            assert icon_theme.size == afanes.ui.theme.ICON_SIZE
+
+    def test_list_rows_use_the_reference_minimum_height(self) -> None:
+        tiles = afanes.ui.theme.LIST_TILE_THEME
+
+        assert tiles.min_height == LIST_ROW_MIN_HEIGHT
+
+    def test_minimum_window_fits_the_reference_desktop_size(self) -> None:
+        assert afanes.ui.theme.WINDOW_MIN_WIDTH <= WINDOW_MIN_WIDTH_VALUE
+        assert afanes.ui.theme.WINDOW_MIN_HEIGHT <= WINDOW_MIN_HEIGHT_VALUE
+
     def test_spacing_uses_the_adwaita_rhythm(self) -> None:
         assert afanes.ui.theme.ITEM_GAP == ITEM_GAP_VALUE
         assert afanes.ui.theme.SECTION_GAP == SECTION_GAP_VALUE
         assert afanes.ui.theme.PAGE_PADDING == PAGE_PADDING_VALUE
         assert not hasattr(afanes.ui.theme, "CARD_RADIUS")
+        assert not hasattr(afanes.ui.theme, "SECTION_EDGE_WIDTH")
 
     def test_adoption_panel_spacing_matches_a_section_gap(self) -> None:
         assert afanes.ui.theme.ADOPTION_PANEL_GAP == afanes.ui.theme.SECTION_GAP
         assert afanes.ui.theme.ADOPTION_PANEL_GAP > 0
 
-    def test_selection_is_a_fifteen_percent_accent_tint(self) -> None:
-        assert ft.Colors.with_opacity(SELECTION_TINT, afanes.ui.theme.ACCENT_FILL) == (
-            afanes.ui.theme.SELECTED_ROW_COLOR
-        )
-        assert afanes.ui.theme.SELECTED_ROW_COLOR.endswith(",0.15")
+    def test_selection_is_a_neutral_ten_percent_shade(self) -> None:
+        assert ft.Colors.with_opacity(SELECTION_TINT, ft.Colors.ON_SURFACE) == (afanes.ui.theme.SELECTED_ROW_COLOR)
+        assert ft.Colors.with_opacity(0.15, afanes.ui.theme.ACCENT_FILL) != afanes.ui.theme.SELECTED_ROW_COLOR
 
     def test_no_per_section_hue_remains(self) -> None:
         for name in (
@@ -248,59 +314,69 @@ class TestTheme:
         assert ft.Colors.with_opacity(LOG_TINT, afanes.ui.theme.ACCENT_FILL) == afanes.ui.theme.LOG_ENTRY_TINT
 
 
-class TestTextTheme:
-    def test_text_theme_defines_every_standard_role(self) -> None:
-        roles = {
-            "display_large",
-            "display_medium",
-            "display_small",
-            "headline_large",
-            "headline_medium",
-            "headline_small",
-            "title_large",
-            "title_medium",
-            "title_small",
-            "body_large",
-            "body_medium",
-            "body_small",
-            "label_large",
-            "label_medium",
-            "label_small",
+class TestTextRoles:
+    def test_standard_roles_are_defined(self) -> None:
+        expected = {
+            "title-1",
+            "title-2",
+            "title-3",
+            "title-4",
+            "heading",
+            "body",
+            "caption",
+            "caption-heading",
         }
 
-        theme = afanes.ui.theme.TEXT_THEME
-
-        for role in roles:
-            style = getattr(theme, role)
-            assert style is not None, role
+        assert set(afanes.ui.theme.TEXT_ROLES) == expected
+        for role, style in afanes.ui.theme.TEXT_ROLES.items():
             assert style.size is not None, role
+            assert style.weight is not None, role
 
-    def test_hierarchy_comes_from_the_named_roles(self) -> None:
-        theme = afanes.ui.theme.TEXT_THEME
+    def test_scale_is_relative_to_the_base_size(self) -> None:
+        roles = afanes.ui.theme.TEXT_ROLES
+        base = afanes.ui.theme.BASE_FONT_SIZE
 
-        assert theme.headline_medium is not None
-        assert theme.headline_medium.size is not None
-        assert theme.label_medium is not None
-        assert theme.label_medium.size is not None
-        assert theme.headline_medium.size > theme.label_medium.size
-        assert theme.headline_medium.weight == ft.FontWeight.W_700
+        assert base == BASE_FONT_SIZE_VALUE
+        assert roles["title-1"].size == round(base * TITLE_1_RATIO)
+        assert roles["title-2"].size == round(base * TITLE_2_RATIO)
+        assert roles["title-3"].size == round(base * TITLE_3_RATIO)
+        assert roles["title-4"].size == round(base * TITLE_4_RATIO)
+        assert roles["heading"].size == base
+        assert roles["body"].size == base
+        assert roles["caption"].size == round(base * CAPTION_RATIO)
+        assert roles["caption-heading"].size == round(base * CAPTION_RATIO)
 
-    def test_metadata_role_uses_the_muted_text_color(self) -> None:
-        style = afanes.ui.theme.TEXT_THEME.body_small
+    def test_hierarchy_and_weights_follow_the_reference(self) -> None:
+        roles = afanes.ui.theme.TEXT_ROLES
 
-        assert style is not None
-        assert style.color == afanes.ui.theme.MUTED_TEXT_COLOR
+        assert _role_size("title-1") > _role_size("title-2")
+        assert _role_size("title-2") >= _role_size("title-3")
+        assert _role_size("title-3") > _role_size("title-4")
+        assert _role_size("title-4") > _role_size("heading")
+        assert _role_size("heading") > _role_size("caption")
+        assert roles["title-1"].weight == ft.FontWeight.W_800
+        assert roles["title-2"].weight == ft.FontWeight.W_800
+        assert roles["title-3"].weight == ft.FontWeight.W_700
+        assert roles["title-4"].weight == ft.FontWeight.W_700
+        assert roles["heading"].weight == ft.FontWeight.W_700
+        assert roles["body"].weight == ft.FontWeight.W_400
+        assert roles["caption"].weight == ft.FontWeight.W_400
+
+    def test_caption_roles_use_the_muted_text_color(self) -> None:
+        roles = afanes.ui.theme.TEXT_ROLES
+
+        assert roles["caption"].color == afanes.ui.theme.MUTED_TEXT_COLOR
+        assert roles["caption-heading"].color == afanes.ui.theme.MUTED_TEXT_COLOR
+        assert roles["body"].color == afanes.ui.theme.TEXT_COLOR
 
     def test_both_themes_carry_the_text_theme(self) -> None:
         assert afanes.ui.theme.LIGHT_THEME.text_theme == afanes.ui.theme.TEXT_THEME
         assert afanes.ui.theme.DARK_THEME.text_theme == afanes.ui.theme.TEXT_THEME
 
-    def test_every_role_used_by_a_view_resolves_through_the_theme(self) -> None:
-        used: set[str] = set()
-        for path in UI_ROOT.rglob("*.py"):
-            used.update(re.findall(r"ft\.TextThemeStyle\.([A-Z_]+)", path.read_text(encoding="utf-8")))
+    def test_views_use_standard_roles_and_no_material_theme_styles(self) -> None:
+        sources = list(UI_ROOT.rglob("*.py"))
+        text_roles = "\n".join(path.read_text(encoding="utf-8") for path in sources)
 
-        assert used
-        theme = afanes.ui.theme.TEXT_THEME
-        for role in used:
-            assert getattr(theme, role.lower()) is not None, role
+        assert 'TEXT_ROLES["' in text_roles
+        assert "theme_style=ft.TextThemeStyle" not in text_roles
+        assert "ft.TextStyle(size=" not in text_roles.replace((UI_ROOT / "theme.py").read_text(encoding="utf-8"), "")

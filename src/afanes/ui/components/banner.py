@@ -41,7 +41,7 @@ class Banner:
             border_radius=afanes.ui.theme.SURFACE_RADIUS,
             content=ft.Row(
                 controls=[
-                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=afanes.ui.theme.ERROR_TEXT_COLOR, size=18),
+                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=afanes.ui.theme.ERROR_TEXT_COLOR),
                     ft.Text(
                         self._message,
                         color=afanes.ui.theme.ERROR_TEXT_COLOR,

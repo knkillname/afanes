@@ -72,7 +72,7 @@ class ProjectBodyView:
         self._owner_query = ""
         self._error = ft.Text(
             "",
-            theme_style=ft.TextThemeStyle.BODY_SMALL,
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
             color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=False,
             selectable=True,
@@ -198,14 +198,14 @@ class ProjectBodyView:
                     on_tap_link=self._follow_link,
                 ).build(),
                 self._step_action(
-                    ft.Icons.CALENDAR_MONTH,
+                    ft.Icons.CALENDAR_MONTH_OUTLINED,
                     afanes.ui.strings.PAGE_STEP_PLAN_ACTION,
                     self._plan_handler(step),
                 ),
                 *(
                     [
                         self._step_action(
-                            ft.Icons.EVENT_BUSY,
+                            ft.Icons.EVENT_BUSY_OUTLINED,
                             afanes.ui.strings.PAGE_STEP_CLEAR_PLAN,
                             self._clear_plan_handler(step),
                         )
@@ -264,7 +264,7 @@ class ProjectBodyView:
             if index:
                 spans.append(ft.TextSpan(", "))
             spans.append(self._role_span(owner))
-        return ft.Text(spans=spans, theme_style=ft.TextThemeStyle.BODY_SMALL)
+        return ft.Text(spans=spans, style=afanes.ui.theme.TEXT_ROLES["caption"])
 
     def _role_span(self, name: str) -> ft.TextSpan:
         """Build one link-styled span for a step owner name."""
@@ -313,7 +313,7 @@ class ProjectBodyView:
         """Render one metadata label on the step surface."""
         return ft.Text(
             text,
-            theme_style=ft.TextThemeStyle.BODY_SMALL,
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
         )
 
     def _step_action(
@@ -405,7 +405,7 @@ class ProjectBodyView:
                 controls=[
                     ft.Text(
                         afanes.ui.strings.PAGE_STEP_OWNER_TITLE,
-                        theme_style=ft.TextThemeStyle.LABEL_LARGE,
+                        style=afanes.ui.theme.TEXT_ROLES["heading"],
                         color=afanes.ui.theme.STEP_TEXT_COLOR,
                     ),
                     ft.Row(controls=chips, spacing=afanes.ui.theme.ITEM_GAP, wrap=True),
@@ -413,7 +413,7 @@ class ProjectBodyView:
                         controls=[
                             self._owner_field,
                             ft.IconButton(
-                                icon=ft.Icons.PERSON_ADD,
+                                icon=ft.Icons.PERSON_ADD_OUTLINED,
                                 tooltip=afanes.ui.strings.PAGE_STEP_OWNER_ADD,
                                 on_click=self._add_owner_from_field,
                                 icon_color=afanes.ui.theme.STEP_TEXT_COLOR,

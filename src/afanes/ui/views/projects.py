@@ -98,7 +98,7 @@ class ProjectsView:
         """Build one collapsible status group."""
         label = afanes.ui.strings.PROJECT_GROUP_LABELS[group.stage.value]
         return ft.ExpansionTile(
-            title=ft.Text(f"{label} ({len(projects)})", theme_style=ft.TextThemeStyle.TITLE_SMALL),
+            title=ft.Text(f"{label} ({len(projects)})", style=afanes.ui.theme.TEXT_ROLES["heading"]),
             controls=[self._project_tile(summary) for summary in projects],
             expanded=group.stage is not ProjectStage.CLOSED,
             dense=True,
@@ -112,33 +112,33 @@ class ProjectsView:
         details: list[ft.Control] = [
             ft.Text(
                 afanes.ui.strings.PROJECT_STATUS.format(status=StatusLabel(note.status).text),
-                theme_style=ft.TextThemeStyle.BODY_SMALL,
+                style=afanes.ui.theme.TEXT_ROLES["caption"],
             )
         ]
         if note.due_date is not None:
             details.append(
                 ft.Text(
                     afanes.ui.strings.PROJECT_DUE.format(date=note.due_date.isoformat()),
-                    theme_style=ft.TextThemeStyle.BODY_SMALL,
+                    style=afanes.ui.theme.TEXT_ROLES["caption"],
                 )
             )
         details.append(
             ft.Text(
                 afanes.ui.strings.open_step_count(summary.open_count),
-                theme_style=ft.TextThemeStyle.BODY_SMALL,
+                style=afanes.ui.theme.TEXT_ROLES["caption"],
             )
         )
         if summary.next_step is None:
             details.append(
                 ft.Text(
-                    afanes.ui.strings.PROJECT_NO_NEXT_STEP, theme_style=ft.TextThemeStyle.BODY_SMALL, selectable=True
+                    afanes.ui.strings.PROJECT_NO_NEXT_STEP, style=afanes.ui.theme.TEXT_ROLES["caption"], selectable=True
                 )
             )
         else:
             details.append(
                 StepText(
                     afanes.ui.strings.PROJECT_NEXT_STEP.format(title=summary.next_step.text),
-                    afanes.ui.theme.METADATA_MARKDOWN_TEXT_STYLE,
+                    afanes.ui.theme.TEXT_ROLES["caption"],
                     selectable=True,
                 ).build()
             )

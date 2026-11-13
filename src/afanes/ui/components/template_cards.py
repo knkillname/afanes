@@ -177,7 +177,7 @@ class TemplateCardPicker:
         )
         self.description = ft.Text(
             self._phrases.empty_description,
-            theme_style=ft.TextThemeStyle.BODY_SMALL,
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
             selectable=True,
             key=f"{prefix}-template-description",
         )

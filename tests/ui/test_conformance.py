@@ -5,8 +5,9 @@ embedded baseline. A count above its baseline entry is a new violation and
 fails; a baseline entry above the measured count is stale and also fails, so the
 ledger can only shrink.
 
-Counting is per module. Each view module holds one view class today, so the
-module count is a faithful proxy for the per-view count required by the spec.
+Value rules count per module. Button rules count within each class scope, so a
+module that holds several dialogs is measured per view rather than as one
+undifferentiated module.
 """
 
 import ast
@@ -14,11 +15,13 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
+import flet as ft
+
 import afanes.ui.theme
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2] / "src" / "afanes" / "ui"
 PALETTE_MODULE = "theme.py"
-SURFACE_ROLE_COUNT = 3
+SURFACE_ROLE_COUNT = 4
 SRGB_LINEAR_THRESHOLD = 0.04045
 
 LAYOUT_KEYWORDS = frozenset(
@@ -45,15 +48,20 @@ LAYOUT_KEYWORDS = frozenset(
     }
 )
 LABEL_KEYWORDS = frozenset({"content", "text", "label"})
+BUTTON_NAMES = frozenset({"FilledButton", "TextButton", "OutlinedButton", "ElevatedButton"})
+TEXT_CONTROL_NAMES = frozenset({"Text", "TextSpan", "TextStyle"})
 FONT_SUFFIXES = frozenset({".ttf", ".otf", ".ttc", ".woff", ".woff2"})
 ICON_SUFFIXES = frozenset({".svg"})
 HEX_COLOR = re.compile(r"#(?:[0-9A-Fa-f]{3,4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})\b")
+OUTLINE_SUFFIXES = ("_OUTLINE", "_OUTLINED")
 
 BASELINE: dict[str, dict[str, int]] = {
     "color_literals": {},
     "hardcoded_font_sizes": {},
+    "material_text_roles": {},
+    "icon_size_literals": {},
+    "filled_icon_glyphs": {},
     "numeric_layout_literals": {
-        "components/banner.py": 1,
         "components/calendar.py": 16,
         "components/log_tree.py": 4,
         "views/inbox.py": 3,
@@ -64,23 +72,24 @@ BASELINE: dict[str, dict[str, int]] = {
         "views/review.py": 1,
         "views/workspace.py": 12,
     },
-    "filled_buttons": {
-        "app.py": 6,
-        "components/role_name.py": 1,
-        "components/role_reference.py": 1,
-        "views/inbox.py": 4,
-        "views/page.py": 12,
-        "views/processing.py": 3,
-        "views/review.py": 7,
-        "views/workspace.py": 3,
+    "suggested_or_destructive_buttons": {
+        "app.py::_Shell": 6,
+        "components/role_name.py::RoleNameDialog": 1,
+        "components/role_reference.py::RoleReferenceDialog": 1,
+        "views/inbox.py::SessionNotice": 1,
+        "views/inbox.py::WelcomeView": 3,
+        "views/page.py::PageView": 13,
+        "views/processing.py::ProcessingView": 3,
+        "views/review.py::ReviewView": 7,
+        "views/workspace.py::WorkspaceView": 3,
     },
     "icon_and_label_buttons": {
-        "app.py": 2,
-        "views/inbox.py": 3,
-        "views/page.py": 15,
-        "views/processing.py": 2,
-        "views/review.py": 11,
-        "views/workspace.py": 4,
+        "app.py::_Shell": 2,
+        "views/inbox.py::WelcomeView": 3,
+        "views/page.py::PageView": 15,
+        "views/processing.py::ProcessingView": 2,
+        "views/review.py::ReviewView": 11,
+        "views/workspace.py::WorkspaceView": 4,
     },
     "dense_rows": {
         "components/log_tree.py": 1,
@@ -106,6 +115,13 @@ def _module_trees(root: Path) -> list[tuple[str, ast.Module]]:
         (_relative(path, root), ast.parse(path.read_text(encoding="utf-8"), filename=str(path)))
         for path in _sources(root)
     ]
+
+
+def _class_scopes(root: Path) -> list[tuple[str, ast.ClassDef]]:
+    scopes: list[tuple[str, ast.ClassDef]] = []
+    for relative, tree in _module_trees(root):
+        scopes.extend((f"{relative}::{node.name}", node) for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
+    return scopes
 
 
 def _is_flet_call(node: ast.AST) -> bool:
@@ -140,12 +156,42 @@ def _count_modules(root: Path, measure: Callable[[ast.AST], bool]) -> dict[str, 
     return counts
 
 
+def _count_scopes(root: Path, measure: Callable[[ast.AST], bool]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for key, node in _class_scopes(root):
+        total = sum(1 for child in ast.walk(node) if measure(child))
+        if total:
+            counts[key] = total
+    return counts
+
+
+def _has_destructive_style(node: ast.Call) -> bool:
+    for keyword in node.keywords:
+        if (
+            keyword.arg == "style"
+            and isinstance(keyword.value, ast.Attribute)
+            and keyword.value.attr == "DESTRUCTIVE_BUTTON_STYLE"
+        ):
+            return True
+    return False
+
+
 def _is_filled_button(node: ast.AST) -> bool:
     return (
         isinstance(node, ast.Call)
         and _is_flet_call(node)
         and isinstance(node.func, ast.Attribute)
         and node.func.attr == "FilledButton"
+    )
+
+
+def _is_suggested_or_destructive(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and _is_flet_call(node)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in BUTTON_NAMES
+        and (_is_filled_button(node) or _has_destructive_style(node))
     )
 
 
@@ -174,10 +220,10 @@ def _layout_literal_count(node: ast.AST) -> int:
 def _scan_counts(root: Path, rule: str) -> dict[str, int]:
     if rule == "numeric_layout_literals":
         return _sum_modules(root, _layout_literal_count)
-    if rule == "filled_buttons":
-        return _count_modules(root, _is_filled_button)
+    if rule == "suggested_or_destructive_buttons":
+        return _count_scopes(root, _is_suggested_or_destructive)
     if rule == "icon_and_label_buttons":
-        return _count_modules(root, _is_icon_and_label)
+        return _count_scopes(root, _is_icon_and_label)
     return _count_modules(root, _is_dense_row)
 
 
@@ -223,7 +269,7 @@ def _scan_font_sizes(root: Path) -> dict[str, int]:
                 isinstance(node.func, ast.Attribute)
                 and isinstance(node.func.value, ast.Name)
                 and node.func.value.id == "ft"
-                and node.func.attr in {"Text", "TextSpan", "TextStyle"}
+                and node.func.attr in TEXT_CONTROL_NAMES
             )
             for keyword in node.keywords:
                 if keyword.arg == "font_size" or (text_control and keyword.arg == "size"):
@@ -233,12 +279,78 @@ def _scan_font_sizes(root: Path) -> dict[str, int]:
     return counts
 
 
+def _scan_material_text_roles(root: Path) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for relative, tree in _module_trees(root):
+        total = 0
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Attribute):
+                continue
+            if not isinstance(node.value, ast.Attribute):
+                continue
+            if not isinstance(node.value.value, ast.Name):
+                continue
+            if node.value.value.id == "ft" and node.value.attr == "TextThemeStyle":
+                total += 1
+        if total:
+            counts[relative] = total
+    return counts
+
+
+def _scan_icon_size_literals(root: Path) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for relative, tree in _module_trees(root):
+        total = 0
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not _is_flet_call(node):
+                continue
+            if not isinstance(node.func, ast.Attribute) or node.func.attr != "Icon":
+                continue
+            for keyword in node.keywords:
+                if (
+                    keyword.arg == "size"
+                    and isinstance(keyword.value, ast.Constant)
+                    and isinstance(keyword.value.value, int | float)
+                    and not isinstance(keyword.value.value, bool)
+                ):
+                    total += 1
+        if total:
+            counts[relative] = total
+    return counts
+
+
+def _scan_filled_icon_glyphs(root: Path) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for relative, tree in _module_trees(root):
+        total = 0
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Attribute):
+                continue
+            if not isinstance(node.value, ast.Attribute):
+                continue
+            if not isinstance(node.value.value, ast.Name):
+                continue
+            if node.value.value.id != "ft" or node.value.attr != "Icons":
+                continue
+            name = node.attr
+            if name.endswith(OUTLINE_SUFFIXES):
+                continue
+            if hasattr(ft.Icons, f"{name}_OUTLINED"):
+                total += 1
+        if total:
+            counts[relative] = total
+    return counts
+
+
 def _actual(root: Path) -> dict[str, dict[str, int]]:
     return {
         "color_literals": _scan_color_literals(root),
         "hardcoded_font_sizes": _scan_font_sizes(root),
+        "material_text_roles": _scan_material_text_roles(root),
+        "icon_size_literals": _scan_icon_size_literals(root),
+        "filled_icon_glyphs": _scan_filled_icon_glyphs(root),
         "numeric_layout_literals": _scan_counts(root, "numeric_layout_literals"),
-        "filled_buttons": _scan_counts(root, "filled_buttons"),
+        "suggested_or_destructive_buttons": _scan_counts(root, "suggested_or_destructive_buttons"),
         "icon_and_label_buttons": _scan_counts(root, "icon_and_label_buttons"),
         "dense_rows": _scan_counts(root, "dense_rows"),
     }
@@ -321,18 +433,19 @@ class TestAssetGate:
 
 
 class TestSurfaceDepth:
-    def test_the_three_surface_roles_resolve_to_distinct_values(self) -> None:
+    def test_the_four_surface_roles_resolve_to_distinct_values(self) -> None:
         for theme in (afanes.ui.theme.LIGHT_THEME, afanes.ui.theme.DARK_THEME):
             scheme = theme.color_scheme
             assert scheme is not None
             values = {
                 scheme.surface,
                 scheme.surface_container,
+                scheme.surface_container_low,
                 scheme.surface_container_lowest,
             }
             assert len(values) == SURFACE_ROLE_COUNT
 
-    def test_the_note_canvas_is_the_brightest_light_surface(self) -> None:
+    def test_light_depth_raises_the_note_canvas(self) -> None:
         scheme = afanes.ui.theme.LIGHT_THEME.color_scheme
 
         assert scheme is not None
@@ -341,6 +454,16 @@ class TestSurfaceDepth:
         assert scheme.surface_container_lowest is not None
         assert _luminance(scheme.surface_container_lowest) > _luminance(scheme.surface)
         assert _luminance(scheme.surface) > _luminance(scheme.surface_container)
+
+    def test_dark_depth_recesses_the_note_canvas(self) -> None:
+        scheme = afanes.ui.theme.DARK_THEME.color_scheme
+
+        assert scheme is not None
+        assert scheme.surface is not None
+        assert scheme.surface_container is not None
+        assert scheme.surface_container_lowest is not None
+        assert _luminance(scheme.surface_container_lowest) < _luminance(scheme.surface)
+        assert _luminance(scheme.surface) < _luminance(scheme.surface_container)
 
 
 class TestHardcodedFontSizes:
@@ -362,3 +485,67 @@ class TestHardcodedFontSizes:
         )
 
         assert _scan_font_sizes(tmp_path) == {"view.py": 1}
+
+
+class TestMaterialTextRoles:
+    def test_no_material_text_role_is_used(self) -> None:
+        assert _scan_material_text_roles(SOURCE_ROOT) == {}
+
+    def test_a_material_role_is_detected(self, tmp_path: Path) -> None:
+        (tmp_path / "view.py").write_text(
+            "import flet as ft\n\nft.Text('x', theme_style=ft.TextThemeStyle.BODY_SMALL)\n",
+            encoding="utf-8",
+        )
+
+        assert _scan_material_text_roles(tmp_path) == {"view.py": 1}
+
+
+class TestIconStyle:
+    def test_every_outlined_variant_is_used(self) -> None:
+        assert _scan_filled_icon_glyphs(SOURCE_ROOT) == {}
+
+    def test_a_filled_icon_is_detected(self, tmp_path: Path) -> None:
+        (tmp_path / "view.py").write_text(
+            "import flet as ft\n\nft.Icon(ft.Icons.ADD)\n",
+            encoding="utf-8",
+        )
+
+        assert _scan_filled_icon_glyphs(tmp_path) == {"view.py": 1}
+
+    def test_an_outlined_icon_is_allowed(self, tmp_path: Path) -> None:
+        (tmp_path / "view.py").write_text(
+            "import flet as ft\n\nft.Icon(ft.Icons.ADD_OUTLINED)\n",
+            encoding="utf-8",
+        )
+
+        assert _scan_filled_icon_glyphs(tmp_path) == {}
+
+    def test_no_icon_size_literal_is_used(self) -> None:
+        assert _scan_icon_size_literals(SOURCE_ROOT) == {}
+
+    def test_an_icon_size_literal_is_detected(self, tmp_path: Path) -> None:
+        (tmp_path / "view.py").write_text(
+            "import flet as ft\n\nft.Icon(ft.Icons.ADD_OUTLINED, size=18)\n",
+            encoding="utf-8",
+        )
+
+        assert _scan_icon_size_literals(tmp_path) == {"view.py": 1}
+
+
+class TestViewScope:
+    def test_button_counts_are_scoped_to_the_view_class(self, tmp_path: Path) -> None:
+        (tmp_path / "view.py").write_text(
+            "import flet as ft\n\n"
+            "class FirstView:\n"
+            "    def build(self):\n"
+            "        return ft.FilledButton('One')\n\n"
+            "class SecondView:\n"
+            "    def build(self):\n"
+            "        return ft.FilledButton('Two')\n",
+            encoding="utf-8",
+        )
+
+        assert _count_scopes(tmp_path, _is_suggested_or_destructive) == {
+            "view.py::FirstView": 1,
+            "view.py::SecondView": 1,
+        }

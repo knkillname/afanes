@@ -52,7 +52,7 @@ class Panel:
             padding=afanes.ui.theme.ITEM_GAP,
             content=ft.Column(
                 controls=[
-                    ft.Text(self._title, theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
+                    ft.Text(self._title, style=afanes.ui.theme.TEXT_ROLES["title-4"]),
                     self._body,
                     ft.Row(controls=self._actions, spacing=afanes.ui.theme.ITEM_GAP, wrap=True),
                 ],

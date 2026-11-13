@@ -76,7 +76,7 @@ class RoleReferenceDialog:
         )
         self.error = ft.Text(
             "",
-            color=afanes.ui.theme.ERROR_COLOR,
+            color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=False,
             key="role-reference-error",
         )

@@ -6,10 +6,15 @@
 Views import these tokens instead of hardcoding pixel values or colors. The
 module is a UI leaf: it imports only Flet and never another Afanes UI module.
 
-Two palette tables hold the light and dark values. Module tokens name the
-toolkit role that resolves through a scheme field, so a view can ask for
-``PAGE_SURFACE_COLOR`` without knowing which mode is active.
+Two palette tables hold the light and dark values from the Adwaita 1.8.0
+reference. Module tokens name the toolkit role that resolves through a scheme
+field, so a view can ask for ``PAGE_SURFACE_COLOR`` without knowing which mode
+is active. Text roles are the GNOME standard styles, expressed relative to
+``BASE_FONT_SIZE`` rather than as per-control sizes.
 """
+
+import types
+import typing
 
 import flet as ft
 
@@ -23,12 +28,12 @@ PAGE_MIN_WIDTH = 420
 TEMPLATE_PICKER_WIDTH = 420
 WORKSPACE_BODY_GAP = 16
 WINDOW_MIN_WIDTH = 960
-WINDOW_MIN_HEIGHT = 640
+WINDOW_MIN_HEIGHT = 600
 COMPOSER_MIN_LINES = 3
 COMPOSER_MAX_LINES = 8
 BANNER_PADDING = 12
 SURFACE_RADIUS = 12
-CONTROL_RADIUS = 8
+CONTROL_RADIUS = 9
 PAGE_FIELD_WIDTH = 200
 PAGE_DUE_WIDTH = 240
 PAGE_FORM_FIELD_HEIGHT = 56
@@ -36,45 +41,47 @@ PAGE_NAME_WIDTH = 420
 PAGE_RENAME_WIDTH = 360
 STEP_INDENT = 16
 CONNECTIONS_GAP = 12
+ICON_SIZE = 16
+ICON_SIZE_LARGE = 32
 
 LIGHT_PALETTE = {
-    "page": "#FAFAFA",
-    "region": "#EBEBEB",
+    "page": "#FAFAFB",
+    "region": "#EBEBED",
     "card": "#FFFFFF",
-    "container": "#F6F5F4",
+    "container": "#F3F3F5",
     "container_high": "#E4E3E1",
     "container_highest": "#DCDBD9",
-    "page_dim": "#EBEBEB",
+    "page_dim": "#F3F3F5",
     "page_bright": "#FFFFFF",
-    "text": "#2E3436",
+    "text": "#333334",
     "muted_text": "#5E5C64",
     "accent_fill": "#3584E4",
     "accent_text": "#1C71D8",
     "on_accent": "#FFFFFF",
     "accent_container": "#D7E6FC",
     "on_accent_container": "#0B3B72",
-    "destructive": "#C01C28",
+    "destructive": "#E01B24",
     "border": "#D0CFCB",
     "control_border": "#7E7E7E",
     "notice": "#D4A72C",
-    "error": "#C01C28",
+    "error": "#E01B24",
     "on_error": "#FFFFFF",
     "error_container": "#F5D6D8",
     "on_error_container": "#4A0008",
-    "inverse_surface": "#303030",
+    "inverse_surface": "#2E2E32",
     "on_inverse_surface": "#FFFFFF",
     "inverse_primary": "#99C1F1",
 }
 
 DARK_PALETTE = {
-    "page": "#242424",
-    "region": "#303030",
-    "card": "#1E1E1E",
-    "container": "#303030",
-    "container_high": "#363636",
-    "container_highest": "#3C3C3C",
-    "page_dim": "#1E1E1E",
-    "page_bright": "#303030",
+    "page": "#222226",
+    "region": "#2E2E32",
+    "card": "#1D1D20",
+    "container": "#28282C",
+    "container_high": "#36363A",
+    "container_highest": "#3C3C40",
+    "page_dim": "#1D1D20",
+    "page_bright": "#2E2E32",
     "text": "#FFFFFF",
     "muted_text": "#C0BFBC",
     "accent_fill": "#3584E4",
@@ -86,27 +93,26 @@ DARK_PALETTE = {
     "border": "#4A4A4A",
     "control_border": "#7E7E7E",
     "notice": "#D4A72C",
-    "error": "#FF7B63",
-    "on_error": "#1A0A00",
+    "error": "#C01C28",
+    "on_error": "#FFFFFF",
     "error_container": "#4A1114",
     "on_error_container": "#FFD9D4",
-    "inverse_surface": "#FAFAFA",
-    "on_inverse_surface": "#2E3436",
+    "inverse_surface": "#FAFAFB",
+    "on_inverse_surface": "#222226",
     "inverse_primary": "#1C71D8",
 }
 
 ACCENT_FILL = LIGHT_PALETTE["accent_fill"]
 ACCENT_TEXT = ft.Colors.TERTIARY
 ON_ACCENT = LIGHT_PALETTE["on_accent"]
-DESTRUCTIVE = LIGHT_PALETTE["destructive"]
+DESTRUCTIVE = ft.Colors.ERROR
 
 PAGE_SURFACE_COLOR = ft.Colors.SURFACE
 REGION_SURFACE_COLOR = ft.Colors.SURFACE_CONTAINER
 CARD_SURFACE_COLOR = ft.Colors.SURFACE_CONTAINER_LOWEST
 SURFACE_CONTAINER_COLOR = ft.Colors.SURFACE_CONTAINER_LOW
-SELECTED_ROW_COLOR = ft.Colors.with_opacity(0.15, ACCENT_FILL)
+SELECTED_ROW_COLOR = ft.Colors.with_opacity(0.10, ft.Colors.ON_SURFACE)
 BORDER_WIDTH = 1
-SECTION_EDGE_WIDTH = 3
 
 NOTICE_COLOR = LIGHT_PALETTE["notice"]
 NOTICE_SURFACE_COLOR = ft.Colors.with_opacity(0.15, NOTICE_COLOR)
@@ -128,33 +134,81 @@ STEP_SURFACE_COLOR = SURFACE_CONTAINER_COLOR
 STEP_TEXT_COLOR = TEXT_COLOR
 STEP_MUTED_ACTION_COLOR = MUTED_ACTION_COLOR
 
-SPLASH_COLOR = ft.Colors.with_opacity(0.12, ft.Colors.PRIMARY)
-HIGHLIGHT_COLOR = ft.Colors.with_opacity(0.08, ft.Colors.PRIMARY)
-HOVER_COLOR = ft.Colors.with_opacity(0.06, ft.Colors.PRIMARY)
-FOCUS_COLOR = ft.Colors.with_opacity(0.12, ft.Colors.PRIMARY)
+SPLASH_COLOR = ft.Colors.with_opacity(0.08, ft.Colors.ON_SURFACE)
+HIGHLIGHT_COLOR = ft.Colors.with_opacity(0.08, ft.Colors.ON_SURFACE)
+HOVER_COLOR = ft.Colors.with_opacity(0.05, ft.Colors.ON_SURFACE)
+FOCUS_COLOR = ft.Colors.with_opacity(0.15, ft.Colors.PRIMARY)
 
-# A Markdown style sheet takes a TextStyle, not a theme role. These two styles
-# back the ``headline_small`` and ``body_small`` roles so the role definition
-# still lives in one place.
-STEP_MARKDOWN_TEXT_STYLE = ft.TextStyle(size=24, weight=ft.FontWeight.W_700, color=TEXT_COLOR)
-METADATA_MARKDOWN_TEXT_STYLE = ft.TextStyle(size=12, weight=ft.FontWeight.W_400, color=MUTED_TEXT_COLOR)
+BASE_FONT_SIZE = 15
+CAPTION_SIZE = round(BASE_FONT_SIZE * 0.82)
+TITLE_4_SIZE = round(BASE_FONT_SIZE * 1.18)
+TITLE_3_SIZE = round(BASE_FONT_SIZE * 1.36)
+TITLE_2_SIZE = round(BASE_FONT_SIZE * 1.36)
+TITLE_1_SIZE = round(BASE_FONT_SIZE * 1.81)
+
+TEXT_ROLES: typing.Mapping[str, ft.TextStyle] = types.MappingProxyType(
+    {
+        "title-1": ft.TextStyle(
+            size=TITLE_1_SIZE,
+            weight=ft.FontWeight.W_800,
+            color=TEXT_COLOR,
+        ),
+        "title-2": ft.TextStyle(
+            size=TITLE_2_SIZE,
+            weight=ft.FontWeight.W_800,
+            color=TEXT_COLOR,
+        ),
+        "title-3": ft.TextStyle(
+            size=TITLE_3_SIZE,
+            weight=ft.FontWeight.W_700,
+            color=TEXT_COLOR,
+        ),
+        "title-4": ft.TextStyle(
+            size=TITLE_4_SIZE,
+            weight=ft.FontWeight.W_700,
+            color=TEXT_COLOR,
+        ),
+        "heading": ft.TextStyle(
+            size=BASE_FONT_SIZE,
+            weight=ft.FontWeight.W_700,
+            color=TEXT_COLOR,
+        ),
+        "body": ft.TextStyle(
+            size=BASE_FONT_SIZE,
+            weight=ft.FontWeight.W_400,
+            color=TEXT_COLOR,
+            height=1.4,
+        ),
+        "caption": ft.TextStyle(
+            size=CAPTION_SIZE,
+            weight=ft.FontWeight.W_400,
+            color=MUTED_TEXT_COLOR,
+            height=1.4,
+        ),
+        "caption-heading": ft.TextStyle(
+            size=CAPTION_SIZE,
+            weight=ft.FontWeight.W_700,
+            color=MUTED_TEXT_COLOR,
+        ),
+    }
+)
 
 TEXT_THEME = ft.TextTheme(
-    display_large=ft.TextStyle(size=40, weight=ft.FontWeight.W_700, color=TEXT_COLOR),
-    display_medium=ft.TextStyle(size=36, weight=ft.FontWeight.W_700, color=TEXT_COLOR),
-    display_small=ft.TextStyle(size=32, weight=ft.FontWeight.W_700, color=TEXT_COLOR),
-    headline_large=ft.TextStyle(size=32, weight=ft.FontWeight.W_700, color=TEXT_COLOR),
-    headline_medium=ft.TextStyle(size=28, weight=ft.FontWeight.W_700, color=TEXT_COLOR),
-    headline_small=STEP_MARKDOWN_TEXT_STYLE,
-    title_large=ft.TextStyle(size=22, weight=ft.FontWeight.W_600, color=TEXT_COLOR),
-    title_medium=ft.TextStyle(size=16, weight=ft.FontWeight.W_600, color=TEXT_COLOR),
-    title_small=ft.TextStyle(size=15, weight=ft.FontWeight.W_600, color=TEXT_COLOR),
-    body_large=ft.TextStyle(size=16, weight=ft.FontWeight.W_400, color=TEXT_COLOR),
-    body_medium=ft.TextStyle(size=14, weight=ft.FontWeight.W_400, color=TEXT_COLOR),
-    body_small=METADATA_MARKDOWN_TEXT_STYLE,
-    label_large=ft.TextStyle(size=14, weight=ft.FontWeight.W_600, color=TEXT_COLOR),
-    label_medium=ft.TextStyle(size=12, weight=ft.FontWeight.W_700, color=MUTED_TEXT_COLOR),
-    label_small=ft.TextStyle(size=11, weight=ft.FontWeight.W_500, color=MUTED_TEXT_COLOR),
+    display_large=TEXT_ROLES["title-1"],
+    display_medium=TEXT_ROLES["title-1"],
+    display_small=TEXT_ROLES["title-2"],
+    headline_large=TEXT_ROLES["title-1"],
+    headline_medium=TEXT_ROLES["title-1"],
+    headline_small=TEXT_ROLES["title-2"],
+    title_large=TEXT_ROLES["title-3"],
+    title_medium=TEXT_ROLES["title-4"],
+    title_small=TEXT_ROLES["heading"],
+    body_large=TEXT_ROLES["body"],
+    body_medium=TEXT_ROLES["body"],
+    body_small=TEXT_ROLES["caption"],
+    label_large=TEXT_ROLES["heading"],
+    label_medium=TEXT_ROLES["caption-heading"],
+    label_small=TEXT_ROLES["caption"],
 )
 
 BUTTON_SHAPE = ft.RoundedRectangleBorder(radius=CONTROL_RADIUS)
@@ -176,7 +230,10 @@ INPUT_DECORATION_THEME = ft.InputDecorationTheme(
 LIST_TILE_THEME = ft.ListTileTheme(
     selected_tile_color=SELECTED_ROW_COLOR,
     selected_color=TEXT_COLOR,
+    min_height=36,
 )
+
+ICON_THEME = ft.IconTheme(size=ICON_SIZE)
 
 LIGHT_THEME = ft.Theme(
     color_scheme=ft.ColorScheme(
@@ -214,6 +271,7 @@ LIGHT_THEME = ft.Theme(
     ),
     surfaces=ft.ThemeSurfaces.NEUTRAL,
     text_theme=TEXT_THEME,
+    icon_theme=ICON_THEME,
     filled_button_theme=FILLED_BUTTON_THEME,
     text_button_theme=TEXT_BUTTON_THEME,
     outlined_button_theme=OUTLINED_BUTTON_THEME,
@@ -262,6 +320,7 @@ DARK_THEME = ft.Theme(
     ),
     surfaces=ft.ThemeSurfaces.NEUTRAL,
     text_theme=TEXT_THEME,
+    icon_theme=ICON_THEME,
     filled_button_theme=FILLED_BUTTON_THEME,
     text_button_theme=TEXT_BUTTON_THEME,
     outlined_button_theme=OUTLINED_BUTTON_THEME,
@@ -275,12 +334,12 @@ DARK_THEME = ft.Theme(
 )
 
 ROLE_LINK_TEXT_STYLE = ft.TextStyle(
-    size=12,
+    size=CAPTION_SIZE,
     color=ACCENT_TEXT,
     decoration=ft.TextDecoration.UNDERLINE,
 )
 ROLE_BROKEN_TEXT_STYLE = ft.TextStyle(
-    size=12,
-    color=ERROR_COLOR,
+    size=CAPTION_SIZE,
+    color=ERROR_TEXT_COLOR,
     decoration=ft.TextDecoration.UNDERLINE,
 )
