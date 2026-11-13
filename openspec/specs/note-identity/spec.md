@@ -286,36 +286,36 @@ be written atomically, and a failed rewrite SHALL leave the file unchanged.
 - **WHEN** a metadata role rewrite fails
 - **THEN** the file's content and modification time are unchanged
 
-### Requirement: Deletion reports inbound references
+### Requirement: Trashing leaves inbound references unresolved
 
-Before deleting a note, the application SHALL report how many references point to it, including
-metadata role references. After deletion, those references SHALL become unresolved. Deletion MUST
-NOT rewrite or remove references.
+Trashing a note SHALL NOT report or rewrite its inbound references before the move. After the move,
+those references SHALL be unresolved and remain in the referring notes. The page's undo action SHALL
+restore the note so the references resolve on the next scan.
 
-#### Scenario: Inbound count is shown
+#### Scenario: Trashing does not report a count
 
-- **WHEN** the user requests deletion of a referenced note
-- **THEN** the application reports the number of inbound references before confirmation
+- **WHEN** the user trashes a note that has inbound references
+- **THEN** the application moves the note without reporting a reference count first
 
-#### Scenario: References remain unresolved
+#### Scenario: References become unresolved
 
-- **WHEN** a referenced note is deleted
+- **WHEN** a referenced note is moved to trash
 - **THEN** its inbound references are reported as unresolved and remain in the referring notes
 
-#### Scenario: Deletion removes no reference text
+#### Scenario: Undo resolves the references
 
-- **WHEN** a referenced note is deleted
-- **THEN** no referring note is modified
+- **WHEN** a just-trashed note is restored by the page's undo action
+- **THEN** its inbound references resolve on the next scan
 
-#### Scenario: Role names count as inbound references
+#### Scenario: Role names remain after trashing
 
-- **WHEN** a note is named only as a project owner, requester, or step owner
-- **THEN** deletion reports it as an inbound reference
-
-#### Scenario: Role values remain after deletion
-
-- **WHEN** a note named as an owner or requester is deleted
+- **WHEN** a trashed note is named as a project owner, requester, or step owner
 - **THEN** the project keeps the plain-text value and the connection becomes unresolved
+
+#### Scenario: No referring note is rewritten
+
+- **WHEN** a note is moved to trash
+- **THEN** no referring note is modified
 
 ### Requirement: External structure changes
 

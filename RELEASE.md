@@ -104,7 +104,7 @@ The remaining work lands in dependency order, one approved OpenSpec change at a
 time:
 
 1. HIG wave 3: writing style and a copy gate. Landed in `0.8.0`.
-2. HIG wave 4: feedback patterns.
+2. HIG wave 4: feedback patterns. Landed in `0.8.0`.
 3. Internationalization: English and Spanish.
 4. Note reminders: schema `2`, recurring and one-shot schedules.
 5. HIG wave 5: keyboard and accessibility, covering the localized and reminder
