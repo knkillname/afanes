@@ -26,8 +26,8 @@ The browser has one group per kind of note. A note appears in exactly one group,
 | **Projects** | Project notes, grouped by status |
 | **References** | Reference notes, grouped by their category label; uncategorized references appear under the plain **References** heading |
 | **Log** | Dated diary entries, with a month calendar and a collapsed year/month/day tree |
-| **Needs attention** | Parsed `type: note` notes found outside `inbox/` |
-| **Unreadable notes** | Files that could not be parsed; selecting one opens raw rescue mode |
+| **Needs Attention** | Parsed `type: note` notes found outside `inbox/` |
+| **Unreadable Notes** | Files that could not be parsed; selecting one opens raw rescue mode |
 
 A capture under `inbox/` appears only under **Inbox**. A log entry appears under **Log**. A note under
 `trash/` appears nowhere, and a file under `templates/` is a template card rather than a note. Selecting
@@ -35,23 +35,22 @@ an entry opens it in the detail region without changing the browser destination.
 destination, the browser shows the snapshot queue instead of the note groups.
 
 The **Log** section offers a calendar and a collapsed date tree instead of a flat list. **Entries** shows
-only log notes; **Everything** is a date lens over every parsed note. **Today's entry** opens or creates
+only log notes; **Everything** is a date lens over every parsed note. **Today’s Entry** opens or creates
 today's page, and the calendar and tree controls create entries for a chosen day, month, or year. See
 [Log](log.md) for the calendar marks, date rules, and linking.
 
-The **References** section also offers **New reference** in the browser header. The dialog asks for a
+The **References** section also offers **New Reference…** in the browser header. The dialog asks for a
 name and a template card or Empty, writes the note immediately, and opens it in edit mode. See
 [References and categories](references-and-categories.md) for the creation rules.
 
-**Needs attention** exists because a capture outside the Inbox cannot be processed. Move it back to the
-Inbox or clarify it by editing its frontmatter by hand. **Unreadable notes** opens the complete file in
+**Needs Attention** exists because a capture outside the Inbox cannot be processed. Move it back to the
+Inbox or clarify it by editing its frontmatter by hand. **Unreadable Notes** opens the complete file in
 raw rescue mode so the text is never lost.
 
 ## 🧭 Navigation and the primary menu
 
 The navigation region names the vault. Hovering the name shows its full folder path, so no status bar is
-needed. The primary menu above the destinations offers **Change vault…**, **Create vault…**, **Close
-vault**, and **About Afanes**. **About Afanes** shows the application name, version, and license.
+needed. The primary menu above the destinations offers **Open Another Vault…**, **Create a New Vault…**, **Close Vault**, and **About Afanes**. **About Afanes** shows the application name, version, and license.
 
 On a window narrower than 1100 pixels, the navigation moves behind a toggle in the browser header. A
 narrow browser presentation shows one region at a time: the browser comes first, and **Back** returns
@@ -67,8 +66,8 @@ them. The navigation counts stay at each destination's total. Matching ignores c
 repeated whitespace. Other step metadata and unknown frontmatter keys are excluded, so a plan date or
 tag inside a comment is not a search result.
 
-While a query is active, the browser title reads **Search results** and the destination's own controls
-step aside: the Inbox composer, the References **New reference** action, the Log calendar and date
+While a query is active, the browser title reads **Search Results** and the destination's own controls
+step aside: the Inbox composer, the References **New Reference…** action, the Log calendar and date
 tree, and the Review queue are hidden. A search started in the Log returns the same grouped results as
 the same search started in any other destination. Clearing the query restores the active destination's
 title, controls, and normal list or calendar.
@@ -83,14 +82,14 @@ search row. When the query is already empty, **Esc** closes the navigation drawe
 The capture field sits at the top of the Inbox browser region. It behaves exactly like the Inbox
 composer: the first non-blank line becomes the filename and heading, and the note is written under
 `inbox/` with only `type: note`. **Capture** stays insensitive while the field is blank. Press
-**Ctrl+N** or choose the **New capture** toolbar action to switch to the Inbox and focus the field
+**Ctrl+N** or choose the **New Capture** toolbar action to switch to the Inbox and focus the field
 from any other destination.
 
 ## 🧱 Detail toolbar
 
-The detail toolbar shows **Back**, the page title, one primary action, and a secondary menu. **Process**
+The detail toolbar shows **Back**, the page title, one primary action, and a secondary menu. **Process…**
 is primary for an unclarified capture, **Edit** for a readable note, and **Done** while editing. Rename
-and Move to trash live in the secondary menu. The page path, metadata, and save status sit below the
+and Move to Trash live in the secondary menu. The page path, metadata, and save status sit below the
 toolbar with the page content, and long-form text stays within a comfortable reading width on large
 windows.
 

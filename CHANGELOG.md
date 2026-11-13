@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- **Writing style and copy gate.** Interface and command-line copy now follows the GNOME writing
+  style: header capitalization for headings and short control labels, sentence capitalization for
+  field labels and prose, no final period, neutral tone without first- or second-person pronouns,
+  typographic apostrophes, and one-character ellipses. Ellipses mark only actions that open further
+  input or a confirmation, and the picker titles and rename preview keep their own labels so the
+  ellipsis stays unambiguous. A new no-baseline gate, `tests/ui/test_copy.py`, classifies every copy
+  constant and checks both catalogs. Visible labels changed, so the shipped screenshots are
+  refreshed with the wave 7 identity work. This implements the `establish-writing-style` OpenSpec
+  change. README: no change required. Docs: updated.
 - **Unified MVP gate.** `RELEASE.md` now defines `1.0.0` as a single gate: the existing six flows
   plus strict HIG conformance, English and Spanish, and note reminders. Linux native is the only
   release gate; macOS and Windows use the released wheel and `afanes --web`, and nightly

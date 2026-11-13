@@ -50,7 +50,7 @@ from read mode with the owner and requester actions beside the names. Both field
 projects and suggest names from the vault while still accepting free text.
 
 Both values are metadata references in the `note:` namespace. They resolve to the note with that name,
-so it appears under **Owned projects** or **Requested projects** on that page, the name is searchable
+so it appears under **Owned Projects** or **Requested Projects** on that page, the name is searchable
 and clickable, and renaming the named note rewrites the value. A value that matches no note stays in
 the file and is shown as a broken link. Neither role changes the project's status, group, or next step.
 

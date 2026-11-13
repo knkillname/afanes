@@ -46,17 +46,17 @@ from the capture text.
 
 A due step card offers:
 
-- **Do it now**: checks the step and records `actual`;
-- **Postpone**: replaces `plan`;
-- **Delegate**: adds an owner and moves the step to waiting;
-- **Open project**: shows the project page;
+- **Do It Now**: checks the step and records `actual`;
+- **Postpone…**: replaces `plan`;
+- **Delegate…**: adds an owner and moves the step to waiting;
+- **Open Project**: shows the project page;
 - **Skip**: changes nothing.
 
-A waiting step card shows its owners and offers **Reassign**, **Open project**, and **Skip**. Reassign
+A waiting step card shows its owners and offers **Reassign…**, **Open Project**, and **Skip**. Reassign
 replaces the owners.
 
 A project card shows the project title, status, optional due date, its next step, and any other open
-steps. **Open project** opens the page. For a project with no open step, the card offers adding a next
+steps. **Open Project** opens the page. For a project with no open step, the card offers adding a next
 step, marking the project done, deferring it to `later`, or skipping. Adding a step requires text and
 appends a task-list item to the project body. Marking done and deferring both require confirmation.
 

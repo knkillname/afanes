@@ -1,6 +1,6 @@
 # 🔄 Processing
 
-Select a capture in the Inbox and choose **Process**. The Processing Wizard asks what the capture
+Select a capture in the Inbox and choose **Process…**. The Processing Wizard asks what the capture
 should become. It never chooses an outcome from the capture text.
 
 :::{admonition} tl;dr
@@ -23,21 +23,21 @@ out of the Inbox, so a failed move leaves the capture available for a retry.
 | **Later** | Keeps it as a reference with `status: later`, using the chosen template card or Empty |
 | **Reference** | Keeps it as a reference, using the chosen template card or Empty |
 | **Project** | Turns it into a project with a status, optional due date, owner, and requester |
-| **Log entry** | Turns it into a dated log entry under `log/`, using the capture's date |
-| **Append step** | Adds the capture as a step of an existing project and moves the capture to trash |
-| **Done now** | Writes a completed one-step project with `status: done` and optional owner and requester |
+| **Log Entry** | Turns it into a dated log entry under `log/`, using the capture's date |
+| **Append Step** | Adds the capture as a step of an existing project and moves the capture to trash |
+| **Done Now** | Writes a completed one-step project with `status: done` and optional owner and requester |
 
 Task list items already in the capture body become steps when the outcome is a project. A project may
 start empty.
 
-Project and Done now also offer optional **Owner** and **Asked by** fields. Both suggest names already
+Project and Done Now also offer optional **Owner** and **Asked by** fields. Both suggest names already
 in the vault and accept a new name typed as-is; the new name is saved on the project and can be created
-later by clicking it on the project page. Append step keeps its current behavior: the appended step gets
+later by clicking it on the project page. Append Step keeps its current behavior: the appended step gets
 no owner, and the project's owner is not copied to it.
 
 The preview shows the destination and, when the outcome changes scheme, how many inbound references
 will be affected. **Preview** stays insensitive until an outcome is chosen and its required project
-or date is valid. A Log entry outcome rewrites `note:` links to the new `log:<date>` destination; an
+or date is valid. A Log Entry outcome rewrites `note:` links to the new `log:<date>` destination; an
 undated capture uses its last-modified date for this conversion. A date that already has a log entry
 is refused.
 
@@ -46,7 +46,7 @@ is refused.
 Reference and Later ask which kind of reference you are creating. The **Template** field lists the
 valid reference cards from the vault's `templates/` folder plus **Empty**. A card supplies the category
 and a starter body; Empty uses `category: general` and adds no starter body. Processing never guesses
-the card from the capture text. The Log entry outcome does not ask for a card and preserves the
+the card from the capture text. The Log Entry outcome does not ask for a card and preserves the
 capture body.
 
 The starter body is added below the capture text in the same atomic write as the classification. The
@@ -57,9 +57,9 @@ and named in a warning; the valid cards remain available. See
 Processing finishes on its success panel. It does not open the created note in the page editor, so you
 can continue with the next capture or review item.
 
-## 🔗 Append step
+## 🔗 Append Step
 
-Append step suggests existing projects by display title or identity and stores the identity. Text that
+Append Step suggests existing projects by display title or identity and stores the identity. Text that
 matches no project is rejected. The target project is written first and the capture is moved to trash
 afterward.
 
@@ -67,7 +67,7 @@ A failed project write leaves both notes unchanged. If the write succeeds and th
 step is already present; retrying the same plan detects the existing step and does not duplicate it.
 
 :::{warning}
-Append step moves the capture to `trash/` after writing the project. If you are unsure, choose
+Append Step moves the capture to `trash/` after writing the project. If you are unsure, choose
 **Project** instead and add the step to the new project yourself.
 :::
 

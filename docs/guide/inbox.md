@@ -46,11 +46,11 @@ to its filename stem as the display title.
 ## 📄 Open and edit
 
 Select a capture to open it in the detail region. Read its body or choose **Edit** to change it.
-**Process** remains available for Inbox captures. Moving a capture out of `inbox/` by hand leaves it
-under **Needs attention**; use the Inbox or the Processing Wizard instead.
+**Process…** remains available for Inbox captures. Moving a capture out of `inbox/` by hand leaves it
+under **Needs Attention**; use the Inbox or the Processing Wizard instead.
 
 :::{warning}
-A capture outside `inbox/` cannot be processed. The **Needs attention** group lists those notes; move
+A capture outside `inbox/` cannot be processed. The **Needs Attention** group lists those notes; move
 them back to the Inbox or classify them by hand.
 :::
 

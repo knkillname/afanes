@@ -45,7 +45,7 @@ too.
 - `--port N` chooses the listening port. The default asks the operating system for a free one.
 
 A browser cannot return a folder path from a file dialog, so a browser session asks for an absolute
-path instead of opening a picker. The **Change vault** action asks the same way.
+path instead of opening a picker. The **Open Another Vault…** action asks the same way.
 
 ## 👥 One session at a time
 
@@ -63,17 +63,17 @@ itself.
 
 ## 🗂️ First launch in a browser
 
-On first launch, choose an existing folder or create a new vault. **New vault** opens a form with the
+On first launch, choose an existing folder or create a new vault. **New Vault…** opens a form with the
 folder path, the starter-content choice, and a preview. It writes `reference/Getting started.md` plus
 the notes of the chosen template, seeds `inbox/`, `trash/`, `reference/`, and `projects/`, and remembers
 the result in the platform configuration directory. Afanes reopens that vault next time.
 
-The same choice is available from **Change vault → Create a new vault** while a vault is open. Only the
+The same choice is available from **Main Menu → Create a New Vault…** while a vault is open. Only the
 create action seeds the default folders and writes starter content. Opening an existing empty folder
 leaves it unseeded, and Afanes creates each folder only when a write needs it. Opening or scanning a
 vault never creates a folder or a file.
 
-**Change vault → Close vault** saves an open page draft, forgets the remembered vault, and returns to
+**Main Menu → Close Vault** saves an open page draft, forgets the remembered vault, and returns to
 the welcome screen. A pending page dialog or disk conflict keeps the vault open and explains what to
 resolve.
 

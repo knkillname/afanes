@@ -30,7 +30,7 @@ the label, so the drift is invisible in the browser.
 
 ## ➕ Creating a reference
 
-Open the **References** section and choose **New reference**. The dialog asks for a name and a template
+Open the **References** section and choose **New Reference…**. The dialog asks for a name and a template
 card, or **Empty**. A card supplies the category and a starter body; Empty uses `category: general` and
 adds no starter body. Invalid cards are skipped and named in the dialog warning.
 

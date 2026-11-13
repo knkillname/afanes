@@ -17,7 +17,7 @@ A single actionable unit is now a step inside a project. A person page is a refe
 - Links using `person:Name`.
 - Notes carrying the retired `people` or `project` frontmatter keys.
 
-These are validation errors. They appear under **Unreadable notes** and open in raw rescue mode without
+These are validation errors. They appear under **Unreadable Notes** and open in raw rescue mode without
 being rewritten. A `category: person` reference remains valid and keeps working.
 
 ## 🛠️ How to repair

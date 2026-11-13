@@ -66,14 +66,14 @@ opens instead of creating a duplicate.
 ## ↩️ Connections use the same resolution
 
 The **Connections** section of a page is the inbound direction of the same name rules. A note appears
-under **Linked from** only when its body reference resolves to exactly one page. A missing or ambiguous
+under **Linked From** only when its body reference resolves to exactly one page. A missing or ambiguous
 reference is attributed to no page, and notes under `trash/` never contribute.
 
 Step owners and a project's `owner` and `asked_by` values resolve in the `note:` namespace, so any note
 with a matching name can own steps, own a project, or request work; the note does not need a person
 category. A role name that matches no note stays in the file and appears in no Connections section; in
 the page it is shown as a broken link that can create the missing note. A project appears under
-**Owned projects** once, under **Requested projects** once, and an owner can own several steps in the
+**Owned Projects** once, under **Requested Projects** once, and an owner can own several steps in the
 same project.
 
 Connections are derived from the scan and are not stored. Nothing in the vault records a backlink,

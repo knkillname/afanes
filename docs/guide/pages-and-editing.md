@@ -27,16 +27,16 @@ rows. See [Projects and steps](projects-and-steps.md) for the step actions.
 Read mode ends with a **Connections** section when the page has at least one connection. The section
 is derived from the current vault scan and is never written to a note.
 
-- **Linked from** lists the notes whose body references resolve to this page, once per note and by
+- **Linked From** lists the notes whose body references resolve to this page, once per note and by
   display title.
-- **Owned projects** lists the open projects whose `owner` value resolves to this page.
-- **Owned steps** lists the open steps of open projects that name this page as an owner. Steps are
+- **Owned Projects** lists the open projects whose `owner` value resolves to this page.
+- **Owned Steps** lists the open steps of open projects that name this page as an owner. Steps are
   grouped by project and keep their order in the project body.
-- **Requested projects** lists the open projects whose `asked_by` value resolves to this page.
+- **Requested Projects** lists the open projects whose `asked_by` value resolves to this page.
 
 The sections always appear in that order, and a section is omitted when it has no visible item. The two
-reveal controls sit in the Connections footer: **Show completed steps** reveals completed owned steps,
-and **Show finished projects** reveals finished owned and requested projects. The controls remain
+reveal controls sit in the Connections footer: **Show Completed Steps** reveals completed owned steps,
+and **Show Finished Projects** reveals finished owned and requested projects. The controls remain
 available when a page has only hidden items, so those items stay reachable. The toggles are independent
 and both start hidden; opening another page hides them again. Selecting a linked note or a project opens
 it, while selecting an owned step opens its project at the top.
@@ -108,12 +108,12 @@ the one you want to keep.
 
 A note whose frontmatter cannot be parsed opens in raw rescue mode. The complete file text is editable
 and labels are unavailable. Saving writes exactly what you typed; once the text parses, the normal
-editor returns. Unreadable notes are listed in the browser's **Unreadable notes** section and can be
+editor returns. Unreadable Notes are listed in the browser's **Unreadable Notes** section and can be
 opened from there.
 
 ## 🔀 Rename and trash
 
-Rename and Move to trash are available from the detail toolbar's secondary menu in read mode. Both show
+Rename and Move to Trash are available from the detail toolbar's secondary menu in read mode. Both show
 their affected references before confirming. A log entry has no Rename action; change its Date instead.
 
 A rename updates the first heading only when it still matches the old identity; a custom heading is

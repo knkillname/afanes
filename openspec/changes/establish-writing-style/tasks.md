@@ -13,6 +13,7 @@
 - [x] 2.3 Replace each remaining straight apostrophe with U+2019 and each three-dot ellipsis with U+2026; verify `grep -n "Today's\|page's" src/afanes/ui/strings.py` returns no output and a scan of the catalog finds only the single-character ellipsis.
 - [x] 2.4 Add an ellipsis to every audited initiating action, including the actions that open the new-vault, change-vault, new-reference, rename, trash, plan-date, owner, asked-by, due-date, processing, review, and log-entry surfaces, and remove the ellipsis from the search placeholder; verify every string ending in `…` is an action in the audited set and no affirmative in-dialog control carries one.
 - [x] 2.5 Rewrite `src/afanes/cli/strings.py` to the same rules, keeping command names and metavariables lowercase and command examples literal; verify `afanes vault --help` renders capitalized prose descriptions without final periods and `hatch test tests/cli` passes.
+- [x] 2.6 Allow the typographic apostrophe in the Ruff lint configuration with `allowed-confusables`; verify `hatch check` passes with the migrated catalogs.
 
 ## 3. Add the copy gate
 
@@ -25,19 +26,19 @@
 
 ## 4. Update the durable documents
 
-- [ ] 4.1 Replace the sentence-case transition note in `AGENTS.md` section 4.6 with the final rule: header capitalization for headings and short control labels, sentence capitalization for field labels and prose, no final period, ellipses only for further input, neutral tone, typographic apostrophes and ellipsis, and the copy gate; verify the section no longer mentions a future writing-style wave.
-- [ ] 4.2 Add a writing-style section to `docs/develop/interface-standard.md` with the capitalization rules, the period, ellipsis, tone, and typography rules, the copy-gate description, and its manual-review limit; add writing style to the conformance levels and mark wave 3 landed in the migration list; verify the page states that the copy gate has no baseline.
-- [ ] 4.3 Sweep `docs/` for quoted UI labels changed by this work, including the guide pages for first vault, capture and review, inbox, log, pages and editing, browser mode, and the interface standard; verify each quoted label matches the catalog and `hatch run docs:build` passes with no warnings.
-- [ ] 4.4 Add one `Unreleased` entry under `Changed` naming the `establish-writing-style` change, the writing-style rules, the copy gate, the visible label changes, and the screenshot deferral to wave 7; include `README: no change required` and `Docs: updated`; verify no version bump.
+- [x] 4.1 Replace the sentence-case transition note in `AGENTS.md` section 4.6 with the final rule: header capitalization for headings and short control labels, sentence capitalization for field labels and prose, no final period, ellipses only for further input, neutral tone, typographic apostrophes and ellipsis, and the copy gate; verify the section no longer mentions a future writing-style wave.
+- [x] 4.2 Add a writing-style section to `docs/develop/interface-standard.md` with the capitalization rules, the period, ellipsis, tone, and typography rules, the copy-gate description, and its manual-review limit; add writing style to the conformance levels and mark wave 3 landed in the migration list; verify the page states that the copy gate has no baseline.
+- [x] 4.3 Sweep `docs/` for quoted UI labels changed by this work, including the guide pages for first vault, capture and review, inbox, log, pages and editing, browser mode, and the interface standard; verify each quoted label matches the catalog and `hatch run docs:build` passes with no warnings.
+- [x] 4.4 Add one `Unreleased` entry under `Changed` naming the `establish-writing-style` change, the writing-style rules, the copy gate, the visible label changes, and the screenshot deferral to wave 7; include `README: no change required` and `Docs: updated`; verify no version bump.
 
 ## 5. Integration checks
 
-- [ ] 5.1 Run `hatch check` and `hatch test --cover`; verify the type and style gates pass and coverage stays at or above 85%.
-- [ ] 5.2 Run `openspec validate --all --strict` and `openspec doctor`; verify both pass.
-- [ ] 5.3 Run both vocabulary compliance greps from `AGENTS.md` section 6.1; verify both exit 1 with no output.
-- [ ] 5.4 Run `git diff --check` and `git status --short`; verify the diff contains only the two copy catalogs, the new copy gate, test updates, `AGENTS.md`, `docs/develop/interface-standard.md`, the swept guide pages, `CHANGELOG.md`, and this change's artifacts, with no theme, token, view-layout, dependency, vault, or schema change.
-- [ ] 5.5 Review the final catalogs against the spec: header case on every heading and short control label, sentence case on every field label and prose line, no final periods, no first- or second-person pronouns, typographic apostrophes, one-character ellipses, and ellipses only on further-input actions.
-- [ ] 5.6 Review the final `docs/develop/interface-standard.md` against the gate: the writing-style rules match the implemented checks, the copy gate is separate from the visual baseline, and wave 3 reads landed.
+- [x] 5.1 Run `hatch check` and `hatch test --cover`; verify the type and style gates pass and coverage stays at or above 85%.
+- [x] 5.2 Run `openspec validate --all --strict` and `openspec doctor`; verify both pass.
+- [x] 5.3 Run both vocabulary compliance greps from `AGENTS.md` section 6.1; verify both exit 1 with no output.
+- [x] 5.4 Run `git diff --check` and `git status --short`; verify the diff contains only the two copy catalogs, the new copy gate, test updates, `AGENTS.md`, `docs/develop/interface-standard.md`, the swept guide pages, `CHANGELOG.md`, the Ruff lint configuration, and this change's artifacts, with no theme, token, view-layout, dependency, vault, or schema change.
+- [x] 5.5 Review the final catalogs against the spec: header case on every heading and short control label, sentence case on every field label and prose line, no final periods, no first- or second-person pronouns, typographic apostrophes, one-character ellipses, and ellipses only on further-input actions.
+- [x] 5.6 Review the final `docs/develop/interface-standard.md` against the gate: the writing-style rules match the implemented checks, the copy gate is separate from the visual baseline, and wave 3 reads landed.
 
 ## Workflow follow-up
 

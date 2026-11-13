@@ -14,8 +14,8 @@ from an older release can be adopted explicitly.
 
 ## 🚪 Open an existing folder
 
-On first launch, choose an existing folder or create a new vault. Use **Open another vault** from
-**Change vault** to switch while Afanes is running.
+On first launch, choose an existing folder or create a new vault. Use **Open Another Vault…** from
+**Main Menu** to switch while Afanes is running.
 
 A folder is a vault only when it contains a valid `afanes.yaml` settings file. Opening a versioned
 folder is read-only: Afanes scans the notes it can parse and opens the **Inbox** group. It does not
@@ -29,21 +29,21 @@ refused with a message, and nothing is written.
 
 ## ✨ Create a new vault
 
-Choose **New vault** from the welcome screen, or **Change vault → Create a new vault** while a vault is
+Choose **New Vault…** from the welcome screen, or **Main Menu → Create a New Vault…** while a vault is
 open. The form asks for:
 
 - the folder path;
 - a starter-content choice;
 - a preview of the notes that will be written.
 
-On desktop, **Choose folder** opens a folder picker. In the browser presentation, type an absolute path
+On desktop, **Choose Folder…** opens a folder picker. In the browser presentation, type an absolute path
 because a browser cannot return a folder path from a native dialog.
 
 Creation writes `afanes.yaml` with the current schema, writes the `Getting started` guide, writes the
 chosen template's notes, seeds the default folders, and remembers the vault for the next launch.
 
 :::{tip}
-You can create a second vault without closing the application. **Change vault → Create a new vault**
+You can create a second vault without closing the application. **Main Menu → Create a New Vault…**
 keeps the current work open and adds the new vault to the remembered choice.
 :::
 
@@ -82,7 +82,7 @@ conveniences, not requirements. Existing notes anywhere in the vault still resol
 
 :::{warning}
 Creation refuses a folder that is not empty and a path that names a file. It reports the problem and
-writes nothing. Only **Create a new vault** seeds content; **Open another vault** leaves an existing
+writes nothing. Only **Create a New Vault…** seeds content; **Open Another Vault…** leaves an existing
 empty folder unseeded.
 :::
 
@@ -102,7 +102,7 @@ folder that is missing a default folder or cannot be written is refused.
 
 ## 🔒 Opening and closing
 
-Opening or scanning a vault never creates a file or folder. **Change vault → Close vault** saves an
+Opening or scanning a vault never creates a file or folder. **Main Menu → Close Vault** saves an
 open page draft, forgets the remembered vault, and returns to the welcome screen, so the next launch
 starts there. A pending page dialog or a disk conflict keeps the vault open until you resolve it.
 

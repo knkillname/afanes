@@ -512,7 +512,9 @@ def catalog_entries(relative: str) -> tuple[dict[str, str], dict[str, list[str]]
             and isinstance(value.args[0], ast.Dict)
         ):
             mappings[name] = [
-                item.value for item in value.args[0].values if isinstance(item, ast.Constant) and isinstance(item.value, str)
+                item.value
+                for item in value.args[0].values
+                if isinstance(item, ast.Constant) and isinstance(item.value, str)
             ]
     return constants, mappings
 

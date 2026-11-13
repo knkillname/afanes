@@ -34,8 +34,8 @@ one closes.
 ## 📄 A note opens in raw rescue mode
 
 The frontmatter cannot be parsed. Raw rescue mode shows the complete file text and hides the labels.
-Saving writes exactly what you typed; once the text parses, the normal editor returns. Unreadable notes
-are listed in the browser's **Unreadable notes** section.
+Saving writes exactly what you typed; once the text parses, the normal editor returns. Unreadable Notes
+are listed in the browser's **Unreadable Notes** section.
 
 Check for an unclosed `---` fence, an unknown `type`, a retired key, or a value that is not valid YAML.
 See [Frontmatter](frontmatter.md) and [Migration](migration.md).
@@ -62,8 +62,8 @@ one you want to keep.
 ## 🗂️ A vault opens but looks incomplete
 
 Notes under `trash/` are excluded from scans, name uniqueness, and reference resolution. A note under
-`inbox/` appears only under **Inbox**; a `type: note` outside `inbox/` appears under **Needs attention**.
-Unreadable notes appear only in their own group. Folders are conventions, so a note is still in the
+`inbox/` appears only under **Inbox**; a `type: note` outside `inbox/` appears under **Needs Attention**.
+Unreadable Notes appear only in their own group. Folders are conventions, so a note is still in the
 vault even when its folder is unusual.
 
 ## ⚙️ A folder is refused as a vault

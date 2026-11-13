@@ -37,7 +37,7 @@ not use. Opening a vault never restores a deleted card.
 
 ## 🧭 Creating from a template
 
-From the application, choose **New vault** and pick a starter-content option. The form shows a preview
+From the application, choose **New Vault…** and pick a starter-content option. The form shows a preview
 before anything is written.
 
 From the command line:

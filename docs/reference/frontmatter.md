@@ -82,7 +82,7 @@ the project having a due date.
 `asked_by` is valid only on projects. It records the person or group that requested the project and is
 shown in the project meta row. The value is one plain name in the file. The application treats it as a
 metadata reference: the name resolves to the note with that name, so its page lists the project under
-**Requested projects**, the name is searchable and clickable, and renaming the named note rewrites the
+**Requested Projects**, the name is searchable and clickable, and renaming the named note rewrites the
 value. A name that matches no note stays in the file and appears as a broken link until you create the
 note.
 
@@ -91,14 +91,14 @@ note.
 `owner` is valid only on projects. It records the person or team accountable for delivering the project
 and is shown before **Asked by** in the project meta row. The value is one plain name in the file. Like
 `asked_by`, it is a metadata reference: the name resolves to the note with that name, its page lists the
-project under **Owned projects**, the name is searchable and clickable, and renaming the named note
+project under **Owned Projects**, the name is searchable and clickable, and renaming the named note
 rewrites the value. The owner is display-only; it does not change the project's status, group, next
 step, or review state.
 
 ## 🚫 Retired values
 
 Notes declaring `type: action`, links using `person:Name`, and notes carrying the retired `people` or
-`project` frontmatter keys are validation errors. They appear under **Unreadable notes** and open in
+`project` frontmatter keys are validation errors. They appear under **Unreadable Notes** and open in
 raw rescue mode without being rewritten. There is no automatic migration; create a one-step project
 for an action, move its work into the project body as a step, and rewrite `person:Name` links as
 `note:Name`. A `category: person` reference remains valid.

@@ -25,7 +25,7 @@ empty day asks for a title and starter, then writes the entry for that date.
 
 ## ✍️ Creating an entry
 
-- **Today's entry** opens today's page or creates it.
+- **Today’s Entry** opens today's page or creates it.
 - Clicking an empty calendar day creates an entry for that day.
 - The **+** on an empty month or year row creates an entry for that whole month or year.
 - A month or year that already has an entry shows an open control instead of the plus.

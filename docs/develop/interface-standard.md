@@ -10,12 +10,13 @@ else — palette, depth, selection, typography, icon treatment, and layout — f
 
 Every interface value comes from `src/afanes/ui/theme.py`. A test gate fails when a view hardcodes a
 color, a layout number, a font size, a Material text role, a filled icon, or an extra suggested or
-destructive action. Existing exceptions live in a baseline that may only shrink.
+destructive action. Existing exceptions live in a baseline that may only shrink. A second gate checks
+the writing style in the interface and command-line copy catalogs, with no baseline.
 :::
 
 ## 🪜 Conformance levels
 
-The standard has five levels, in the order a reviewer should check them:
+The standard has six levels, in the order a reviewer should check them:
 
 1. **Palette and contrast.** Light and dark each define the Adwaita 1.8.0 tokens independently.
    Body and muted text meet 4.5:1 on every neutral surface; accent text meets 4.5:1 on the note
@@ -32,6 +33,9 @@ The standard has five levels, in the order a reviewer should check them:
 5. **Control values and the ratchet.** Every color, radius, spacing, dimension, icon size, column
    width, content width, and minimum-window value comes from the token module, and the conformance
    gate keeps it that way.
+6. **Writing style.** Headings and short control labels use header capitalization; field labels and
+   prose use sentence capitalization; copy ends without a period; ellipses mark only actions that
+   need further input; tone stays neutral; apostrophes and ellipses are typographic.
 
 ## 🎨 Palette roles
 
@@ -109,7 +113,7 @@ the permanent global search entry and its clear action. The detail toolbar holds
 flow title, at most one suggested action, and a secondary menu.
 
 Search is a browser filter, never a navigation location: the navigation keeps its destinations and
-counts without a Search row. While a query is active, the browser title reads **Search results** and
+counts without a Search row. While a query is active, the browser title reads **Search Results** and
 the destination-specific controls (Inbox composer, References action, Log date controls, Review
 queue) are hidden so one origin-independent result list fills the browser.
 
@@ -162,6 +166,32 @@ Views select a role from `theme.TEXT_ROLES` with `style=`. The Material `theme_s
 part of the standard; the gate rejects them. The application does not bundle a font file: the
 theme leaves the family unset so Flutter resolves the platform font, and the resolved family is
 checked per platform at release.
+
+## ✍️ Writing style
+
+Copy follows the GNOME writing style. Headings, view and destination titles, dialog titles, buttons,
+menu items, tooltips, and section labels use **header capitalization**: capitalize the first and last
+word, every word of four or more letters, every verb and noun, and both parts of a hyphenated word.
+Articles, conjunctions, and prepositions of three letters or fewer stay lowercase in the middle of a
+label. Examples: **New Vault…**, **Move to Trash…**, **Search Results**, **Due Step**.
+
+Field labels, hints, dialog bodies, banners, and status messages use **sentence capitalization**:
+capitalize the first word and proper nouns only. Examples: **Vault folder path**, **Due date**, **The
+first line becomes the title**.
+
+Copy does not end with a period, even when it is written as a complete sentence. Internal periods
+remain in text that needs more than one sentence.
+
+An ellipsis (…) marks only an action that opens a dialog, form, confirmation, or native picker before
+it can complete: **New Vault…**, **Move to Trash…**, **Set Plan Date…**. The affirmative control
+inside that surface carries no ellipsis because it completes the action immediately. Navigation
+destinations, immediate actions, and informational dialogs such as About carry none.
+
+Tone is neutral. First- and second-person pronouns are not used; **your** is avoided even where the
+reference allows it, because no current string needs it. Command examples keep straight quotes
+because they are typed syntax; prose uses typographic quotation marks.
+
+The typographic apostrophe (’) and the single-character ellipsis (…) are mandatory.
 
 ## 📋 Lists and rows
 
@@ -238,6 +268,18 @@ deleted in the same change. The baseline is a debt ledger: it starts at the valu
 gate landed and must reach empty before the standard is complete. Never add an entry to make a
 change pass. The icon-or-label and dense-row ledgers are empty after wave 2.
 
+### 🧪 The copy gate
+
+`tests/ui/test_copy.py` scans `src/afanes/ui/strings.py` and `src/afanes/cli/strings.py`. It applies
+the mechanical rules to every string literal and the capitalization rules to the constants and
+mapping values declared in its header-case and sentence-case sets. A name without a declared style
+fails the gate. The ellipsis rule requires every `…` string to appear in the declared further-input
+action set, and every member of that set to carry the ellipsis.
+
+The gate has no baseline: a copy violation is either fixed or the change is not complete. Its
+header-capitalization check cannot identify short nouns and verbs, so a lowercase three-letter
+content word in the middle of a label remains a manual-review catch.
+
 ## 🧭 Migration waves
 
 Wave 0 landed with the change that introduced this standard. Later waves are separate changes with
@@ -252,9 +294,9 @@ WAVE 2  landed: control hierarchy: one suggested or destructive action
         per rendered surface, icon XOR label outside header bars,
         standard list rows, insensitive invalid actions, cancel-first
         confirmations
-WAVE 3  writing style: header capitalization, ellipses, final periods,
-        neutral tone (avoid you/my), typographic apostrophes and ellipsis,
-        copy gate, AGENTS.md 4.6
+WAVE 3  landed: writing style: header capitalization, ellipses, final periods,
+        neutral tone, typographic apostrophes and ellipsis, copy gate,
+        AGENTS.md 4.6
 WAVE 4  feedback: undo over confirmation, toasts for one-time events,
         banners only for persistent states, overlays
 WAVE 5  keyboard and accessibility: shortcut map, focus order, semantics

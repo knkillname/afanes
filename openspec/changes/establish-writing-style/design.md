@@ -157,7 +157,9 @@ Every contraction and possessive uses U+2019. Text that quotes an interpolated
 value uses typographic quotation marks. A command example such as
 `"pip install afanes[desktop]"` keeps straight quotes because the characters are
 typed syntax, and the gate bans only the straight apostrophe and three-dot
-ellipsis, not the straight double quote.
+ellipsis, not the straight double quote. Ruff's `allowed-confusables`
+configuration lists `’`; without it, the default ambiguous-character rule
+rejects the required character.
 
 Alternatives considered:
 
