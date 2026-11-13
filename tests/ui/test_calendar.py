@@ -2,6 +2,8 @@
 
 import typing
 
+import flet as ft
+
 import afanes.core.log
 import afanes.ui.components.calendar as calendar_component
 import afanes.ui.theme
@@ -39,6 +41,20 @@ class TestLogCalendar:
         assert style.bgcolor == afanes.ui.theme.LOG_ENTRY_TINT
         plain_style = calendar.day_buttons[13].style
         assert plain_style is None or plain_style.bgcolor is None
+
+    def test_day_dots_follow_the_filtered_counts(self) -> None:
+        calendar = calendar_component.LogCalendar(lambda _day: None, lambda: None, lambda: None)
+
+        calendar.build(_month(day_counts={12: 0, 13: 1}))
+
+        hidden = calendar.day_buttons[12].content
+        shown = calendar.day_buttons[13].content
+        assert isinstance(hidden, ft.Column)
+        assert isinstance(shown, ft.Column)
+        assert isinstance(hidden.controls[1], ft.Container)
+        assert isinstance(shown.controls[1], ft.Container)
+        assert hidden.controls[1].visible is False
+        assert shown.controls[1].visible is True
 
     def test_empty_month_hides_header_dots(self) -> None:
         calendar = calendar_component.LogCalendar(lambda _day: None, lambda: None, lambda: None)

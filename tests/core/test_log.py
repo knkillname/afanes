@@ -19,6 +19,7 @@ def _write_note(
     *,
     date: str | None = None,
     category: str | None = None,
+    owner: str | None = None,
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["---", f"type: {note_type}"]
@@ -26,6 +27,8 @@ def _write_note(
         lines.append(f"date: {date}")
     if category is not None:
         lines.append(f"category: {category}")
+    if owner is not None:
+        lines.append(f"owner: {owner}")
     lines.extend(["---", "", body])
     path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     return path
@@ -142,3 +145,18 @@ class TestSearch:
         timeline = _timeline(root).with_query("2025-10-12")
 
         assert [note.title for note in timeline.entries()] == ["Tuesday"]
+
+    def test_search_matches_a_project_role_name_in_everything_mode(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "log/2025/10/2025-10-12.md", date="2025-10-12", body="# Tuesday\n")
+        _write_note(
+            root / "projects/Launch.md",
+            "project",
+            body="# Launch\n",
+            date="2025-10-13",
+            owner="Ada Lovelace",
+        )
+
+        timeline = _timeline(root, afanes.core.log.LogMode.EVERYTHING).with_query("Ada Lovelace")
+
+        assert [note.name for note in timeline.entries()] == ["Launch"]

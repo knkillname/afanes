@@ -8,7 +8,7 @@ import afanes.core.vault.service
 import afanes.core.vault.snapshot
 from afanes.core.search import Browser, BrowserSection, ProjectBoard, ProjectStage, ReviewItemKind, ReviewPlanner
 from afanes.core.vault.service import Vault
-from afanes.models.note import CategoryLabel
+from afanes.models.note import CategoryLabel, Status
 
 TODAY = datetime.date(2026, 11, 14)
 TOMORROW = datetime.date(2026, 11, 15)
@@ -133,9 +133,9 @@ class TestBrowserGroups:
 
 
 class TestBrowserFilter:
-    def test_title_match_is_listed(self, tmp_path: Path) -> None:
+    def test_title_match_is_listed_without_a_body_match(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
-        _write_note(root, "projects/Home.md", "project", "# Home improvements\n")
+        _write_note(root, "projects/Home improvements.md", "project", "No heading here.\n")
 
         listing = Browser(_snapshot(root)).filter("improvements")
 
@@ -207,6 +207,32 @@ class TestBrowserFilter:
 
         assert len(listing.group(BrowserSection.PROJECTS).notes) == 1
 
+    def test_step_actual_is_not_searched(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(
+            root,
+            "projects/Home.md",
+            "project",
+            "# Home\n\n- [x] Call <!-- {actual: 2026-01-03} -->\n",
+        )
+
+        listing = Browser(_snapshot(root)).filter("2026-01-03")
+
+        assert listing.group(BrowserSection.PROJECTS).notes == ()
+
+    def test_unknown_frontmatter_is_not_searched(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        path = root / "projects/Home.md"
+        path.parent.mkdir(parents=True)
+        path.write_text(
+            "---\ntype: project\ncustom: secret\n---\n\n# Home\n",
+            encoding="utf-8",
+        )
+
+        listing = Browser(_snapshot(root)).filter("secret")
+
+        assert listing.group(BrowserSection.PROJECTS).notes == ()
+
     def test_step_tags_are_not_searched(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         _write_note(
@@ -266,6 +292,40 @@ class TestProjectBoard:
 
         assert summary.next_step is not None
         assert summary.next_step.text == "One"
+
+    def test_owner_does_not_change_the_status(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root, "projects/Home.md", "project", "# Home\n", status="waiting", owner="Ada")
+
+        summary = ProjectBoard(_snapshot(root)).summaries()[0]
+
+        assert summary.note.status is Status.WAITING
+
+    def test_owner_does_not_change_the_group(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root, "projects/Home.md", "project", "# Home\n", status="waiting", owner="Ada")
+        _write_note(root, "projects/Work.md", "project", "# Work\n", status="active")
+
+        groups = {group.stage: group for group in ProjectBoard(_snapshot(root)).groups()}
+
+        assert [summary.note.name for summary in groups[ProjectStage.WAITING].projects] == ["Home"]
+        assert [summary.note.name for summary in groups[ProjectStage.ACTIVE].projects] == ["Work"]
+
+    def test_owner_does_not_change_the_next_step(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(
+            root,
+            "projects/Home.md",
+            "project",
+            "# Home\n\n- [ ] One\n- [ ] Two\n",
+            owner="Ada",
+        )
+
+        summary = ProjectBoard(_snapshot(root)).summaries()[0]
+
+        assert summary.next_step is not None
+        assert summary.next_step.text == "One"
+        assert summary.next_step.is_waiting is False
 
     def test_owned_next_step_is_marked_waiting(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

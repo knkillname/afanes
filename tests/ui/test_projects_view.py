@@ -32,6 +32,7 @@ def _write_note(
     note_type: str = "project",
     status: str | None = None,
     due_date: str | None = None,
+    owner: str | None = None,
     body: str = "",
 ) -> Path:
     ensure_vault(path)
@@ -41,6 +42,8 @@ def _write_note(
         lines.append(f"status: {status}")
     if due_date is not None:
         lines.append(f"due_date: {due_date}")
+    if owner is not None:
+        lines.append(f"owner: {owner}")
     lines.extend(["---", body])
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
@@ -148,6 +151,55 @@ class TestProjectRows:
         details = _details(_project_tiles(view, "active")[0])
 
         assert all(not detail.startswith("Due ") for detail in details)
+
+    def test_row_keeps_the_owner_out_of_the_summary(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(
+            vault / "projects" / "Launch.md",
+            status="waiting",
+            due_date="2026-12-01",
+            owner="Sam Rivera",
+            body="# Launch\n\n- [ ] Write copy\n- [ ] Review\n",
+        )
+        view = _open_view(tmp_path, monkeypatch)
+
+        tiles = _project_tiles(view, "waiting")
+        assert [tile.title for tile in tiles] == ["Launch"]
+        details = _details(tiles[0])
+        assert "Status: Waiting" in details
+        assert afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01") in details
+        assert "2 open steps" in details
+        assert any("Write copy" in detail for detail in details)
+        assert "Sam Rivera" not in " ".join(details)
+        assert all("Owner" not in detail for detail in details)
+
+    def test_clearing_the_owner_keeps_the_project_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        project = _write_note(
+            vault / "projects" / "Launch.md",
+            status="waiting",
+            due_date="2026-12-01",
+            owner="Sam Rivera",
+            body="# Launch\n\n- [ ] Write copy\n- [ ] Review\n",
+        )
+        view = _open_view(tmp_path, monkeypatch)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.navigation.open_page(project)
+            assert await state.pages.set_page_owner("", save=True) is True
+
+        asyncio.run(scenario())
+        view.refresh()
+
+        tiles = _project_tiles(view, "waiting")
+        assert [tile.title for tile in tiles] == ["Launch"]
+        details = _details(tiles[0])
+        assert "Status: Waiting" in details
+        assert afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01") in details
+        assert "2 open steps" in details
+        assert any("Write copy" in detail for detail in details)
+        assert "Sam Rivera" not in " ".join(details)
 
     def test_checked_step_is_not_counted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

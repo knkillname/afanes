@@ -349,6 +349,26 @@ class TestLogProcessing:
         assert "due_date" not in document.raw
         assert "asked_by" not in document.raw
 
+    def test_log_outcome_strips_forbidden_project_labels(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        capture = root / "inbox" / "Call.md"
+        capture.parent.mkdir(parents=True)
+        capture.write_text(
+            "---\ntype: project\nstatus: waiting\ndue_date: 2026-12-01\n"
+            "asked_by: Priya Nair\nowner: Sam Rivera\ndate: 2025-10-12\n---\n\n# Call\n",
+            encoding="utf-8",
+        )
+        vault = afanes.core.vault.service.Vault(root)
+        processing = afanes.core.vault.processing.VaultProcessing(vault)
+
+        plan = processing.plan_processing(capture, ProcessingOutcome.LOG)
+        target = processing.apply_processing(plan, confirm=True)
+
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert document.note_type is NoteType.LOG
+        for key in ("category", "status", "due_date", "asked_by", "owner"):
+            assert key not in document.raw
+
     def test_undated_capture_uses_the_last_modified_date(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         capture = _write_note(root / "inbox" / "Call the plumber.md", body="Call the plumber\n")

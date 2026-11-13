@@ -775,9 +775,7 @@ class PageView:
         sections: list[ft.Control] = []
         linked_from = self._linked_from_controls(result)
         if linked_from:
-            sections.append(
-                self._connection_subsection(afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM, linked_from)
-            )
+            sections.append(self._connection_subsection(afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM, linked_from))
         owned_projects = self._owned_project_controls(result)
         if owned_projects:
             sections.append(
@@ -785,9 +783,7 @@ class PageView:
             )
         owned_steps = self._owned_step_controls(result)
         if owned_steps:
-            sections.append(
-                self._connection_subsection(afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS, owned_steps)
-            )
+            sections.append(self._connection_subsection(afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS, owned_steps))
         requested_projects = self._requested_project_controls(result)
         if requested_projects:
             sections.append(

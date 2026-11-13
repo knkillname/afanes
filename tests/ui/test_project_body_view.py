@@ -260,8 +260,10 @@ class TestActions:
         assert step.plan is None
 
     def test_owner_panel_adds_and_removes_owners(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
         body = "# Home\n\n- [ ] Call <!-- {owners: [Ada]} -->\n"
-        path, view, _followed = _open_project(tmp_path, monkeypatch, body)
+        path, view, followed = _open_project(tmp_path, monkeypatch, body)
 
         _run(_button(view.root, afanes.ui.strings.PAGE_STEP_OWNER_ACTION).on_click)
         field = _field(view.root)
@@ -276,6 +278,7 @@ class TestActions:
 
         step = StepDocument(NoteDocument.from_text(path.read_text(encoding="utf-8")).body).steps[0]
         assert step.owners == ("Grace",)
+        assert followed == []
 
     def test_removing_the_last_owner_clears_the_key(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         body = "# Home\n\n- [ ] Call <!-- {owners: [Ada]} -->\n"

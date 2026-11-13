@@ -175,6 +175,7 @@ class TestProcessingView:
         versioned(root)
         vault = afanes.core.vault.service.Vault(root)
         afanes.core.vault.pages.VaultPages(vault).create_page("Sam Rivera", NoteType.REFERENCE)
+        afanes.core.vault.pages.VaultPages(vault).create_page("Priya Nair", NoteType.REFERENCE)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
         _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
@@ -191,11 +192,30 @@ class TestProcessingView:
 
         assert view.owner.value == "Sam Rivera"
 
+    def test_role_suggestions_exclude_non_matching_names(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        versioned(root)
+        vault = afanes.core.vault.service.Vault(root)
+        afanes.core.vault.pages.VaultPages(vault).create_page("Sam Rivera", NoteType.REFERENCE)
+        afanes.core.vault.pages.VaultPages(vault).create_page("Priya Nair", NoteType.REFERENCE)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
+        _open_vault_capture(root, capture, monkeypatch)
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.PROJECT.value
+        _select_outcome(view)
+        view.owner.value = "zzz"
+
+        _trigger(view.owner.on_change)
+
+        assert view.role_suggestions.controls == []
+        assert view.role_suggestions.visible is False
+
     def test_asked_by_field_suggests_vault_names(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"
         versioned(root)
         vault = afanes.core.vault.service.Vault(root)
         afanes.core.vault.pages.VaultPages(vault).create_page("Priya Nair", NoteType.REFERENCE)
+        afanes.core.vault.pages.VaultPages(vault).create_page("Sam Rivera", NoteType.REFERENCE)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
         _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
@@ -207,6 +227,27 @@ class TestProcessingView:
 
         tiles = [control for control in view.role_suggestions.controls if isinstance(control, ft.ListTile)]
         assert [tile.title for tile in tiles] == ["Priya Nair"]
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [
+            ProcessingOutcome.APPEND_STEP,
+            ProcessingOutcome.REFERENCE,
+            ProcessingOutcome.LATER,
+            ProcessingOutcome.TRASH,
+            ProcessingOutcome.LOG,
+        ],
+    )
+    def test_non_project_outcomes_hide_the_role_fields(self, outcome: ProcessingOutcome) -> None:
+        _open_capture()
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = outcome.value
+
+        _select_outcome(view)
+
+        assert view.owner.visible is False
+        assert view.asked_by.visible is False
+        assert view.role_suggestions.visible is False
 
     def test_append_outcome_reveals_the_project_field(self) -> None:
         _open_capture()
@@ -502,9 +543,7 @@ class TestProcessingView:
     ) -> None:
         root = tmp_path / "vault"
         versioned(root)
-        capture = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).capture(
-            "Met with Ada"
-        )
+        capture = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).capture("Met with Ada")
         _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
         view.outcome.value = ProcessingOutcome.LOG.value

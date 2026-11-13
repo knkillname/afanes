@@ -107,6 +107,25 @@ class TestReadMode:
         assert state.pages.page.path == person.resolve()
         assert scrolls == [0]
 
+    def test_edit_mode_preserves_project_task_list_lines(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        body = "# Launch\n\n- [ ] Write copy\n- [x] Done\n"
+        path = _write_note(vault / "projects" / "Launch.md", _typed_note("project", body))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+
+        asyncio.run(scenario())
+
+        assert view.body_field.value == body
+
     def test_edit_button_switches_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
@@ -1253,17 +1272,14 @@ def _freeze(control: ft.Control) -> None:
     object.__setattr__(control, "_frozen", True)
 
 
+def _tree_state(root: Path) -> dict[str, bytes]:
+    return {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+
+
 def _record_scroll(view: PageView) -> list[float | None]:
     positions: list[float | None] = []
 
-    async def recorder(
-        *,
-        offset: float | None = None,
-        delta: float | None = None,
-        scroll_key: object = None,
-        duration: float = 0,
-        curve: object = None,
-    ) -> None:
+    async def recorder(*, offset: float | None = None, **_kwargs: object) -> None:
         positions.append(offset)
 
     object.__setattr__(view.content, "scroll_to", recorder)
@@ -1306,7 +1322,8 @@ def _connection_section(view: PageView, title: str) -> ft.Control:
     for control in view.connections_body.controls:
         if title in _texts(control):
             return control
-    raise AssertionError(f"missing connection section {title!r}")
+    message = f"missing connection section {title!r}"
+    raise AssertionError(message)
 
 
 def _panel_actions(panel: ft.Control) -> list[ft.Control]:
@@ -1415,6 +1432,36 @@ class TestConnections:
         assert headings == [afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM]
         assert view.connections_steps_toggle.visible is False
         assert view.connections_projects_toggle.visible is False
+
+    def test_owned_project_alone_renders_the_section(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        person = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", category="person"),
+        )
+        _write_note(vault / "projects" / "Home.md", _typed_note("project", "# Home\n", extra="owner: Ada"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(person)
+
+        asyncio.run(scenario())
+        view = PageView(lambda: None)
+        headings = [
+            title
+            for title in (
+                afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM,
+                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS,
+                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS,
+                afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
+            )
+            if any(title in _texts(control) for control in view.connections_body.controls)
+        ]
+
+        assert headings == [afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS]
+        assert "Home" in _texts(_connection_section(view, afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS))
 
     def test_finished_owned_project_keeps_the_footer_control_available(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1617,6 +1664,21 @@ class TestConnections:
         assert "Old" not in _texts(view.connections_body.controls[1])
         assert "Finished" not in _texts(view.connections_body.controls[3])
 
+    def test_reading_and_toggling_connections_writes_nothing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._open_person(tmp_path, monkeypatch)
+        view = PageView(lambda: None)
+        vault = tmp_path / "vault"
+        before = _tree_state(vault)
+
+        view.connections_steps_toggle.value = True
+        asyncio.run(view.toggle_completed_steps(ft.Event(name="change", control=view.connections_steps_toggle)))
+        view.connections_projects_toggle.value = True
+        asyncio.run(view.toggle_finished_projects(ft.Event(name="change", control=view.connections_projects_toggle)))
+
+        assert _tree_state(vault) == before
+
     def test_page_without_connections_hides_the_section(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
@@ -1797,6 +1859,7 @@ class TestPageDates:
         assert view.status_dropdown.visible is False
         assert view.due_field.visible is False
         assert view.asked_by_field.visible is False
+        assert view.owner_field.visible is False
 
     def test_malformed_date_shows_a_warning(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

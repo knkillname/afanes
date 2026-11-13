@@ -25,6 +25,7 @@ from tests.support import ensure_vault, versioned
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
 SECTION_COUNT = 5
+TWO_ENTRIES = 2
 FIRST_DAY = 1
 SECOND_DAY = 2
 THIRD_DAY = 3
@@ -103,14 +104,7 @@ def _freeze(control: ft.Control) -> None:
 def _record_page_scroll(view: afanes.ui.views.workspace.WorkspaceView) -> list[float | None]:
     positions: list[float | None] = []
 
-    async def recorder(
-        *,
-        offset: float | None = None,
-        delta: float | None = None,
-        scroll_key: object = None,
-        duration: float = 0,
-        curve: object = None,
-    ) -> None:
+    async def recorder(*, offset: float | None = None, **_kwargs: object) -> None:
         positions.append(offset)
 
     object.__setattr__(view.page_view.content, "scroll_to", recorder)
@@ -763,7 +757,10 @@ class TestLogSection:
         calendar = view.log_calendar
         assert tree is not None
         assert calendar is not None
-        assert sorted(note.title for note in tree.note_rows.values()) == ["Dentist", "Groceries"]
+        titles = [note.title for note in tree.note_rows.values()]
+        assert len(titles) == TWO_ENTRIES
+        assert "Dentist" in titles
+        assert "Groceries" in titles
         assert calendar.day_buttons[today.day].data["count"] == 1
         assert calendar.day_buttons[other.day].data["count"] == 1
 

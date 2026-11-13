@@ -37,13 +37,13 @@
 
 ## 7. UI test hardening
 
-- [ ] 7.1 Add project-overview tests for owner isolation: status, group, next step, the project row, and clearing the owner; verify each test uses an owner-bearing project and asserts the workspace view.
-- [ ] 7.2 Strengthen the log-label negative tests by starting from a capture that actually carries `status`, `due_date`, `asked_by`, and `owner`; verify the applied log note omits each key.
-- [ ] 7.3 Strengthen the cancellation and read-only tests with vault byte/tree snapshots for rename, role creation, role navigation, repair, and connection reading; verify no file changes on cancel or read.
-- [ ] 7.4 Strengthen the suggestion tests with at least two vault names and assert a non-matching name is excluded; verify the filtered list is exact.
-- [ ] 7.5 Add an edit-mode test that opens a project with task-list steps and asserts the raw step lines are preserved; verify the test fails if steps are stripped.
-- [ ] 7.6 Isolate title matching from body matching and add negative search tests for `actual` and unknown frontmatter metadata; verify the matching cases pass and the metadata cases produce no result.
-- [ ] 7.7 Harden the remaining prioritized weak tests for the log owner field, the owner chip delete, the owned-project-only section, non-project outcomes hiding role fields, calendar day accents, and role-name Log search; verify each test asserts the rendered or applied result.
+- [x] 7.1 Add project-overview tests for owner isolation: status, group, next step, the project row, and clearing the owner; verify each test uses an owner-bearing project and asserts the workspace view.
+- [x] 7.2 Strengthen the log-label negative tests by starting from a capture that actually carries `status`, `due_date`, `asked_by`, and `owner`; verify the applied log note omits each key.
+- [x] 7.3 Strengthen the cancellation and read-only tests with vault byte/tree snapshots for rename, role creation, role navigation, repair, and connection reading; verify no file changes on cancel or read.
+- [x] 7.4 Strengthen the suggestion tests with at least two vault names and assert a non-matching name is excluded; verify the filtered list is exact.
+- [x] 7.5 Add an edit-mode test that opens a project with task-list steps and asserts the raw step lines are preserved; verify the test fails if steps are stripped.
+- [x] 7.6 Isolate title matching from body matching and add negative search tests for `actual` and unknown frontmatter metadata; verify the matching cases pass and the metadata cases produce no result.
+- [x] 7.7 Harden the remaining prioritized weak tests for the log owner field, the owner chip delete, the owned-project-only section, non-project outcomes hiding role fields, calendar day accents, and role-name Log search; verify each test asserts the rendered or applied result.
 
 ## 8. Gate and integration
 

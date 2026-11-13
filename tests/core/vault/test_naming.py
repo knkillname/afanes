@@ -417,8 +417,7 @@ class TestMetadataReferenceCharacterization:
             "# Review\n\n[Ada](<note:Ada>)\n",
         )
         project.write_text(
-            "---\ntype: project\nowner: Ada\ncustom: keep\n---\n\n"
-            "[Ada](<note:Ada>)\n",
+            "---\ntype: project\nowner: Ada\ncustom: keep\n---\n\n[Ada](<note:Ada>)\n",
             encoding="utf-8",
         )
         vault = afanes.core.vault.service.Vault(root)
@@ -437,9 +436,7 @@ class TestMetadataReferenceCharacterization:
         project = _write_note(
             root / "projects/Review.md",
             "project",
-            "# Review\n\n"
-            "- [ ] Call <!-- {owners: [Ada]} -->\n"
-            "- [ ] Review <!-- {owners: [Grace]} -->\n",
+            "# Review\n\n- [ ] Call <!-- {owners: [Ada]} -->\n- [ ] Review <!-- {owners: [Grace]} -->\n",
         )
         vault = afanes.core.vault.service.Vault(root)
         preview = afanes.core.vault.naming.VaultNaming(vault).plan_rename(note, "Ada King")

@@ -2745,6 +2745,32 @@ class TestPageLinks:
         assert set(state.navigation.ambiguous) == {first.resolve(), second.resolve()}
         assert state.pages.page is None
 
+    def test_role_navigation_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        first = _write_note(
+            vault / "reference" / "people" / "Sam Rivera.md",
+            _typed_note("reference", "# Sam Rivera\n", category="person"),
+        )
+        _write_note(vault / "notes" / "Sam Rivera.md", _typed_note("reference", "# Sam Rivera\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        before = _tree_state(vault)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            ambiguous = await state.navigation.follow_role("Sam Rivera")
+            assert ambiguous is afanes.ui.state.navigation.RoleFollowOutcome.AMBIGUOUS
+            await state.navigation.choose_candidate(first)
+            missing = await state.navigation.follow_role("Nobody")
+            assert missing is afanes.ui.state.navigation.RoleFollowOutcome.MISSING
+
+        asyncio.run(scenario())
+
+        assert _tree_state(vault) == before
+        assert state.pages.page is not None
+        assert state.pages.page.path == first.resolve()
+
     def test_missing_role_name_reports_missing_without_writing(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -2879,18 +2905,21 @@ class TestPageLinks:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
-        async def scenario() -> None:
+        async def scenario() -> dict[str, bytes]:
             await state.workspace.choose_vault(vault)
             await state.navigation.follow_link("note:Q1: Planning?")
             await state.pages.set_page_body("# Q1: Planning?\n\nDraft.\n")
             await state.pages.autosave()
+            before_tree = _tree_state(vault)
             await state.dialogs.keep_repair()
+            return before_tree
 
-        asyncio.run(scenario())
+        before_tree = asyncio.run(scenario())
 
         assert (vault / "reference" / "Q1 Planning.md").exists()
         assert source.read_bytes() == before
         assert state.pages.repair_preview is None
+        assert _tree_state(vault) == before_tree
 
     def test_cancelling_the_repair_restores_the_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -3130,8 +3159,10 @@ class TestPageRenameTrash:
             vault / "reference" / "people" / "Ada.md",
             _typed_note("reference", "# Ada\n", category="person"),
         )
+        referrer = _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<note:Ada>)\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
+        before = _tree_state(vault)
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -3144,6 +3175,8 @@ class TestPageRenameTrash:
         assert person.exists()
         assert not (vault / "reference" / "people" / "Ada King.md").exists()
         assert state.dialogs.rename_preview is None
+        assert _tree_state(vault) == before
+        assert "note:Ada" in referrer.read_text(encoding="utf-8")
 
     def test_trash_is_previewed_and_returns_through_history(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -4482,9 +4515,7 @@ class TestLogTypeChange:
 
 
 class TestRewriteReports:
-    def test_rename_reports_updated_and_skipped_notes(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_rename_reports_updated_and_skipped_notes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _versioned(vault)
         person = _write_note(
@@ -4652,9 +4683,7 @@ class TestRewriteReports:
         assert (vault / "log" / "2025" / "10" / "2025-10-13.md").is_file()
         assert "log:2025-10-13" in referrer.read_text(encoding="utf-8")
 
-    def test_repair_reports_updated_and_failed_notes(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_repair_reports_updated_and_failed_notes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _versioned(vault)
         source = _write_note(vault / "notes" / "Source.md", _note_text("[Q1](<note:Q1: Planning?>)\n"))

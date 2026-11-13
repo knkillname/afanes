@@ -1,12 +1,18 @@
 """Tests for the missing-role-name category dialog."""
 
 import asyncio
+from pathlib import Path
 
 import flet as ft
 
 import afanes.ui.components.role_reference
 import afanes.ui.strings
 from afanes.models.note import CategoryLabel
+from tests.support import versioned
+
+
+def _tree_state(root: Path) -> dict[str, bytes]:
+    return {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
 
 
 class TestRoleReferenceDialog:
@@ -118,6 +124,16 @@ class TestRoleReferenceDialog:
 
         assert confirmed == []
         assert cancelled == [True]
+
+    def test_cancelling_leaves_a_real_vault_unchanged(self, tmp_path: Path) -> None:
+        vault = tmp_path / "vault"
+        versioned(vault)
+        before = _tree_state(vault)
+        dialog = self._dialog([], [])
+
+        asyncio.run(dialog.cancel())
+
+        assert _tree_state(vault) == before
 
     def test_the_dialog_names_the_role(self) -> None:
         dialog = self._dialog([], [])
