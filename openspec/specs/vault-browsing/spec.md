@@ -400,9 +400,23 @@ The workspace SHALL choose its column arrangement from the available width witho
 - **WHEN** the navigation is behind a toggle
 - **THEN** the toggle exposes every destination and count
 
+### Requirement: Search is a browser filter, not a navigation destination
+
+The global search entry SHALL be part of the browser region and SHALL be available without entering a separate search destination. The navigation region MUST NOT offer a Search destination, a Search section, a search count, or a selected search row. The navigation region SHALL continue to list only its existing destinations and counts.
+
+#### Scenario: Search is not a sidebar destination
+
+- **WHEN** the workspace renders the navigation region
+- **THEN** no Search destination, Search section, or search count appears
+
+#### Scenario: Search remains available from every destination
+
+- **WHEN** the user enters a query while any content destination is active
+- **THEN** the browser shows the global search results without changing the active destination
+
 ### Requirement: The workspace toolbar reflects the active view
 
-The detail region SHALL present an in-window toolbar aligned with the navigation and browser headers. It SHALL show the active page or flow title, a Back control when a previous view exists, at most one suggested action, and a secondary menu for the remaining actions. The browser header SHALL show its destination title, search entry, and section actions. The workspace MUST NOT draw controls into the operating-system title bar.
+The detail region SHALL present an in-window toolbar aligned with the navigation and browser headers. It SHALL show the active page or flow title, a Back control when a previous view exists, at most one suggested action, and a secondary menu for the remaining actions. The browser header SHALL show its destination title and actions. A permanent search row below the browser header SHALL hold the global search entry. The workspace MUST NOT draw controls into the operating-system title bar.
 
 #### Scenario: The toolbar names the active page
 
@@ -427,7 +441,12 @@ The detail region SHALL present an in-window toolbar aligned with the navigation
 #### Scenario: The browser header holds search and section actions
 
 - **WHEN** a destination is active
-- **THEN** its header shows the destination title, the search entry, and the actions that belong to that destination
+- **THEN** its header shows the destination title and the actions that belong to that destination, and the search entry appears in the dedicated row beneath the header
+
+#### Scenario: The search entry has its own row
+
+- **WHEN** the browser renders
+- **THEN** the search entry is permanently available in a full-width row beneath the browser header, separate from the title and actions
 
 #### Scenario: No controls in the title bar
 
@@ -436,21 +455,21 @@ The detail region SHALL present an in-window toolbar aligned with the navigation
 
 ### Requirement: The browser hosts the active destination's controls
 
-The browser region SHALL host the controls that act on the active destination. Inbox SHALL show the capture composer at the top of the browser. References SHALL show the New Reference action. Log SHALL show its date-lens controls. A New Capture toolbar action SHALL switch to Inbox and focus the composer from any other destination.
+The browser region SHALL host the controls that act on the active destination. While no search is active, Inbox SHALL show the capture composer at the top of the browser, References SHALL show the New Reference action, and Log SHALL show its date-lens controls. While a search query is active, the browser SHALL hide those destination-specific controls and show the global search results instead. A New Capture toolbar action SHALL switch to Inbox and focus the composer from any other destination.
 
 #### Scenario: Inbox shows the composer
 
-- **WHEN** the user selects Inbox
+- **WHEN** the user selects Inbox without an active search query
 - **THEN** the capture composer is at the top of the browser region
 
 #### Scenario: References shows New Reference
 
-- **WHEN** the user selects References
+- **WHEN** the user selects References without an active search query
 - **THEN** the New Reference action is visible in the browser header
 
 #### Scenario: Log shows its date controls
 
-- **WHEN** the user selects Log
+- **WHEN** the user selects Log without an active search query
 - **THEN** the Entries and Everything controls, Today's Entry, and the calendar are available in the browser region
 
 #### Scenario: New Capture focuses the composer
@@ -463,9 +482,14 @@ The browser region SHALL host the controls that act on the active destination. I
 - **WHEN** the user selects Projects
 - **THEN** the capture composer is not shown in the browser region
 
+#### Scenario: Search hides destination controls
+
+- **WHEN** a non-empty search query is active
+- **THEN** the capture composer, New Reference action, Log date-lens controls, and Review queue are not shown
+
 ### Requirement: Search spans every destination
 
-A non-empty search query SHALL filter every destination, and the browser SHALL show matching results grouped by section. The active destination MUST NOT limit the results. The Log calendar and date tree SHALL use the same query. Clearing the query SHALL restore the active destination's normal browser.
+A non-empty search query SHALL replace the active destination's browser content with matching results grouped by section. The active destination MUST NOT limit the results. While the query is active, the browser header SHALL show Search results, and the browser MUST NOT show the Log calendar, date tree, or other destination-specific content. Clearing the query SHALL restore the active destination's normal browser.
 
 #### Scenario: A query lists matches from several sections
 
@@ -485,7 +509,12 @@ A non-empty search query SHALL filter every destination, and the browser SHALL s
 #### Scenario: The Log calendar uses the query
 
 - **WHEN** the user searches while Log is active
-- **THEN** both the calendar marks and the date tree show only matching entries
+- **THEN** the global result list is built from the query-filtered Log timeline, and the Log calendar and date tree are not shown
+
+#### Scenario: The title names the search mode
+
+- **WHEN** a non-empty query is active
+- **THEN** the browser title shows Search results instead of the active destination title
 
 #### Scenario: Clearing restores the active destination
 

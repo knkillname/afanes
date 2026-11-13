@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- **Global search has its own browser row.** The browser header now holds only the destination title,
+  refresh, and destination actions, with a permanent full-width search row beneath it and a clear
+  action. While a query is active the title reads **Search results**, destination-specific controls
+  (Inbox composer, References action, Log date controls, Review queue) are hidden, and the grouped
+  results no longer depend on the origin destination. `Ctrl+F` focuses the field, and `Esc` clears a
+  non-empty query before closing the navigation drawer. This implements the `refine-browser-search`
+  OpenSpec change. README: no change required. Docs: the workspace guide and interface standard were
+  updated during implementation.
 - **Breaking (UI):** the workspace is now a three-region shell with a navigation sidebar, a browser
   column, and a detail pane. The navigation holds destinations, counts, vault identity, and the
   primary menu (Change Vault…, Create Vault…, Close Vault, About Afanes); search is global and returns

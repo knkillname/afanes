@@ -20,7 +20,7 @@ The global search entry SHALL be part of the browser region and SHALL be availab
 
 ### Requirement: The workspace toolbar reflects the active view
 
-The detail region SHALL present an in-window toolbar aligned with the navigation and browser headers. It SHALL show the active page or flow title, a Back control when a previous view exists, at most one suggested action, and a secondary menu for the remaining actions. The browser header SHALL show its destination title and section actions. A permanent, full-width search row directly beneath the browser header SHALL hold the global search entry. The workspace MUST NOT draw controls into the operating-system title bar.
+The detail region SHALL present an in-window toolbar aligned with the navigation and browser headers. It SHALL show the active page or flow title, a Back control when a previous view exists, at most one suggested action, and a secondary menu for the remaining actions. The browser header SHALL show its destination title and actions. A permanent search row below the browser header SHALL hold the global search entry. The workspace MUST NOT draw controls into the operating-system title bar.
 
 #### Scenario: The toolbar names the active page
 
