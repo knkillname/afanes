@@ -18,6 +18,7 @@ from afanes.models.link import ReferenceScheme
 from afanes.models.note import NoteType
 from afanes.ui.views.page import PageView
 from tests.support import ensure_vault, versioned
+from tests.ui.test_conformance import HEADER_ACTION_KEYS
 
 TWO_CANDIDATES = 2
 FOUR_SUBSECTIONS = 4
@@ -1993,3 +1994,15 @@ class TestPageWidth:
         view.fit_width(10)
 
         assert view.page_column.width == 600 - 2 * afanes.ui.theme.ITEM_GAP
+
+
+class TestToolbarActions:
+    def test_the_toolbar_actions_match_the_gate_allowlist(self) -> None:
+        view = PageView(lambda: None)
+        keys = {
+            control.key
+            for control in view.header.controls
+            if getattr(control, "key", None) in HEADER_ACTION_KEYS
+        }
+
+        assert keys == HEADER_ACTION_KEYS

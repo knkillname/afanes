@@ -208,8 +208,12 @@ embedded baseline:
 - filled icon glyphs that have an outlined variant;
 - numeric layout literals outside the token module;
 - suggested or destructive actions per view class;
-- controls carrying both an icon and a label;
+- controls carrying both an icon and a label outside a header bar;
 - `dense=True` rows.
+
+Header-bar actions are exempt from the icon-or-label rule through an explicit key allowlist in the
+gate; the spec allows the combination there, and a focused test asserts the allowlist matches the
+controls actually placed in the toolbar.
 
 The value rules count per module; the button rules count within each class scope, so a module with
 several dialogs is measured per view. The comparison fails in both directions. A count above its

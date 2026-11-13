@@ -49,6 +49,7 @@ LAYOUT_KEYWORDS = frozenset(
 )
 LABEL_KEYWORDS = frozenset({"content", "text", "label"})
 BUTTON_NAMES = frozenset({"FilledButton", "TextButton", "OutlinedButton", "ElevatedButton"})
+HEADER_ACTION_KEYS = frozenset({"page-edit-action", "page-done-action", "process-note"})
 TEXT_CONTROL_NAMES = frozenset({"Text", "TextSpan", "TextStyle"})
 FONT_SUFFIXES = frozenset({".ttf", ".otf", ".ttc", ".woff", ".woff2"})
 ICON_SUFFIXES = frozenset({".svg"})
@@ -86,7 +87,7 @@ BASELINE: dict[str, dict[str, int]] = {
     "icon_and_label_buttons": {
         "app.py::_Shell": 2,
         "views/inbox.py::WelcomeView": 3,
-        "views/page.py::PageView": 15,
+        "views/page.py::PageView": 12,
         "views/processing.py::ProcessingView": 2,
         "views/review.py::ReviewView": 11,
     },
@@ -193,11 +194,66 @@ def _is_suggested_or_destructive(node: ast.AST) -> bool:
     )
 
 
-def _is_icon_and_label(node: ast.AST) -> bool:
+def _has_icon_and_label(node: ast.AST) -> bool:
     if not isinstance(node, ast.Call) or not _is_flet_call(node):
         return False
     keywords = {keyword.arg for keyword in node.keywords}
     return "icon" in keywords and bool(keywords & LABEL_KEYWORDS)
+
+
+def _key_of(node: ast.AST) -> str | None:
+    if not isinstance(node, ast.Call):
+        return None
+    for keyword in node.keywords:
+        if (
+            keyword.arg == "key"
+            and isinstance(keyword.value, ast.Constant)
+            and isinstance(keyword.value.value, str)
+        ):
+            return keyword.value.value
+    return None
+
+
+def _is_icon_and_label(node: ast.AST) -> bool:
+    return _has_icon_and_label(node) and _key_of(node) not in HEADER_ACTION_KEYS
+
+
+def _header_action_keys(root: Path) -> set[str]:
+    keys: set[str] = set()
+    for _relative, tree in _module_trees(root):
+        assigned: dict[str, ast.Call] = {}
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+                continue
+            target = node.targets[0]
+            if (
+                isinstance(target, ast.Attribute)
+                and isinstance(target.value, ast.Name)
+                and target.value.id == "self"
+                and isinstance(node.value, ast.Call)
+            ):
+                assigned[target.attr] = node.value
+        header = assigned.get("header")
+        if header is None:
+            continue
+        controls = next((keyword.value for keyword in header.keywords if keyword.arg == "controls"), None)
+        if controls is None:
+            continue
+        for control in ast.walk(controls):
+            if not (
+                isinstance(control, ast.Attribute)
+                and isinstance(control.value, ast.Name)
+                and control.value.id == "self"
+                and control.attr in assigned
+            ):
+                continue
+            call = assigned[control.attr]
+            if not _has_icon_and_label(call):
+                continue
+            key = _key_of(call)
+            if key is not None:
+                keys.add(key)
+    return keys
 
 
 def _is_dense_row(node: ast.AST) -> bool:
@@ -547,3 +603,71 @@ class TestViewScope:
             "view.py::FirstView": 1,
             "view.py::SecondView": 1,
         }
+
+
+class TestHeaderActions:
+    def test_a_header_action_is_not_counted(self, tmp_path: Path) -> None:
+        (tmp_path / "view.py").write_text(
+            "import flet as ft\n\n"
+            "class View:\n"
+            "    def __init__(self):\n"
+            "        self.edit = ft.FilledButton(\n"
+            "            content='Edit', icon=ft.Icons.EDIT_OUTLINED, key='page-edit-action'\n"
+            "        )\n",
+            encoding="utf-8",
+        )
+
+        assert _count_scopes(tmp_path, _is_icon_and_label) == {}
+
+    def test_a_non_header_action_is_counted(self, tmp_path: Path) -> None:
+        (tmp_path / "view.py").write_text(
+            "import flet as ft\n\n"
+            "class View:\n"
+            "    def __init__(self):\n"
+            "        self.save = ft.FilledButton(\n"
+            "            content='Save', icon=ft.Icons.CHECK_OUTLINED, key='other-action'\n"
+            "        )\n",
+            encoding="utf-8",
+        )
+
+        assert _count_scopes(tmp_path, _is_icon_and_label) == {"view.py::View": 1}
+
+    def test_a_header_action_without_a_key_is_counted(self, tmp_path: Path) -> None:
+        (tmp_path / "view.py").write_text(
+            "import flet as ft\n\n"
+            "class View:\n"
+            "    def __init__(self):\n"
+            "        self.edit = ft.FilledButton(content='Edit', icon=ft.Icons.EDIT_OUTLINED)\n",
+            encoding="utf-8",
+        )
+
+        assert _count_scopes(tmp_path, _is_icon_and_label) == {"view.py::View": 1}
+
+    def test_the_allowlist_matches_the_page_toolbar(self) -> None:
+        assert _header_action_keys(SOURCE_ROOT) == HEADER_ACTION_KEYS
+
+    def test_a_missing_header_key_breaks_the_allowlist(self, tmp_path: Path) -> None:
+        (tmp_path / "view.py").write_text(
+            "import flet as ft\n\n"
+            "class View:\n"
+            "    def __init__(self):\n"
+            "        self.edit = ft.FilledButton(content='Edit', icon=ft.Icons.EDIT_OUTLINED)\n"
+            "        self.header = ft.Row(controls=[self.edit])\n",
+            encoding="utf-8",
+        )
+
+        assert _header_action_keys(tmp_path) == set()
+
+    def test_an_unlisted_header_key_is_reported(self, tmp_path: Path) -> None:
+        (tmp_path / "view.py").write_text(
+            "import flet as ft\n\n"
+            "class View:\n"
+            "    def __init__(self):\n"
+            "        self.edit = ft.FilledButton(\n"
+            "            content='Edit', icon=ft.Icons.EDIT_OUTLINED, key='other-action'\n"
+            "        )\n"
+            "        self.header = ft.Row(controls=[self.edit])\n",
+            encoding="utf-8",
+        )
+
+        assert _header_action_keys(tmp_path) == {"other-action"}

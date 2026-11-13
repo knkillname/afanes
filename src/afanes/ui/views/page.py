@@ -195,12 +195,14 @@ class PageView:
             content=afanes.ui.strings.PAGE_EDIT,
             icon=ft.Icons.EDIT_OUTLINED,
             on_click=self.start_edit,
+            key="page-edit-action",
         )
         self.done_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_DONE,
             icon=ft.Icons.CHECK_OUTLINED,
             on_click=self.finish_edit,
             visible=False,
+            key="page-done-action",
         )
         self.edit_item = ft.PopupMenuItem(
             content=afanes.ui.strings.PAGE_EDIT,
