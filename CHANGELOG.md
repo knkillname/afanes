@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+
+- **Strict type gate.** `hatch check` now fails on Pyrefly warning-level diagnostics by running
+  `pyrefly check --min-severity=warn`. All existing warnings were fixed rather than suppressed:
+  explicit module imports replace implicit ones, typed helpers replace untyped test lambdas, boolean
+  assertions use truthiness, redundant casts and string conversions were removed, and the type-check
+  environment now uses the `dev` dependency group with the `types-PyYAML==6.0.12.20261113` stubs.
+  This implements the `strict-type-warnings` OpenSpec change. README: no change required.
+  Docs: updated.
+
 ## [0.8.0] - 2026-11-13
 
 ### Changed
