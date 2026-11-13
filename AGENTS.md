@@ -97,18 +97,22 @@ Use neutral vocabulary: Inbox, Processing Wizard / Clarification Pipeline, Step,
 
 ### 4.2 Object ownership and the architecture gate
 
-Classify every new unit as one of: **value object** (immutable data + invariants), **service object** (owns one resource, validates it at construction), **pure function** (stateless transformation), or **controller/view** (UI state + presentation). Split mixed roles. No Java-style getters, anemic data bags, or dependency injection.
+Classify every new unit as one of: **value object** (immutable data + invariants), **service object** (owns one resource, validates it at construction), or **controller/view** (UI state + presentation). Split mixed roles. A stateless transformation is a method on the value object or service that owns the data, not a free function. No Java-style getters, anemic data bags, or dependency injection.
+
+Code is object-oriented: every behavior is a method on an owning class. Module-level functions are prohibited. The only exception is a function object passed to a class or library by contract — a Flet `main` target, an `argparse` type, or a console-script entry point — and it must delegate to an owned method in one line.
+
+Prefer small, public, fruitful methods that return a value and can be tested directly. Keep a private method to an internal step of a public command; do not hide testable behavior in a large private helper.
 
 `tests/core/test_architecture.py` is a hard gate:
 
-- Module-level functions are allowed only in `core/names.py`, `core/atomic.py`, `ui/strings.py`, `main` in `ui/app.py` and `cli/main.py`, and `main`/`_port_number` in `__main__.py`.
+- Module-level functions fail; the gate lists the remaining free functions as migration debt, and that list may only shrink.
 - Views must not define `_banner`, `_status_label`, `_panel`, or `_card`; shared helpers live in `ui/components/`.
 - `AppState` may declare at most 10 annotated fields.
 - `AppState` exposes at most 10 public names, counted as public annotated fields plus public commands.
 - Any one domain controller may define at most 25 public commands.
 - A class that declares state fields must define at least one public command.
 
-Adding a free function, a duplicate view helper, or an `AppState` field requires an approved change and an update to the gate.
+Adding a duplicate view helper or an `AppState` field requires an approved change and an update to the gate. A free function is never added.
 
 ### 4.3 Python style, type checking, errors, and logging
 

@@ -1,20 +1,13 @@
 """Architecture tests for layering, imports, and object ownership.
 
 The ownership gate enforces the end state described in ``AGENTS.md`` section
-4.2. During ``refactor-object-ownership`` the gate carries a temporary
-allowlist; each phase removes its entries until only the final entries remain:
+4.2: every behavior is a method on an owning class. The remaining module-level
+functions are migration debt and are listed by name; the list may only shrink.
+The callback exception covers the ``main`` entry points and the ``argparse``
+type ``_port_number``.
 
-- ``core/names.py`` (name and filename policy)
-- ``core/atomic.py`` (the atomic write primitive)
-- ``ui/strings.py`` (user-facing copy)
-- the ``main`` callbacks in ``ui/app.py`` and ``__main__.py`` plus the
-  ``argparse`` callback ``_port_number``
-
-The migration order is policy and gate, leaf value objects, vault ownership,
-page and draft unions, query services, shared UI components, the ``AppState``
-facade split, remaining public functions, then final verification. Do not add a
-temporary entry without an approved change, and delete each entry when its
-phase passes.
+Do not add a free function. Delete an allowlist entry when its module gains an
+owning class.
 """
 
 import ast
@@ -30,11 +23,29 @@ CLI_ROOT = SOURCE_ROOT / "cli"
 UI_ROOT = SOURCE_ROOT / "ui"
 VIEW_ROOT = UI_ROOT / "views"
 
-# Final state: ``None`` allows every module-level function in that file.
+# Migration debt: each entry is an existing free function, not a permission for
+# new ones. The list may only shrink as modules gain an owning class.
 FINAL_FUNCTION_ALLOWLIST: dict[str, frozenset[str] | None] = {
-    "core/names.py": None,
-    "core/atomic.py": None,
-    "ui/strings.py": None,
+    "core/names.py": frozenset(
+        {
+            "normalize_name",
+            "safe_filename",
+            "unique_name",
+            "_avoid_reserved_device_name",
+            "_truncate_to_utf8_bytes",
+        }
+    ),
+    "core/atomic.py": frozenset({"write_text_exclusive", "write_text_atomic"}),
+    "ui/strings.py": frozenset(
+        {
+            "log_entry_count",
+            "log_day_tooltip",
+            "reference_count",
+            "note_count",
+            "open_step_count",
+            "review_pending",
+        }
+    ),
     "ui/app.py": frozenset({"main"}),
     "cli/main.py": frozenset({"main"}),
     "__main__.py": frozenset({"main", "_port_number"}),
@@ -404,14 +415,15 @@ class TestObjectOwnership:
         assert frozenset() == TEMPORARY_FIELD_BUDGET_ALLOWLIST
 
     def test_final_allowlist_is_exact(self) -> None:
-        assert {
-            "core/names.py": None,
-            "core/atomic.py": None,
-            "ui/strings.py": None,
-            "ui/app.py": frozenset({"main"}),
-            "cli/main.py": frozenset({"main"}),
-            "__main__.py": frozenset({"main", "_port_number"}),
-        } == FINAL_FUNCTION_ALLOWLIST
+        assert set(FINAL_FUNCTION_ALLOWLIST) == {
+            "core/names.py",
+            "core/atomic.py",
+            "ui/strings.py",
+            "ui/app.py",
+            "cli/main.py",
+            "__main__.py",
+        }
+        assert all(value is not None for value in FINAL_FUNCTION_ALLOWLIST.values())
 
     def test_module_functions_are_owned(self) -> None:
         offenders: list[str] = []
