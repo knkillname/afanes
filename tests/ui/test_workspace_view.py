@@ -769,6 +769,37 @@ class TestCapturePlacement:
         assert _find_control(view.browser_region, "browser-divider") is not None
         assert view.search_field not in view.capture_section.controls
 
+    def test_the_composer_accepts_programmatic_focus(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _write_note(tmp_path / "vault" / "inbox" / "One.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        assert view.capture_field.shift_enter is False
+
+    def test_new_capture_flushes_the_section_before_focusing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_note(tmp_path / "vault" / "inbox" / "One.md")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        calls: list[str] = []
+        view = afanes.ui.views.workspace.WorkspaceView(
+            lambda: calls.append("update"),
+            _change_vault,
+            _create_vault,
+            _close_vault,
+        )
+
+        async def focus(_field: ft.TextField) -> None:
+            calls.append("focus")
+
+        monkeypatch.setattr(ft.TextField, "focus", focus)
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.PROJECTS])())
+        calls.clear()
+
+        asyncio.run(_handler(view.new_capture_button)())
+
+        assert calls.index("update") < calls.index("focus")
+
     def test_new_capture_switches_to_inbox_and_focuses(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _write_note(vault / "inbox" / "One.md")

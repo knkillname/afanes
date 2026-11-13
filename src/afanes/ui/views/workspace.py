@@ -203,12 +203,14 @@ class WorkspaceView:
             on_click=self._new_capture,
             key="workspace-new-capture",
         )
+        # Flet 1.1.2 ignores a focus request on a field built with
+        # shift_enter=True, so the composer keeps Enter for new lines and the
+        # Capture button submits.
         self.capture_field = ft.TextField(
             hint_text=afanes.ui.strings.COMPOSER_HINT,
             multiline=True,
             min_lines=1,
             max_lines=4,
-            shift_enter=True,
             expand=True,
             on_submit=self._capture,
             key="workspace-capture-field",
@@ -631,8 +633,8 @@ class WorkspaceView:
         """Switch to the Inbox and focus the capture composer."""
         await self._state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.INBOX)
         self._refresh_dynamic()
-        await self._focus_capture()
         self._update()
+        await self._focus_capture()
 
     async def _new_capture(self) -> None:
         """Run the New Capture command from the toolbar."""
