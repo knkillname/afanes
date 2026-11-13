@@ -389,7 +389,7 @@ class WorkspaceView:
         )
         self.shell_row = ft.Row(
             controls=[],
-            spacing=afanes.ui.theme.SECTION_GAP,
+            spacing=afanes.ui.theme.WORKSPACE_BODY_GAP,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
             expand=True,
         )
@@ -447,10 +447,13 @@ class WorkspaceView:
         self.nav_toggle.visible = not wide
         self.drawer_close_button.visible = not wide
         if wide:
-            self.navigation.border = None
-            self.navigation.border_radius = None
+            self.navigation.border = ft.Border.all(
+                afanes.ui.theme.BORDER_WIDTH,
+                afanes.ui.theme.BORDER_COLOR,
+            )
+            self.navigation.border_radius = afanes.ui.theme.SURFACE_RADIUS
             self.navigation.shadow = None
-            self.navigation.padding = None
+            self.navigation.padding = afanes.ui.theme.NAVIGATION_PADDING
             self.navigation.left = None
             self.navigation.top = None
             self.navigation.bottom = None

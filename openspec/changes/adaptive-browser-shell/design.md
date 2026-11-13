@@ -168,8 +168,9 @@ its own spec and state command; it is better as a later guided-review change.
 
 Navigation uses the sidebar surface, the browser uses the window surface, and the detail uses the
 note-view surface. The four reference roles stay unchanged; the browser does not add a fifth role.
-The navigation is flush chrome rather than a rounded card, the browser is flush, and the detail
-keeps its card border and radius. The three headers share one height token.
+The navigation is a bordered panel with the surface radius, structural in the wide layout and
+elevated with a shadow as a drawer. The browser is flush, and the detail keeps its card border and
+radius. The three headers share one height token.
 
 ### 9. Widths and content bounds
 
@@ -177,7 +178,7 @@ Add tokens for the navigation width, browser minimum and maximum, detail minimum
 maximum reading width. Proposed values:
 
 ```text
-NAVIGATION_WIDTH   220
+NAVIGATION_WIDTH   240
 BROWSER_MIN_WIDTH  320
 BROWSER_MAX_WIDTH  360
 PAGE_MIN_WIDTH     420

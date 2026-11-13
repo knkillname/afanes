@@ -232,8 +232,9 @@ class TestWorkspaceShell:
         border = ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR)
 
         assert view.navigation.bgcolor == afanes.ui.theme.REGION_SURFACE_COLOR
-        assert view.navigation.border is None
-        assert view.navigation.border_radius is None
+        assert view.navigation.border == border
+        assert view.navigation.border_radius == afanes.ui.theme.SURFACE_RADIUS
+        assert view.navigation.padding == afanes.ui.theme.NAVIGATION_PADDING
         assert view.browser_region.bgcolor == afanes.ui.theme.PAGE_SURFACE_COLOR
         assert view.browser_region.border is None
         assert isinstance(view.page_view.root, ft.Container)
@@ -886,10 +887,10 @@ class TestAdaptiveLayout:
         assert view.shell_row.controls == [view.navigation, view.browser_region, view.detail_region]
         assert view.nav_toggle.visible is False
         assert view.drawer_close_button.visible is False
-        assert view.navigation.border is None
-        assert view.navigation.border_radius is None
+        assert view.navigation.border is not None
+        assert view.navigation.border_radius == afanes.ui.theme.SURFACE_RADIUS
         assert view.navigation.shadow is None
-        assert view.navigation.padding is None
+        assert view.navigation.padding == afanes.ui.theme.NAVIGATION_PADDING
         assert view.navigation.left is None
         assert view.navigation.width == afanes.ui.theme.NAVIGATION_WIDTH
 

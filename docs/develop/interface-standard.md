@@ -73,7 +73,7 @@ guidelines. The workspace divides the window into three regions with bounded wid
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `NAVIGATION_WIDTH` | 220 | Destinations, counts, vault identity, primary menu |
+| `NAVIGATION_WIDTH` | 240 | Destinations, counts, vault identity, primary menu |
 | `DRAWER_WIDTH` | 280 | Transient navigation drawer at medium widths |
 | `BROWSER_MIN_WIDTH` | 320 | Smallest usable browser column |
 | `BROWSER_MAX_WIDTH` | 360 | Browser column ceiling |
@@ -104,7 +104,8 @@ search entry, refresh, and the destination's actions. The detail toolbar holds B
 flow title, at most one suggested action, and a secondary menu.
 
 The primary menu sits above the navigation list, as required when a window has a sidebar. The
-navigation is flush chrome, not a rounded card. The browser is flush with the window surface. The
+navigation is a bordered panel with the reference surface radius: structural in the wide layout, and
+elevated with a shadow when it becomes a drawer. The browser is flush with the window surface. The
 detail keeps the note-view surface and its card boundary.
 
 A third-party desktop window supplies its own decorations. The application cannot draw controls
