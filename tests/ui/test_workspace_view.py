@@ -442,9 +442,7 @@ class TestFrozenControlRecovery:
 
 
 class TestCaptureBar:
-    def test_capture_action_tracks_the_composer(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_capture_action_tracks_the_composer(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         versioned(vault)
         view = _open_workspace(tmp_path, monkeypatch)

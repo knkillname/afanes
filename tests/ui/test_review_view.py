@@ -17,6 +17,7 @@ from afanes.core.frontmatter import NoteDocument
 from afanes.core.steps import StepDocument
 from afanes.models.note import Status
 from tests.support import ensure_vault, versioned
+from tests.ui.control_tree import emphasis_controls
 
 TODAY = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
@@ -253,6 +254,33 @@ class TestDueStepCard:
 
         assert afanes.ui.strings.REVIEW_INVALID_DATE in _texts(view.root)
 
+    def test_postpone_action_waits_for_a_valid_date(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._due_step(tmp_path, monkeypatch)
+        view = afanes.ui.views.review.ReviewView(_noop)
+        asyncio.run(_handler(_find_by_key(view.root, "review-postpone"))())
+        submit = _find_by_key(view.root, "review-form-submit")
+        field = _find_by_key(view.root, "review-form-field")
+        assert isinstance(submit, ft.FilledButton)
+        assert isinstance(field, ft.TextField)
+        assert submit.disabled is True
+        field.value = "soon"
+        asyncio.run(_change_handler(field)())
+        assert submit.disabled is True
+        field.value = "2026-12-01"
+        asyncio.run(_change_handler(field)())
+        assert submit.disabled is False
+
+    def test_the_open_form_is_the_only_suggested_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._due_step(tmp_path, monkeypatch)
+        view = afanes.ui.views.review.ReviewView(_noop)
+
+        asyncio.run(_handler(_find_by_key(view.root, "review-postpone"))())
+
+        submit = _find_by_key(view.root, "review-form-submit")
+        assert emphasis_controls(view.root) == [submit]
+        asyncio.run(_handler(_find_by_key(view.root, "review-form-cancel"))())
+        assert emphasis_controls(view.root) == [_find_by_key(view.root, "review-do-now")]
+
     def test_delegate_adds_an_owner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._due_step(tmp_path, monkeypatch)
         view = afanes.ui.views.review.ReviewView(_noop)
@@ -438,6 +466,35 @@ class TestStalledProject:
 
         assert afanes.ui.strings.REVIEW_TITLE_REQUIRED in _texts(view.root)
         assert (tmp_path / "vault" / "projects" / "Launch.md").read_bytes() == before
+
+    def test_add_step_action_tracks_the_text(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._stalled(tmp_path, monkeypatch)
+        view = afanes.ui.views.review.ReviewView(_noop)
+        asyncio.run(_handler(_find_by_key(view.root, "review-create"))())
+        submit = _find_by_key(view.root, "review-form-submit")
+        field = _find_by_key(view.root, "review-form-field")
+        assert isinstance(submit, ft.FilledButton)
+        assert isinstance(field, ft.TextField)
+        assert submit.disabled is True
+        field.value = "Call the plumber"
+        asyncio.run(_change_handler(field)())
+        assert submit.disabled is False
+        field.value = "   "
+        asyncio.run(_change_handler(field)())
+        assert submit.disabled is True
+
+    def test_the_open_add_step_form_is_the_only_suggested_action(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._stalled(tmp_path, monkeypatch)
+        view = afanes.ui.views.review.ReviewView(_noop)
+
+        asyncio.run(_handler(_find_by_key(view.root, "review-create"))())
+
+        submit = _find_by_key(view.root, "review-form-submit")
+        assert emphasis_controls(view.root) == [submit]
+        asyncio.run(_handler(_find_by_key(view.root, "review-form-cancel"))())
+        assert emphasis_controls(view.root) == [_find_by_key(view.root, "review-next")]
 
     def test_cancel_add_changes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._stalled(tmp_path, monkeypatch)

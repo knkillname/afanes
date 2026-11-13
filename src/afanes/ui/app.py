@@ -157,6 +157,16 @@ class _Shell:
         if self.workspace is not None:
             self.workspace.refresh()
 
+    @staticmethod
+    def _has_text(value: str | None) -> bool:
+        """Return whether a field holds non-blank text."""
+        return bool((value or "").strip())
+
+    def _refresh_dialog_submit(self, field: ft.TextField, button: ft.FilledButton) -> None:
+        """Enable a dialog action when its field has text."""
+        button.disabled = not self._has_text(field.value)
+        self.page.update()
+
     def _viewport_width(self) -> int:
         """Return the current viewport width in logical pixels.
 
@@ -491,6 +501,11 @@ class _Shell:
             expand=True,
             key="create-vault-path",
         )
+        submit_button = ft.FilledButton(
+            content=afanes.ui.strings.NEW_VAULT_CREATE,
+            disabled=True,
+            key="create-vault-submit",
+        )
 
         async def browse() -> None:
             if self.picker is None:
@@ -499,7 +514,7 @@ class _Shell:
             if selected is None:
                 return
             field.value = selected
-            self.page.update()
+            self._refresh_dialog_submit(field, submit_button)
 
         browse_button = ft.TextButton(
             content=afanes.ui.strings.NEW_VAULT_BROWSE,
@@ -574,6 +589,8 @@ class _Shell:
             self.page.pop_dialog()
             self.page.update()
 
+        submit_button.on_click = submit
+        field.on_change = lambda: self._refresh_dialog_submit(field, submit_button)
         field.on_submit = submit
         self.page.show_dialog(
             ft.AlertDialog(
@@ -599,11 +616,7 @@ class _Shell:
                         on_click=cancel,
                         key="create-vault-cancel",
                     ),
-                    ft.FilledButton(
-                        content=afanes.ui.strings.NEW_VAULT_CREATE,
-                        on_click=submit,
-                        key="create-vault-submit",
-                    ),
+                    submit_button,
                 ],
             ),
         )
@@ -636,6 +649,11 @@ class _Shell:
             autofocus=True,
             key="new-reference-name",
         )
+        submit_button = ft.FilledButton(
+            content=afanes.ui.strings.BROWSER_CREATE_ACTION,
+            disabled=True,
+            key="new-reference-submit",
+        )
         error = ft.Text(
             "",
             color=afanes.ui.theme.ERROR_TEXT_COLOR,
@@ -662,6 +680,8 @@ class _Shell:
             self.page.pop_dialog()
             self.page.update()
 
+        submit_button.on_click = submit
+        name_field.on_change = lambda: self._refresh_dialog_submit(name_field, submit_button)
         name_field.on_submit = submit
         self.page.show_dialog(
             ft.AlertDialog(
@@ -683,11 +703,7 @@ class _Shell:
                         on_click=cancel,
                         key="new-reference-cancel",
                     ),
-                    ft.FilledButton(
-                        content=afanes.ui.strings.BROWSER_CREATE_ACTION,
-                        on_click=submit,
-                        key="new-reference-submit",
-                    ),
+                    submit_button,
                 ],
             ),
         )

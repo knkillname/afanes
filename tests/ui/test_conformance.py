@@ -205,11 +205,7 @@ def _key_of(node: ast.AST) -> str | None:
     if not isinstance(node, ast.Call):
         return None
     for keyword in node.keywords:
-        if (
-            keyword.arg == "key"
-            and isinstance(keyword.value, ast.Constant)
-            and isinstance(keyword.value.value, str)
-        ):
+        if keyword.arg == "key" and isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
             return keyword.value.value
     return None
 
@@ -218,41 +214,52 @@ def _is_icon_and_label(node: ast.AST) -> bool:
     return _has_icon_and_label(node) and _key_of(node) not in HEADER_ACTION_KEYS
 
 
-def _header_action_keys(root: Path) -> set[str]:
+def _assigned_calls(tree: ast.Module) -> dict[str, ast.Call]:
+    assigned: dict[str, ast.Call] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        if not (
+            isinstance(target, ast.Attribute)
+            and isinstance(target.value, ast.Name)
+            and target.value.id == "self"
+            and isinstance(node.value, ast.Call)
+        ):
+            continue
+        assigned[target.attr] = node.value
+    return assigned
+
+
+def _module_header_action_keys(tree: ast.Module) -> set[str]:
+    assigned = _assigned_calls(tree)
+    header = assigned.get("header")
+    if header is None:
+        return set()
+    controls = next((keyword.value for keyword in header.keywords if keyword.arg == "controls"), None)
+    if controls is None:
+        return set()
     keys: set[str] = set()
-    for _relative, tree in _module_trees(root):
-        assigned: dict[str, ast.Call] = {}
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Assign) or len(node.targets) != 1:
-                continue
-            target = node.targets[0]
-            if (
-                isinstance(target, ast.Attribute)
-                and isinstance(target.value, ast.Name)
-                and target.value.id == "self"
-                and isinstance(node.value, ast.Call)
-            ):
-                assigned[target.attr] = node.value
-        header = assigned.get("header")
-        if header is None:
+    for control in ast.walk(controls):
+        if not (
+            isinstance(control, ast.Attribute)
+            and isinstance(control.value, ast.Name)
+            and control.value.id == "self"
+            and control.attr in assigned
+        ):
             continue
-        controls = next((keyword.value for keyword in header.keywords if keyword.arg == "controls"), None)
-        if controls is None:
-            continue
-        for control in ast.walk(controls):
-            if not (
-                isinstance(control, ast.Attribute)
-                and isinstance(control.value, ast.Name)
-                and control.value.id == "self"
-                and control.attr in assigned
-            ):
-                continue
-            call = assigned[control.attr]
-            if not _has_icon_and_label(call):
-                continue
+        call = assigned[control.attr]
+        if _has_icon_and_label(call):
             key = _key_of(call)
             if key is not None:
                 keys.add(key)
+    return keys
+
+
+def _header_action_keys(root: Path) -> set[str]:
+    keys: set[str] = set()
+    for _relative, tree in _module_trees(root):
+        keys.update(_module_header_action_keys(tree))
     return keys
 
 

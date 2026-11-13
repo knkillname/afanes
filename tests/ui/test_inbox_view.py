@@ -98,4 +98,6 @@ class TestBrowserWelcomeView:
         highlighted = emphasis_controls(control)
 
         assert len(highlighted) == 1
-        assert highlighted[0].content == afanes.ui.strings.WELCOME_OPEN
+        button = highlighted[0]
+        assert isinstance(button, ft.FilledButton)
+        assert button.content == afanes.ui.strings.WELCOME_OPEN

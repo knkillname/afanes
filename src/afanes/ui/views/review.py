@@ -47,6 +47,7 @@ class ReviewView:
         self._form_mode: str | None = None
         self._typed = ""
         self._form_error: str | None = None
+        self._form_submit: ft.FilledButton | None = None
         self._confirmation: str | None = None
         self.root = ft.Column(
             controls=[],
@@ -201,7 +202,9 @@ class ReviewView:
                 )
             )
         controls.append(self._form_controls())
-        controls.append(self._step_actions(due=due))
+        actions = self._step_actions(due=due)
+        actions.visible = self._form_mode is None and self._confirmation is None
+        controls.append(actions)
         return Card(ft.Column(controls=controls, spacing=afanes.ui.theme.ITEM_GAP)).build()
 
     def _step_actions(self, *, due: bool) -> ft.Control:
@@ -276,58 +279,59 @@ class ReviewView:
         controls.extend(self._next_step_controls(summary))
         controls.append(self._form_controls())
         controls.append(self._confirmation_controls())
+        actions_visible = self._form_mode is None and self._confirmation is None
         if summary.next_step is None:
-            controls.append(
-                ft.Row(
-                    controls=[
-                        ft.OutlinedButton(
-                            content=afanes.ui.strings.REVIEW_CREATE_STEP,
-                            icon=ft.Icons.ADD_OUTLINED,
-                            on_click=self._open_add_step,
-                            key="review-create",
-                        ),
-                        ft.OutlinedButton(
-                            content=afanes.ui.strings.REVIEW_MARK_DONE,
-                            icon=ft.Icons.CHECK_OUTLINED,
-                            on_click=self._confirm_done,
-                            key="review-mark-done",
-                        ),
-                        ft.OutlinedButton(
-                            content=afanes.ui.strings.REVIEW_DEFER,
-                            icon=ft.Icons.SCHEDULE_OUTLINED,
-                            on_click=self._confirm_defer,
-                            key="review-defer",
-                        ),
-                    ],
-                    spacing=afanes.ui.theme.ITEM_GAP,
-                    wrap=True,
-                )
-            )
-        controls.append(
-            ft.Row(
+            stalled = ft.Row(
                 controls=[
-                    ft.TextButton(
-                        content=afanes.ui.strings.REVIEW_OPEN_PROJECT,
-                        icon=ft.Icons.OPEN_IN_NEW_OUTLINED,
-                        on_click=self._open_project,
-                        key="review-open-project",
+                    ft.OutlinedButton(
+                        content=afanes.ui.strings.REVIEW_CREATE_STEP,
+                        icon=ft.Icons.ADD_OUTLINED,
+                        on_click=self._open_add_step,
+                        key="review-create",
                     ),
-                    ft.FilledButton(
-                        content=afanes.ui.strings.REVIEW_NEXT,
-                        icon=ft.Icons.ARROW_FORWARD_OUTLINED,
-                        on_click=self._next,
-                        key="review-next",
+                    ft.OutlinedButton(
+                        content=afanes.ui.strings.REVIEW_MARK_DONE,
+                        icon=ft.Icons.CHECK_OUTLINED,
+                        on_click=self._confirm_done,
+                        key="review-mark-done",
                     ),
-                    ft.TextButton(
-                        content=afanes.ui.strings.REVIEW_SKIP,
-                        on_click=self._skip,
-                        key="review-skip",
+                    ft.OutlinedButton(
+                        content=afanes.ui.strings.REVIEW_DEFER,
+                        icon=ft.Icons.SCHEDULE_OUTLINED,
+                        on_click=self._confirm_defer,
+                        key="review-defer",
                     ),
                 ],
                 spacing=afanes.ui.theme.ITEM_GAP,
                 wrap=True,
+                visible=actions_visible,
             )
+            controls.append(stalled)
+        next_row = ft.Row(
+            controls=[
+                ft.TextButton(
+                    content=afanes.ui.strings.REVIEW_OPEN_PROJECT,
+                    icon=ft.Icons.OPEN_IN_NEW_OUTLINED,
+                    on_click=self._open_project,
+                    key="review-open-project",
+                ),
+                ft.FilledButton(
+                    content=afanes.ui.strings.REVIEW_NEXT,
+                    icon=ft.Icons.ARROW_FORWARD_OUTLINED,
+                    on_click=self._next,
+                    key="review-next",
+                ),
+                ft.TextButton(
+                    content=afanes.ui.strings.REVIEW_SKIP,
+                    on_click=self._skip,
+                    key="review-skip",
+                ),
+            ],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            wrap=True,
+            visible=actions_visible,
         )
+        controls.append(next_row)
         return Card(ft.Column(controls=controls, spacing=afanes.ui.theme.ITEM_GAP)).build()
 
     def _next_step_controls(self, summary: ProjectSummary) -> list[ft.Control]:
@@ -388,18 +392,20 @@ class ReviewView:
             on_change=self._change_typed,
             key="review-form-field",
         )
+        self._form_submit = ft.FilledButton(
+            content=afanes.ui.strings.REVIEW_CONFIRM,
+            icon=ft.Icons.CHECK_OUTLINED,
+            on_click=self._submit_form,
+            disabled=not self._form_value_valid(),
+            key="review-form-submit",
+        )
         return ft.Column(
             controls=[
                 field,
                 error,
                 ft.Row(
                     controls=[
-                        ft.FilledButton(
-                            content=afanes.ui.strings.REVIEW_CONFIRM,
-                            icon=ft.Icons.CHECK_OUTLINED,
-                            on_click=self._submit_form,
-                            key="review-form-submit",
-                        ),
+                        self._form_submit,
                         ft.TextButton(
                             content=afanes.ui.strings.REVIEW_CANCEL,
                             on_click=self._cancel_form,
@@ -412,6 +418,18 @@ class ReviewView:
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
         )
+
+    def _form_value_valid(self) -> bool:
+        """Return whether the typed form value can be submitted."""
+        value = (self._typed or "").strip()
+        if not value:
+            return False
+        if self._form_mode == "postpone":
+            try:
+                datetime.date.fromisoformat(value)
+            except ValueError:
+                return False
+        return True
 
     def _form_label(self) -> str:
         """Return the label for the active inline form."""
@@ -550,6 +568,9 @@ class ReviewView:
             None,
         )
         self._typed = "" if field is None else field.value or ""
+        if self._form_submit is not None:
+            self._form_submit.disabled = not self._form_value_valid()
+            self._update()
 
     async def _submit_form(self) -> None:
         """Submit the active inline form."""
@@ -634,6 +655,7 @@ class ReviewView:
         self._form_mode = None
         self._typed = ""
         self._form_error = None
+        self._form_submit = None
         self._confirmation = None
 
     @staticmethod

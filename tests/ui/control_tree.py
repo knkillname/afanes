@@ -37,8 +37,7 @@ def visible_controls(root: ft.Control) -> list[ft.Control]:
         visible = parent_visible and getattr(control, "visible", True) is not False
         if visible:
             result.append(control)
-        for child in _children(control):
-            stack.append((child, visible))
+        stack.extend((child, visible) for child in _children(control))
     return result
 
 

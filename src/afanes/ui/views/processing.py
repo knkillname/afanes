@@ -399,8 +399,8 @@ class ProcessingView:
                     datetime.date.fromisoformat(due_text)
                 except ValueError:
                     return False
-        if outcome is ProcessingOutcome.APPEND_STEP and not (self.project.value or "").strip():
-            return False
+        if outcome is ProcessingOutcome.APPEND_STEP:
+            return bool((self.project.value or "").strip())
         return True
 
     async def _preview(self) -> None:

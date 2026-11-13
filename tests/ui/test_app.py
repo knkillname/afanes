@@ -90,9 +90,14 @@ def _reset_state() -> None:
     afanes.ui.state.app_state.reset()
 
 
-def _welcome_button(control: ft.Control, key: str = "welcome-choose") -> ft.FilledButton:
+def _welcome_button(
+    control: ft.Control,
+    key: str = "welcome-choose",
+) -> ft.FilledButton | ft.OutlinedButton:
     assert isinstance(control, ft.Container)
-    return _typed(_find_by_key(control, key), ft.FilledButton)
+    found = _find_by_key(control, key)
+    assert isinstance(found, ft.FilledButton | ft.OutlinedButton)
+    return found
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
@@ -710,10 +715,17 @@ class TestRefreshLoop:
 async def _submit_creation(page: FakePage, path_text: Path | None = None) -> None:
     dialog = page.dialogs[-1]
     if path_text is not None:
-        field = _typed(_find_by_key(dialog, "create-vault-path"), ft.TextField)
-        field.value = str(path_text)
+        _set_creation_path(page, str(path_text))
     submit = _typed(_find_by_key(dialog, "create-vault-submit"), ft.FilledButton)
     await typing.cast("Handler", submit.on_click)()
+
+
+def _set_creation_path(page: FakePage, value: str) -> None:
+    field = _typed(_find_by_key(page.dialogs[-1], "create-vault-path"), ft.TextField)
+    field.value = value
+    handler = field.on_change
+    assert handler is not None
+    typing.cast("typing.Any", handler)()
 
 
 async def _browse_creation(page: FakePage) -> None:
@@ -738,12 +750,19 @@ async def _open_reference_dialog(page: FakePage) -> None:
 
 async def _submit_reference(page: FakePage, name: str, template: str = "empty") -> None:
     dialog = page.dialogs[-1]
-    name_field = _typed(_find_by_key(dialog, "new-reference-name"), ft.TextField)
-    name_field.value = name
+    _set_reference_name(page, name)
     selector = _typed(_find_by_key(dialog, "new-reference-template"), ft.Dropdown)
     selector.value = template
     submit = _typed(_find_by_key(dialog, "new-reference-submit"), ft.FilledButton)
     await typing.cast("Handler", submit.on_click)()
+
+
+def _set_reference_name(page: FakePage, value: str) -> None:
+    field = _typed(_find_by_key(page.dialogs[-1], "new-reference-name"), ft.TextField)
+    field.value = value
+    handler = field.on_change
+    assert handler is not None
+    typing.cast("typing.Any", handler)()
 
 
 class TestCreation:
@@ -788,6 +807,27 @@ class TestCreation:
         assert [option.key for option in selector.options] == ["", "personal", "work", "study"]
         field = _typed(_find_by_key(page.dialogs[0], "create-vault-path"), ft.TextField)
         assert field.value == ""
+
+    def test_create_vault_action_is_insensitive_until_a_path_is_entered(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        page = FakePage()
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+            submit = _typed(_find_by_key(page.dialogs[-1], "create-vault-submit"), ft.FilledButton)
+            assert submit.disabled is True
+            _set_creation_path(page, str(tmp_path / "vault"))
+            assert submit.disabled is False
+            _set_creation_path(page, "   ")
+            assert submit.disabled is True
+
+        asyncio.run(scenario())
 
     def test_desktop_creation_browse_fills_the_path(
         self,
@@ -1242,6 +1282,23 @@ class TestBrowserReferenceCreation:
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
         return FakePage(), vault
+
+    def test_create_is_insensitive_until_a_name_is_entered(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        page, _vault = self._open_vault(tmp_path, monkeypatch)
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await _open_reference_dialog(page)
+            submit = _typed(_find_by_key(page.dialogs[-1], "new-reference-submit"), ft.FilledButton)
+            assert submit.disabled is True
+            _set_reference_name(page, "Priya Nair")
+            assert submit.disabled is False
+            _set_reference_name(page, "   ")
+            assert submit.disabled is True
+
+        asyncio.run(scenario())
 
     def test_creates_a_card_reference_and_opens_edit_mode(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -56,12 +56,12 @@ def _typed_note(note_type: str, body: str, *, category: str | None = None, extra
     return "\n".join(lines)
 
 
-def _action_labels(panel: ft.Control) -> list[str]:
+def _action_labels(panel: ft.Container) -> list[str]:
     content = panel.content
     assert isinstance(content, ft.Column)
     row = content.controls[-1]
     assert isinstance(row, ft.Row)
-    return [str(control.content) for control in row.controls]
+    return [str(getattr(control, "content", "")) for control in row.controls]
 
 
 class TestReadMode:
@@ -2119,10 +2119,6 @@ class TestRenameAvailability:
 class TestToolbarActions:
     def test_the_toolbar_actions_match_the_gate_allowlist(self) -> None:
         view = PageView(lambda: None)
-        keys = {
-            control.key
-            for control in view.header.controls
-            if getattr(control, "key", None) in HEADER_ACTION_KEYS
-        }
+        keys = {control.key for control in view.header.controls if getattr(control, "key", None) in HEADER_ACTION_KEYS}
 
         assert keys == HEADER_ACTION_KEYS
