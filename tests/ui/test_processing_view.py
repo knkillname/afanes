@@ -106,14 +106,15 @@ class TestProcessingView:
             "later",
             "trash",
         ]
+        labels = afanes.ui.strings.PROCESSING_OUTCOME_LABELS
         assert [option.text for option in view.outcome.options] == [
-            "Project",
-            "Done now",
-            "Append step",
-            "Reference",
-            "Log entry",
-            "Later",
-            "Trash",
+            labels["project"],
+            labels["done_now"],
+            labels["append_step"],
+            labels["reference"],
+            labels["log"],
+            labels["later"],
+            labels["trash"],
         ]
         assert view.plan_panel.visible is False
         assert view.success_panel.visible is False
@@ -566,7 +567,7 @@ class TestProcessingView:
 
         plan = afanes.ui.state.app_state.processing.plan
         assert isinstance(plan, ProcessingPlan)
-        assert "Log entry" in view.plan_details.value
+        assert afanes.ui.strings.PROCESSING_OUTCOME_LABELS["log"] in view.plan_details.value
         assert str(plan.target_path) in view.plan_destination.value
 
     def test_append_preview_shows_the_project_and_step(self, tmp_path: Path) -> None:

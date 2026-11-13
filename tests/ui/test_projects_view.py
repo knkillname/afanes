@@ -317,7 +317,7 @@ class TestProjectRows:
         details = _details(_project_buttons(view, "active")[0])
 
         assert "0 open steps" in details[-1]
-        assert "No next step" in details
+        assert afanes.ui.strings.PROJECT_NO_NEXT_STEP in details
 
     def test_next_step_renders_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -572,7 +572,7 @@ class TestProjectRefresh:
 
         details = _details(_project_buttons(view, "active")[0])
         assert "0 open steps" in details[-1]
-        assert "No next step" in details
+        assert afanes.ui.strings.PROJECT_NO_NEXT_STEP in details
 
     def test_search_filters_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

@@ -403,7 +403,7 @@ class _Shell:
             return
         if self.picker is None:
             return
-        selected = await self.picker.get_directory_path(dialog_title=afanes.ui.strings.WELCOME_CHOOSE)
+        selected = await self.picker.get_directory_path(dialog_title=afanes.ui.strings.WELCOME_PICKER_TITLE)
         if selected is None:
             return
         path = Path(selected)
@@ -511,7 +511,7 @@ class _Shell:
         async def browse() -> None:
             if self.picker is None:
                 return
-            selected = await self.picker.get_directory_path(dialog_title=afanes.ui.strings.NEW_VAULT_ACTION)
+            selected = await self.picker.get_directory_path(dialog_title=afanes.ui.strings.NEW_VAULT_PICKER_TITLE)
             if selected is None:
                 return
             field.value = selected

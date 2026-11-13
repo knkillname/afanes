@@ -4565,7 +4565,7 @@ class TestRewriteReports:
         assert "Updated: " in message
         assert "reference/people/Ada King.md" in message
         assert "notes/Ref.md" in message
-        assert "notes/Skipped.md (changed on disk after planning)" in message
+        assert f"notes/Skipped.md ({afanes.ui.strings.PAGE_REWRITE_CHANGED_ON_DISK})" in message
         assert "notes/Failed.md (permission denied)" in message
 
     def test_type_change_reports_updated_and_failed_notes(
@@ -4620,7 +4620,7 @@ class TestRewriteReports:
         assert message is not None
         assert "Updated: " in message
         assert "notes/Ref.md" in message
-        assert "notes/Skipped.md (changed on disk after planning)" in message
+        assert f"notes/Skipped.md ({afanes.ui.strings.PAGE_REWRITE_CHANGED_ON_DISK})" in message
         assert "notes/Failed.md (permission denied)" in message
         assert (vault / "log" / "2025" / "10" / "2025-10-12.md").is_file()
         assert "log:2025-10-12" in referrer.read_text(encoding="utf-8")
@@ -4678,7 +4678,7 @@ class TestRewriteReports:
         assert message is not None
         assert "Updated: " in message
         assert "notes/Ref.md" in message
-        assert "notes/Skipped.md (changed on disk after planning)" in message
+        assert f"notes/Skipped.md ({afanes.ui.strings.PAGE_REWRITE_CHANGED_ON_DISK})" in message
         assert "notes/Failed.md (permission denied)" in message
         assert (vault / "log" / "2025" / "10" / "2025-10-13.md").is_file()
         assert "log:2025-10-13" in referrer.read_text(encoding="utf-8")
@@ -4729,6 +4729,6 @@ class TestRewriteReports:
         assert message is not None
         assert "Updated: " in message
         assert "notes/Source.md" in message
-        assert "notes/Skipped.md (changed on disk after planning)" in message
+        assert f"notes/Skipped.md ({afanes.ui.strings.PAGE_REWRITE_CHANGED_ON_DISK})" in message
         assert "notes/Failed.md (permission denied)" in message
         assert source.is_file()

@@ -299,7 +299,6 @@ class TestLogEntryDialog:
         selector = _typed(_find_by_key(page.dialogs[-1], "new-log-template"), ft.Dropdown)
         empty = selector.options[-1]
         assert empty.text == afanes.ui.strings.LOG_CARD_EMPTY
-        assert "starter body" in (empty.text or "")
         assert "category" not in (empty.text or "").casefold()
         description = _typed(_find_by_key(page.dialogs[-1], "new-log-template-description"), ft.Text)
         assert description.value == afanes.ui.strings.LOG_CARD_DESCRIPTION_EMPTY

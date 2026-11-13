@@ -118,6 +118,8 @@ target-version = "py313"
 
 [tool.ruff.lint]
 extend-select = ["ANN", "C90", "D", "S"]
+# The interface writing style requires the typographic apostrophe.
+allowed-confusables = ["’"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"

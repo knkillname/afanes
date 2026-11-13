@@ -3,6 +3,7 @@
 import typing
 from pathlib import Path
 
+import afanes.ui.strings
 from afanes.core.template_cards import TemplateCard, TemplateCardCatalog, TemplateCardIssue
 from afanes.models.note import NoteType
 from afanes.ui.components.template_cards import TemplateCardContext, TemplateCardPicker
@@ -60,9 +61,11 @@ class TestTemplateCardPickerOptions:
 
         texts = [option.text for option in picker.dropdown.options]
         assert texts == [
-            "Person - A contact. (person/a.md)",
-            "Person (vendor/person.md)",
-            "Empty - general category, no starter body",
+            afanes.ui.strings.BROWSER_TEMPLATE_OPTION_DUPLICATE.format(
+                title="Person", description="A contact.", path="person/a.md"
+            ),
+            afanes.ui.strings.BROWSER_TEMPLATE_OPTION_DUPLICATE_PLAIN.format(title="Person", path="vendor/person.md"),
+            afanes.ui.strings.BROWSER_TEMPLATE_EMPTY,
         ]
 
     def test_derives_control_keys_from_the_prefix(self) -> None:
@@ -110,7 +113,7 @@ class TestTemplateCardPickerCopy:
         picker = _picker()
         picker.refresh([_card("person.md", title="Person", description="A contact.")])
 
-        assert picker.description.value == "Empty creates a reference in the general category with no starter body."
+        assert picker.description.value == afanes.ui.strings.BROWSER_TEMPLATE_DESCRIPTION_EMPTY
 
     def test_shows_the_no_description_text_for_a_plain_card(self) -> None:
         picker = _picker()
@@ -119,7 +122,7 @@ class TestTemplateCardPickerCopy:
         picker.dropdown.value = "card:plain.md"
         typing.cast("typing.Any", picker.dropdown.on_select)()
 
-        assert picker.description.value == "No description."
+        assert picker.description.value == afanes.ui.strings.BROWSER_TEMPLATE_NO_DESCRIPTION
 
     def test_log_context_describes_a_log_entry_without_a_category(self) -> None:
         picker = _picker(TemplateCardContext.LOG)
@@ -127,9 +130,9 @@ class TestTemplateCardPickerCopy:
 
         empty = picker.dropdown.options[-1]
 
-        assert empty.text == "Empty - no starter body"
+        assert empty.text == afanes.ui.strings.LOG_CARD_EMPTY
         assert "category" not in empty.text.casefold()
-        assert picker.description.value == "No starter body."
+        assert picker.description.value == afanes.ui.strings.LOG_CARD_DESCRIPTION_EMPTY
         assert "category" not in picker.description.value.casefold()
 
     def test_calls_the_change_callback_after_a_selection(self) -> None:
@@ -151,7 +154,7 @@ class TestTemplateCardPickerWarnings:
         picker.refresh([], [issue])
 
         assert picker.warning.visible
-        assert picker.warning.value == "Some template cards could not be read and will be skipped: broken.md"
+        assert picker.warning.value == afanes.ui.strings.BROWSER_TEMPLATE_INVALID.format(paths="broken.md")
 
     def test_hides_the_warning_when_the_listing_is_clean(self) -> None:
         picker = _picker()
@@ -168,4 +171,4 @@ class TestTemplateCardPickerWarnings:
         picker.refresh([], [TemplateCardIssue(relative_path=Path("broken.md"), message="cannot be read")])
 
         assert picker.warning.visible
-        assert picker.warning.value == "Some template cards could not be read and will be skipped: broken.md"
+        assert picker.warning.value == afanes.ui.strings.BROWSER_TEMPLATE_INVALID.format(paths="broken.md")

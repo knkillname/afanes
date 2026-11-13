@@ -2074,7 +2074,7 @@ class TestConfirmationOrder:
 
         assert _action_labels(view.rename_panel) == [
             afanes.ui.strings.PAGE_CANCEL,
-            afanes.ui.strings.PAGE_RENAME,
+            afanes.ui.strings.PAGE_RENAME_PREVIEW_ACTION,
             afanes.ui.strings.PAGE_RENAME_CONFIRM,
         ]
 

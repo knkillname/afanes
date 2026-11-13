@@ -355,7 +355,7 @@ class TestWorkspaceShell:
         assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.PROJECTS].value == "1"
         assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.REFERENCES].value == "1"
         assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION].value == "0"
-        assert "3 pending" in view.review_count.value
+        assert afanes.ui.strings.REVIEW_PENDING_MANY.format(count=3) in view.review_count.value
 
     def test_capture_appears_only_under_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

@@ -519,7 +519,7 @@ class PageView:
         )
         self.rename_preview_text = ft.Text("", selectable=True)
         self.rename_preview_button = ft.OutlinedButton(
-            content=afanes.ui.strings.PAGE_RENAME,
+            content=afanes.ui.strings.PAGE_RENAME_PREVIEW_ACTION,
             on_click=self.preview_rename,
             disabled=True,
         )
