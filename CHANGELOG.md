@@ -7,8 +7,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-12
+
 ### Added
 
+- **Strict Adwaita interface standard.** The interface now uses the libadwaita 1.8.0 palette, four
+  surface roles, the neutral navigation-sidebar selection, and the GNOME standard type scale
+  (`title-1` through `caption-heading`). Interface icons use outlined symbolic-style glyphs, the
+  minimum window fits 1024x600, and `tests/ui/test_conformance.py` enforces the palette, surface,
+  text-role, icon, and per-view action rules with a baseline that may only shrink. This implements
+  the `establish-interface-standard` OpenSpec change. No runtime dependency or public API change.
+  README: no change required. Docs: the interface standard page, workspace guide, and screenshots
+  were updated.
 - **Project roles and metadata name references.** A project may declare one optional `owner`, shown before `Asked
   by` and backed by a real note name. The owner, requester, and step owners now resolve through the `note:` catalog:
   renaming a note rewrites each matching value, moving it to trash leaves the value as an unresolved name, rename
