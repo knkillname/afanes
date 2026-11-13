@@ -4,7 +4,7 @@
 
 - [x] 1.1 Add `NoticeAction` and a frozen slotted `Notice` to `src/afanes/ui/state/status.py`, add the transient `notice` field and `show_notice`, `take_notice`, and `clear_notice` to `UiStatus`, and keep the existing message slot temporarily so the tree stays green; verify focused tests cover latest-wins, consume-once, and reset, and `hatch test tests/ui/test_state.py` passes.
 - [x] 1.2 Add one owned banner field or property to `WorkspaceController`, `VaultSession`, `PageEditorState`, and `ProcessingState`; derive the page banner from its existing conflict and blocking state; verify one focused test per owner sets and clears its banner without touching another owner.
-- [ ] 1.3 Add a focused `tests/ui/test_feedback.py` for the notice lifecycle and owner-banner isolation; verify `hatch test tests/ui/test_feedback.py` passes.
+- [x] 1.3 Add a focused `tests/ui/test_feedback.py` for the notice lifecycle and owner-banner isolation; verify `hatch test tests/ui/test_feedback.py` passes.
 
 ## 2. Toast presenter and shell wiring
 
@@ -45,7 +45,7 @@
 - [x] 7.3 Update the guide pages that describe trash, editing, inbox, review, processing, and workspace behavior; verify quoted labels match the catalog and `hatch run docs:build` passes.
 - [x] 7.4 Add one `Unreleased` changelog entry naming the change, the feedback channels, the trash undo, the `VaultNaming.trash` return change, `restore_from_trash`, the `UiStatus.show_message` removal, and `README: no change required` / `Docs: updated`; verify no version bump.
 - [x] 7.5 Run `hatch check`, `hatch test --cover`, `hatch run docs:build`, `openspec validate --all --strict`, `openspec doctor`, both vocabulary greps, and `git diff --check`; verify coverage stays at or above 85%.
-- [ ] 7.6 Review the final diff for scope: no vault schema, `afanes.yaml`, trash frontmatter, retention, sidebar, dependency, CLI, or runtime-network change.
+- [x] 7.6 Review the final diff for scope: no vault schema, `afanes.yaml`, trash frontmatter, retention, sidebar, dependency, CLI, or runtime-network change.
 
 ## Workflow follow-up
 
