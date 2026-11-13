@@ -141,13 +141,13 @@ class ProjectsView:
             next_step: ft.Control = ft.Text(
                 afanes.ui.strings.PROJECT_NO_NEXT_STEP,
                 style=afanes.ui.theme.TEXT_ROLES["caption"],
-                selectable=True,
             )
         else:
             next_step = StepText(
                 afanes.ui.strings.PROJECT_NEXT_STEP.format(title=summary.next_step.text),
                 afanes.ui.theme.TEXT_ROLES["body"],
-                selectable=True,
+                on_tap_link=self._link_handler(note.path),
+                underline_links=False,
             ).build()
         meta: list[str] = [StatusLabel(note.status).text]
         if note.due_date is not None:
@@ -197,13 +197,26 @@ class ProjectsView:
         return row
 
     def _apply_selection(self) -> None:
-        """Mark the open project row without replacing any row control."""
+        """Mark the open project row without replacing any row control.
+
+        Notes
+        -----
+        The accent ring belongs to the open row only. Any selection change that
+        leaves the previously focused row behind clears the ring, so a link or
+        keyboard navigation cannot leave a second row looking selected.
+        """
         page = self._state.pages.page
+        if page is None or page.path != self._focused:
+            self._focused = None
         for path, row in self._rows.items():
             row.bgcolor = (
                 afanes.ui.theme.SELECTED_ROW_COLOR
                 if page is not None and page.path == path
                 else afanes.ui.theme.TRANSPARENT_COLOR
+            )
+            row.border = ft.Border.all(
+                afanes.ui.theme.FOCUS_RING_WIDTH,
+                afanes.ui.theme.FOCUS_RING_COLOR if path == self._focused else afanes.ui.theme.TRANSPARENT_COLOR,
             )
 
     def _signature_for(
@@ -278,6 +291,22 @@ class ProjectsView:
         """Bind a no-argument async handler to one project path."""
 
         async def handle() -> None:
+            await self._focus_row(path)
+            await self._on_select(path)
+
+        return handle
+
+    def _link_handler(self, path: Path) -> Callable[[ft.Event[ft.Markdown]], Awaitable[None]]:
+        """Treat a link tap in a row preview as a tap on the whole row.
+
+        Notes
+        -----
+        Flet attaches a tap recognizer to every Markdown link, even when no
+        link handler is set. Forwarding it to selection keeps a preview link
+        from becoming a dead zone that focuses the row without opening it.
+        """
+
+        async def handle(_event: ft.Event[ft.Markdown]) -> None:
             await self._focus_row(path)
             await self._on_select(path)
 

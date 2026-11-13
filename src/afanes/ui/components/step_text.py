@@ -33,6 +33,8 @@ class StepText:
     on_tap_link : LinkHandler | None
         Command that resolves a tapped link, or ``None`` when links are
         display-only.
+    underline_links : bool
+        Whether link text is underlined, by default ``True``.
     key : str | None
         Stable control key, or ``None`` for no key.
     """
@@ -45,6 +47,7 @@ class StepText:
         selectable: bool = False,
         expand: bool = False,
         on_tap_link: LinkHandler | None = None,
+        underline_links: bool = True,
         key: str | None = None,
     ) -> None:
         """Store the step text and its surface options.
@@ -63,6 +66,8 @@ class StepText:
         on_tap_link : LinkHandler | None
             Command that resolves a tapped link, or ``None`` when links are
             display-only.
+        underline_links : bool
+            Whether link text is underlined, by default ``True``.
         key : str | None
             Stable control key, or ``None`` for no key.
         """
@@ -71,6 +76,7 @@ class StepText:
         self._selectable = selectable
         self._expand = expand
         self._on_tap_link = on_tap_link
+        self._underline_links = underline_links
         self._key = key
 
     def build(self) -> ft.Markdown:
@@ -92,7 +98,11 @@ class StepText:
             key=self._key,
             md_style_sheet=ft.MarkdownStyleSheet(
                 p_text_style=self._text_style,
-                a_text_style=self._text_style.copy(decoration=ft.TextDecoration.UNDERLINE),
+                a_text_style=(
+                    self._text_style.copy(decoration=ft.TextDecoration.UNDERLINE)
+                    if self._underline_links
+                    else self._text_style
+                ),
                 p_padding=0,
                 block_spacing=0,
             ),

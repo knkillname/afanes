@@ -149,9 +149,11 @@ checked per platform at release.
 Browser lists follow the reference list view rather than a card grid: a row keeps a heading title,
 at most one body-weight supporting line, and one muted caption line for metadata. Rows do not use
 the toolkit's dense mode. The standard row height and the type roles carry the hierarchy, so a list
-does not become a wall of equally muted text. A selected row keeps the neutral selected-row fill;
-focus adds an accent ring and never a second fill, so a focused row cannot read as a second
-selection.
+does not become a wall of equally muted text. Row text is not selectable: the row is one click
+target, so a text-selection surface must not sit inside it. A preview link keeps the body style
+instead of the link underline and acts like a click on the row. A selected row keeps the neutral
+selected-row fill; focus adds an accent ring and never a second fill. The ring clears as soon as
+the open page is not that row, so no second row can read as a selection.
 
 ## 🖼️ Icons
 

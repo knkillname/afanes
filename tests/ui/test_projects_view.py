@@ -16,6 +16,7 @@ from tests.support import ensure_vault, versioned
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
 FocusHandler = Callable[[object], Coroutine[typing.Any, typing.Any, None]]
+LinkHandler = Callable[[object], Coroutine[typing.Any, typing.Any, None]]
 
 
 @pytest.fixture(autouse=True)
@@ -119,6 +120,12 @@ def _ring(view: afanes.ui.views.projects.ProjectsView, path: str) -> object:
     row = _row(view, path)
     assert row.border is not None
     return row.border.top.color
+
+
+def _next_step(button: ft.TextButton) -> ft.Control:
+    content = button.content
+    assert isinstance(content, ft.Column)
+    return content.controls[1]
 
 
 def _titles(view: afanes.ui.views.projects.ProjectsView, stage: str) -> list[str]:
@@ -324,7 +331,12 @@ class TestProjectRows:
         plain = [control.value for control in content.controls[1:] if isinstance(control, ft.Text)]
 
         assert [control.value for control in rendered] == ["Next: **Write** [copy](<note:Copy>)"]
-        assert rendered[0].on_tap_link is None
+        assert rendered[0].selectable is False
+        assert rendered[0].on_tap_link is not None
+        style_sheet = rendered[0].md_style_sheet
+        assert style_sheet is not None
+        assert style_sheet.a_text_style is not None
+        assert style_sheet.a_text_style.decoration != ft.TextDecoration.UNDERLINE
         assert all("](" not in text and "**" not in text for text in plain)
 
     def test_remaining_open_steps_are_counted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -391,6 +403,50 @@ class TestProjectSelection:
         assert row.bgcolor == afanes.ui.theme.SELECTED_ROW_COLOR
 
 
+class TestProjectRowInteraction:
+    def test_preview_text_is_not_selectable(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "projects" / "Launch.md", status="active", body="# Launch\n\n- [ ] Write copy\n")
+        view = _open_view(tmp_path, monkeypatch)
+
+        next_step = _next_step(_button(view, "projects/Launch.md"))
+
+        assert isinstance(next_step, ft.Markdown)
+        assert next_step.selectable is False
+
+    def test_missing_step_preview_is_not_selectable(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "projects" / "Launch.md", status="active")
+        view = _open_view(tmp_path, monkeypatch)
+
+        next_step = _next_step(_button(view, "projects/Launch.md"))
+
+        assert isinstance(next_step, ft.Text)
+        assert next_step.selectable is not True
+
+    def test_tapping_a_preview_link_opens_the_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        project = _write_note(
+            vault / "projects" / "Launch.md",
+            status="active",
+            body="# Launch\n\n- [ ] Call [the printer](<note:Printer>)\n",
+        )
+        state = afanes.ui.state.app_state
+
+        async def open_page(path: Path) -> None:
+            await state.navigation.open_page(path)
+
+        view = _open_view(tmp_path, monkeypatch, on_select=open_page)
+        next_step = _next_step(_button(view, "projects/Launch.md"))
+        assert isinstance(next_step, ft.Markdown)
+        assert next_step.on_tap_link is not None
+
+        asyncio.run(typing.cast("LinkHandler", next_step.on_tap_link)(None))
+
+        assert state.pages.page is not None
+        assert state.pages.page.path == project
+
+
 class TestProjectFocus:
     def test_clicking_a_second_row_moves_the_ring_and_rejects_a_late_blur(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -450,6 +506,28 @@ class TestProjectFocus:
 
         assert _button(view, "projects/Launch.md") is not button
         assert _ring(view, "projects/Launch.md") == afanes.ui.theme.TRANSPARENT_COLOR
+
+    def test_opening_another_page_clears_the_old_ring(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        launch = _write_note(vault / "projects" / "Launch.md", status="active")
+        ship = _write_note(vault / "projects" / "Ship.md", status="active")
+        state = afanes.ui.state.app_state
+
+        async def open_page(path: Path) -> None:
+            await state.navigation.open_page(path)
+
+        view = _open_view(tmp_path, monkeypatch, on_select=open_page)
+        asyncio.run(_handler(_button(view, "projects/Launch.md"))())
+        assert _ring(view, "projects/Launch.md") == afanes.ui.theme.FOCUS_RING_COLOR
+        assert state.pages.page is not None
+        assert state.pages.page.path == launch
+
+        asyncio.run(state.navigation.open_page(ship))
+        view.refresh()
+
+        assert _ring(view, "projects/Launch.md") == afanes.ui.theme.TRANSPARENT_COLOR
+        assert _ring(view, "projects/Ship.md") == afanes.ui.theme.TRANSPARENT_COLOR
+        assert _row(view, "projects/Ship.md").bgcolor == afanes.ui.theme.SELECTED_ROW_COLOR
 
 
 class TestProjectRefresh:
