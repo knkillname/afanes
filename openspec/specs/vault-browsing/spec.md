@@ -124,7 +124,10 @@ Selecting any browser entry SHALL open that note in the page pane with its displ
 
 ### Requirement: The browser searches titles, identities, and bodies
 
-The browser SHALL provide a search field that filters entries by display title, identity, prose body text, and step text. Matching SHALL ignore case, Unicode form, and repeated whitespace. Step metadata comments SHALL NOT be searched.
+The browser SHALL provide a search field that filters entries by display title, identity, prose body
+text, step text, and role names (`owner`, `asked_by`, and step `owners`). Matching SHALL ignore case,
+Unicode form, and repeated whitespace. Other step metadata and unknown frontmatter keys SHALL NOT be
+searched.
 
 #### Scenario: Title match is listed
 
@@ -146,10 +149,25 @@ The browser SHALL provide a search field that filters entries by display title, 
 - **WHEN** a search term appears in a step
 - **THEN** the project is listed and the matching step is shown with its project
 
+#### Scenario: Owner match names the project
+
+- **WHEN** a search term appears only in a project's `owner` value
+- **THEN** that project is listed
+
+#### Scenario: Requester match names the project
+
+- **WHEN** a search term appears only in a project's `asked_by` value
+- **THEN** that project is listed
+
+#### Scenario: Step owner match names the project
+
+- **WHEN** a search term appears only in a step's `owners` value
+- **THEN** the project is listed
+
 #### Scenario: Metadata is not searched
 
-- **WHEN** a term appears only inside a step's metadata comment
-- **THEN** no result is produced for that term
+- **WHEN** a term appears only inside a step's `plan`, `actual`, or `tags` metadata
+- **THEN** no result is produced for that term; role names are searched separately
 
 #### Scenario: Matching ignores case and repeated whitespace
 

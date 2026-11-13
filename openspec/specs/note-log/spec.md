@@ -10,9 +10,9 @@ entries through a calendar and a collapsible year/month/day tree.
 ### Requirement: A log note is a dated entry
 
 A note whose `type` is `log` SHALL carry an optional ISO `date`, a body, and a display title from its
-first level-1 heading. It MUST NOT carry `category`, `status`, `due_date`, or `asked_by`. A log note
-without a date SHALL remain readable and SHALL appear in the Undated group rather than being
-reported as a parse failure.
+first level-1 heading. It MUST NOT carry `category`, `status`, `due_date`, `asked_by`, or `owner`. A
+log note without a date SHALL remain readable and SHALL appear in the Undated group rather than
+being reported as a parse failure.
 
 #### Scenario: A valid log note parses
 
@@ -42,6 +42,11 @@ reported as a parse failure.
 #### Scenario: A requester is rejected
 
 - **WHEN** a log note declares `asked_by: Sam Rivera`
+- **THEN** parsing reports a validation error
+
+#### Scenario: An owner is rejected
+
+- **WHEN** a log note declares `owner: Sam Rivera`
 - **THEN** parsing reports a validation error
 
 ### Requirement: One log entry per exact date
@@ -143,8 +148,8 @@ vault SHALL start in Entries mode.
 ### Requirement: The Log search filters the tree and the calendar
 
 The Log SHALL apply the workspace search query to both the date tree and the calendar. Matching SHALL
-use the same title, identity, body, and step-text rules as the rest of the browser. Days without a
-match MUST NOT be accented while a query is active.
+use the same title, identity, body, step-text, and role-name rules as the rest of the browser. Days
+without a match MUST NOT be accented while a query is active.
 
 #### Scenario: Matching entries remain in the tree
 
@@ -160,6 +165,12 @@ match MUST NOT be accented while a query is active.
 
 - **WHEN** the user clears the search field
 - **THEN** the full tree and every entry accent return
+
+#### Scenario: A role name match names the project
+
+- **WHEN** the Log is in Everything mode and a project's owner, requester, or step owner matches the
+  query
+- **THEN** the project is listed
 
 ### Requirement: Log entries are created from dated actions
 
