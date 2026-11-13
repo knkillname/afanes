@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking (UI):** the workspace is now a three-region shell with a navigation sidebar, a browser
+  column, and a detail pane. The navigation holds destinations, counts, vault identity, and the
+  primary menu (Change Vault…, Create Vault…, Close Vault, About Afanes); search is global and returns
+  section-grouped results; the capture composer sits at the top of the Inbox browser; Review shows
+  its snapshot queue as selectable cards; and the layout adapts at 1100 px and 1024 px down to a
+  browse-to-detail stack. The OS title bar stays native. This implements the `adaptive-browser-shell`
+  OpenSpec change. README: no change required. Docs: the interface standard, workspace, log, inbox,
+  and review guides and the four screenshots were updated during implementation.
+
 ## [0.7.0] - 2026-11-12
 
 ### Added
