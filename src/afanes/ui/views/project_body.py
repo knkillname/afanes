@@ -23,7 +23,7 @@ from afanes.core.project_body import ProseBlock, StepEntry, StepListBlock
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteType
 from afanes.models.step import ProjectStep, StepEdit, StepEditKind
-from afanes.ui.components.step_text import StepText
+from afanes.ui.components.step_text import StepText, StepTextOptions
 
 type PickDate = Callable[[datetime.date | None], Awaitable[datetime.date | None]]
 
@@ -193,8 +193,7 @@ class ProjectBodyView:
                 StepText(
                     step.text,
                     text_style,
-                    expand=True,
-                    on_tap_link=self._follow_link,
+                    StepTextOptions(expand=True, on_tap_link=self._follow_link),
                 ).build(),
                 self._step_action(
                     ft.Icons.CALENDAR_MONTH_OUTLINED,
@@ -227,7 +226,7 @@ class ProjectBodyView:
                 StepText(
                     entry.detail,
                     text_style,
-                    on_tap_link=self._follow_link,
+                    StepTextOptions(on_tap_link=self._follow_link),
                 ).build()
             )
         if details:

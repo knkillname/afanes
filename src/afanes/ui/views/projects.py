@@ -19,7 +19,7 @@ import afanes.ui.theme
 from afanes.core.search import ProjectGroup, ProjectStage, ProjectSummary
 from afanes.ui.components.frozen import FrozenControlRecovery
 from afanes.ui.components.status import StatusLabel
-from afanes.ui.components.step_text import StepText
+from afanes.ui.components.step_text import StepText, StepTextOptions
 
 
 class ProjectsView:
@@ -147,8 +147,10 @@ class ProjectsView:
             next_step = StepText(
                 afanes.ui.strings.PROJECT_NEXT_STEP.format(title=summary.next_step.text),
                 afanes.ui.theme.TEXT_ROLES["body"],
-                on_tap_link=self._link_handler(note.path),
-                underline_links=False,
+                StepTextOptions(
+                    on_tap_link=self._link_handler(note.path),
+                    underline_links=False,
+                ),
             ).build()
         meta: list[str] = [StatusLabel(note.status).text]
         if note.due_date is not None:

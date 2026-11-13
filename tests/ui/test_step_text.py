@@ -43,20 +43,32 @@ class TestStepTextRendering:
 
     def test_selection_is_opt_in(self) -> None:
         plain = afanes.ui.components.step_text.StepText("Call", _style()).build()
-        selectable = afanes.ui.components.step_text.StepText("Call", _style(), selectable=True).build()
+        selectable = afanes.ui.components.step_text.StepText(
+            "Call",
+            _style(),
+            afanes.ui.components.step_text.StepTextOptions(selectable=True),
+        ).build()
 
         assert plain.selectable is False
         assert selectable.selectable is True
 
     def test_expansion_is_configurable(self) -> None:
         plain = afanes.ui.components.step_text.StepText("Call", _style()).build()
-        expanded = afanes.ui.components.step_text.StepText("Call", _style(), expand=True).build()
+        expanded = afanes.ui.components.step_text.StepText(
+            "Call",
+            _style(),
+            afanes.ui.components.step_text.StepTextOptions(expand=True),
+        ).build()
 
         assert plain.expand is False
         assert expanded.expand is True
 
     def test_key_is_forwarded(self) -> None:
-        control = afanes.ui.components.step_text.StepText("Call", _style(), key="step-text").build()
+        control = afanes.ui.components.step_text.StepText(
+            "Call",
+            _style(),
+            afanes.ui.components.step_text.StepTextOptions(key="step-text"),
+        ).build()
 
         assert control.key == "step-text"
 
@@ -76,7 +88,7 @@ class TestStepTextLinks:
         control = afanes.ui.components.step_text.StepText(
             "[Ada](<note:Ada>)",
             _style(),
-            on_tap_link=follow,
+            afanes.ui.components.step_text.StepTextOptions(on_tap_link=follow),
         ).build()
         assert control.on_tap_link is not None
         handler = typing.cast("typing.Any", control.on_tap_link)

@@ -8,6 +8,7 @@ The component is presentational: it receives a
 It performs no vault access and never derives dates from files.
 """
 
+import dataclasses
 import datetime
 from collections.abc import Callable
 from pathlib import Path
@@ -18,6 +19,47 @@ import afanes.core.log
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.vault.snapshot import VaultNote
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class CalendarCell:
+    """One year or month row that may have an entry.
+
+    Attributes
+    ----------
+    key : str
+        Stable control key for the row.
+    year : int
+        Calendar year.
+    month : int | None
+        Calendar month, or ``None`` for a year row.
+    has_entry : bool
+        Whether the row has an entry to open.
+    entry : VaultNote | None
+        First entry in the row, or ``None`` when the row is empty.
+    """
+
+    key: str
+    year: int
+    month: int | None
+    has_entry: bool
+    entry: VaultNote | None
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ControlLabels:
+    """Tooltips for a calendar row's create and open controls.
+
+    Attributes
+    ----------
+    tooltip_create : str
+        Tooltip for the create action.
+    tooltip_open : str
+        Tooltip for the open action.
+    """
+
+    tooltip_create: str
+    tooltip_open: str
 
 
 class LogTree:
@@ -100,13 +142,17 @@ class LogTree:
         controls: list[ft.Control] = [self._note_row(note) for note in year.entries]
         controls.extend(self._month_tile(month) for month in year.months)
         control = self._control_for(
-            key=f"year:{year.year}",
-            year=year.year,
-            month=None,
-            has_entry=bool(year.entries),
-            entry=year.entries[0] if year.entries else None,
-            tooltip_create=afanes.ui.strings.LOG_NEW_YEAR_ENTRY.format(year=year.year),
-            tooltip_open=afanes.ui.strings.LOG_OPEN_YEAR_ENTRY.format(year=year.year),
+            CalendarCell(
+                key=f"year:{year.year}",
+                year=year.year,
+                month=None,
+                has_entry=bool(year.entries),
+                entry=year.entries[0] if year.entries else None,
+            ),
+            ControlLabels(
+                tooltip_create=afanes.ui.strings.LOG_NEW_YEAR_ENTRY.format(year=year.year),
+                tooltip_open=afanes.ui.strings.LOG_OPEN_YEAR_ENTRY.format(year=year.year),
+            ),
         )
         tile = ft.ExpansionTile(
             title=ft.Row(
@@ -136,13 +182,17 @@ class LogTree:
         name = datetime.date(month.year, month.month, 1).strftime("%B")
         period = f"{name} {month.year}"
         control = self._control_for(
-            key=f"month:{month.year}-{month.month:02d}",
-            year=month.year,
-            month=month.month,
-            has_entry=bool(month.entries),
-            entry=month.entries[0] if month.entries else None,
-            tooltip_create=afanes.ui.strings.LOG_NEW_MONTH_ENTRY.format(period=period),
-            tooltip_open=afanes.ui.strings.LOG_OPEN_MONTH_ENTRY.format(period=period),
+            CalendarCell(
+                key=f"month:{month.year}-{month.month:02d}",
+                year=month.year,
+                month=month.month,
+                has_entry=bool(month.entries),
+                entry=month.entries[0] if month.entries else None,
+            ),
+            ControlLabels(
+                tooltip_create=afanes.ui.strings.LOG_NEW_MONTH_ENTRY.format(period=period),
+                tooltip_open=afanes.ui.strings.LOG_OPEN_MONTH_ENTRY.format(period=period),
+            ),
         )
         tile = ft.ExpansionTile(
             title=ft.Row(
@@ -226,36 +276,26 @@ class LogTree:
             key="log-undated",
         )
 
-    def _control_for(
-        self,
-        *,
-        key: str,
-        year: int,
-        month: int | None,
-        has_entry: bool,
-        entry: VaultNote | None,
-        tooltip_create: str,
-        tooltip_open: str,
-    ) -> ft.IconButton:
+    def _control_for(self, cell: CalendarCell, labels: ControlLabels) -> ft.IconButton:
         """Build the plus or open control for a year or month row."""
-        if has_entry and entry is not None:
+        if cell.has_entry and cell.entry is not None:
             button = ft.IconButton(
                 icon=ft.Icons.EVENT_AVAILABLE_OUTLINED,
-                tooltip=tooltip_open,
-                on_click=self._open_handler(entry.path),
+                tooltip=labels.tooltip_open,
+                on_click=self._open_handler(cell.entry.path),
                 icon_size=16,
-                key=f"{key}:open",
+                key=f"{cell.key}:open",
             )
-            self.open_buttons[key] = button
+            self.open_buttons[cell.key] = button
             return button
         button = ft.IconButton(
             icon=ft.Icons.ADD_OUTLINED,
-            tooltip=tooltip_create,
-            on_click=self._create_handler(year, month),
+            tooltip=labels.tooltip_create,
+            on_click=self._create_handler(cell.year, cell.month),
             icon_size=16,
-            key=f"{key}:create",
+            key=f"{cell.key}:create",
         )
-        self.plus_buttons[key] = button
+        self.plus_buttons[cell.key] = button
         return button
 
     def _select_handler(self, path: Path) -> Callable[[object], None]:
