@@ -89,7 +89,6 @@ BASELINE: dict[str, dict[str, int]] = {
         "views/page.py::PageView": 15,
         "views/processing.py::ProcessingView": 2,
         "views/review.py::ReviewView": 11,
-        "views/workspace.py::WorkspaceView": 1,
     },
     "dense_rows": {
         "components/log_tree.py": 1,

@@ -211,29 +211,27 @@ class WorkspaceView:
             multiline=True,
             min_lines=1,
             max_lines=4,
-            expand=True,
             on_submit=self._capture,
             key="workspace-capture-field",
         )
         self.capture_button = ft.FilledButton(
             content=afanes.ui.strings.CAPTURE_ACTION,
-            icon=ft.Icons.SEND_OUTLINED,
             on_click=self._capture,
             key="workspace-capture-button",
         )
-        self.capture_row = ft.Row(
-            controls=[self.capture_field, self.capture_button],
-            spacing=afanes.ui.theme.ITEM_GAP,
-            vertical_alignment=ft.CrossAxisAlignment.END,
-            key="workspace-capture-row",
+        self.capture_actions = ft.Row(
+            controls=[self.capture_button],
+            alignment=ft.MainAxisAlignment.END,
+            key="workspace-capture-actions",
         )
         self.capture_label = ft.Text(
             afanes.ui.strings.COMPOSER_LABEL,
             style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
         )
         self.capture_section = ft.Column(
-            controls=[self.capture_label, self.capture_row],
+            controls=[self.capture_label, self.capture_field, self.capture_actions],
             spacing=afanes.ui.theme.ITEM_GAP,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             key="workspace-capture-section",
         )
 
