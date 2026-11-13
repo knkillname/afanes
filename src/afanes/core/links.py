@@ -104,22 +104,22 @@ class DestinationKind(StrEnum):
         """
         value = DestinationText(destination).stripped
         if value.startswith("#"):
-            return cls.ANCHOR
-        if value.startswith("//"):
-            return cls.EXTERNAL
-
-        match = _SCHEME_PATTERN.match(value)
-        if match is None:
-            return cls.ATTACHMENT
-
-        scheme = match.group("scheme").casefold()
-        if scheme == "person":
-            return cls.INTERNAL
-        if cls._internal_scheme(scheme) is not None:
-            return cls.INTERNAL
-        if scheme in UNSAFE_SCHEMES:
-            return cls.UNSAFE
-        return cls.EXTERNAL
+            kind = cls.ANCHOR
+        elif value.startswith("//"):
+            kind = cls.EXTERNAL
+        else:
+            match = _SCHEME_PATTERN.match(value)
+            if match is None:
+                kind = cls.ATTACHMENT
+            else:
+                scheme = match.group("scheme").casefold()
+                if scheme == "person" or cls._internal_scheme(scheme) is not None:
+                    kind = cls.INTERNAL
+                elif scheme in UNSAFE_SCHEMES:
+                    kind = cls.UNSAFE
+                else:
+                    kind = cls.EXTERNAL
+        return kind
 
     @staticmethod
     def _internal_scheme(token: str) -> ReferenceScheme | None:

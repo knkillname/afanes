@@ -13,7 +13,7 @@ import afanes.ui.state.browser
 import afanes.ui.strings
 from afanes.core.errors import AfanesError, InvalidReferenceError, VaultError
 from afanes.core.links import DestinationKind, ReferenceParser
-from afanes.core.vault.snapshot import LinkOutcome
+from afanes.core.vault.snapshot import LinkOutcome, VaultSnapshot
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType
 from afanes.ui.state.lock import CommandLock
@@ -435,22 +435,21 @@ class PageNavigator:
         if snapshot is None:
             await self._open_new_draft(reference)
             return
+        await self._follow_reference(reference, snapshot)
+
+    async def _follow_reference(self, reference: NoteReference, snapshot: VaultSnapshot) -> None:
+        """Route one parsed reference against the current snapshot."""
         target = snapshot.link_target(reference)
         if target.outcome is LinkOutcome.RESOLVED:
             await self.open_page(target.paths[0])
             return
-        if target.outcome is LinkOutcome.AMBIGUOUS:
+        if target.outcome is LinkOutcome.AMBIGUOUS or (target.outcome is LinkOutcome.BROKEN and len(target.paths) > 1):
             async with self.command_lock:
                 self.ambiguous = target.paths
                 self.status.clear_message()
             return
         if target.outcome is LinkOutcome.BROKEN:
-            if len(target.paths) == 1:
-                await self.open_page(target.paths[0])
-                return
-            async with self.command_lock:
-                self.ambiguous = target.paths
-                self.status.clear_message()
+            await self.open_page(target.paths[0])
             return
         safe_page = self._existing_safe_page(reference)
         if safe_page is not None:

@@ -544,29 +544,31 @@ class NoteDocument:
             Parsed date and ``None``, or ``None`` and an actionable warning.
             An absent or null key returns ``(None, None)``.
         """
-        if "date" not in raw:
+        if "date" not in raw or raw["date"] is None:
             return None, None
         value = raw["date"]
-        if value is None:
-            return None, None
+        note_date: NoteDate | None = None
+        warning: str | None = None
         if isinstance(value, bool):
-            return None, "A note date must be a date written as YYYY, YYYY-MM, or YYYY-MM-DD"
-        if isinstance(value, datetime.datetime):
-            return None, "A note date is a calendar date, not a timestamp"
-        try:
-            if isinstance(value, datetime.date):
-                note_date = NoteDate.from_date(value)
-            elif isinstance(value, int):
-                note_date = NoteDate.from_year(value)
-            elif isinstance(value, str):
-                note_date = NoteDate.from_text(value)
-            else:
-                message = "A note date must be a date written as YYYY, YYYY-MM, or YYYY-MM-DD"
-                return None, message
-        except ValueError as exc:
-            return None, str(exc)
-        raw["date"] = note_date.to_yaml_value()
-        return note_date, None
+            warning = "A note date must be a date written as YYYY, YYYY-MM, or YYYY-MM-DD"
+        elif isinstance(value, datetime.datetime):
+            warning = "A note date is a calendar date, not a timestamp"
+        else:
+            try:
+                if isinstance(value, datetime.date):
+                    note_date = NoteDate.from_date(value)
+                elif isinstance(value, int):
+                    note_date = NoteDate.from_year(value)
+                elif isinstance(value, str):
+                    note_date = NoteDate.from_text(value)
+                else:
+                    warning = "A note date must be a date written as YYYY, YYYY-MM, or YYYY-MM-DD"
+            except ValueError as exc:
+                warning = str(exc)
+        if warning is None and note_date is not None:
+            raw["date"] = note_date.to_yaml_value()
+            return note_date, None
+        return None, warning
 
     @staticmethod
     def _calendar_date(value: object) -> datetime.date:

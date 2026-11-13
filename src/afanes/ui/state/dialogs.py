@@ -132,6 +132,10 @@ class PageDialogState:
             self.pages.page = page.with_labels(page.labels.with_type(note_type))
             self.status.clear_message()
             return True
+        return await self._move_log_type(note_type)
+
+    async def _move_log_type(self, note_type: NoteType) -> bool:
+        """Move the committed page through the log conversion pipeline."""
         vault = self.session.vault
         if vault is None:
             return False
@@ -189,29 +193,36 @@ class PageDialogState:
                 self.pages.page = page.with_labels(proposed)
                 self.status.clear_message()
                 return True
-            vault = self.session.vault
-            if vault is None:
-                return False
-            try:
-                preview = await asyncio.to_thread(
-                    afanes.core.vault.naming.VaultNaming(vault).plan_category_move,
-                    page.path,
-                    proposed.category,
-                    snapshot=self.session.snapshot,
-                )
-            except (AfanesError, OSError) as exc:
-                logger.debug("Category move planning failed", exc_info=True)
-                self.status.show_message(afanes.ui.strings.PAGE_CATEGORY_MOVE_FAILED.format(detail=str(exc)))
-                return False
-            if VaultPath.same(preview.target_path, preview.note_path):
-                self.pages.page = page.with_labels(proposed)
-                self.status.clear_message()
-                return True
-            self.category_move = preview
-            self.pending_labels = proposed
-            self.pages.blocking_message = afanes.ui.strings.PAGE_TYPE_CHANGE_LEAVE
-            self.status.clear_message()
+            return await self._preview_category_move(page, proposed)
+
+    async def _preview_category_move(self, page: NormalDraft, proposed: PageLabels) -> bool:
+        """Plan a category folder move or apply a same-folder label change."""
+        path = page.path
+        if path is None:
             return False
+        vault = self.session.vault
+        if vault is None:
+            return False
+        try:
+            preview = await asyncio.to_thread(
+                afanes.core.vault.naming.VaultNaming(vault).plan_category_move,
+                path,
+                proposed.category,
+                snapshot=self.session.snapshot,
+            )
+        except (AfanesError, OSError) as exc:
+            logger.debug("Category move planning failed", exc_info=True)
+            self.status.show_message(afanes.ui.strings.PAGE_CATEGORY_MOVE_FAILED.format(detail=str(exc)))
+            return False
+        if VaultPath.same(preview.target_path, preview.note_path):
+            self.pages.page = page.with_labels(proposed)
+            self.status.clear_message()
+            return True
+        self.category_move = preview
+        self.pending_labels = proposed
+        self.pages.blocking_message = afanes.ui.strings.PAGE_TYPE_CHANGE_LEAVE
+        self.status.clear_message()
+        return False
 
     async def set_page_status(self, status: Status | None) -> None:
         """Change the draft workflow status.

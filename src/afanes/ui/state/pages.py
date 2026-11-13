@@ -506,24 +506,31 @@ class PageEditorState:
         page = self.page
         if page is None:
             return True
+        if not self._commit_allowed(check_conflict=False):
+            return False
+        if page.is_new and not page.is_dirty:
+            self.clear()
+            return True
+        if not self._commit_allowed(check_conflict=True):
+            return False
+        if not page.is_dirty:
+            return True
+        saved = await self._save_page()
+        if saved and self.repair_preview is not None:
+            self.status.show_message(afanes.ui.strings.PAGE_REPAIR_PENDING)
+            saved = False
+        return saved
+
+    def _commit_allowed(self, *, check_conflict: bool) -> bool:
+        """Show the first blocking page message and report whether saving may proceed."""
         if self.repair_preview is not None:
             self.status.show_message(afanes.ui.strings.PAGE_REPAIR_PENDING)
             return False
         if self.blocking_message is not None:
             self.status.show_message(self.blocking_message)
             return False
-        if page.is_new and not page.is_dirty:
-            self.clear()
-            return True
-        if self.conflict is not None:
+        if check_conflict and self.conflict is not None:
             self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_LEAVE)
-            return False
-        if not page.is_dirty:
-            return True
-        if not await self._save_page():
-            return False
-        if self.repair_preview is not None:
-            self.status.show_message(afanes.ui.strings.PAGE_REPAIR_PENDING)
             return False
         return True
 
@@ -547,32 +554,35 @@ class PageEditorState:
         try:
             if page.is_new:
                 return await self._create_new_page(page, labels, text, vault)
-
-            path = page.path
-            if path is None:
-                self.status.show_message(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail="The page has no path"))
-                return False
-            try:
-                new_hash = await asyncio.to_thread(
-                    afanes.core.vault.pages.VaultPages(vault).write_page, path, text, page.baseline_hash
-                )
-            except ContentChangedError:
-                self.conflict = "changed"
-                self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_CHANGED)
-                return False
-            except VaultPathError:
-                self.conflict = "missing"
-                self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_MISSING)
-                return False
-            except (AfanesError, OSError) as exc:
-                logger.debug("Page save failed", exc_info=True)
-                self.status.show_message(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
-                return False
-            self.page = page.after_write(text, content_hash=new_hash)
-            self.status.clear_message()
-            return True
+            return await self._write_existing_page(page, text, vault)
         finally:
             self.saving = False
+
+    async def _write_existing_page(self, page: NormalDraft, text: str, vault: Vault) -> bool:
+        """Write an existing page with the conflict guard."""
+        path = page.path
+        if path is None:
+            self.status.show_message(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail="The page has no path"))
+            return False
+        try:
+            new_hash = await asyncio.to_thread(
+                afanes.core.vault.pages.VaultPages(vault).write_page, path, text, page.baseline_hash
+            )
+        except ContentChangedError:
+            self.conflict = "changed"
+            self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_CHANGED)
+            return False
+        except VaultPathError:
+            self.conflict = "missing"
+            self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_MISSING)
+            return False
+        except (AfanesError, OSError) as exc:
+            logger.debug("Page save failed", exc_info=True)
+            self.status.show_message(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
+            return False
+        self.page = page.after_write(text, content_hash=new_hash)
+        self.status.clear_message()
+        return True
 
     async def _create_new_page(
         self,

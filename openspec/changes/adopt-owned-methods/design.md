@@ -18,7 +18,8 @@ The current production inventory is:
 | `C901` too complex (10) | 0 | already selected through `C90` |
 
 That is twenty-one findings across eighteen unique production methods. Tests add
-sixteen `PLR0913` findings, all from pytest fixture signatures.
+`PLR0913` findings from pytest fixture signatures and test request helpers; the
+configuration exempts the whole test tree from that one rule.
 
 The project already uses classmethod services for stateless work:
 `VaultCommand.create`, `CommandLine.run`, `SettingsStore.default`, and

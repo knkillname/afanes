@@ -880,7 +880,15 @@ class WorkspaceView:
             return [self._projects_view.root]
         if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.LOG:
             return self._log_controls()
-        section = state.browser.active_section.browser_section
+        return self._section_controls(state.browser.active_section, listing)
+
+    def _section_controls(
+        self,
+        active_section: afanes.ui.state.browser.WorkspaceSection,
+        listing: afanes.core.search.BrowserListing | None,
+    ) -> list[ft.Control]:
+        """Build the browser entries for a non-special destination."""
+        section = active_section.browser_section
         if listing is None or section is None:
             return []
         if section is afanes.core.search.BrowserSection.REFERENCES:

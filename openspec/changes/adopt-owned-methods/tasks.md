@@ -33,9 +33,9 @@
 - [x] 5.6 Add a frozen slotted `NoteDraft` value object and make `Vault.create` take it; update `VaultCommand`, UI state, and tests; verify `ruff check --select PLR0913 src/afanes/core/vault/service.py` reports no findings.
 - [x] 5.7 Add a `ProjectIndex` accumulator for `Connections._index_project` and a frozen `ReferenceRewrite` value object for `VaultNaming._apply_reference_sites`; update callers and tests; verify both modules report no `PLR0913` findings.
 - [x] 5.8 Group `LogTree._control_for` into `CalendarCell` plus `ControlLabels`, and `StepText.__init__` into `StepTextOptions`; update callers and tests; verify both components report no `PLR0913` findings.
-- [ ] 5.9 Reduce the return count in `core/frontmatter.py` and `core/links.py` by extracting decision methods; preserve behavior and add a regression test for each changed branch; verify both modules report no `PLR0911` findings.
-- [ ] 5.10 Reduce the return count in `ui/state/dialogs.py` (two methods), `ui/state/navigation.py`, `ui/state/pages.py` (two methods), and `ui/views/workspace.py` by extracting decision methods; preserve behavior and add regression tests; verify all four modules report no `PLR0911` findings.
-- [ ] 5.11 Run `hatch run ruff check --select PLR src` and confirm zero production findings; run `hatch run ruff check --select PLR tests` and confirm the only findings are the sixteen `PLR0913` test signatures that the configuration will exempt.
+- [x] 5.9 Reduce the return count in `core/frontmatter.py` and `core/links.py` by extracting decision methods; preserve behavior and add a regression test for each changed branch; verify both modules report no `PLR0911` findings.
+- [x] 5.10 Reduce the return count in `ui/state/dialogs.py` (two methods), `ui/state/navigation.py`, `ui/state/pages.py` (two methods), and `ui/views/workspace.py` by extracting decision methods; preserve behavior and add regression tests; verify all four modules report no `PLR0911` findings.
+- [x] 5.11 Run `hatch run ruff check --select PLR src` and confirm zero production findings; run `hatch run ruff check --select PLR tests` and confirm the only findings are the `PLR0913` test signatures that the configuration will exempt.
 
 ## 6. Enable the gates
 
