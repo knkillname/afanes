@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- **Owned methods and the Ruff method-shape gate.** Free functions now live on owning classes:
+  `NamePolicy.normalize`, `safe_filename`, and `unique` replace `normalize_name`, `safe_filename`,
+  and `unique_name`; `AtomicWriter.write_text_atomic` and `write_text_exclusive` replace the module
+  functions; and `CopyFormatter` replaces the six `ui.strings` count helpers. `CommandLine.main`,
+  `Launcher.main`, `LaunchOptions.port_number`, and `AppShell.main` replace the module entry points;
+  `entrypoint()` in `__main__.py` is the only module-level function and backs the installed `afanes`
+  script. `Vault.create` now takes a `NoteDraft`; `VaultProcessing.plan_processing` and
+  `ProcessingState.build_plan` take a `ProcessingRequest`; `PageView` and `WorkspaceView` take
+  `PageActions` and `WorkspaceActions`; and `StepText` takes a `StepTextOptions`. Ruff now enables
+  the `PLR` family with `max-statements = 50`, selects `C901`, and exempts tests from `PLR0913`; the
+  architecture gate allows only `entrypoint`. This is a breaking API change with no compatibility
+  aliases. This implements the `adopt-owned-methods` OpenSpec change. README: no change required.
+  Docs: updated.
+
 - **Writing style and copy gate.** Interface and command-line copy now follows the GNOME writing
   style: header capitalization for headings and short control labels, sentence capitalization for
   field labels and prose, no final period, neutral tone without first- or second-person pronouns,

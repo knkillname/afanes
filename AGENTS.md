@@ -101,13 +101,14 @@ Use neutral vocabulary: Inbox, Processing Wizard / Clarification Pipeline, Step,
 
 Classify every new unit as one of: **value object** (immutable data + invariants), **service object** (owns one resource, validates it at construction), or **controller/view** (UI state + presentation). Split mixed roles. A stateless transformation is a method on the value object or service that owns the data, not a free function. No Java-style getters, anemic data bags, dependency-injection containers, service locators, or injected clocks; dependency inversion is expressed through explicit parameters and plain values.
 
-Code is object-oriented: every behavior is a method on an owning class. Module-level functions are prohibited. The only exception is a function object passed to a class or library by contract — a Flet `main` target, an `argparse` type, or a console-script entry point — and it must delegate to an owned method in one line. Apply SOLID, DRY, KISS, and YAGNI to the object graph: one responsibility per unit, composition over inheritance, narrow interfaces, and no speculative abstraction.
+Code is object-oriented: every behavior is a method on an owning class. Module-level functions are prohibited except `entrypoint` in `__main__.py`, the installed `afanes` script target, which delegates to `Launcher.main` in one line. Callback functions that a class or library receives as objects live on an owning class or as the local Flet entry closure. Apply SOLID, DRY, KISS, and YAGNI to the object graph: one responsibility per unit, composition over inheritance, narrow interfaces, and no speculative abstraction.
 
 Prefer small, public, fruitful methods that return a value and can be tested directly. Keep a private method to an internal step of a public command; do not hide testable behavior in a large private helper.
 
 `tests/core/test_architecture.py` is a hard gate:
 
-- Module-level functions fail; the gate lists the remaining free functions as migration debt, and that list may only shrink.
+- Module-level functions fail; the only allowed function is `entrypoint`, the installed script target.
+- Ruff enforces `PLR0915` at 50 statements and selects the `PLR` family, including `PLR0913` and `PLR0911`; tests ignore `PLR0913`. `C901` is selected with the default complexity limit.
 - Views must not define `_banner`, `_status_label`, `_panel`, or `_card`; shared helpers live in `ui/components/`.
 - `AppState` may declare at most 10 annotated fields.
 - `AppState` exposes at most 10 public names, counted as public annotated fields plus public commands.

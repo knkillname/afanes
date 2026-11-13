@@ -391,9 +391,9 @@ class TestObjectOwnership:
         assert frozenset() == TEMPORARY_FIELD_BUDGET_ALLOWLIST
 
     def test_final_allowlist_is_exact(self) -> None:
-        assert FINAL_FUNCTION_ALLOWLIST == {
+        assert {
             "__main__.py": frozenset({"entrypoint"}),
-        }
+        } == FINAL_FUNCTION_ALLOWLIST
 
     def test_module_functions_are_owned(self) -> None:
         offenders: list[str] = []

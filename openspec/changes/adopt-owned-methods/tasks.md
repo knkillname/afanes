@@ -45,11 +45,11 @@
 
 ## 7. Update the durable documents
 
-- [ ] 7.1 Update `AGENTS.md` 4.2 so the gate bullet allows only `entrypoint`, records the `PLR` statement budget and the test exemption, and removes the migration-debt wording; verify the section no longer allows functions in `core/names.py`, `core/atomic.py`, or `ui/strings.py`.
-- [ ] 7.2 Update `docs/develop/architecture.md`: remove the "pure function" unit category, state that a stateless transformation is a method on its owning object, and describe `NamePolicy`, `AtomicWriter`, `CopyFormatter`, `AppShell`, and the Ruff `PLR`/`C901` gate; verify `hatch run docs:build` passes.
-- [ ] 7.3 Add one `Unreleased` entry under `Changed` naming the `adopt-owned-methods` change, the three owning classes, the entry-point consolidation, the Ruff `PLR`/`C901` gate, and every API replacement; include `README: no change required` and `Docs: updated`; verify no version bump.
-- [ ] 7.4 Run `hatch check`, `hatch test --cover`, `hatch run docs:build`, `openspec validate --all --strict`, `openspec doctor`, and both vocabulary greps from `AGENTS.md` 6.1; verify every gate passes and coverage stays at or above 85%.
-- [ ] 7.5 Run `git diff --check` and review the final diff: only the refactored modules, entry points, call sites, tests, `pyproject.toml`, `AGENTS.md`, `docs/develop/architecture.md`, `CHANGELOG.md`, and this change's artifacts; no behavior, vault, schema, dependency, or UI-copy change.
+- [x] 7.1 Update `AGENTS.md` 4.2 so the gate bullet allows only `entrypoint`, records the `PLR` statement budget and the test exemption, and removes the migration-debt wording; verify the section no longer allows functions in `core/names.py`, `core/atomic.py`, or `ui/strings.py`.
+- [x] 7.2 Update `docs/develop/architecture.md`: remove the "pure function" unit category, state that a stateless transformation is a method on its owning object, and describe `NamePolicy`, `AtomicWriter`, `CopyFormatter`, `AppShell`, and the Ruff `PLR`/`C901` gate; verify `hatch run docs:build` passes.
+- [x] 7.3 Add one `Unreleased` entry under `Changed` naming the `adopt-owned-methods` change, the three owning classes, the entry-point consolidation, the Ruff `PLR`/`C901` gate, and every API replacement; include `README: no change required` and `Docs: updated`; verify no version bump.
+- [x] 7.4 Run `hatch check`, `hatch test --cover`, `hatch run docs:build`, `openspec validate --all --strict`, `openspec doctor`, and both vocabulary greps from `AGENTS.md` 6.1; verify every gate passes and coverage stays at or above 85%.
+- [x] 7.5 Run `git diff --check` and review the final diff: only the refactored modules, entry points, call sites, tests, `pyproject.toml`, `AGENTS.md`, `docs/develop/architecture.md`, `CHANGELOG.md`, and this change's artifacts; no behavior, vault, schema, dependency, or UI-copy change.
 
 ## Workflow follow-up
 

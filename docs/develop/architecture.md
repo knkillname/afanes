@@ -61,11 +61,14 @@ Every new unit is one of:
 
 - a value object: immutable data plus invariants;
 - a service object: owns one resource and validates it at construction;
-- a pure function: stateless transformation;
 - a controller or view: UI state plus presentation.
 
+Every behavior is a method on its owning class. A stateless transformation is a method on the value object or service that owns the data, not a free function. The name and filename rules live on `NamePolicy`, atomic writes on `AtomicWriter`, user-facing count formatting on `CopyFormatter`, and the Flet page lifecycle on `AppShell`.
+
 The architecture test is the hard gate: module-level functions, duplicate view helpers, `AppState`
-fields, public surface budgets, and the import graph are checked mechanically. Add a temporary
+fields, public surface budgets, and the import graph are checked mechanically. The only allowed
+module-level function is `entrypoint` in `__main__.py`, the installed script target. Ruff enforces
+the `PLR` family with a 50-statement budget and the `C901` complexity limit. Add a temporary
 exemption only through an approved change, and remove it when the phase passes.
 
 ## 🧭 See also
