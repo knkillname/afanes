@@ -1,8 +1,12 @@
 """Tests for the read-only connection indexes."""
 
+import datetime
 from pathlib import Path
 
+import afanes.core.steps
+import afanes.core.vault.naming
 from afanes.core.connections import Connections
+from afanes.core.frontmatter import NoteDocument
 from afanes.core.vault.service import Vault
 
 
@@ -434,6 +438,88 @@ class TestRequestedProjects:
         connections = _connections(root).for_note(team)
 
         assert [note.title for note in connections.requested_projects] == ["Home"]
+
+
+class TestRoleReferencesAfterExternalChanges:
+    def test_an_external_rename_leaves_role_values_unchanged(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        project = _write_note(
+            root,
+            "projects/Home.md",
+            "project",
+            "# Home\n",
+            owner="Ada",
+            asked_by="Ada",
+        )
+        renamed = root / "reference" / "Ada King.md"
+
+        ada.rename(renamed)
+
+        text = project.read_text(encoding="utf-8")
+        assert "owner: Ada\n" in text
+        assert "asked_by: Ada\n" in text
+        connections = _connections(root)
+        assert connections.for_note(renamed).project_owner_projects == ()
+        assert connections.for_note(renamed).requested_projects == ()
+
+    def test_trashing_the_requester_leaves_the_value_unchanged(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        project = _write_note(root, "projects/Home.md", "project", "# Home\n", asked_by="Ada")
+        afanes.core.vault.naming.VaultNaming(Vault(root)).trash(ada, confirm=True)
+
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+
+        assert document.asked_by == "Ada"
+        assert "asked_by: Ada\n" in project.read_text(encoding="utf-8")
+
+    def test_trashing_the_owner_leaves_the_value_unchanged(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        project = _write_note(root, "projects/Home.md", "project", "# Home\n", owner="Ada")
+        afanes.core.vault.naming.VaultNaming(Vault(root)).trash(ada, confirm=True)
+
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+
+        assert document.owner == "Ada"
+        assert "owner: Ada\n" in project.read_text(encoding="utf-8")
+
+    def test_trashing_the_step_owner_leaves_the_step_unchanged(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        project = _write_note(
+            root,
+            "projects/Home.md",
+            "project",
+            "# Home\n\n- [ ] Call <!-- {owners: [Ada], plan: 2026-01-02} -->\n",
+        )
+        afanes.core.vault.naming.VaultNaming(Vault(root)).trash(ada, confirm=True)
+
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+        steps = afanes.core.steps.StepDocument(document.body).steps
+
+        assert steps[0].owners == ("Ada",)
+        assert steps[0].plan == datetime.date(2026, 1, 2)
+
+    def test_role_values_remain_after_deleting_the_target(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        project = _write_note(
+            root,
+            "projects/Home.md",
+            "project",
+            "# Home\n",
+            owner="Ada",
+            asked_by="Ada",
+        )
+        afanes.core.vault.naming.VaultNaming(Vault(root)).trash(ada, confirm=True)
+
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+
+        assert document.owner == "Ada"
+        assert document.asked_by == "Ada"
+        assert [note.name for note in Vault(root).scan().notes if note.path == project.resolve()] == ["Home"]
 
 
 class TestReadOnly:

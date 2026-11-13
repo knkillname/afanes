@@ -32,8 +32,8 @@
 
 ## 6. Core test hardening
 
-- [ ] 6.1 Add the core rename/trash tests for an external rename, a trashed requester, a trashed owner, an unknown frontmatter key, role values after deletion, a trashed step owner, and multiple step owners updating independently; verify each test asserts the post-operation file or connection state.
-- [ ] 6.2 Add the processing and log tests for blank role values writing no keys, Append step not inheriting the project owner, and clearing the Log query restoring the tree and calendar; verify each test asserts the outcome rather than a callback.
+- [x] 6.1 Add the core rename/trash tests for an external rename, a trashed requester, a trashed owner, an unknown frontmatter key, role values after deletion, a trashed step owner, and multiple step owners updating independently; verify each test asserts the post-operation file or connection state.
+- [x] 6.2 Add the processing and log tests for blank role values writing no keys, Append step not inheriting the project owner, and clearing the Log query restoring the tree and calendar; verify each test asserts the outcome rather than a callback.
 
 ## 7. UI test hardening
 

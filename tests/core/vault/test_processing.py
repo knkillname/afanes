@@ -179,6 +179,46 @@ class TestProcessingGuards:
         with pytest.raises(ProcessingError, match="Only projects"):
             service.plan_processing(capture, outcome, owner="Sam Rivera")
 
+    def test_blank_role_values_write_no_keys(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.service.Vault(root)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Call")
+        service = afanes.core.vault.processing.VaultProcessing(vault)
+
+        plan = service.plan_processing(
+            capture,
+            ProcessingOutcome.PROJECT,
+            owner="   ",
+            asked_by="   ",
+        )
+        target = service.apply_processing(plan, confirm=True)
+
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert "owner" not in document.raw
+        assert "asked_by" not in document.raw
+
+    def test_append_step_does_not_inherit_the_project_owner(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.service.Vault(root)
+        project = _write_note(root / "projects" / "Home.md", "project", "# Home\n")
+        project.write_text(
+            "---\ntype: project\nowner: Sam Rivera\n---\n\n# Home\n",
+            encoding="utf-8",
+        )
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Call the plumber")
+        service = afanes.core.vault.processing.VaultProcessing(vault)
+
+        plan = service.plan_processing(capture, ProcessingOutcome.APPEND_STEP, project="Home")
+        service.apply_processing(plan, confirm=True)
+
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+        steps = afanes.core.steps.StepDocument(document.body).steps
+        assert document.owner == "Sam Rivera"
+        assert steps[0].owners == ()
+        assert "owners" not in steps[0].metadata.raw
+
     def test_append_step_rejects_role_names(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()

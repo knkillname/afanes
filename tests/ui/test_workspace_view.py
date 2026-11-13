@@ -744,6 +744,29 @@ class TestLogSection:
         assert calendar.day_buttons[today.day].data["count"] == 1
         assert calendar.day_buttons[other.day].data["count"] == 0
 
+    def test_clearing_the_query_restores_the_tree_and_calendar(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        today = _today()
+        self._log_path(vault, today, "Dentist")
+        other = today.replace(day=1) if today.day != 1 else today.replace(day=2)
+        self._log_path(vault, other, "Groceries")
+        view = self._open_log(tmp_path, monkeypatch)
+        asyncio.run(afanes.ui.state.app_state.browser.set_query("dentist"))
+        view.refresh()
+
+        asyncio.run(afanes.ui.state.app_state.browser.set_query(""))
+        view.refresh()
+
+        tree = view.log_tree
+        calendar = view.log_calendar
+        assert tree is not None
+        assert calendar is not None
+        assert sorted(note.title for note in tree.note_rows.values()) == ["Dentist", "Groceries"]
+        assert calendar.day_buttons[today.day].data["count"] == 1
+        assert calendar.day_buttons[other.day].data["count"] == 1
+
     def test_month_plus_requests_a_month_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         today = _today()

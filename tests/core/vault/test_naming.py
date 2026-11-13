@@ -408,6 +408,49 @@ class TestMetadataReferenceCharacterization:
         assert steps[0].metadata.raw["custom"] == "keep"
         assert "\n" not in rewritten.replace("\r\n", "")
 
+    def test_rename_preserves_an_unknown_frontmatter_key(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        project = _write_note(
+            root / "projects/Review.md",
+            "project",
+            "# Review\n\n[Ada](<note:Ada>)\n",
+        )
+        project.write_text(
+            "---\ntype: project\nowner: Ada\ncustom: keep\n---\n\n"
+            "[Ada](<note:Ada>)\n",
+            encoding="utf-8",
+        )
+        vault = afanes.core.vault.service.Vault(root)
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_rename(note, "Ada King")
+
+        afanes.core.vault.naming.VaultNaming(vault).apply_rename(preview, confirm=True)
+
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+        assert document.owner == "Ada King"
+        assert document.raw["custom"] == "keep"
+
+    def test_rename_updates_multiple_step_owners_independently(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        _write_note(root / "people/Grace.md", "person")
+        project = _write_note(
+            root / "projects/Review.md",
+            "project",
+            "# Review\n\n"
+            "- [ ] Call <!-- {owners: [Ada]} -->\n"
+            "- [ ] Review <!-- {owners: [Grace]} -->\n",
+        )
+        vault = afanes.core.vault.service.Vault(root)
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_rename(note, "Ada King")
+
+        afanes.core.vault.naming.VaultNaming(vault).apply_rename(preview, confirm=True)
+
+        document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
+        steps = afanes.core.steps.StepDocument(document.body).steps
+        assert steps[0].owners == ("Ada King",)
+        assert steps[1].owners == ("Grace",)
+
     def test_trash_counts_body_and_metadata_references(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         note = _write_note(root / "people/Ada.md", "person")
