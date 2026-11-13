@@ -1,7 +1,8 @@
 # ✍️ Pages and editing
 
-Select a note in the browser to open it in the page pane. Read mode shows the display title and the
-rendered Markdown body. Choose **Edit** to change the body and the labels that control how the note is
+Select a note in the browser to open it in the detail region. The detail toolbar shows the page title,
+**Back**, one primary action, and a secondary menu. Read mode shows the display title and the rendered
+Markdown body. Choose **Edit** to change the body and the labels that control how the note is
 classified.
 
 :::{admonition} tl;dr
@@ -76,7 +77,7 @@ owner.
 The body includes its level-1 heading, which is the display title, and project steps with their
 metadata. There are no `people` or `project` fields. The label fields sit in one wrapping row: Date
 stays beside Type, Category, and Status when the pane is wide, and the fields wrap onto more rows when
-it narrows. The body editor fills the page pane, with its text starting at the top-left, so the
+it narrows. The body editor fills the detail region, with its text starting at the top-left, so the
 Markdown area grows with the window while the label fields stay above it.
 
 Changing a reference's category previews its new folder and moves the file only after confirmation.
@@ -112,8 +113,8 @@ opened from there.
 
 ## 🔀 Rename and trash
 
-Rename and Move to trash are available in read mode. Both show their affected references before
-confirming. A log entry has no Rename action; change its Date instead.
+Rename and Move to trash are available from the detail toolbar's secondary menu in read mode. Both show
+their affected references before confirming. A log entry has no Rename action; change its Date instead.
 
 A rename updates the first heading only when it still matches the old identity; a custom heading is
 preserved. Trashed pages move under `trash/`, and their inbound references become unresolved until a

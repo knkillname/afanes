@@ -70,7 +70,7 @@ BASELINE: dict[str, dict[str, int]] = {
         "views/project_body.py": 2,
         "views/projects.py": 2,
         "views/review.py": 1,
-        "views/workspace.py": 12,
+        "views/workspace.py": 11,
     },
     "suggested_or_destructive_buttons": {
         "app.py::_Shell": 6,
@@ -78,10 +78,10 @@ BASELINE: dict[str, dict[str, int]] = {
         "components/role_reference.py::RoleReferenceDialog": 1,
         "views/inbox.py::SessionNotice": 1,
         "views/inbox.py::WelcomeView": 3,
-        "views/page.py::PageView": 13,
+        "views/page.py::PageView": 12,
         "views/processing.py::ProcessingView": 3,
         "views/review.py::ReviewView": 7,
-        "views/workspace.py::WorkspaceView": 3,
+        "views/workspace.py::WorkspaceView": 1,
     },
     "icon_and_label_buttons": {
         "app.py::_Shell": 2,
@@ -89,7 +89,7 @@ BASELINE: dict[str, dict[str, int]] = {
         "views/page.py::PageView": 15,
         "views/processing.py::ProcessingView": 2,
         "views/review.py::ReviewView": 11,
-        "views/workspace.py::WorkspaceView": 4,
+        "views/workspace.py::WorkspaceView": 1,
     },
     "dense_rows": {
         "components/log_tree.py": 1,

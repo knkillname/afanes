@@ -76,6 +76,7 @@ class WorkspaceView:
         on_log_entry: Callable[[NoteDate], Awaitable[None]] | None = None,
         on_missing_role: Callable[[str], Awaitable[None]] | None = None,
         pick_role: afanes.ui.views.page.PickRole | None = None,
+        on_about: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         """Build the workspace controls against the shared application state.
 
@@ -101,6 +102,9 @@ class WorkspaceView:
             reference.
         pick_role : afanes.ui.views.page.PickRole | None
             Command that asks for an owner or requester name in read mode.
+        on_about : Callable[[], Awaitable[None]] | None
+            Command that shows the About dialog, or ``None`` when the host does
+            not provide one.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
@@ -109,18 +113,22 @@ class WorkspaceView:
         self._on_close_vault = on_close_vault
         self._on_new_reference = on_new_reference
         self._on_log_entry = on_log_entry
+        self._on_about = on_about
         self._pick_date = pick_date
         self._on_missing_role = on_missing_role
         self._pick_role = pick_role
         self.log_calendar: afanes.ui.components.calendar.LogCalendar | None = None
         self.log_tree: afanes.ui.components.log_tree.LogTree | None = None
-        self.log_today_button: ft.FilledButton | None = None
+        self.log_today_button: ft.TextButton | None = None
         self.log_entries_button: ft.TextButton | None = None
         self.log_everything_button: ft.TextButton | None = None
         self._processing_view: afanes.ui.views.processing.ProcessingView | None = None
         self._processing_key: tuple[Path | None, Path | None] | None = None
         self._projects_view: afanes.ui.views.projects.ProjectsView | None = None
         self._review_view: afanes.ui.views.review.ReviewView | None = None
+        self._breakpoint = "wide"
+        self._drawer_open = False
+        self._show_detail = False
 
         self.progress = ft.ProgressRing(
             width=16,
@@ -130,8 +138,10 @@ class WorkspaceView:
         )
         self.vault_text = ft.Text(
             "",
-            style=afanes.ui.theme.TEXT_ROLES["caption"],
+            style=afanes.ui.theme.TEXT_ROLES["heading"],
             selectable=True,
+            overflow=ft.TextOverflow.ELLIPSIS,
+            expand=True,
         )
         self.refresh_button = ft.IconButton(
             icon=ft.Icons.REFRESH_OUTLINED,
@@ -139,16 +149,16 @@ class WorkspaceView:
             on_click=self._refresh,
             key="workspace-refresh",
         )
-        self.new_reference_button = ft.FilledButton(
-            content=afanes.ui.strings.BROWSER_NEW_REFERENCE,
+        self.new_reference_button = ft.IconButton(
             icon=ft.Icons.ADD_OUTLINED,
+            tooltip=afanes.ui.strings.BROWSER_NEW_REFERENCE,
             on_click=self._new_reference,
+            visible=False,
             key="browser-new-reference",
         )
         self.change_button = ft.PopupMenuButton(
-            content=ft.Text(afanes.ui.strings.CHANGE_VAULT_ACTION),
             icon=ft.Icons.FOLDER_OPEN_OUTLINED,
-            tooltip=afanes.ui.strings.CHANGE_VAULT_ACTION,
+            tooltip=afanes.ui.strings.MAIN_MENU,
             items=[
                 ft.PopupMenuItem(
                     content=afanes.ui.strings.CHANGE_VAULT_OPEN,
@@ -165,11 +175,28 @@ class WorkspaceView:
                     on_click=self._close_vault,
                     key="workspace-close-vault",
                 ),
+                ft.PopupMenuItem(
+                    content=afanes.ui.strings.ABOUT_ACTION,
+                    on_click=self._about,
+                    key="workspace-about",
+                ),
             ],
             key="workspace-change",
         )
+        self.nav_toggle = ft.IconButton(
+            icon=ft.Icons.MENU_OUTLINED,
+            tooltip=afanes.ui.strings.WORKSPACE_NAVIGATION,
+            on_click=self._open_drawer,
+            visible=False,
+            key="workspace-navigation-toggle",
+        )
+        self.new_capture_button = ft.IconButton(
+            icon=ft.Icons.NOTE_ADD_OUTLINED,
+            tooltip=afanes.ui.strings.NEW_CAPTURE_ACTION,
+            on_click=self._new_capture,
+            key="workspace-new-capture",
+        )
         self.capture_field = ft.TextField(
-            label=afanes.ui.strings.COMPOSER_LABEL,
             hint_text=afanes.ui.strings.COMPOSER_HINT,
             multiline=True,
             min_lines=1,
@@ -184,6 +211,12 @@ class WorkspaceView:
             icon=ft.Icons.SEND_OUTLINED,
             on_click=self._capture,
             key="workspace-capture-button",
+        )
+        self.capture_row = ft.Row(
+            controls=[self.capture_field, self.capture_button],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            vertical_alignment=ft.CrossAxisAlignment.END,
+            key="workspace-capture-row",
         )
 
         self.review_count = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
@@ -220,9 +253,10 @@ class WorkspaceView:
             self.section_edges[section] = ft.Container(content=tile, border_radius=afanes.ui.theme.SURFACE_RADIUS)
 
         self.search_field = ft.TextField(
-            label=afanes.ui.strings.BROWSER_SEARCH_LABEL,
             hint_text=afanes.ui.strings.BROWSER_SEARCH_HINT,
+            prefix_icon=ft.Icons.SEARCH_OUTLINED,
             dense=True,
+            expand=True,
             on_change=self._search,
             key="browser-search",
         )
@@ -234,24 +268,68 @@ class WorkspaceView:
             key="browser-list",
         )
         self.failures_column = ft.Column(controls=[], spacing=0, visible=False)
-        self.sidebar = ft.Container(
-            width=afanes.ui.theme.SIDEBAR_WIDTH,
-            padding=afanes.ui.theme.ITEM_GAP,
+        self.browser_title = ft.Text(
+            "",
+            style=afanes.ui.theme.TEXT_ROLES["title-4"],
+            overflow=ft.TextOverflow.ELLIPSIS,
+        )
+        self.browser_actions = ft.Row(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
+        self.browser_header = ft.Container(
+            height=afanes.ui.theme.HEADER_HEIGHT,
+            content=ft.Row(
+                controls=[
+                    self.nav_toggle,
+                    self.browser_title,
+                    self.search_field,
+                    self.refresh_button,
+                    self.browser_actions,
+                ],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            key="browser-header",
+        )
+        self.browser_body = ft.Column(
+            controls=[
+                self.capture_row,
+                ft.Container(content=self.browser_list, expand=True),
+                self.failures_column,
+            ],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            expand=True,
+        )
+        self.browser_region = ft.Container(
+            width=afanes.ui.theme.BROWSER_MAX_WIDTH,
+            bgcolor=afanes.ui.theme.PAGE_SURFACE_COLOR,
+            content=ft.Column(
+                controls=[self.browser_header, self.browser_body],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                expand=True,
+            ),
+            key="workspace-browser",
+        )
+        self.navigation_header = ft.Container(
+            height=afanes.ui.theme.HEADER_HEIGHT,
+            content=ft.Row(
+                controls=[self.vault_text, self.change_button],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+        )
+        self.navigation = ft.Container(
+            width=afanes.ui.theme.NAVIGATION_WIDTH,
             bgcolor=afanes.ui.theme.REGION_SURFACE_COLOR,
-            border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
-            border_radius=afanes.ui.theme.SURFACE_RADIUS,
             content=ft.Column(
                 controls=[
+                    self.navigation_header,
+                    ft.Divider(height=afanes.ui.theme.BORDER_WIDTH),
                     self.review_edge,
-                    ft.Divider(height=1),
                     *self.section_edges.values(),
-                    self.search_field,
-                    ft.Container(content=self.browser_list, expand=True),
-                    self.failures_column,
                 ],
                 spacing=0,
                 expand=True,
             ),
+            key="workspace-navigation",
         )
 
         self.banners = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
@@ -261,44 +339,166 @@ class WorkspaceView:
             self._pick_date,
             self._on_missing_role,
             self._pick_role,
+            on_back=self._back_to_browser_if_empty,
         )
-        self.main_host = ft.Container(expand=True)
-        self.status_bar = ft.Container(
-            padding=ft.Padding.only(top=afanes.ui.theme.ITEM_GAP),
-            border=ft.Border(top=ft.BorderSide(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR)),
+        self.detail_title = ft.Text(
+            "",
+            style=afanes.ui.theme.TEXT_ROLES["title-3"],
+            overflow=ft.TextOverflow.ELLIPSIS,
+            expand=True,
+        )
+        self.detail_back_button = ft.IconButton(
+            icon=ft.Icons.ARROW_BACK_OUTLINED,
+            tooltip=afanes.ui.strings.PAGE_BACK,
+            on_click=self._back_to_browser,
+            visible=False,
+            key="workspace-detail-back",
+        )
+        self.detail_flow = ft.Row(
+            controls=[self.detail_back_button, self.detail_title],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            expand=True,
+        )
+        self.detail_host = ft.Container(expand=True)
+        self.detail_bar = ft.Container(
+            height=afanes.ui.theme.HEADER_HEIGHT,
             content=ft.Row(
-                controls=[
-                    self.vault_text,
-                    ft.Container(expand=True),
-                    self.progress,
-                    self.refresh_button,
-                    self.change_button,
-                ],
+                controls=[self.detail_host, self.new_capture_button],
                 spacing=afanes.ui.theme.ITEM_GAP,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
+            key="workspace-detail-toolbar",
         )
-        self.root = ft.Column(
-            controls=[
-                ft.Row(
-                    controls=[self.capture_field, self.capture_button],
-                    spacing=afanes.ui.theme.ITEM_GAP,
-                    vertical_alignment=ft.CrossAxisAlignment.END,
-                ),
-                self.banners,
-                ft.Row(
-                    controls=[self.sidebar, self.main_host],
-                    spacing=afanes.ui.theme.SECTION_GAP,
-                    vertical_alignment=ft.CrossAxisAlignment.STRETCH,
-                    expand=True,
-                ),
-                self.status_bar,
-            ],
-            spacing=afanes.ui.theme.SECTION_GAP,
+        self.main_host = ft.Container(expand=True)
+        self.detail_region = ft.Container(
             expand=True,
+            content=ft.Column(
+                controls=[self.detail_bar, self.main_host],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                expand=True,
+            ),
+            key="workspace-detail",
+        )
+        self.shell_row = ft.Row(
+            controls=[],
+            spacing=afanes.ui.theme.SECTION_GAP,
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+            expand=True,
+        )
+        self.shell_column = ft.Column(
+            controls=[self.banners, self.shell_row],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            expand=True,
+        )
+        self.root = ft.Stack(
+            controls=[self.shell_column],
+            expand=True,
+            fit=ft.StackFit.EXPAND,
             key="workspace-view",
         )
+        self._render_shell()
         self._refresh_dynamic()
+
+    def resize(self, width: int) -> None:
+        """Choose the shell arrangement for one available width.
+
+        Parameters
+        ----------
+        width : int
+            Viewport width in logical pixels.
+
+        Notes
+        -----
+        The open page, active destination, and search query are retained; only
+        the column arrangement changes.
+        """
+        if width >= afanes.ui.theme.SHELL_WIDE_MIN:
+            arrangement = "wide"
+        elif width >= afanes.ui.theme.SHELL_MEDIUM_MIN:
+            arrangement = "medium"
+        else:
+            arrangement = "narrow"
+        self._breakpoint = arrangement
+        self._render_shell()
+        self._update()
+
+    def close_drawer(self) -> None:
+        """Close the transient navigation drawer."""
+        if not self._drawer_open:
+            return
+        self._drawer_open = False
+        self._render_shell()
+        self._update()
+
+    def _render_shell(self) -> None:
+        """Arrange the shell controls for the stored breakpoint."""
+        wide = self._breakpoint == "wide"
+        narrow = self._breakpoint == "narrow"
+        if wide:
+            self._drawer_open = False
+        self.nav_toggle.visible = not wide
+        if wide:
+            self.browser_region.width = afanes.ui.theme.BROWSER_MAX_WIDTH
+            self.browser_region.expand = False
+            self.shell_row.controls = [self.navigation, self.browser_region, self.detail_region]
+        elif narrow:
+            self.browser_region.width = None
+            self.browser_region.expand = True
+            self.shell_row.controls = [self.detail_region if self._show_detail else self.browser_region]
+        else:
+            self.browser_region.width = afanes.ui.theme.BROWSER_MAX_WIDTH
+            self.browser_region.expand = False
+            self.shell_row.controls = [self.browser_region, self.detail_region]
+        overlay = self._drawer_control() if self._drawer_open and not wide else None
+        self.root.controls = [self.shell_column] if overlay is None else [self.shell_column, overlay]
+        if self._breakpoint == "narrow":
+            self.detail_back_button.visible = self._show_detail
+
+    def _drawer_control(self) -> ft.Control:
+        """Return the transient navigation overlay with its scrim."""
+        return ft.Row(
+            controls=[
+                self.navigation,
+                ft.Container(
+                    expand=True,
+                    bgcolor=afanes.ui.theme.DRAWER_SCRIM_COLOR,
+                    on_click=self._close_drawer,
+                    key="workspace-drawer-scrim",
+                ),
+            ],
+            expand=True,
+            key="workspace-drawer",
+        )
+
+    async def _open_drawer(self) -> None:
+        """Open the transient navigation drawer."""
+        self._drawer_open = True
+        self._render_shell()
+        self._update()
+
+    async def _close_drawer(self) -> None:
+        """Close the transient navigation drawer from its scrim."""
+        self.close_drawer()
+
+    async def _back_to_browser(self) -> None:
+        """Show the browser in a one-region layout."""
+        self._show_detail = False
+        self._render_shell()
+        self._update()
+
+    async def _back_to_browser_if_empty(self) -> bool:
+        """Return to the browser when the detail has no page history.
+
+        Returns
+        -------
+        bool
+            ``True`` when this shell handled the back request.
+        """
+        if self._breakpoint == "narrow" and self._show_detail and not self._state.navigation.history:
+            await self._back_to_browser()
+            return True
+        return False
 
     def build(self) -> ft.Control:
         """Return the root control for the workspace.
@@ -378,6 +578,38 @@ class WorkspaceView:
         finally:
             self._set_working(working=False)
 
+    async def _about(self) -> None:
+        """Show the About dialog through the application shell."""
+        if self._on_about is None:
+            return
+        await self._on_about()
+
+    async def start_capture(self) -> None:
+        """Switch to the Inbox and focus the capture composer."""
+        await self._state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.INBOX)
+        self._refresh_dynamic()
+        await self._focus_capture()
+        self._update()
+
+    async def _new_capture(self) -> None:
+        """Run the New Capture command from the toolbar."""
+        await self.start_capture()
+
+    async def focus_search(self) -> None:
+        """Focus the permanent browser search entry."""
+        await self._focus(self.search_field)
+
+    async def _focus_capture(self) -> None:
+        """Focus the capture composer when the control is attached."""
+        await self._focus(self.capture_field)
+
+    async def _focus(self, control: ft.TextField) -> None:
+        """Focus one text field, ignoring an unattached control."""
+        try:
+            await control.focus()
+        except RuntimeError:
+            return
+
     async def _select(self, path: Path) -> None:
         """Open one browser entry in the page pane."""
         self._set_working(working=True)
@@ -385,6 +617,8 @@ class WorkspaceView:
             await self._state.navigation.open_page(path)
         finally:
             self._set_working(working=False)
+        self._show_detail = True
+        self._render_shell()
         self._refresh_dynamic()
         await self.page_view.scroll_to_top()
         self._update()
@@ -392,12 +626,18 @@ class WorkspaceView:
     async def _select_section(self, section: afanes.ui.state.browser.WorkspaceSection) -> None:
         """Switch the browser to one section."""
         await self._state.browser.set_section(section)
+        self._drawer_open = False
+        self._show_detail = False
+        self._render_shell()
         self._refresh_dynamic()
         self._update()
 
     async def _select_review(self) -> None:
         """Open the review destination."""
         await self._state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.REVIEW)
+        self._drawer_open = False
+        self._show_detail = True
+        self._render_shell()
         self._refresh_dynamic()
         self._update()
 
@@ -411,6 +651,8 @@ class WorkspaceView:
         """Open the Processing Wizard for one inbox capture."""
         opened = await self._state.processing.begin(path)
         if opened:
+            self._show_detail = True
+            self._render_shell()
             self._refresh_dynamic()
             self._update()
 
@@ -423,6 +665,8 @@ class WorkspaceView:
     async def _finish_processing(self) -> None:
         """Close the Processing Wizard success state."""
         self._state.processing.finish()
+        self._show_detail = False
+        self._render_shell()
         self._refresh_dynamic()
         self._update()
 
@@ -449,6 +693,8 @@ class WorkspaceView:
         self.refresh_button.disabled = working
         self.change_button.disabled = working
         self.new_reference_button.disabled = working
+        self.new_capture_button.disabled = working
+        self.nav_toggle.disabled = working
         self.capture_field.read_only = working
         if self.log_today_button is not None:
             self.log_today_button.disabled = working
@@ -478,17 +724,13 @@ class WorkspaceView:
         """Refresh counts, browser entries, banners, and the main area."""
         self._own_controls()
         state = self._state
-        self.vault_text.value = str(state.session.vault_root) if state.session.vault_root is not None else ""
+        root = state.session.vault_root
+        self.vault_text.value = root.name if root is not None else ""
+        self.vault_text.tooltip = str(root) if root is not None else None
         listing = state.browser.listing()
+        counts = state.browser.counts()
         for section, tile in self.section_tiles.items():
-            browser_section = section.browser_section
-            count = 0
-            if section is afanes.ui.state.browser.WorkspaceSection.LOG:
-                timeline = state.browser.timeline()
-                count = len(timeline.entries()) if timeline is not None else 0
-            elif listing is not None and browser_section is not None:
-                count = sum(len(group.notes) for group in listing.groups_for(browser_section))
-            self.section_counts[section].value = str(count)
+            self.section_counts[section].value = str(counts.get(section, 0))
             active = state.browser.active_section is section
             tile.selected = active
             self.section_icons[section].color = afanes.ui.theme.SECTION_ICON_COLOR
@@ -497,28 +739,37 @@ class WorkspaceView:
         self.review_tile.selected = review_active
         self.review_icon.color = afanes.ui.theme.SECTION_ICON_COLOR
         self.search_field.value = state.browser.query
+        self._refresh_browser_header()
+        self.capture_row.visible = state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
         self.browser_list.controls = self._browser_controls(listing)
         self._refresh_failures()
         self._refresh_banners()
         self._refresh_main()
         self.progress.visible = state.status.busy
 
+    def _refresh_browser_header(self) -> None:
+        """Refresh the browser title and the destination actions."""
+        state = self._state
+        section = state.browser.active_section
+        if section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
+            title = afanes.ui.strings.REVIEW_TITLE
+        else:
+            title = afanes.ui.strings.WORKSPACE_SECTION_LABELS[section.value]
+        self.browser_title.value = title
+        references = section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
+        self.new_reference_button.visible = references
+        self.browser_actions.controls = [self.new_reference_button] if references else []
+
     def _browser_controls(
         self,
         listing: afanes.core.search.BrowserListing | None,
     ) -> list[ft.Control]:
-        """Build the sidebar entries for the active section."""
+        """Build the browser entries for the active destination or search."""
         state = self._state
+        if state.browser.query.strip():
+            return self._search_controls(listing)
         if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
-            return [
-                ft.Container(
-                    padding=afanes.ui.theme.ITEM_GAP,
-                    content=ft.Text(
-                        afanes.ui.strings.review_pending(state.browser.pending_count()),
-                        color=afanes.ui.theme.MUTED_TEXT_COLOR,
-                    ),
-                )
-            ]
+            return self._review_queue_controls()
         if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.PROJECTS:
             if self._projects_view is None:
                 self._projects_view = afanes.ui.views.projects.ProjectsView(self._update, self._select)
@@ -529,44 +780,136 @@ class WorkspaceView:
         section = state.browser.active_section.browser_section
         if listing is None or section is None:
             return []
-        groups = listing.groups_for(section)
-        controls: list[ft.Control] = []
         if section is afanes.core.search.BrowserSection.REFERENCES:
+            return self._reference_controls(listing.groups_for(section))
+        return self._flat_controls(listing.groups_for(section))
+
+    def _reference_controls(self, groups: tuple[afanes.core.search.BrowserGroup, ...]) -> list[ft.Control]:
+        """Build the categorized reference list for the References section."""
+        controls: list[ft.Control] = []
+        for group in groups:
+            if not group.notes:
+                continue
             controls.append(
                 ft.Container(
                     padding=afanes.ui.theme.ITEM_GAP,
-                    content=self.new_reference_button,
+                    content=ft.Text(
+                        group.title,
+                        style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
+                    ),
                 )
             )
-            for group in groups:
-                if not group.notes:
+            controls.extend(self._note_row(note) for note in group.notes)
+        if not controls:
+            controls.append(self._empty_message(afanes.ui.strings.BROWSER_EMPTY))
+        return controls
+
+    def _flat_controls(self, groups: tuple[afanes.core.search.BrowserGroup, ...]) -> list[ft.Control]:
+        """Build the flat note list for Inbox or Needs attention."""
+        notes = groups[0].notes if groups else ()
+        if not notes:
+            return [self._empty_message(afanes.ui.strings.BROWSER_EMPTY)]
+        return [self._note_row(note) for note in notes]
+
+    def _empty_message(self, message: str) -> ft.Control:
+        """Build one muted empty-state message."""
+        return ft.Container(
+            padding=afanes.ui.theme.ITEM_GAP,
+            content=ft.Text(message, color=afanes.ui.theme.MUTED_TEXT_COLOR, selectable=True),
+        )
+
+    def _search_controls(
+        self,
+        listing: afanes.core.search.BrowserListing | None,
+    ) -> list[ft.Control]:
+        """Build section-grouped search results across every destination."""
+        state = self._state
+        controls: list[ft.Control] = []
+        matched = False
+        if listing is not None:
+            for section in (
+                afanes.core.search.BrowserSection.INBOX,
+                afanes.core.search.BrowserSection.PROJECTS,
+                afanes.core.search.BrowserSection.REFERENCES,
+            ):
+                notes = [note for group in listing.groups_for(section) for note in group.notes]
+                if not notes:
                     continue
+                matched = True
+                controls.append(self._heading(afanes.ui.strings.WORKSPACE_SECTION_LABELS[section.value], len(notes)))
+                controls.extend(self._note_row(note) for note in notes)
+        timeline = state.browser.timeline()
+        log_entries = timeline.entries() if timeline is not None else ()
+        if log_entries:
+            matched = True
+            controls.append(self._heading(afanes.ui.strings.WORKSPACE_SECTION_LABELS["log"], len(log_entries)))
+        if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.LOG:
+            controls.extend(self._log_controls())
+        else:
+            controls.extend(self._note_row(note) for note in log_entries)
+        if listing is not None:
+            misplaced = listing.group(afanes.core.search.BrowserSection.NEEDS_ATTENTION).notes
+            if misplaced:
+                matched = True
                 controls.append(
-                    ft.Container(
-                        padding=afanes.ui.theme.ITEM_GAP,
-                        content=ft.Text(
-                            group.title,
-                            style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
-                        ),
+                    self._heading(
+                        afanes.ui.strings.WORKSPACE_SECTION_LABELS[
+                            afanes.core.search.BrowserSection.NEEDS_ATTENTION.value
+                        ],
+                        len(misplaced),
                     )
                 )
-                controls.extend(self._note_row(note) for note in group.notes)
-            groups_empty = not any(group.notes for group in groups)
-        else:
-            notes = groups[0].notes if groups else ()
-            controls = [self._note_row(note) for note in notes]
-            groups_empty = not notes
-        if groups_empty:
-            message = (
-                afanes.ui.strings.BROWSER_NO_MATCH if state.browser.query.strip() else afanes.ui.strings.BROWSER_EMPTY
-            )
-            controls.append(
+                controls.extend(self._note_row(note) for note in misplaced)
+        if not matched:
+            return [
+                self._empty_message(afanes.ui.strings.BROWSER_NO_MATCH_QUERY.format(query=state.browser.query.strip()))
+            ]
+        return controls
+
+    @staticmethod
+    def _heading(label: str, count: int) -> ft.Control:
+        """Build one search-result section heading with its match count."""
+        return ft.Container(
+            padding=afanes.ui.theme.ITEM_GAP,
+            content=ft.Text(
+                f"{label} ({count})",
+                style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
+            ),
+        )
+
+    def _review_queue_controls(self) -> list[ft.Control]:
+        """Build the read-only snapshot queue for the active review session."""
+        state = self._state
+        session = state.review.review_session
+        if session is None:
+            return [
                 ft.Container(
                     padding=afanes.ui.theme.ITEM_GAP,
-                    content=ft.Text(message, color=afanes.ui.theme.MUTED_TEXT_COLOR, selectable=True),
+                    content=ft.Text(
+                        afanes.ui.strings.review_pending(state.browser.pending_count()),
+                        color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                    ),
                 )
+            ]
+        return [
+            ft.ListTile(
+                title=self._review_item_title(item),
+                selected=index == session.index,
+                key=f"review-queue-{index}",
             )
-        return controls
+            for index, item in enumerate(session.items)
+        ]
+
+    def _review_item_title(self, item: afanes.core.search.ReviewItem) -> str:
+        """Return the display title for one review queue item."""
+        if item.kind is afanes.core.search.ReviewItemKind.INBOX:
+            note = next((note for note in self._state.session.notes if note.path == item.path), None)
+            return note.title if note is not None else item.path.stem
+        if item.step is not None:
+            return item.step.text
+        if item.project is not None:
+            return item.project.note.title
+        return item.path.stem
 
     @staticmethod
     def _today() -> datetime.date:
@@ -656,9 +999,8 @@ class WorkspaceView:
             on_click=self._log_everything,
             key="log-mode-everything",
         )
-        self.log_today_button = ft.FilledButton(
+        self.log_today_button = ft.TextButton(
             content=afanes.ui.strings.LOG_TODAY_ENTRY,
-            icon=ft.Icons.TODAY_OUTLINED,
             on_click=self._log_today,
             key="log-today-entry",
         )
@@ -896,6 +1238,8 @@ class WorkspaceView:
                     self._finish_processing,
                 )
                 self._processing_key = key
+            self.detail_title.value = afanes.ui.strings.PROCESSING_TITLE
+            self._show_flow_toolbar()
             self.main_host.content = self._processing_view.build()
             return
         self._processing_view = None
@@ -904,7 +1248,17 @@ class WorkspaceView:
             if self._review_view is None:
                 self._review_view = afanes.ui.views.review.ReviewView(self._on_review_update)
             self._review_view.refresh()
+            self.detail_title.value = afanes.ui.strings.REVIEW_TITLE
+            self._show_flow_toolbar()
             self.main_host.content = self._review_view.build()
             return
         self.page_view.refresh()
-        self.main_host.content = self.page_view.build()
+        self.detail_host.content = self.page_view.toolbar()
+        if self._breakpoint == "narrow" and state.pages.page is not None:
+            self.page_view.back_button.disabled = False
+        self.main_host.content = self.page_view.body()
+
+    def _show_flow_toolbar(self) -> None:
+        """Show the flow title and Back control instead of the page toolbar."""
+        self.detail_back_button.visible = self._breakpoint == "narrow" and self._show_detail
+        self.detail_host.content = self.detail_flow

@@ -721,8 +721,9 @@ class TestPanels:
         view = PageView(lambda: None)
 
         assert view.trash_confirm_button.style == afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE
-        assert view.trash_button.style == afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE
         assert view.trash_cancel_button.style is None
+        assert view.trash_item.content == afanes.ui.strings.PAGE_TRASH
+        assert view.menu_button.icon == ft.Icons.MORE_VERT_OUTLINED
 
     def test_conflict_panel_offers_reload_and_overwrite(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -906,8 +907,8 @@ class TestPanels:
 
         asyncio.run(scenario())
 
-        assert view.rename_button.visible is False
-        assert view.trash_button.visible is True
+        assert view.rename_item.visible is False
+        assert view.trash_item.visible is True
 
 
 class TestSteps:

@@ -8,12 +8,12 @@ files as every other section: there is no separate database and no hidden histor
 
 A log entry is a note with `type: log` and a date. Its date is its identity, so it is filed under
 `log/<year>/` or `log/<year>/<month>/`. One entry may exist per exact date. The calendar and the
-collapsed year tree show the archive; the page pane is the reading and writing area.
+collapsed year tree show the archive; the detail region is the reading and writing area.
 :::
 
 ## 🗓️ The calendar
 
-Open **Log** in the sidebar. The lower area shows a month calendar and a collapsed date tree.
+Open **Log** in the navigation region. The browser region shows a month calendar and a collapsed date tree.
 
 - A day with entries has a tinted cell and a dot.
 - A month with a whole-month entry has a dot on its header.

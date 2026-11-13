@@ -120,6 +120,7 @@ class BrowserState:
         """
         async with self.command_lock:
             self.active_section = section
+            self.query = ""
             self.session.status.clear_message()
 
     async def set_query(self, query: str) -> None:
@@ -147,6 +148,34 @@ class BrowserState:
         if snapshot is None:
             return None
         return afanes.core.search.Browser(snapshot).filter(self.query)
+
+    def counts(self) -> dict[WorkspaceSection, int]:
+        """Return unfiltered totals for every destination.
+
+        Returns
+        -------
+        dict[WorkspaceSection, int]
+            Number of notes behind each destination. Review is omitted; Log
+            counts every entry in the active Log lens. An empty mapping is
+            returned when no vault is open.
+        """
+        snapshot = self.session.snapshot
+        if snapshot is None:
+            return {}
+        listing = afanes.core.search.Browser(snapshot).groups()
+        counts: dict[WorkspaceSection, int] = {}
+        for section in WorkspaceSection:
+            if section is WorkspaceSection.REVIEW:
+                continue
+            if section is WorkspaceSection.LOG:
+                counts[section] = len(LogTimeline(snapshot, self.log_mode, "").entries())
+                continue
+            browser_section = section.browser_section
+            if browser_section is None:
+                counts[section] = 0
+            else:
+                counts[section] = sum(len(group.notes) for group in listing.groups_for(browser_section))
+        return counts
 
     def reference_categories(self) -> tuple[CategoryLabel, ...]:
         """Return every category label used by a reference note.

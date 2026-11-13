@@ -137,11 +137,23 @@ class TestWorkspaceShell:
         view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
 
         assert view.root.key == "workspace-view"
-        assert isinstance(view.root, ft.Column)
-        assert view.capture_field.label == afanes.ui.strings.COMPOSER_LABEL
+        assert isinstance(view.root, ft.Stack)
+        assert view.capture_field.hint_text == afanes.ui.strings.COMPOSER_HINT
         assert len(view.section_tiles) == SECTION_COUNT
         assert view.review_tile.title == afanes.ui.strings.REVIEW_TITLE
         assert view.page_view.empty_text.visible is True
+        assert view.navigation.key == "workspace-navigation"
+        assert view.browser_region.key == "workspace-browser"
+        assert view.detail_region.key == "workspace-detail"
+
+    def test_navigation_lists_destinations_only(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        assert _find_control(view.navigation, "browser-list") is None
+        assert _find_control(view.navigation, "browser-search") is None
+        assert _find_control(view.navigation, "review-entry") is not None
+        assert _find_control(view.browser_region, "browser-list") is not None
+        assert _find_control(view.browser_region, "browser-search") is not None
 
     def test_change_menu_offers_open_create_and_close(
         self,
@@ -163,14 +175,40 @@ class TestWorkspaceShell:
             "workspace-change-open",
             "workspace-change-create",
             "workspace-close-vault",
+            "workspace-about",
         ]
         assert view.change_button.items[0].content == afanes.ui.strings.CHANGE_VAULT_OPEN
         assert view.change_button.items[1].content == afanes.ui.strings.CHANGE_VAULT_CREATE
         assert view.change_button.items[2].content == afanes.ui.strings.CLOSE_VAULT_ACTION
+        assert view.change_button.items[3].content == afanes.ui.strings.ABOUT_ACTION
 
         asyncio.run(_handler(view.change_button.items[2])())
 
         assert calls == ["close"]
+
+    def test_about_menu_item_reaches_the_host(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        calls: list[str] = []
+
+        async def about() -> None:
+            calls.append("about")
+
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        view = afanes.ui.views.workspace.WorkspaceView(
+            _noop,
+            _change_vault,
+            _create_vault,
+            _close_vault,
+            on_about=about,
+        )
+
+        asyncio.run(_handler(view.change_button.items[3])())
+
+        assert calls == ["about"]
 
     def test_browser_and_page_are_visible_together(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -185,7 +223,7 @@ class TestWorkspaceShell:
         asyncio.run(scenario())
         view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
 
-        assert view.sidebar.visible is True
+        assert view.navigation.visible is True
         assert view.page_view.title.value == "Buy milk"
         assert view.page_view.read_body.visible is True
 
@@ -193,24 +231,40 @@ class TestWorkspaceShell:
         view = _open_workspace(tmp_path, monkeypatch)
         border = ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR)
 
-        assert view.sidebar.bgcolor == afanes.ui.theme.REGION_SURFACE_COLOR
-        assert view.sidebar.border == border
+        assert view.navigation.bgcolor == afanes.ui.theme.REGION_SURFACE_COLOR
+        assert view.navigation.border is None
+        assert view.navigation.border_radius is None
+        assert view.browser_region.bgcolor == afanes.ui.theme.PAGE_SURFACE_COLOR
+        assert view.browser_region.border is None
         assert isinstance(view.page_view.root, ft.Container)
         assert view.page_view.root.bgcolor == afanes.ui.theme.CARD_SURFACE_COLOR
         assert view.page_view.root.border == border
 
-    def test_status_bar_holds_the_vault_identity_and_actions(
+    def test_navigation_holds_the_vault_identity_and_actions(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
-        assert isinstance(view.status_bar.content, ft.Row)
-        assert view.status_bar in view.root.controls
-        assert view.vault_text in view.status_bar.content.controls
-        assert view.refresh_button in view.status_bar.content.controls
-        assert view.change_button in view.status_bar.content.controls
+        navigation_header = typing.cast("ft.Row", view.navigation_header.content)
+        browser_header = typing.cast("ft.Row", view.browser_header.content)
+        assert view.vault_text in navigation_header.controls
+        assert view.change_button in navigation_header.controls
+        assert view.refresh_button in browser_header.controls
+        assert not hasattr(view, "status_bar")
         assert afanes.ui.strings.APP_TITLE not in _texts(view.root)
+
+    def test_vault_identity_names_the_vault_and_keeps_the_path(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        root = afanes.ui.state.app_state.session.vault_root
+
+        assert root is not None
+        assert view.vault_text.value == root.name
+        assert view.vault_text.tooltip == str(root)
 
     def test_sections_share_one_icon_tint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
@@ -572,11 +626,11 @@ class TestBrowserCreationAction:
             on_new_reference=new_reference,
         )
 
-        assert _find_control(view.browser_list, "browser-new-reference") is None
+        assert _find_control(view.browser_actions, "browser-new-reference") is None
         section = afanes.ui.state.browser.WorkspaceSection.REFERENCES
         asyncio.run(_handler(view.section_tiles[section])())
-        button = typing.cast("ft.FilledButton", _find_control(view.browser_list, "browser-new-reference"))
-        assert button.content == afanes.ui.strings.BROWSER_NEW_REFERENCE
+        button = typing.cast("ft.IconButton", _find_control(view.browser_actions, "browser-new-reference"))
+        assert button.tooltip == afanes.ui.strings.BROWSER_NEW_REFERENCE
 
         asyncio.run(_handler(button)())
 
@@ -608,6 +662,309 @@ class TestBrowserCreationAction:
 
         assert observed == [True]
         assert view.new_reference_button.disabled is False
+
+
+class TestGlobalSearch:
+    def test_results_span_every_section(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "Buy milk.md", body="# Buy milk\n\nshared term")
+        _write_note(
+            vault / "projects" / "Launch.md",
+            note_type="project",
+            status="active",
+            body="# Launch\n\nshared term",
+        )
+        _write_note(vault / "reference" / "Ada.md", note_type="reference", body="# Ada\n\nshared term")
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        view.search_field.value = "shared term"
+        asyncio.run(_change_handler(view.search_field)())
+
+        titles = [control.title for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        assert set(titles) == {"Buy milk", "Launch", "Ada"}
+        headings = _texts(view.browser_list)
+        assert "Inbox (1)" in headings
+        assert "Projects (1)" in headings
+        assert "References (1)" in headings
+
+    def test_a_match_outside_the_active_section_is_listed(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "Buy milk.md")
+        _write_note(vault / "projects" / "Launch.md", note_type="project", status="active")
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        view.search_field.value = "launch"
+        asyncio.run(_change_handler(view.search_field)())
+
+        assert afanes.ui.state.app_state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
+        assert _row_for(view.browser_list, "Launch") is not None
+
+    def test_navigation_counts_remain_unfiltered_totals(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "One.md", body="# One\n\nterm")
+        _write_note(vault / "inbox" / "Two.md", body="# Two")
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        view.search_field.value = "term"
+        asyncio.run(_change_handler(view.search_field)())
+
+        assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.INBOX].value == "2"
+
+    def test_clearing_restores_the_active_destination(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "One.md", body="# One\n\nterm")
+        _write_note(vault / "inbox" / "Two.md", body="# Two")
+        view = _open_workspace(tmp_path, monkeypatch)
+        view.search_field.value = "term"
+        asyncio.run(_change_handler(view.search_field)())
+
+        view.search_field.value = ""
+        asyncio.run(_change_handler(view.search_field)())
+
+        titles = [control.title for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        assert titles == ["Two", "One"]
+
+    def test_switching_destinations_clears_the_query(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "One.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+        view.search_field.value = "one"
+        asyncio.run(_change_handler(view.search_field)())
+
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.PROJECTS])())
+
+        assert afanes.ui.state.app_state.browser.query == ""
+        assert view.search_field.value == ""
+
+    def test_a_miss_names_the_query(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _write_note(tmp_path / "vault" / "inbox" / "One.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+        view.search_field.value = "absent"
+        asyncio.run(_change_handler(view.search_field)())
+
+        assert any("absent" in text for text in _texts(view.browser_list))
+        assert afanes.ui.strings.BROWSER_NO_MATCH_QUERY.format(query="absent") in _texts(view.browser_list)
+
+
+class TestCapturePlacement:
+    def test_the_composer_appears_only_in_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _write_note(tmp_path / "vault" / "inbox" / "One.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        assert view.capture_row.visible is True
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.PROJECTS])())
+
+        assert view.capture_row.visible is False
+
+    def test_new_capture_switches_to_inbox_and_focuses(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "One.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.PROJECTS])())
+        focused: list[str] = []
+
+        async def record(control: ft.TextField) -> None:
+            focused.append(str(control.key or ""))
+
+        monkeypatch.setattr(ft.TextField, "focus", record)
+
+        asyncio.run(_handler(view.new_capture_button)())
+
+        assert afanes.ui.state.app_state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
+        assert view.capture_row.visible is True
+        assert focused == ["workspace-capture-field"]
+
+    def test_capture_is_the_only_suggested_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _write_note(tmp_path / "vault" / "inbox" / "One.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.REFERENCES])())
+
+        assert isinstance(view.capture_button, ft.FilledButton)
+        assert not isinstance(view.new_reference_button, ft.FilledButton)
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.LOG])())
+        assert view.log_today_button is not None
+        assert not isinstance(view.log_today_button, ft.FilledButton)
+
+
+class TestReviewQueue:
+    def _open_review(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> afanes.ui.views.workspace.WorkspaceView:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "One.md")
+        _write_note(vault / "inbox" / "Two.md")
+        _write_note(vault / "projects" / "Launch.md", note_type="project", status="active")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.review.start()
+
+        asyncio.run(scenario())
+        return afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
+
+    def _queue_titles(self, view: afanes.ui.views.workspace.WorkspaceView) -> list[str]:
+        return [str(control.title) for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+
+    def test_the_queue_follows_the_session_order(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = self._open_review(tmp_path, monkeypatch)
+        session = afanes.ui.state.app_state.review.review_session
+
+        assert session is not None
+        assert self._queue_titles(view) == [self._review_title(item) for item in session.items]
+        assert self._queue_titles(view)[0] == "Two"
+
+    def test_the_current_item_is_marked(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = self._open_review(tmp_path, monkeypatch)
+        rows = [control for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+
+        assert rows[0].selected is True
+        assert not any(row.selected for row in rows[1:])
+
+        asyncio.run(afanes.ui.state.app_state.review.skip())
+        view.refresh()
+        rows = [control for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+
+        assert rows[0].selected is False
+        assert rows[1].selected is True
+
+    def test_new_work_waits_for_the_next_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = self._open_review(tmp_path, monkeypatch)
+        before = self._queue_titles(view)
+        state = afanes.ui.state.app_state
+        _write_note(tmp_path / "vault" / "inbox" / "Later.md")
+
+        async def scenario() -> None:
+            await state.workspace.refresh()
+
+        asyncio.run(scenario())
+        view.refresh()
+
+        assert self._queue_titles(view) == before
+
+    def test_a_completed_session_marks_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = self._open_review(tmp_path, monkeypatch)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            session = state.review.review_session
+            assert session is not None
+            for _ in session.items:
+                await state.review.skip()
+
+        asyncio.run(scenario())
+        view.refresh()
+        rows = [control for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+
+        assert rows
+        assert not any(row.selected for row in rows)
+
+    @staticmethod
+    def _review_title(item: afanes.core.search.ReviewItem) -> str:
+        if item.step is not None:
+            return item.step.text
+        if item.project is not None:
+            return item.project.note.title
+        note = next(
+            (candidate for candidate in afanes.ui.state.app_state.session.notes if candidate.path == item.path),
+            None,
+        )
+        return note.title if note is not None else item.path.stem
+
+
+class TestAdaptiveLayout:
+    def test_a_wide_window_shows_three_regions(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        view.resize(afanes.ui.theme.SHELL_WIDE_MIN)
+
+        assert view.shell_row.controls == [view.navigation, view.browser_region, view.detail_region]
+        assert view.nav_toggle.visible is False
+
+    def test_a_medium_window_keeps_browser_and_detail(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN)
+
+        assert view.shell_row.controls == [view.browser_region, view.detail_region]
+        assert view.nav_toggle.visible is True
+
+    def test_a_narrow_presentation_starts_with_the_browser(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN - 1)
+
+        assert view.shell_row.controls == [view.browser_region]
+        assert view.browser_region.expand is True
+
+    def test_a_narrow_presentation_opens_and_returns_from_the_detail(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "One.md", body="# One")
+        view = _open_workspace(tmp_path, monkeypatch)
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN - 1)
+        _record_page_scroll(view)
+
+        asyncio.run(_handler(_row_for(view.browser_list, "One"))())
+
+        assert view.shell_row.controls == [view.detail_region]
+        assert view.page_view.back_button.disabled is False
+
+        asyncio.run(view.page_view.go_back())
+
+        assert view.shell_row.controls == [view.browser_region]
+
+    def test_a_resize_preserves_the_page_destination_and_query(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        note = _write_note(vault / "inbox" / "One.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+        _record_page_scroll(view)
+        asyncio.run(_handler(_row_for(view.browser_list, "One"))())
+        asyncio.run(afanes.ui.state.app_state.browser.set_query("one"))
+        view.refresh()
+
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN - 1)
+        view.resize(afanes.ui.theme.SHELL_WIDE_MIN)
+
+        state = afanes.ui.state.app_state
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
+        assert state.browser.query == "one"
+        assert state.pages.page is not None
+        assert state.pages.page.path == note
+
+    def test_the_drawer_exposes_the_navigation_and_closes_on_selection(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN)
+
+        asyncio.run(_handler(view.nav_toggle)())
+
+        drawer = next(control for control in view.root.controls if getattr(control, "key", None) == "workspace-drawer")
+        assert view.navigation in typing.cast("ft.Row", drawer).controls
+
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.PROJECTS])())
+
+        assert view.root.controls == [view.shell_column]
+
+    def test_escape_closes_the_drawer(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN)
+        asyncio.run(_handler(view.nav_toggle)())
+
+        view.close_drawer()
+
+        assert view.root.controls == [view.shell_column]
 
 
 def _row_for(browser: ft.ListView, title: str) -> ft.ListTile:

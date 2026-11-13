@@ -76,6 +76,14 @@ ICON_SIZE_LARGE_VALUE = 32
 LIST_ROW_MIN_HEIGHT = 36
 WINDOW_MIN_WIDTH_VALUE = 1024
 WINDOW_MIN_HEIGHT_VALUE = 600
+NAVIGATION_WIDTH_VALUE = 220
+BROWSER_MIN_WIDTH_VALUE = 320
+BROWSER_MAX_WIDTH_VALUE = 360
+PAGE_MIN_WIDTH_VALUE = 420
+CONTENT_MAX_WIDTH_VALUE = 720
+SHELL_WIDE_MIN_VALUE = 1100
+SHELL_MEDIUM_MIN_VALUE = 1024
+HEADER_HEIGHT_VALUE = 48
 SELECTION_TINT = 0.10
 LOG_TINT = 0.18
 BASE_FONT_SIZE_VALUE = 15
@@ -281,8 +289,34 @@ class TestTheme:
         assert tiles.min_height == LIST_ROW_MIN_HEIGHT
 
     def test_minimum_window_fits_the_reference_desktop_size(self) -> None:
-        assert afanes.ui.theme.WINDOW_MIN_WIDTH <= WINDOW_MIN_WIDTH_VALUE
-        assert afanes.ui.theme.WINDOW_MIN_HEIGHT <= WINDOW_MIN_HEIGHT_VALUE
+        assert afanes.ui.theme.WINDOW_MIN_WIDTH == WINDOW_MIN_WIDTH_VALUE
+        assert afanes.ui.theme.WINDOW_MIN_HEIGHT == WINDOW_MIN_HEIGHT_VALUE
+
+    def test_shell_tokens_match_the_designed_widths(self) -> None:
+        assert afanes.ui.theme.NAVIGATION_WIDTH == NAVIGATION_WIDTH_VALUE
+        assert afanes.ui.theme.BROWSER_MIN_WIDTH == BROWSER_MIN_WIDTH_VALUE
+        assert afanes.ui.theme.BROWSER_MAX_WIDTH == BROWSER_MAX_WIDTH_VALUE
+        assert afanes.ui.theme.PAGE_MIN_WIDTH == PAGE_MIN_WIDTH_VALUE
+        assert afanes.ui.theme.CONTENT_MAX_WIDTH == CONTENT_MAX_WIDTH_VALUE
+        assert afanes.ui.theme.SHELL_WIDE_MIN == SHELL_WIDE_MIN_VALUE
+        assert afanes.ui.theme.SHELL_MEDIUM_MIN == SHELL_MEDIUM_MIN_VALUE
+        assert afanes.ui.theme.HEADER_HEIGHT == HEADER_HEIGHT_VALUE
+        assert not hasattr(afanes.ui.theme, "LIST_WIDTH")
+
+    def test_shell_width_relationships_hold(self) -> None:
+        theme = afanes.ui.theme
+
+        assert theme.BROWSER_MIN_WIDTH < theme.BROWSER_MAX_WIDTH
+        assert theme.PAGE_MIN_WIDTH < theme.CONTENT_MAX_WIDTH
+        assert theme.SHELL_MEDIUM_MIN < theme.SHELL_WIDE_MIN
+        assert theme.HEADER_HEIGHT > 0
+        assert theme.NAVIGATION_WIDTH > 0
+
+    def test_the_shell_fits_its_breakpoints(self) -> None:
+        theme = afanes.ui.theme
+
+        assert theme.NAVIGATION_WIDTH + theme.BROWSER_MAX_WIDTH + theme.PAGE_MIN_WIDTH <= theme.SHELL_WIDE_MIN
+        assert theme.BROWSER_MAX_WIDTH + theme.PAGE_MIN_WIDTH <= theme.SHELL_MEDIUM_MIN
 
     def test_spacing_uses_the_adwaita_rhythm(self) -> None:
         assert afanes.ui.theme.ITEM_GAP == ITEM_GAP_VALUE

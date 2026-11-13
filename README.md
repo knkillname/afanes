@@ -3,7 +3,7 @@
 Afanes is an offline, local-first Markdown vault: a personal wiki and project engine that keeps every
 note as an ordinary `.md` file you own.
 
-![The Afanes workspace with browser groups on the left and a capture open in the page pane](https://raw.githubusercontent.com/knkillname/afanes/main/docs/_static/screenshots/workspace.png)
+![The Afanes workspace with navigation and browser groups on the left and a capture open in the detail region](https://raw.githubusercontent.com/knkillname/afanes/main/docs/_static/screenshots/workspace.png)
 
 ## 📦 Run from a source checkout
 

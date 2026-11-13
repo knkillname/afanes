@@ -32,9 +32,10 @@ Starting a review snapshots a queue in this order:
 4. Open projects with no open step.
 5. Healthy open projects, for a quick confirmation.
 
-Closed projects are excluded. Notes created during a session appear in the browser immediately but wait
-for the next review session. The session is not saved across restarts; the pending count is recomputed
-from the vault.
+Closed projects are excluded. The browser shows the session's snapshot queue in order and marks the
+current item; the detail region keeps the current card and its actions. Notes created during a session
+do not join the queue and wait for the next review session. The session is not saved across restarts;
+the pending count is recomputed from the vault.
 
 ## 🎛️ Card actions
 

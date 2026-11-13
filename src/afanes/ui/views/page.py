@@ -51,6 +51,7 @@ class PageView:
         pick_date: PickDate | None = None,
         on_missing_role: Callable[[str], Awaitable[None]] | None = None,
         pick_role: PickRole | None = None,
+        on_back: Callable[[], Awaitable[bool]] | None = None,
     ) -> None:
         """Build the page controls against the shared application state.
 
@@ -68,6 +69,9 @@ class PageView:
         pick_role : PickRole | None
             Command that asks for an owner or requester name, or ``None`` when
             the read-mode action is unavailable.
+        on_back : Callable[[], Awaitable[bool]] | None
+            Optional fallback tried before the page history. It returns
+            ``True`` when the host handled the back request itself.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
@@ -75,6 +79,7 @@ class PageView:
         self._pick_date = pick_date
         self._on_missing_role = on_missing_role
         self._pick_role = pick_role
+        self._on_back = on_back
         self._rename_open = False
         self._role_suggestion_field: str | None = None
 
@@ -83,11 +88,19 @@ class PageView:
             tooltip=afanes.ui.strings.PAGE_BACK,
             on_click=self.go_back,
         )
-        self.title = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["title-1"])
+        self.title = ft.Text(
+            "",
+            style=afanes.ui.theme.TEXT_ROLES["title-3"],
+            max_lines=1,
+            overflow=ft.TextOverflow.ELLIPSIS,
+            expand=True,
+        )
         self.path = ft.Text(
             "",
             style=afanes.ui.theme.TEXT_ROLES["caption"],
             selectable=True,
+            overflow=ft.TextOverflow.ELLIPSIS,
+            expand=True,
         )
         self.meta_status = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.meta_owner = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
@@ -189,31 +202,43 @@ class PageView:
             on_click=self.finish_edit,
             visible=False,
         )
-        self.rename_button = ft.TextButton(
+        self.edit_item = ft.PopupMenuItem(
+            content=afanes.ui.strings.PAGE_EDIT,
+            on_click=self.start_edit,
+            key="page-edit",
+        )
+        self.rename_item = ft.PopupMenuItem(
             content=afanes.ui.strings.PAGE_RENAME,
             icon=ft.Icons.DRIVE_FILE_RENAME_OUTLINE,
             on_click=self.begin_rename,
+            key="page-rename",
         )
-        self.trash_button = ft.TextButton(
+        self.trash_item = ft.PopupMenuItem(
             content=afanes.ui.strings.PAGE_TRASH,
             icon=ft.Icons.DELETE_OUTLINE,
             on_click=self.begin_trash,
-            style=afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE,
+            key="page-trash",
+        )
+        self.menu_button = ft.PopupMenuButton(
+            icon=ft.Icons.MORE_VERT_OUTLINED,
+            tooltip=afanes.ui.strings.PAGE_ACTIONS,
+            items=[self.edit_item, self.rename_item, self.trash_item],
+            key="page-menu",
         )
         self.header = ft.Row(
             controls=[
                 self.back_button,
-                ft.Column(controls=[self.title, self.path, self.meta_row], spacing=0, expand=True),
+                self.title,
                 self.progress,
-                self.status_text,
                 self.process_button,
                 self.edit_button,
                 self.done_button,
-                self.rename_button,
-                self.trash_button,
+                self.menu_button,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            expand=True,
+            key="page-toolbar",
         )
 
         self.banners = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
@@ -574,25 +599,62 @@ class PageView:
             fit=ft.StackFit.EXPAND,
             key="page-mode-host",
         )
+        self.body_header = ft.Row(
+            controls=[self.path, self.status_text],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+        self.page_content = ft.Column(
+            controls=[
+                self.body_header,
+                self.meta_row,
+                self.banners,
+                self.dialogs,
+                self.mode_host,
+            ],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            expand=True,
+        )
+        self.page_column = ft.Container(
+            width=afanes.ui.theme.CONTENT_MAX_WIDTH,
+            content=self.page_content,
+        )
         self.root = ft.Container(
             expand=True,
             padding=afanes.ui.theme.ITEM_GAP,
             bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
             border_radius=afanes.ui.theme.SURFACE_RADIUS,
-            content=ft.Column(
-                controls=[
-                    self.header,
-                    ft.Divider(),
-                    self.banners,
-                    self.dialogs,
-                    self.mode_host,
-                ],
+            content=ft.Row(
+                controls=[self.page_column],
                 spacing=afanes.ui.theme.ITEM_GAP,
+                vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+                alignment=ft.MainAxisAlignment.CENTER,
                 expand=True,
             ),
         )
         self.refresh()
+
+    def toolbar(self) -> ft.Control:
+        """Return the page toolbar for a host that owns the detail region.
+
+        Returns
+        -------
+        ft.Control
+            Back, title, progress, the single primary action, and the
+            secondary page menu.
+        """
+        return self.header
+
+    def body(self) -> ft.Control:
+        """Return the page card without its toolbar.
+
+        Returns
+        -------
+        ft.Control
+            Bounded page content for the detail region.
+        """
+        return self.root
 
     def build(self) -> ft.Control:
         """Return the root control for the page pane.
@@ -600,9 +662,14 @@ class PageView:
         Returns
         -------
         ft.Control
-            Composed read, edit, and raw rescue layout.
+            Composed read, edit, and raw rescue layout with its toolbar.
         """
-        return self.root
+        return ft.Column(
+            controls=[self.header, self.root],
+            spacing=afanes.ui.theme.SECTION_GAP,
+            expand=True,
+            key="page-view",
+        )
 
     async def scroll_to_top(self) -> None:
         """Move the reusable page pane to its starting scroll position."""
@@ -692,6 +759,7 @@ class PageView:
 
     def refresh(self) -> None:
         """Refresh every control from the shared application state."""
+        FrozenControlRecovery.clear(self.header)
         FrozenControlRecovery.clear(self.root)
         page = self._state.pages.page
         editing = self._state.pages.editing or self._state.pages.page_mode is DraftMode.RAW
@@ -717,15 +785,17 @@ class PageView:
         self.title.value = state.pages.page_title if page is not None else ""
         self.path.value = state.pages.page_path_label
         self.back_button.disabled = page is None and not state.navigation.history
-        self.edit_button.visible = page is not None and not editing and self._state.pages.page_mode is DraftMode.NORMAL
+        normal = page is not None and not editing and self._state.pages.page_mode is DraftMode.NORMAL
+        process_visible = page is not None and normal and self._is_inbox_page(page)
+        self.process_button.visible = process_visible
+        self.edit_button.visible = normal and not process_visible
         self.done_button.visible = page is not None and editing
         labels = self._state.pages.page_labels if page is not None else None
         is_log = labels is not None and labels.note_type is NoteType.LOG
-        self.rename_button.visible = (
-            page is not None and not editing and self._state.pages.page_mode is DraftMode.NORMAL and not is_log
-        )
-        self.trash_button.visible = page is not None and not editing
-        self.process_button.visible = page is not None and not editing and self._is_inbox_page(page)
+        self.edit_item.visible = normal and process_visible
+        self.rename_item.visible = normal and not is_log
+        self.trash_item.visible = page is not None and not editing
+        self.menu_button.visible = page is not None and not editing
         self.progress.visible = state.status.busy or state.pages.saving
         if state.pages.saving:
             self.status_text.value = afanes.ui.strings.PAGE_SAVING
@@ -1092,8 +1162,13 @@ class PageView:
         return page.path is not None and any(note.path == page.path for note in self._state.session.notes)
 
     async def go_back(self) -> None:
-        """Return to the previous page."""
+        """Return to the previous page or let the host close the detail."""
         self._rename_open = False
+        if self._on_back is not None and await self._on_back():
+            self.refresh()
+            await self.scroll_to_top()
+            self._update()
+            return
         await self._state.navigation.back()
         self.refresh()
         await self.scroll_to_top()

@@ -7,8 +7,9 @@ than a decision.
 :::{admonition} tl;dr
 :class: note
 
-Type one line in the composer. The first non-blank line becomes the filename and heading. Open the
-capture when you are ready to process it.
+Type one line in the composer at the top of the Inbox browser region, or press **Ctrl+N** from any
+destination. The first non-blank line becomes the filename and heading. Open the capture when you are
+ready to process it.
 :::
 
 ## ✍️ Capture a thought
@@ -44,7 +45,7 @@ to its filename stem as the display title.
 
 ## 📄 Open and edit
 
-Select a capture to open it in the page pane. Read its body or choose **Edit** to change it.
+Select a capture to open it in the detail region. Read its body or choose **Edit** to change it.
 **Process** remains available for Inbox captures. Moving a capture out of `inbox/` by hand leaves it
 under **Needs attention**; use the Inbox or the Processing Wizard instead.
 

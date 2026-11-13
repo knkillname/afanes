@@ -9,6 +9,7 @@ from pathlib import Path
 import flet as ft
 import pytest
 
+import afanes.__about__
 import afanes.core.settings
 import afanes.core.templates
 import afanes.core.vault.pages
@@ -20,6 +21,7 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.page
+import afanes.ui.views.workspace
 from afanes.core.errors import TemplateContentError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.settings import Settings
@@ -29,6 +31,8 @@ from tests.support import versioned
 Handler = Callable[[], Awaitable[None]]
 WINDOW_WIDTH = 1100
 WINDOW_HEIGHT = 760
+WIDE_REGION_COUNT = 3
+MEDIUM_REGION_COUNT = 2
 
 
 class FakeWindow:
@@ -51,6 +55,10 @@ class FakePage:
         self.controls: list[ft.Control] = []
         self.updates = 0
         self.web = web
+        self.width = WINDOW_WIDTH
+        self.height = WINDOW_HEIGHT
+        self.on_resize: Callable[..., None] | None = None
+        self.on_keyboard_event: Callable[..., Awaitable[None]] | None = None
         self.on_disconnect: Callable[[], None] | None = None
         self.dialogs: list[ft.AlertDialog] = []
 
@@ -193,7 +201,7 @@ class TestAppShell:
         asyncio.run(scenario())
 
         assert afanes.ui.state.app_state.session.vault_root == vault.resolve()
-        assert isinstance(page.controls[0], ft.Column)
+        assert isinstance(page.controls[0], ft.Stack)
         assert settings.is_file()
 
     def test_cancelling_the_picker_keeps_the_welcome(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -226,7 +234,7 @@ class TestAppShell:
         asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
 
         assert afanes.ui.state.app_state.session.vault_root == vault.resolve()
-        assert isinstance(page.controls[0], ft.Column)
+        assert isinstance(page.controls[0], ft.Stack)
 
     def test_process_action_opens_the_wizard_and_cancel_returns(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -278,7 +286,7 @@ class TestLogEntryDialog:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
             section = _typed(_find_by_key(page.controls[0], "section-log"), ft.ListTile)
             await typing.cast("Handler", section.on_click)()
-            today = _typed(_find_by_key(page.controls[0], "log-today-entry"), ft.FilledButton)
+            today = _typed(_find_by_key(page.controls[0], "log-today-entry"), ft.TextButton)
             await typing.cast("Handler", today.on_click)()
 
         asyncio.run(scenario())
@@ -433,7 +441,7 @@ class TestWebPresentation:
 
         assert state.session.vault_root == vault.resolve()
         assert [note.name for note in state.session.notes] == ["Buy milk"]
-        assert isinstance(page.controls[0], ft.Column)
+        assert isinstance(page.controls[0], ft.Stack)
         assert settings.is_file()
 
     def test_invalid_path_keeps_the_welcome(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -724,7 +732,7 @@ def _select_template(page: FakePage, identifier: str) -> None:
 async def _open_reference_dialog(page: FakePage) -> None:
     tile = _typed(_find_by_key(page.controls[0], "section-references"), ft.ListTile)
     await typing.cast("Handler", tile.on_click)()
-    button = _typed(_find_by_key(page.controls[0], "browser-new-reference"), ft.FilledButton)
+    button = _typed(_find_by_key(page.controls[0], "browser-new-reference"), ft.IconButton)
     await typing.cast("Handler", button.on_click)()
 
 
@@ -813,7 +821,7 @@ class TestCreation:
         assert (target / "projects").is_dir()
         assert (target / "reference" / "Getting started.md").is_file()
         assert page.dialogs == []
-        assert isinstance(page.controls[0], ft.Column)
+        assert isinstance(page.controls[0], ft.Stack)
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
 
     def test_cancelling_the_browse_keeps_the_form_and_writes_nothing(
@@ -911,7 +919,7 @@ class TestCreation:
         assert state.session.vault_root == target.resolve()
         assert (target / "inbox").is_dir()
         assert page.dialogs == []
-        assert isinstance(page.controls[0], ft.Column)
+        assert isinstance(page.controls[0], ft.Stack)
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
 
     def test_web_creation_error_stays_in_the_dialog(
@@ -1325,3 +1333,131 @@ class TestBrowserReferenceCreation:
         assert "broken.md" in warning.value
         selector = _typed(_find_by_key(dialog, "new-reference-template"), ft.Dropdown)
         assert [option.key for option in selector.options] == ["card:person.md", "empty"]
+
+
+def _shell_row(page: FakePage) -> ft.Row:
+    stack = _typed(page.controls[0], ft.Stack)
+    column = _typed(stack.controls[0], ft.Column)
+    return _typed(column.controls[-1], ft.Row)
+
+
+def _keyboard(key: str, *, ctrl: bool) -> ft.KeyboardEvent:
+    return ft.KeyboardEvent(
+        name="key_down",
+        control=typing.cast("ft.Page", None),
+        key=key,
+        shift=False,
+        ctrl=ctrl,
+        alt=False,
+        meta=False,
+    )
+
+
+class TestAdaptiveShell:
+    def test_the_initial_width_and_a_resize_arrange_the_shell(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        page = FakePage()
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+
+        asyncio.run(scenario())
+
+        assert page.on_resize is not None
+        assert len(_shell_row(page).controls) == WIDE_REGION_COUNT
+
+        page.width = afanes.ui.theme.SHELL_MEDIUM_MIN
+        typing.cast("Callable[[object], None]", page.on_resize)(None)
+
+        assert len(_shell_row(page).controls) == MEDIUM_REGION_COUNT
+
+    def test_the_shortcuts_reach_the_workspace(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        page = FakePage()
+        calls: list[str] = []
+
+        async def start_capture(_self: afanes.ui.views.workspace.WorkspaceView) -> None:
+            calls.append("capture")
+
+        async def focus_search(_self: afanes.ui.views.workspace.WorkspaceView) -> None:
+            calls.append("search")
+
+        monkeypatch.setattr(afanes.ui.views.workspace.WorkspaceView, "start_capture", start_capture)
+        monkeypatch.setattr(afanes.ui.views.workspace.WorkspaceView, "focus_search", focus_search)
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            assert page.on_keyboard_event is not None
+            await page.on_keyboard_event(_keyboard("n", ctrl=True))
+            await page.on_keyboard_event(_keyboard("f", ctrl=True))
+
+        asyncio.run(scenario())
+
+        assert calls == ["capture", "search"]
+
+    def test_escape_closes_the_navigation_drawer(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        page = FakePage()
+        page.width = afanes.ui.theme.SHELL_MEDIUM_MIN
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            toggle = _typed(_find_by_key(page.controls[0], "workspace-navigation-toggle"), ft.IconButton)
+            await typing.cast("Handler", toggle.on_click)()
+            assert _find_by_key(page.controls[0], "workspace-drawer") is not None
+            assert page.on_keyboard_event is not None
+            await page.on_keyboard_event(_keyboard("Escape", ctrl=False))
+
+        asyncio.run(scenario())
+
+        assert _find_by_key(page.controls[0], "workspace-drawer") is None
+
+
+class TestAboutDialog:
+    def test_the_primary_menu_names_the_version(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        page = FakePage()
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            menu = _typed(_find_by_key(page.controls[0], "workspace-change"), ft.PopupMenuButton)
+            item = typing.cast(
+                "ft.PopupMenuItem",
+                next(
+                    entry
+                    for entry in menu.items
+                    if isinstance(entry, ft.PopupMenuItem) and entry.key == "workspace-about"
+                ),
+            )
+            await typing.cast("Handler", item.on_click)()
+
+        asyncio.run(scenario())
+
+        dialog = page.dialogs[-1]
+        title = typing.cast("ft.Text", dialog.title)
+        content = _typed(dialog.content, ft.Column)
+        version = _typed(content.controls[0], ft.Text)
+        license_text = _typed(content.controls[1], ft.Text)
+        assert title.value == afanes.ui.strings.ABOUT_TITLE
+        assert afanes.__about__.__version__ in (version.value or "")
+        assert license_text.value == afanes.ui.strings.ABOUT_LICENSE

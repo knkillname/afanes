@@ -10,6 +10,7 @@ from pathlib import Path
 
 import flet as ft
 
+import afanes.__about__
 import afanes.core.vault.service
 import afanes.ui.state
 import afanes.ui.strings
@@ -75,6 +76,8 @@ class _Shell:
         self.page.bgcolor = afanes.ui.theme.PAGE_SURFACE_COLOR
         self.page.padding = afanes.ui.theme.PAGE_PADDING
         self.page.on_disconnect = self.release_session
+        self.page.on_resize = self._on_resize
+        self.page.on_keyboard_event = self._on_keyboard
         if not self.is_desktop:
             return
         self.page.window.width = 1100
@@ -154,6 +157,74 @@ class _Shell:
         if self.workspace is not None:
             self.workspace.refresh()
 
+    def _viewport_width(self) -> int:
+        """Return the current viewport width in logical pixels.
+
+        Returns
+        -------
+        int
+            Page width when the client reports one, otherwise the configured
+            window width, otherwise the default three-region width.
+        """
+        width = getattr(self.page, "width", None)
+        if isinstance(width, int | float) and width > 0:
+            return int(width)
+        window_width = self.page.window.width
+        if isinstance(window_width, int | float) and window_width > 0:
+            return int(window_width)
+        return afanes.ui.theme.SHELL_WIDE_MIN
+
+    def _on_resize(self, _event: object = None) -> None:
+        """Apply the viewport width to the retained workspace."""
+        if self.workspace is None:
+            return
+        self.workspace.resize(self._viewport_width())
+
+    async def _on_keyboard(self, event: ft.KeyboardEvent) -> None:
+        """Route the workspace shortcuts from the page keyboard event."""
+        key = (event.key or "").upper()
+        if key == "ESCAPE":
+            if self.workspace is not None:
+                self.workspace.close_drawer()
+            return
+        if not event.ctrl or self.workspace is None:
+            return
+        if key == "F":
+            await self.workspace.focus_search()
+        elif key == "N":
+            await self.workspace.start_capture()
+
+    async def show_about_dialog(self) -> None:
+        """Show the application name, version, and license."""
+
+        async def close() -> None:
+            self.page.pop_dialog()
+            self.page.update()
+
+        self.page.show_dialog(
+            ft.AlertDialog(
+                title=ft.Text(afanes.ui.strings.ABOUT_TITLE),
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            afanes.ui.strings.ABOUT_VERSION.format(version=afanes.__about__.__version__),
+                            selectable=True,
+                        ),
+                        ft.Text(afanes.ui.strings.ABOUT_LICENSE, selectable=True),
+                    ],
+                    tight=True,
+                ),
+                actions=[
+                    ft.TextButton(
+                        content=afanes.ui.strings.CLOSE_ACTION,
+                        on_click=close,
+                        key="about-close",
+                    ),
+                ],
+            ),
+        )
+        self.page.update()
+
     async def render(self) -> None:
         """Render the welcome state or the workspace for the current session."""
         await self._stop_refresh_loop()
@@ -187,8 +258,10 @@ class _Shell:
                 on_log_entry=self.show_log_entry_dialog,
                 on_missing_role=self.show_role_reference_dialog,
                 pick_role=self.pick_role,
+                on_about=self.show_about_dialog,
             )
             self.workspace = workspace
+            workspace.resize(self._viewport_width())
             digest = self._due_digest()
             if digest is None:
                 self.page.add(workspace.build())

@@ -2,8 +2,8 @@
 
 Afanes follows the GNOME Human Interface Guidelines strictly, using libadwaita 1.8.0 as the
 reference implementation. The guidelines assume GTK and libadwaita; Afanes runs on Flet and
-Flutter, so four toolkit limits are declared rather than treated as design choices. Everything
-else — palette, depth, selection, typography, and icon treatment — follows the reference.
+Flutter, so five toolkit limits are declared rather than treated as design choices. Everything
+else — palette, depth, selection, typography, icon treatment, and layout — follows the reference.
 
 :::{admonition} tl;dr
 :class: note
@@ -29,15 +29,16 @@ The standard has five levels, in the order a reviewer should check them:
 4. **Typography.** One platform font family and the GNOME standard styles — `title-1` through
    `title-4`, `heading`, `body`, `caption`, and `caption-heading` — expressed as relative
    percentages of one base size.
-5. **Control values and the ratchet.** Every color, radius, spacing, dimension, icon size, and
-   minimum-window value comes from the token module, and the conformance gate keeps it that way.
+5. **Control values and the ratchet.** Every color, radius, spacing, dimension, icon size, column
+   width, content width, and minimum-window value comes from the token module, and the conformance
+   gate keeps it that way.
 
 ## 🎨 Palette roles
 
 | Role | Light | Dark | Reference token | Use |
 | --- | --- | --- | --- | --- |
 | Window | `#FAFAFB` | `#222226` | `--window-bg-color` | Window background |
-| Sidebar | `#EBEBED` | `#2E2E32` | `--sidebar-bg-color` | Browser sidebar and chrome |
+| Sidebar | `#EBEBED` | `#2E2E32` | `--sidebar-bg-color` | Navigation region and chrome |
 | Note view | `#FFFFFF` | `#1D1D20` | `--view-bg-color` | Markdown canvas and content cards |
 | Secondary container | `#F3F3F5` | `#28282C` | `--secondary-sidebar-bg-color` | Panel inside a view |
 | Body text | `#333334` | `#FFFFFF` | `--window-fg-color` | Prose and control labels |
@@ -62,7 +63,52 @@ value step alone must be visible.
 
 The note canvas uses `--view-bg-color`, not the reference's translucent dark card token, so the
 reading surface stays a solid, testable value. The in-view panel uses the secondary-sidebar token
-for the same reason.
+for the same reason. The navigation uses the sidebar surface, the browser uses the window surface,
+and the detail uses the note-view surface, so the four reference roles stay unchanged.
+
+## 📐 Window and columns
+
+The window starts at 1100x760 and cannot shrink below 1024x600, the desktop floor in the reference
+guidelines. The workspace divides the window into three regions with bounded widths:
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `NAVIGATION_WIDTH` | 220 | Destinations, counts, vault identity, primary menu |
+| `BROWSER_MIN_WIDTH` | 320 | Smallest usable browser column |
+| `BROWSER_MAX_WIDTH` | 360 | Browser column ceiling |
+| `PAGE_MIN_WIDTH` | 420 | Smallest detail region |
+| `CONTENT_MAX_WIDTH` | 720 | Maximum reading width for prose and forms |
+| `SHELL_WIDE_MIN` | 1100 | Three-region breakpoint |
+| `SHELL_MEDIUM_MIN` | 1024 | Browser-and-detail breakpoint |
+| `HEADER_HEIGHT` | 48 | Shared height of the three aligned headers |
+
+At `SHELL_WIDE_MIN` and above the navigation, browser, and detail are side by side. Between
+`SHELL_MEDIUM_MIN` and `SHELL_WIDE_MIN` the navigation moves behind a transient toggle. A narrower
+presentation shows one region at a time, with the browser as the root and Back returning from the
+detail. Long-form content stays within `CONTENT_MAX_WIDTH` on very wide windows.
+
+## 🧱 Workspace regions
+
+The workspace has three regions with one owner each:
+
+| Region | Owns | Surface |
+| --- | --- | --- |
+| Navigation | Destinations, counts, the Review entry, the vault identity, and the primary menu | Sidebar |
+| Browser | The active destination's title, search, actions, list, calendar, or review queue | Window |
+| Detail | The page or focused flow with its toolbar | Note view |
+
+The three headers share `HEADER_HEIGHT` and align horizontally. The navigation header holds the
+vault name and the primary menu. The browser header holds the destination title, the permanent
+search entry, refresh, and the destination's actions. The detail toolbar holds Back, the page or
+flow title, at most one suggested action, and a secondary menu.
+
+The primary menu sits above the navigation list, as required when a window has a sidebar. The
+navigation is flush chrome, not a rounded card. The browser is flush with the window surface. The
+detail keeps the note-view surface and its card boundary.
+
+A third-party desktop window supplies its own decorations. The application cannot draw controls
+into the title bar, so the in-window headers are the structural equivalent of the reference header
+bar. The application never mimics a custom title bar.
 
 ## 🎯 Accent, actions, and selection
 
@@ -104,7 +150,7 @@ Material icon set stands in for Adwaita's symbolic set; no custom SVG icon set s
 
 ## 🔀 Bounded differences
 
-These four differences are toolkit limits, not design preferences. Adding another one requires a
+These five differences are toolkit limits, not design preferences. Adding another one requires a
 change that updates this table and the `interface-theme` spec.
 
 | Reference behavior | Afanes | Status | Why |
@@ -113,6 +159,7 @@ change that updates this table and the `interface-theme` spec.
 | libadwaita widget rendering | Flet/Material widget internals: field labels, ink feedback, scrollbars, overlay chrome | Temporary, shrinking | Flet boundary; feedback colors, radii, and density are set centrally |
 | Access-key mnemonics | No underlined Alt shortcuts | Permanent, Flet limit | Flet exposes no mnemonic API |
 | High-contrast style | No separate high-contrast input | Permanent, Flet limit | Flet exposes no high-contrast input; Flutter exposes one |
+| Header bar with window controls | Native title bar plus in-window headers | Permanent, Flet limit | Flet desktop windows use native decorations and expose no title-bar control API |
 
 The platform typeface is **not** a difference: the typography guideline requires the system font.
 The remaining obligation is to confirm the resolved family on each platform. If Flutter resolves to
@@ -162,7 +209,7 @@ their own spec deltas:
 ```text
 WAVE 0  tokens, two palettes, four surfaces, neutral selection, GNOME type
         scale, outlined icons, 1024x600 minimum, expanded gate
-WAVE 1  shell composition: header bar and chrome frame, sidebar as chrome,
+WAVE 1  landed: three regions, aligned headers, global search, primary menu,
         max content width, panel/radius/spacing sweep
 WAVE 2  control hierarchy: one suggested or destructive action per view,
         icon XOR label, dense rows, insensitive invalid actions instead of
@@ -174,13 +221,13 @@ WAVE 4  feedback: undo over confirmation, toasts for one-time events,
         banners only for persistent states, overlays
 WAVE 5  keyboard and accessibility: shortcut map, focus order, semantics
         labels, large-text robustness
-WAVE 6  adaptivity: breakpoints, collapsible sidebar, narrow and large-window
-        behavior
+WAVE 6  landed: breakpoints, collapsible navigation, narrow and large-window
+        behavior; the remaining adaptivity work is per-view polish
 WAVE 7  identity: app icon, placeholder pages, final palette pass, empty
         baseline
 ```
 
-Waves are ordering, not exemptions. The target remains strict conformance; the four Flet limits
+Waves are ordering, not exemptions. The target remains strict conformance; the five Flet limits
 above are the only permanent exceptions.
 
 ## ✅ Changing the standard
