@@ -13,6 +13,7 @@ import afanes.core.template_cards
 import afanes.core.vault.pages
 import afanes.core.vault.processing
 import afanes.core.vault.service
+import afanes.core.vault.snapshot
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.views.processing
@@ -29,6 +30,33 @@ def _reset_state() -> None:
 
 def _noop() -> None:
     return None
+
+
+def _plan_request(
+    source: Path,
+    outcome: ProcessingOutcome,
+    *,
+    status: Status | None = None,
+    due_date: datetime.date | None = None,
+    owner: str | None = None,
+    asked_by: str | None = None,
+    project: str | None = None,
+    card: afanes.core.template_cards.TemplateCard | None = None,
+    today: datetime.date | None = None,
+    snapshot: afanes.core.vault.snapshot.VaultSnapshot | None = None,
+) -> afanes.core.vault.processing.ProcessingRequest:
+    return afanes.core.vault.processing.ProcessingRequest(
+        outcome=outcome,
+        note_path=source,
+        status=status,
+        due_date=due_date,
+        owner=owner,
+        asked_by=asked_by,
+        project=project,
+        card=card,
+        today=today,
+        snapshot=snapshot,
+    )
 
 
 async def _noop_async() -> None:
@@ -451,7 +479,9 @@ class TestProcessingView:
         versioned(root)
         vault = afanes.core.vault.service.Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
-        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            _plan_request(capture, ProcessingOutcome.PROJECT)
+        )
         assert isinstance(plan, ProcessingPlan)
         state = _open_capture()
 
@@ -471,10 +501,12 @@ class TestProcessingView:
         vault = afanes.core.vault.service.Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
-            capture,
-            ProcessingOutcome.PROJECT,
-            owner="Sam Rivera",
-            asked_by="Priya Nair",
+            _plan_request(
+                capture,
+                ProcessingOutcome.PROJECT,
+                owner="Sam Rivera",
+                asked_by="Priya Nair",
+            )
         )
         assert isinstance(plan, ProcessingPlan)
         state = _open_capture()
@@ -500,7 +532,7 @@ class TestProcessingView:
             text="",
         )
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
-            capture, ProcessingOutcome.REFERENCE, card=card
+            _plan_request(capture, ProcessingOutcome.REFERENCE, card=card)
         )
         assert isinstance(plan, ProcessingPlan)
         state = _open_capture("Approve the invoice")
@@ -516,7 +548,9 @@ class TestProcessingView:
         versioned(root)
         vault = afanes.core.vault.service.Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Approve the invoice")
-        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.REFERENCE)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            _plan_request(capture, ProcessingOutcome.REFERENCE)
+        )
         assert isinstance(plan, ProcessingPlan)
         state = _open_capture("Approve the invoice")
 
@@ -532,7 +566,9 @@ class TestProcessingView:
         vault = afanes.core.vault.service.Vault(root)
         note = vault.create("Note", NoteType.REFERENCE, body="[Launch](<note:Launch>)\n")
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Launch")
-        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            _plan_request(capture, ProcessingOutcome.PROJECT)
+        )
         state = _open_capture("Launch")
         assert note.is_file()
 
@@ -577,7 +613,7 @@ class TestProcessingView:
         project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Call the plumber")
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
-            capture, ProcessingOutcome.APPEND_STEP, project="Home"
+            _plan_request(capture, ProcessingOutcome.APPEND_STEP, project="Home")
         )
         state = _open_capture("Call the plumber")
 
@@ -628,14 +664,13 @@ class TestProcessingView:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         _open_capture()
-        calls: list[tuple[ProcessingOutcome, dict[str, object]]] = []
+        calls: list[afanes.core.vault.processing.ProcessingRequest] = []
 
         async def fake_plan(
             _self: afanes.ui.state.processing.ProcessingState,
-            outcome: ProcessingOutcome,
-            **kwargs: object,
+            request: afanes.core.vault.processing.ProcessingRequest,
         ) -> None:
-            calls.append((outcome, kwargs))
+            calls.append(request)
 
         monkeypatch.setattr(afanes.ui.state.processing.ProcessingState, "build_plan", fake_plan)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
@@ -650,29 +685,28 @@ class TestProcessingView:
         asyncio.run(_click(view.preview_button.on_click))
 
         assert len(calls) == 1
-        outcome, kwargs = calls[0]
-        status = kwargs["status"]
+        request = calls[0]
+        status = request.status
         assert isinstance(status, Status)
-        assert outcome is ProcessingOutcome.PROJECT
+        assert request.outcome is ProcessingOutcome.PROJECT
         assert status is Status.WAITING
-        assert kwargs["due_date"] == datetime.date(2026, 11, 20)
-        assert kwargs["owner"] == "Sam Rivera"
-        assert kwargs["asked_by"] == "Priya Nair"
-        assert kwargs["project"] is None
+        assert request.due_date == datetime.date(2026, 11, 20)
+        assert request.owner == "Sam Rivera"
+        assert request.asked_by == "Priya Nair"
+        assert request.project is None
 
     def test_append_preview_passes_the_project_identity(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         _open_capture()
-        calls: list[tuple[ProcessingOutcome, dict[str, object]]] = []
+        calls: list[afanes.core.vault.processing.ProcessingRequest] = []
 
         async def fake_plan(
             _self: afanes.ui.state.processing.ProcessingState,
-            outcome: ProcessingOutcome,
-            **kwargs: object,
+            request: afanes.core.vault.processing.ProcessingRequest,
         ) -> None:
-            calls.append((outcome, kwargs))
+            calls.append(request)
 
         monkeypatch.setattr(afanes.ui.state.processing.ProcessingState, "build_plan", fake_plan)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
@@ -682,21 +716,20 @@ class TestProcessingView:
 
         asyncio.run(_click(view.preview_button.on_click))
 
-        assert calls[0][0] is ProcessingOutcome.APPEND_STEP
-        assert calls[0][1]["project"] == "Launch"
+        assert calls[0].outcome is ProcessingOutcome.APPEND_STEP
+        assert calls[0].project == "Launch"
 
     def test_reference_preview_passes_the_selected_card(self, monkeypatch: pytest.MonkeyPatch) -> None:
         state = _open_capture()
         card = _card()
         state.processing.cards = (card,)
-        calls: list[tuple[ProcessingOutcome, dict[str, object]]] = []
+        calls: list[afanes.core.vault.processing.ProcessingRequest] = []
 
         async def fake_plan(
             _self: afanes.ui.state.processing.ProcessingState,
-            outcome: ProcessingOutcome,
-            **kwargs: object,
+            request: afanes.core.vault.processing.ProcessingRequest,
         ) -> None:
-            calls.append((outcome, kwargs))
+            calls.append(request)
 
         monkeypatch.setattr(afanes.ui.state.processing.ProcessingState, "build_plan", fake_plan)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
@@ -707,19 +740,18 @@ class TestProcessingView:
         assert view.preview_button.on_click is not None
         asyncio.run(_click(view.preview_button.on_click))
 
-        assert calls[0][0] is ProcessingOutcome.REFERENCE
-        assert calls[0][1]["card"] is card
+        assert calls[0].outcome is ProcessingOutcome.REFERENCE
+        assert calls[0].card is card
 
     def test_reference_preview_passes_empty_as_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         _open_capture()
-        calls: list[tuple[ProcessingOutcome, dict[str, object]]] = []
+        calls: list[afanes.core.vault.processing.ProcessingRequest] = []
 
         async def fake_plan(
             _self: afanes.ui.state.processing.ProcessingState,
-            outcome: ProcessingOutcome,
-            **kwargs: object,
+            request: afanes.core.vault.processing.ProcessingRequest,
         ) -> None:
-            calls.append((outcome, kwargs))
+            calls.append(request)
 
         monkeypatch.setattr(afanes.ui.state.processing.ProcessingState, "build_plan", fake_plan)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
@@ -729,7 +761,7 @@ class TestProcessingView:
         assert view.preview_button.on_click is not None
         asyncio.run(_click(view.preview_button.on_click))
 
-        assert calls[0][1]["card"] is None
+        assert calls[0].card is None
 
     def test_project_suggestions_store_the_identity(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"

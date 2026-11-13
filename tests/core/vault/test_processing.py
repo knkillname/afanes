@@ -18,6 +18,7 @@ from afanes.core.errors import NameCollisionError, ProcessingError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
 from afanes.models.note import NoteDate, NoteType, Status
+from tests.support import processing_request
 
 ONE = 1
 TWO = 2
@@ -68,7 +69,7 @@ class TestProcessingEdgeCases:
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Plan\n\n- [ ] One\n- [ ] Two\n")
 
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
-            capture, ProcessingOutcome.DONE_NOW, today=datetime.date(2026, 11, 14)
+            processing_request(capture, ProcessingOutcome.DONE_NOW, today=datetime.date(2026, 11, 14))
         )
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
         document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
@@ -84,7 +85,7 @@ class TestProcessingEdgeCases:
         project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Call")
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
-            capture, ProcessingOutcome.APPEND_STEP, project="Home"
+            processing_request(capture, ProcessingOutcome.APPEND_STEP, project="Home")
         )
         capture.write_text("---\ntype: note\n---\n# Changed\n", encoding="utf-8")
 
@@ -99,7 +100,9 @@ class TestProcessingEdgeCases:
         root.mkdir()
         vault = afanes.core.vault.service.Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Call")
-        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            processing_request(capture, ProcessingOutcome.PROJECT)
+        )
         capture.unlink()
 
         with pytest.raises(ProcessingError):
@@ -113,7 +116,7 @@ class TestProcessingEdgeCases:
         capture = vault.create("Blank", NoteType.NOTE)
         capture.write_text("---\ntype: note\n---\n", encoding="utf-8")
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
-            capture, ProcessingOutcome.APPEND_STEP, project="Home"
+            processing_request(capture, ProcessingOutcome.APPEND_STEP, project="Home")
         )
 
         assert isinstance(plan, AppendStepPlan)
@@ -130,10 +133,12 @@ class TestProcessingGuards:
         service = afanes.core.vault.processing.VaultProcessing(vault)
 
         plan = service.plan_processing(
-            capture,
-            ProcessingOutcome.PROJECT,
-            owner="  Sam Rivera  ",
-            asked_by="  Priya Nair  ",
+            processing_request(
+                capture,
+                ProcessingOutcome.PROJECT,
+                owner="  Sam Rivera  ",
+                asked_by="  Priya Nair  ",
+            )
         )
 
         assert isinstance(plan, ProcessingPlan)
@@ -152,11 +157,13 @@ class TestProcessingGuards:
         service = afanes.core.vault.processing.VaultProcessing(vault)
 
         plan = service.plan_processing(
-            capture,
-            ProcessingOutcome.DONE_NOW,
-            today=datetime.date(2026, 11, 14),
-            owner="Sam Rivera",
-            asked_by="Priya Nair",
+            processing_request(
+                capture,
+                ProcessingOutcome.DONE_NOW,
+                today=datetime.date(2026, 11, 14),
+                owner="Sam Rivera",
+                asked_by="Priya Nair",
+            )
         )
 
         assert isinstance(plan, ProcessingPlan)
@@ -177,7 +184,7 @@ class TestProcessingGuards:
         service = afanes.core.vault.processing.VaultProcessing(vault)
 
         with pytest.raises(ProcessingError, match="Only projects"):
-            service.plan_processing(capture, outcome, owner="Sam Rivera")
+            service.plan_processing(processing_request(capture, outcome, owner="Sam Rivera"))
 
     def test_blank_role_values_write_no_keys(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -187,10 +194,12 @@ class TestProcessingGuards:
         service = afanes.core.vault.processing.VaultProcessing(vault)
 
         plan = service.plan_processing(
-            capture,
-            ProcessingOutcome.PROJECT,
-            owner="   ",
-            asked_by="   ",
+            processing_request(
+                capture,
+                ProcessingOutcome.PROJECT,
+                owner="   ",
+                asked_by="   ",
+            )
         )
         target = service.apply_processing(plan, confirm=True)
 
@@ -210,7 +219,7 @@ class TestProcessingGuards:
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Call the plumber")
         service = afanes.core.vault.processing.VaultProcessing(vault)
 
-        plan = service.plan_processing(capture, ProcessingOutcome.APPEND_STEP, project="Home")
+        plan = service.plan_processing(processing_request(capture, ProcessingOutcome.APPEND_STEP, project="Home"))
         service.apply_processing(plan, confirm=True)
 
         document = NoteDocument.from_text(project.read_text(encoding="utf-8"))
@@ -228,7 +237,9 @@ class TestProcessingGuards:
         service = afanes.core.vault.processing.VaultProcessing(vault)
 
         with pytest.raises(ProcessingError, match="Only projects"):
-            service.plan_processing(capture, ProcessingOutcome.APPEND_STEP, project="Home", asked_by="Sam Rivera")
+            service.plan_processing(
+                processing_request(capture, ProcessingOutcome.APPEND_STEP, project="Home", asked_by="Sam Rivera")
+            )
         assert project.is_file()
 
     def test_plan_rejects_a_capture_missing_from_the_snapshot(self, tmp_path: Path) -> None:
@@ -245,7 +256,7 @@ class TestProcessingGuards:
 
         with pytest.raises(ProcessingError):
             afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
-                capture, ProcessingOutcome.PROJECT, snapshot=snapshot
+                processing_request(capture, ProcessingOutcome.PROJECT, snapshot=snapshot)
             )
 
     def test_plan_rejects_an_unindexed_destination_file(self, tmp_path: Path) -> None:
@@ -258,7 +269,9 @@ class TestProcessingGuards:
         broken.write_text("---\ntype: refrence\n---\n", encoding="utf-8")
 
         with pytest.raises(NameCollisionError):
-            afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
+            afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+                processing_request(capture, ProcessingOutcome.PROJECT)
+            )
 
     def test_append_rejects_status_or_due_date(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -268,9 +281,11 @@ class TestProcessingGuards:
         service = afanes.core.vault.processing.VaultProcessing(vault)
 
         with pytest.raises(ProcessingError):
-            service.plan_processing(capture, ProcessingOutcome.APPEND_STEP, status=Status.ACTIVE)
+            service.plan_processing(processing_request(capture, ProcessingOutcome.APPEND_STEP, status=Status.ACTIVE))
         with pytest.raises(ProcessingError):
-            service.plan_processing(capture, ProcessingOutcome.TRASH, due_date=datetime.date(2026, 11, 20))
+            service.plan_processing(
+                processing_request(capture, ProcessingOutcome.TRASH, due_date=datetime.date(2026, 11, 20))
+            )
 
     def test_append_rejects_a_capture_missing_from_the_snapshot(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -316,7 +331,7 @@ class TestProcessingGuards:
         vault = afanes.core.vault.service.Vault(root)
         service = afanes.core.vault.processing.VaultProcessing(vault)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
-        plan = service.plan_processing(capture, ProcessingOutcome.TRASH)
+        plan = service.plan_processing(processing_request(capture, ProcessingOutcome.TRASH))
         capture.write_text("---\ntype: note\n---\n\nChanged\n", encoding="utf-8")
 
         with pytest.raises(ProcessingError):
@@ -334,7 +349,7 @@ class TestLogProcessing:
         vault = afanes.core.vault.service.Vault(root)
         processing = afanes.core.vault.processing.VaultProcessing(vault)
 
-        plan = processing.plan_processing(capture, ProcessingOutcome.LOG)
+        plan = processing.plan_processing(processing_request(capture, ProcessingOutcome.LOG))
         target = processing.apply_processing(plan, confirm=True)
 
         expected = root / "log" / "2025" / "10" / "2025-10-12.md"
@@ -361,7 +376,7 @@ class TestLogProcessing:
         vault = afanes.core.vault.service.Vault(root)
         processing = afanes.core.vault.processing.VaultProcessing(vault)
 
-        plan = processing.plan_processing(capture, ProcessingOutcome.LOG)
+        plan = processing.plan_processing(processing_request(capture, ProcessingOutcome.LOG))
         target = processing.apply_processing(plan, confirm=True)
 
         document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
@@ -377,7 +392,7 @@ class TestLogProcessing:
         vault = afanes.core.vault.service.Vault(root)
         processing = afanes.core.vault.processing.VaultProcessing(vault)
 
-        plan = processing.plan_processing(capture, ProcessingOutcome.LOG)
+        plan = processing.plan_processing(processing_request(capture, ProcessingOutcome.LOG))
         target = processing.apply_processing(plan, confirm=True)
 
         assert target == root / "log" / "2025" / "10" / "2025-10-12.md"
@@ -394,7 +409,7 @@ class TestLogProcessing:
         processing = afanes.core.vault.processing.VaultProcessing(vault)
 
         with pytest.raises(NameCollisionError):
-            processing.plan_processing(capture, ProcessingOutcome.LOG)
+            processing.plan_processing(processing_request(capture, ProcessingOutcome.LOG))
 
     def test_inbound_note_references_are_rewritten(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -411,7 +426,7 @@ class TestLogProcessing:
         vault = afanes.core.vault.service.Vault(root)
         processing = afanes.core.vault.processing.VaultProcessing(vault)
 
-        plan = processing.plan_processing(capture, ProcessingOutcome.LOG)
+        plan = processing.plan_processing(processing_request(capture, ProcessingOutcome.LOG))
         processing.apply_processing(plan, confirm=True)
 
         assert "log:2025-10-12" in referrer.read_text(encoding="utf-8")

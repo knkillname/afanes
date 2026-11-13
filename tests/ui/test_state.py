@@ -12,6 +12,7 @@ import pytest
 
 import afanes.core.connections
 import afanes.core.settings
+import afanes.core.template_cards
 import afanes.core.templates
 import afanes.core.vault.log_conversions
 import afanes.core.vault.naming
@@ -54,6 +55,27 @@ TWO_PENDING = 2
 @pytest.fixture(autouse=True)
 def _reset_state() -> None:
     afanes.ui.state.app_state.reset()
+
+
+def _processing_request(
+    outcome: ProcessingOutcome,
+    *,
+    status: Status | None = None,
+    due_date: datetime.date | None = None,
+    owner: str | None = None,
+    asked_by: str | None = None,
+    project: str | None = None,
+    card: afanes.core.template_cards.TemplateCard | None = None,
+) -> afanes.core.vault.processing.ProcessingRequest:
+    return afanes.core.vault.processing.ProcessingRequest(
+        outcome=outcome,
+        status=status,
+        due_date=due_date,
+        owner=owner,
+        asked_by=asked_by,
+        project=project,
+        card=card,
+    )
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
@@ -155,9 +177,11 @@ class TestProcessingState:
             assert capture is not None
             assert await state.processing.begin(capture) is True
             plan = await state.processing.build_plan(
-                ProcessingOutcome.PROJECT,
-                owner="Sam Rivera",
-                asked_by="Priya Nair",
+                _processing_request(
+                    ProcessingOutcome.PROJECT,
+                    owner="Sam Rivera",
+                    asked_by="Priya Nair",
+                )
             )
             assert isinstance(plan, ProcessingPlan)
             return plan
@@ -281,7 +305,7 @@ class TestProcessingState:
             assert capture is not None
             assert await state.processing.begin(capture) is True
             selected = state.processing.cards[0]
-            plan = await state.processing.build_plan(ProcessingOutcome.REFERENCE, card=selected)
+            plan = await state.processing.build_plan(_processing_request(ProcessingOutcome.REFERENCE, card=selected))
             assert isinstance(plan, ProcessingPlan)
             assert plan.category == CategoryLabel("person")
             assert plan.scaffold == "## Contact"
@@ -299,7 +323,7 @@ class TestProcessingState:
             capture = await state.session.capture("Buy milk")
             assert capture is not None
             assert await state.processing.begin(capture) is True
-            plan = await state.processing.build_plan(ProcessingOutcome.REFERENCE)
+            plan = await state.processing.build_plan(_processing_request(ProcessingOutcome.REFERENCE))
             assert isinstance(plan, ProcessingPlan)
             assert plan.category == CategoryLabel("general")
             assert plan.scaffold is None
@@ -319,7 +343,7 @@ class TestProcessingState:
             capture = await state.session.capture("Buy milk")
             assert capture is not None
             await state.processing.begin(capture)
-            plan = await state.processing.build_plan(ProcessingOutcome.PROJECT)
+            plan = await state.processing.build_plan(_processing_request(ProcessingOutcome.PROJECT))
             assert plan is not None
             assert state.processing.plan is plan
 
@@ -339,8 +363,10 @@ class TestProcessingState:
             assert capture is not None
             await state.processing.begin(capture)
             plan = await state.processing.build_plan(
-                ProcessingOutcome.REFERENCE,
-                due_date=datetime.date(2026, 11, 20),
+                _processing_request(
+                    ProcessingOutcome.REFERENCE,
+                    due_date=datetime.date(2026, 11, 20),
+                )
             )
             assert plan is None
 
@@ -361,7 +387,7 @@ class TestProcessingState:
             capture = await state.session.capture("Buy milk")
             assert capture is not None
             await state.processing.begin(capture)
-            await state.processing.build_plan(ProcessingOutcome.PROJECT)
+            await state.processing.build_plan(_processing_request(ProcessingOutcome.PROJECT))
             target = await state.processing.apply()
             assert target is not None
             return target
@@ -390,7 +416,7 @@ class TestProcessingState:
             capture = await state.session.capture("Buy milk")
             assert capture is not None
             await state.processing.begin(capture)
-            await state.processing.build_plan(ProcessingOutcome.PROJECT)
+            await state.processing.build_plan(_processing_request(ProcessingOutcome.PROJECT))
             assert await state.processing.apply() is not None
 
         asyncio.run(scenario())
@@ -413,7 +439,7 @@ class TestProcessingState:
             capture_path = await state.session.capture("Buy milk")
             assert capture_path is not None
             await state.processing.begin(capture_path)
-            await state.processing.build_plan(ProcessingOutcome.PROJECT)
+            await state.processing.build_plan(_processing_request(ProcessingOutcome.PROJECT))
 
         asyncio.run(scenario())
 
@@ -441,7 +467,7 @@ class TestProcessingState:
             capture = await state.session.capture("Buy milk")
             assert capture is not None
             await state.processing.begin(capture)
-            await state.processing.build_plan(ProcessingOutcome.PROJECT)
+            await state.processing.build_plan(_processing_request(ProcessingOutcome.PROJECT))
             state.processing.cancel()
 
         asyncio.run(scenario())
@@ -463,7 +489,7 @@ class TestProcessingState:
             capture = await state.session.capture("Buy milk")
             assert capture is not None
             await state.processing.begin(capture)
-            await state.processing.build_plan(ProcessingOutcome.PROJECT)
+            await state.processing.build_plan(_processing_request(ProcessingOutcome.PROJECT))
             await state.processing.apply()
             state.processing.finish()
 
@@ -1759,7 +1785,7 @@ class TestRefreshWorkspace:
             capture = await state.session.capture("Buy milk")
             assert capture is not None
             await state.processing.begin(capture)
-            plan = await state.processing.build_plan(ProcessingOutcome.PROJECT)
+            plan = await state.processing.build_plan(_processing_request(ProcessingOutcome.PROJECT))
             _write_note(vault / "inbox" / "External.md", _note_text("# External"))
             changed = await state.workspace.refresh_workspace()
             assert changed is True
@@ -3503,7 +3529,7 @@ class TestReviewState:
         async def scenario() -> Path | None:
             await state.workspace.choose_vault(vault)
             await state.review.start()
-            plan = await state.processing.build_plan(ProcessingOutcome.PROJECT)
+            plan = await state.processing.build_plan(_processing_request(ProcessingOutcome.PROJECT))
             assert plan is not None
             target = await state.processing.apply()
             await state.review.record_processed()

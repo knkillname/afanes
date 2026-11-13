@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable
 
 import flet as ft
 
+import afanes.core.vault.processing
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
@@ -434,17 +435,22 @@ class ProcessingView:
             project = (self.project.value or "").strip() or None
 
         self.form_error.visible = False
+        note = self._state.processing.note
+        if note is None:
+            return
+        request = afanes.core.vault.processing.ProcessingRequest(
+            outcome=outcome,
+            note_path=note,
+            status=status,
+            due_date=due_date,
+            owner=owner,
+            asked_by=asked_by,
+            project=project,
+            card=card,
+        )
         self._set_working(working=True)
         try:
-            plan = await self._state.processing.build_plan(
-                outcome,
-                status=status,
-                due_date=due_date,
-                owner=owner,
-                asked_by=asked_by,
-                project=project,
-                card=card,
-            )
+            plan = await self._state.processing.build_plan(request)
         finally:
             self._set_working(working=False)
         self._plan_hidden = plan is None

@@ -25,7 +25,7 @@
 
 ## 5. Refactor the PLR findings
 
-- [ ] 5.1 Add frozen slotted `ProcessingRequest` and `ProcessingContext` value objects and make `VaultProcessing.plan_processing` take the request; split the method below 50 statements and extract validation, target resolution, and note/non-note planning; update `_plan_non_note`, `ProcessingState.build_plan`, callers, and tests; verify `hatch run ruff check --select PLR0915,PLR0913 src/afanes/core/vault/processing.py src/afanes/ui/state/processing.py` reports no findings.
+- [x] 5.1 Add frozen slotted `ProcessingRequest` and `ProcessingContext` value objects and make `VaultProcessing.plan_processing` take the request; split the method below 50 statements and extract validation, target resolution, and note/non-note planning; update `_plan_non_note`, `ProcessingState.build_plan`, callers, and tests; verify `hatch run ruff check --select PLR0915,PLR0913 src/afanes/core/vault/processing.py src/afanes/ui/state/processing.py` reports no findings.
 - [ ] 5.2 Add a frozen slotted `PageActions` value object and extract the self-contained `PageView` blocks into small classes under `ui/components/`; update `tests/ui/` and verify the extracted components' tests pass.
 - [ ] 5.3 Finish `PageView.__init__` as thin `_build_*` glue over the components; verify `ruff check --select PLR0915,PLR0913 src/afanes/ui/views/page.py` reports no findings and the page-view tests pass.
 - [ ] 5.4 Add a frozen slotted `WorkspaceActions` value object and extract the self-contained `WorkspaceView` blocks into small classes under `ui/components/`; update `tests/ui/` and verify the extracted components' tests pass.

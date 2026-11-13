@@ -2,7 +2,6 @@
 
 import asyncio
 import dataclasses
-import datetime
 import logging
 from pathlib import Path
 
@@ -11,9 +10,8 @@ import afanes.core.vault.processing
 import afanes.core.vault.service
 import afanes.ui.strings
 from afanes.core.errors import AfanesError, VaultError
-from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
+from afanes.core.processing import AppendStepPlan, ProcessingPlan
 from afanes.core.template_cards import TemplateCard, TemplateCardCatalog, TemplateCardIssue, TemplateCardListing
-from afanes.models.note import Status
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.session import VaultSession
 from afanes.ui.state.status import UiStatus
@@ -142,33 +140,15 @@ class ProcessingState:
 
     async def build_plan(
         self,
-        outcome: ProcessingOutcome,
-        *,
-        status: Status | None = None,
-        due_date: datetime.date | None = None,
-        owner: str | None = None,
-        asked_by: str | None = None,
-        project: str | None = None,
-        card: TemplateCard | None = None,
+        request: afanes.core.vault.processing.ProcessingRequest,
     ) -> ProcessingPlan | AppendStepPlan | None:
         """Build a processing preview for the open capture.
 
         Parameters
         ----------
-        outcome : ProcessingOutcome
-            Selected clarification outcome.
-        status : Status | None
-            Requested target status, when the outcome accepts one.
-        due_date : datetime.date | None
-            Optional calendar due date for a new project.
-        owner : str | None
-            Optional project-owner name for Project or Done now.
-        asked_by : str | None
-            Optional requester name for Project or Done now.
-        project : str | None
-            Target project identity for Append step.
-        card : TemplateCard | None
-            Template card chosen for Reference or Later, or ``None`` for Empty.
+        request : afanes.core.vault.processing.ProcessingRequest
+            Selected outcome and optional metadata. The state fills
+            ``note_path`` from the open capture.
 
         Returns
         -------
@@ -186,20 +166,14 @@ class ProcessingState:
             note = self.note
             if vault is None or note is None:
                 return None
+            request = dataclasses.replace(request, note_path=note)
             self.status.set_busy(busy=True)
             self.status.clear_message()
             try:
                 try:
                     plan = await asyncio.to_thread(
                         afanes.core.vault.processing.VaultProcessing(vault).plan_processing,
-                        note,
-                        outcome,
-                        status=status,
-                        due_date=due_date,
-                        owner=owner,
-                        asked_by=asked_by,
-                        project=project,
-                        card=card,
+                        request,
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Processing plan failed", exc_info=True)

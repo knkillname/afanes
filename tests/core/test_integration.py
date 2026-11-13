@@ -28,7 +28,7 @@ from afanes.core.vault.snapshot import UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType, Status
 from afanes.models.step import StepEdit, StepEditKind
-from tests.support import versioned
+from tests.support import processing_request, versioned
 
 TODAY = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
 TWO_OPEN_STEPS = 2
@@ -109,7 +109,9 @@ class TestProcessingLifecycle:
         vault = Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Read the manual")
 
-        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.REFERENCE)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            processing_request(capture, ProcessingOutcome.REFERENCE)
+        )
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert target == root / "reference" / "general" / "Read the manual.md"
@@ -122,7 +124,9 @@ class TestProcessingLifecycle:
         vault = Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Read the manual")
 
-        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.LATER)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            processing_request(capture, ProcessingOutcome.LATER)
+        )
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert NoteDocument.from_text(target.read_text(encoding="utf-8")).status is Status.LATER
@@ -135,7 +139,9 @@ class TestProcessingLifecycle:
             "Launch\n\n- [ ] Call the printer\n- [ ] Book the room\n"
         )
 
-        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            processing_request(capture, ProcessingOutcome.PROJECT)
+        )
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
         note = vault.scan().find_note(target)
 
@@ -151,7 +157,7 @@ class TestProcessingLifecycle:
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Send the invoice")
 
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
-            capture, ProcessingOutcome.DONE_NOW, today=TODAY
+            processing_request(capture, ProcessingOutcome.DONE_NOW, today=TODAY)
         )
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
         document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
@@ -169,7 +175,7 @@ class TestProcessingLifecycle:
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Call the plumber\n\nAsk about the boiler")
 
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
-            capture, ProcessingOutcome.APPEND_STEP, project="Home"
+            processing_request(capture, ProcessingOutcome.APPEND_STEP, project="Home")
         )
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
@@ -186,7 +192,9 @@ class TestProcessingLifecycle:
         vault = Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Obsolete")
 
-        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.TRASH)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            processing_request(capture, ProcessingOutcome.TRASH)
+        )
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert target == root / "trash" / "Obsolete.md"
@@ -358,7 +366,9 @@ class TestMisplacedNote:
 
         assert listing.group(BrowserSection.NEEDS_ATTENTION).notes[0].path == path
         with pytest.raises(ProcessingError):
-            afanes.core.vault.processing.VaultProcessing(vault).plan_processing(path, ProcessingOutcome.PROJECT)
+            afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+                processing_request(path, ProcessingOutcome.PROJECT)
+            )
 
 
 class TestReviewWorkflow:
@@ -371,7 +381,9 @@ class TestReviewWorkflow:
         versioned(root)
         vault = Vault(root)
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Launch the site")
-        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.PROJECT)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            processing_request(capture, ProcessingOutcome.PROJECT)
+        )
         project = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
         afanes.core.vault.steps.VaultSteps(vault).append_step(project, "Call the printer", confirm=True)
         afanes.core.vault.steps.VaultSteps(vault).append_step(project, "Book the room", confirm=True)
@@ -422,7 +434,9 @@ class TestCreatedVaultWorkflow:
         creation = afanes.core.vault.service.Vault.create_directory(tmp_path / "vault")
         vault = creation.vault
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Draft the plan")
-        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(capture, ProcessingOutcome.REFERENCE)
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            processing_request(capture, ProcessingOutcome.REFERENCE)
+        )
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
         assert target.is_file()

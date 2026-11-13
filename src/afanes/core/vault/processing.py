@@ -27,6 +27,71 @@ from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class ProcessingRequest:
+    """Request one clarification plan for an inbox capture.
+
+    Attributes
+    ----------
+    outcome : ProcessingOutcome
+        Selected clarification outcome.
+    note_path : pathlib.Path | None
+        Capture path, relative or absolute, under the vault's ``inbox/``.
+        ``None`` lets the UI state fill its open capture.
+    status : Status | None
+        Requested target status. Projects default to ``active``; Later is
+        always ``later``; Reference has no status; Done now is ``done``.
+    due_date : datetime.date | None
+        Optional calendar due date for a new project or a done-now project.
+    owner : str | None
+        Optional project-owner name for Project or Done now.
+    asked_by : str | None
+        Optional requester name for Project or Done now.
+    project : str | None
+        Target project identity for Append step.
+    card : TemplateCard | None
+        Template card chosen for Reference or Later, or ``None`` for Empty.
+    today : datetime.date | None
+        Calendar date recorded as ``actual`` by Done now. ``None`` uses the
+        current local date.
+    snapshot : VaultSnapshot | None
+        Pre-built scan to avoid rescanning, or ``None`` to scan the vault.
+    """
+
+    outcome: ProcessingOutcome
+    note_path: Path | None = None
+    status: Status | None = None
+    due_date: datetime.date | None = None
+    owner: str | None = None
+    asked_by: str | None = None
+    project: str | None = None
+    card: TemplateCard | None = None
+    today: datetime.date | None = None
+    snapshot: VaultSnapshot | None = None
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ProcessingContext:
+    """Resolved capture and scan shared by the planning steps.
+
+    Attributes
+    ----------
+    source : pathlib.Path
+        Containment-checked capture path under ``inbox/``.
+    vault : VaultSnapshot
+        Scan that contains the capture.
+    note : VaultNote
+        Capture note from the scan.
+    source_hash : str
+        SHA-256 of the capture bytes at planning time.
+    """
+
+    source: Path
+    vault: VaultSnapshot
+    note: VaultNote
+    source_hash: str
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class VaultProcessing:
     """Plan and apply clarification steps for inbox captures.
 
@@ -38,51 +103,13 @@ class VaultProcessing:
 
     vault: Vault
 
-    def plan_processing(
-        self,
-        note_path: Path,
-        outcome: ProcessingOutcome,
-        *,
-        status: Status | None = None,
-        due_date: datetime.date | None = None,
-        owner: str | None = None,
-        asked_by: str | None = None,
-        project: str | None = None,
-        card: TemplateCard | None = None,
-        today: datetime.date | None = None,
-        snapshot: VaultSnapshot | None = None,
-    ) -> ProcessingPlan | AppendStepPlan:
+    def plan_processing(self, request: ProcessingRequest) -> ProcessingPlan | AppendStepPlan:
         """Plan one clarification step for an inbox capture.
 
         Parameters
         ----------
-        note_path : Path
-            Capture path, relative or absolute, under the vault's ``inbox/``.
-        outcome : ProcessingOutcome
-            Selected clarification outcome.
-        status : Status | None
-            Requested target status. Projects default to ``active``; Later is
-            always ``later``; Reference has no status; Done now is ``done``.
-        due_date : datetime.date | None
-            Optional calendar due date for a new project or a done-now project.
-        owner : str | None
-            Optional project-owner name. Only project outcomes accept it;
-            surrounding whitespace is trimmed and a blank value means no owner.
-        asked_by : str | None
-            Optional requester name. Only project outcomes accept it;
-            surrounding whitespace is trimmed and a blank value means no
-            requester.
-        project : str | None
-            Target project identity for Append step. Text that matches no
-            project is rejected.
-        card : TemplateCard | None
-            Template card chosen for Reference or Later. ``None`` is the Empty
-            option and produces a ``general`` reference with no starter body.
-        today : datetime.date | None
-            Calendar date recorded as ``actual`` by Done now. ``None`` uses the
-            current local date.
-        snapshot : VaultSnapshot | None
-            Pre-built scan to avoid rescanning, or ``None`` to scan the vault.
+        request : ProcessingRequest
+            Capture path, outcome, optional metadata, and pre-built snapshot.
 
         Returns
         -------
@@ -111,38 +138,55 @@ class VaultProcessing:
         and Later always carry a category: the chosen card's label, or
         ``general`` for Empty. Only those outcomes accept a card.
         """
-        if card is not None and outcome not in (ProcessingOutcome.REFERENCE, ProcessingOutcome.LATER):
+        self._validate_card(request)
+        self._validate_role_outcome(request.outcome, request.owner, request.asked_by)
+        context = self._resolve_capture(request)
+        non_note = self._plan_non_note(request, context)
+        if non_note is not None:
+            return non_note
+        owner_name, asked_by_name = self._role_names(request.owner, request.asked_by)
+        return self._plan_note(request, context, owner_name, asked_by_name)
+
+    @staticmethod
+    def _validate_card(request: ProcessingRequest) -> None:
+        """Reject a template card outside Reference and Later."""
+        if request.card is not None and request.outcome not in (
+            ProcessingOutcome.REFERENCE,
+            ProcessingOutcome.LATER,
+        ):
             message = "Only Reference and Later accept a template card"
             raise ProcessingError(message)
-        if card is not None and card.note_type is not NoteType.REFERENCE:
+        if request.card is not None and request.card.note_type is not NoteType.REFERENCE:
             message = "Reference and Later need a reference card"
             raise ProcessingError(message)
-        self._validate_role_outcome(outcome, owner, asked_by)
-        owner_name, asked_by_name = self._role_names(owner, asked_by)
+
+    def _resolve_capture(self, request: ProcessingRequest) -> ProcessingContext:
+        """Resolve the capture, scan the vault, and hash the source."""
+        note_path = request.note_path
+        if note_path is None:
+            message = "Processing needs an inbox capture path"
+            raise ProcessingError(message)
         source = self.vault.contained(note_path)
         self._require_inbox_note(source)
-
-        vault = snapshot or self.vault.scan()
+        vault = request.snapshot or self.vault.scan()
         note = vault.find_note(source)
         if note is None:
             message = f"Note is not part of the vault: {note_path}"
             raise ProcessingError(message)
-
         source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
-        source_scheme = ReferenceScheme.for_note(note.note_type)
-        non_note = self._plan_non_note(
-            source,
-            vault,
-            note,
-            outcome,
-            status=status,
-            due_date=due_date,
-            project=project,
-            source_hash=source_hash,
-        )
-        if non_note is not None:
-            return non_note
+        return ProcessingContext(source=source, vault=vault, note=note, source_hash=source_hash)
 
+    def _plan_note(
+        self,
+        request: ProcessingRequest,
+        context: ProcessingContext,
+        owner_name: str | None,
+        asked_by_name: str | None,
+    ) -> ProcessingPlan:
+        """Plan a single-note outcome after the non-note outcomes are handled."""
+        outcome = request.outcome
+        status = request.status
+        due_date = request.due_date
         target = ProcessingTarget.from_outcome(outcome, status)
         target_type = target.note_type
         target_status = target.status
@@ -153,11 +197,14 @@ class VaultProcessing:
         category: CategoryLabel | None = None
         scaffold: str | None = None
         if outcome in (ProcessingOutcome.REFERENCE, ProcessingOutcome.LATER):
+            card = request.card
             category = card.category if card is not None else CategoryLabel("general")
             scaffold = card.body if card is not None and card.body.strip() else None
         target_date: NoteDate | None = None
+        source = context.source
+        vault = context.vault
         if outcome is ProcessingOutcome.LOG:
-            target_date = note.date or NoteDate.from_date(
+            target_date = context.note.date or NoteDate.from_date(
                 datetime.datetime.fromtimestamp(source.stat().st_mtime, tz=datetime.UTC).astimezone().date()
             )
             target_directory = self.vault.log_directory(target_date)
@@ -176,7 +223,7 @@ class VaultProcessing:
             raise NameCollisionError(message)
 
         affected = vault.affected_sites(source)
-        body_override = self._done_now_override(source, outcome, today=today)
+        body_override = self._done_now_override(source, outcome, today=request.today)
         plan = ProcessingPlan(
             source_path=source,
             target_path=target_path,
@@ -187,11 +234,11 @@ class VaultProcessing:
             body_override=body_override,
             category=category,
             scaffold=scaffold,
-            source_hash=source_hash,
-            processed_hash=source_hash,
+            source_hash=context.source_hash,
+            processed_hash=context.source_hash,
             reference_count=sum(site.reference_count for site in affected),
             affected_notes=tuple(site.path for site in affected),
-            changes_scheme=source_scheme is not target_scheme,
+            changes_scheme=ReferenceScheme.for_note(context.note.note_type) is not target_scheme,
             target_date=target_date,
             owner=owner_name,
             asked_by=asked_by_name,
@@ -255,42 +302,36 @@ class VaultProcessing:
 
     def _plan_non_note(
         self,
-        source: Path,
-        vault: VaultSnapshot,
-        note: VaultNote,
-        outcome: ProcessingOutcome,
-        *,
-        status: Status | None,
-        due_date: datetime.date | None,
-        project: str | None,
-        source_hash: str,
+        request: ProcessingRequest,
+        context: ProcessingContext,
     ) -> ProcessingPlan | AppendStepPlan | None:
         """Plan Append step or Trash, or return ``None`` for a note outcome."""
+        outcome = request.outcome
         if outcome is ProcessingOutcome.APPEND_STEP:
-            if status is not None or due_date is not None:
+            if request.status is not None or request.due_date is not None:
                 message = "Append step does not accept status or due date metadata"
                 raise ProcessingError(message)
-            if project is None:
+            if request.project is None:
                 message = "Append step needs a target project"
                 raise ProcessingError(message)
-            return self.plan_append_step(source, project, snapshot=vault)
+            return self.plan_append_step(context.source, request.project, snapshot=context.vault)
         if outcome is ProcessingOutcome.TRASH:
-            if status is not None or due_date is not None:
+            if request.status is not None or request.due_date is not None:
                 message = "Trash does not accept assignment metadata"
                 raise ProcessingError(message)
-            trash_preview = VaultNaming(self.vault).plan_trash(source, snapshot=vault)
+            trash_preview = VaultNaming(self.vault).plan_trash(context.source, snapshot=context.vault)
             return ProcessingPlan(
-                source_path=source,
+                source_path=context.source,
                 target_path=trash_preview.trash_path,
                 outcome=outcome,
-                target_type=note.note_type,
-                target_status=note.status,
+                target_type=context.note.note_type,
+                target_status=context.note.status,
                 due_date=None,
                 body_override=None,
                 category=None,
                 scaffold=None,
-                source_hash=source_hash,
-                processed_hash=source_hash,
+                source_hash=context.source_hash,
+                processed_hash=context.source_hash,
                 reference_count=trash_preview.reference_count,
                 affected_notes=trash_preview.affected_notes,
                 changes_scheme=False,
