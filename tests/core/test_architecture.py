@@ -63,7 +63,7 @@ SECTION_HEADING_PATTERN = re.compile(r"^#{2,3}\s+(\d+(?:\.\d+)?)\b", re.MULTILIN
 SECTION_CITATION_PATTERN = re.compile(r"[Ss]ections?\s+(\d+(?:\.\d+)?)|(?:see|through)\s+(\d+(?:\.\d+)?)")
 APP_STATE_SURFACE_BUDGET = 10
 DOMAIN_CONTROLLER_SURFACE_BUDGET = 25
-LABEL_KEYS = frozenset({"type", "category", "status", "due_date", "asked_by", "date"})
+LABEL_KEYS = frozenset({"type", "category", "status", "due_date", "asked_by", "owner", "date"})
 LABEL_OWNER_MODULES = frozenset({"core/labels.py", "core/frontmatter.py"})
 TEMPLATE_OPTION_HELPERS = frozenset(
     {"_template_options", "_template_option_text", "_reference_template_options", "_reference_template_text"}
@@ -493,11 +493,15 @@ class TestLabelOwnership:
 
     def test_a_label_write_outside_the_owner_is_reported(self, tmp_path: Path) -> None:
         path = tmp_path / "writer.py"
-        path.write_text('raw = {}\nraw["status"] = "done"\nraw.pop("date", None)\n', encoding="utf-8")
+        path.write_text(
+            'raw = {}\nraw["status"] = "done"\nraw["owner"] = "Ada"\nraw.pop("date", None)\n',
+            encoding="utf-8",
+        )
 
         assert _label_key_writes(path) == [
             "line 2: assignment to 'status'",
-            "line 3: pop of 'date'",
+            "line 3: assignment to 'owner'",
+            "line 4: pop of 'date'",
         ]
 
 

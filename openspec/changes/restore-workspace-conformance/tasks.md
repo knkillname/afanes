@@ -47,10 +47,10 @@
 
 ## 8. Gate and integration
 
-- [ ] 8.1 Add `owner` to `LABEL_KEYS` in `tests/core/test_architecture.py`; verify the architecture gate passes and would flag an owner write outside the allowed modules.
-- [ ] 8.2 Verify the `RENAMED` deltas for `vault-browsing` and `note-editing` and the modified requirements remain structurally valid and archive-ready; verify `openspec validate --all --strict` passes.
-- [ ] 8.3 Run `hatch check`, `hatch test --cover`, `hatch run docs:build`, `openspec doctor`, and both vocabulary compliance greps; verify every command passes.
-- [ ] 8.4 Re-run the scenario trace for the six changed capabilities and record the closed findings; verify no changed scenario is left weak or gap.
+- [x] 8.1 Add `owner` to `LABEL_KEYS` in `tests/core/test_architecture.py`; verify the architecture gate passes and would flag an owner write outside the allowed modules.
+- [x] 8.2 Verify the `RENAMED` deltas for `vault-browsing` and `note-editing` and the modified requirements remain structurally valid and archive-ready; verify `openspec validate --all --strict` passes.
+- [x] 8.3 Run `hatch check`, `hatch test --cover`, `hatch run docs:build`, `openspec doctor`, and both vocabulary compliance greps; verify every command passes.
+- [x] 8.4 Re-run the scenario trace for the six changed capabilities and record the closed findings; verify no changed scenario is left weak or gap.
 
 ## Workflow follow-up
 

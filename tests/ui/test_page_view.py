@@ -1433,6 +1433,41 @@ class TestConnections:
         assert view.connections_steps_toggle.visible is False
         assert view.connections_projects_toggle.visible is False
 
+    def test_an_empty_section_does_not_reorder_the_others(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        person = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", category="person"),
+        )
+        _write_note(vault / "notes" / "Call.md", _note_text("# Call\n\n[Ada](<note:Ada>)\n"))
+        _write_note(vault / "projects" / "Home.md", _typed_note("project", "# Home\n", extra="owner: Ada"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(person)
+
+        asyncio.run(scenario())
+        view = PageView(lambda: None)
+        headings = [
+            title
+            for title in (
+                afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM,
+                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS,
+                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS,
+                afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
+            )
+            if any(title in _texts(control) for control in view.connections_body.controls)
+        ]
+
+        assert headings == [
+            afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM,
+            afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS,
+        ]
+
     def test_owned_project_alone_renders_the_section(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         person = _write_note(

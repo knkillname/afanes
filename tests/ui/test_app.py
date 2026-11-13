@@ -19,6 +19,7 @@ import afanes.ui.app
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
+import afanes.ui.views.page
 from afanes.core.errors import TemplateContentError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.settings import Settings
@@ -1184,6 +1185,11 @@ class TestRoleReferenceCreation:
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
         page = FakePage()
         state = afanes.ui.state.app_state
+
+        async def ignore_scroll(_view: object) -> None:
+            return None
+
+        monkeypatch.setattr(afanes.ui.views.page.PageView, "scroll_to_top", ignore_scroll)
 
         async def scenario() -> None:
             await afanes.ui.app.main(typing.cast("ft.Page", page))
