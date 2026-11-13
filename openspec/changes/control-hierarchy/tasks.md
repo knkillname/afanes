@@ -35,7 +35,7 @@
 
 - [x] 6.1 Mark wave 2 as landed in `docs/develop/interface-standard.md`, describe the insensitive-action, cancel-first, and list-row rules, and refresh the baseline table. Verify `hatch run docs:build` passes and review the affected user guides for statements that changed.
 - [x] 6.2 Run `hatch check`, `hatch test --cover`, `hatch run docs:build`, `openspec validate --all --strict`, `openspec doctor`, and the vocabulary checks. Verify all pass at 85% coverage or higher.
-- [ ] 6.3 Check the Welcome, page conflict, rename, review form, and processing surfaces at 1024x600 and 1100x760 in light and dark modes. Verify each surface shows one affirmative style, Cancel comes first, and no control clips.
+- [x] 6.3 Check the Welcome, page conflict, rename, review form, and processing surfaces at 1024x600 and 1100x760 in light and dark modes. Verify each surface shows one affirmative style, Cancel comes first, and no control clips.
 
 ## Workflow follow-up
 
