@@ -137,7 +137,7 @@ Selecting any browser entry SHALL open that note in the detail region with its d
 - **WHEN** the current page has an unresolved disk conflict
 - **THEN** selecting another browser entry does not change the page until the conflict is resolved
 
-### Requirement: The browser searches titles, identities, and bodies
+### Requirement: The browser searches titles, identities, bodies, steps, and role names
 
 The browser SHALL provide a search field that filters entries by display title, identity, prose body
 text, step text, and role names (`owner`, `asked_by`, and step `owners`). Matching SHALL ignore case,
@@ -162,7 +162,7 @@ searched.
 #### Scenario: Step text match names the project
 
 - **WHEN** a search term appears in a step
-- **THEN** the project is listed and the matching step is shown with its project
+- **THEN** the project is listed
 
 #### Scenario: Owner match names the project
 
@@ -575,3 +575,28 @@ While Review is active, the browser SHALL show the session's snapshot queue in r
 
 - **WHEN** every queue item has been passed
 - **THEN** the browser no longer marks an active card and the detail shows the completion summary
+
+### Requirement: A page change starts at the top
+
+Whenever the page pane switches to a page, including browser selection, a link, a connection entry, or
+Back, the new page SHALL start at the top.
+
+#### Scenario: Browser selection starts at the top
+
+- **WHEN** the user selects a page while the previous page is scrolled
+- **THEN** the new page starts at the top
+
+#### Scenario: A link starts at the top
+
+- **WHEN** the user follows a link while the previous page is scrolled
+- **THEN** the linked page starts at the top
+
+#### Scenario: A connection starts at the top
+
+- **WHEN** the user selects a connection entry while the page is scrolled
+- **THEN** the connection target starts at the top
+
+#### Scenario: Back starts at the top
+
+- **WHEN** the user chooses Back while the current page is scrolled
+- **THEN** the previous page starts at the top

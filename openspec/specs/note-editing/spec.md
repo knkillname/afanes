@@ -140,7 +140,7 @@ If the safe identity already belongs to a page in the same scheme, the applicati
 - **WHEN** a page named `Q1 Planning` already exists in the same scheme
 - **THEN** the application opens that page and offers the repair instead of creating another page
 
-### Requirement: The page edits the body and the four labels
+### Requirement: The page edits the body and the label fields
 
 Edit mode SHALL present the complete Markdown body, including its headings and steps, as raw text,
 along with a label form for type, date, category, status, due date, requester, and owner. Date SHALL

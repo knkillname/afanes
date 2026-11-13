@@ -11,7 +11,8 @@ Defines the four note types Afanes stores, the frontmatter keys they share, the 
 A note's recognized frontmatter keys SHALL be `type`, `date`, `category`, `status`, `due_date`,
 `asked_by`, and `owner`. `date` SHALL be valid on every note. `category` SHALL be valid only on a
 reference. `due_date`, `asked_by`, and `owner` SHALL be valid only on a project. A log note MUST NOT
-declare `category`, `status`, `due_date`, `asked_by`, or `owner`. Unknown keys SHALL be preserved.
+declare `category`, `status`, `due_date`, `asked_by`, or `owner`. A null `status` or `due_date` SHALL
+be treated as absent on every note type. Unknown keys SHALL be preserved.
 
 #### Scenario: Category on a reference
 
@@ -128,6 +129,16 @@ declare `category`, `status`, `due_date`, `asked_by`, or `owner`. Unknown keys S
 - **WHEN** a log declares `status: archived`
 - **THEN** parsing reports a validation error
 
+#### Scenario: Null status is absent on a log
+
+- **WHEN** a log declares `status: null`
+- **THEN** the note parses with no status
+
+#### Scenario: Null due date is absent on a reference
+
+- **WHEN** a reference declares `due_date: null`
+- **THEN** the note parses with no due date
+
 ### Requirement: The requester is a plain label
 
 An `asked_by` value SHALL be stored as one non-empty plain-text name or team. It SHALL resolve
@@ -239,12 +250,12 @@ NOT be a valid status.
 
 #### Scenario: Note with a status is rejected
 
-- **WHEN** a `type: note` declares any status
+- **WHEN** a `type: note` declares a non-null status
 - **THEN** parsing reports a validation error
 
 #### Scenario: Log with a status is rejected
 
-- **WHEN** a `type: log` declares any status
+- **WHEN** a `type: log` declares a non-null status
 - **THEN** parsing reports a validation error
 
 #### Scenario: Inbox is not a status

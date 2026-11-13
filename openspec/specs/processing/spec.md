@@ -45,6 +45,11 @@ step, or Done now. The user SHALL choose the outcome; processing MUST NOT infer 
 - **WHEN** the user treats one step as the whole commitment
 - **THEN** the outcome is a one-step project
 
+#### Scenario: Every fixed outcome is offered
+
+- **WHEN** the Processing Wizard opens for a capture
+- **THEN** the outcome list offers Trash, Later, Reference, Project, Log entry, Append step, and Done now
+
 #### Scenario: A log entry is an explicit outcome
 
 - **WHEN** the user chooses Log entry

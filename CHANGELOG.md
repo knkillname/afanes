@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   browse-to-detail stack. The OS title bar stays native. This implements the `adaptive-browser-shell`
   OpenSpec change. README: no change required. Docs: the interface standard, workspace, log, inbox,
   and review guides and the four screenshots were updated during implementation.
+- **Connections, page navigation, and rewrite reports.** Connections omit a group with no visible
+  item, and the completed-item reveal controls stay available when only hidden items remain. A page
+  always opens at the top after browser selection, a link, a connection entry, or Back. Processing
+  offers Log entry among its fixed outcomes, and every reference rewrite reports the notes it
+  updated and skipped with vault-relative paths and reasons. A null `status` or `due_date` is treated
+  as absent on every note type. This implements the `restore-workspace-conformance` OpenSpec change,
+  which also closed the scenario-to-test audit. README: no change required. Docs: the pages,
+  workspace, processing, and frontmatter pages were updated during implementation.
 
 ## [0.7.0] - 2026-11-12
 
