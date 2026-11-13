@@ -251,7 +251,7 @@ class PageView:
         self.connections_panel = Panel(
             afanes.ui.strings.PAGE_CONNECTIONS_TITLE,
             self.connections_body,
-            [],
+            [self.connections_steps_toggle, self.connections_projects_toggle],
         ).build()
         self.connections_panel.visible = False
 
@@ -766,49 +766,45 @@ class PageView:
         self.connections_projects_toggle.visible = bool(
             result.finished_projects or result.finished_project_owner_projects
         )
-        self.connections_body.controls = [
-            self._connection_subsection(
-                afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM,
-                self._linked_from_controls(result),
-            ),
-            self._connection_subsection(
-                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS,
-                self._owned_project_controls(result),
-            ),
-            self._connection_subsection(
-                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS,
-                self._owned_step_controls(result),
-                self.connections_steps_toggle,
-            ),
-            self._connection_subsection(
-                afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
-                self._requested_project_controls(result),
-                self.connections_projects_toggle,
-            ),
-        ]
+        sections: list[ft.Control] = []
+        linked_from = self._linked_from_controls(result)
+        if linked_from:
+            sections.append(
+                self._connection_subsection(afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM, linked_from)
+            )
+        owned_projects = self._owned_project_controls(result)
+        if owned_projects:
+            sections.append(
+                self._connection_subsection(afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS, owned_projects)
+            )
+        owned_steps = self._owned_step_controls(result)
+        if owned_steps:
+            sections.append(
+                self._connection_subsection(afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS, owned_steps)
+            )
+        requested_projects = self._requested_project_controls(result)
+        if requested_projects:
+            sections.append(
+                self._connection_subsection(
+                    afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
+                    requested_projects,
+                )
+            )
+        self.connections_body.controls = sections
         self.connections_panel.visible = True
 
-    def _connection_subsection(
-        self,
-        title: str,
-        rows: list[ft.Control],
-        toggle: ft.Checkbox | None = None,
-    ) -> ft.Column:
+    def _connection_subsection(self, title: str, rows: list[ft.Control]) -> ft.Column:
         """Build one labeled group of connection rows."""
-        controls: list[ft.Control] = [
-            ft.Text(title, style=afanes.ui.theme.SECTION_LABEL_TEXT_STYLE),
-            *rows,
-        ]
-        if toggle is not None:
-            controls.append(toggle)
-        return ft.Column(controls=controls, spacing=afanes.ui.theme.ITEM_GAP)
+        return ft.Column(
+            controls=[
+                ft.Text(title, style=afanes.ui.theme.SECTION_LABEL_TEXT_STYLE),
+                *rows,
+            ],
+            spacing=afanes.ui.theme.ITEM_GAP,
+        )
 
     def _linked_from_controls(self, result: afanes.core.connections.ConnectionSet) -> list[ft.Control]:
         """Build one row per note whose body links here."""
-        if not result.linked_from:
-            return [
-                ft.Text(afanes.ui.strings.PAGE_CONNECTIONS_EMPTY_LINKED_FROM, style=afanes.ui.theme.METADATA_TEXT_STYLE)
-            ]
         return [
             ft.TextButton(
                 content=note.title,
@@ -822,10 +818,6 @@ class PageView:
         projects = list(result.project_owner_projects)
         if self._show_finished_projects:
             projects.extend(result.finished_project_owner_projects)
-        if not projects:
-            return [
-                ft.Text(afanes.ui.strings.PAGE_CONNECTIONS_EMPTY_PROJECTS, style=afanes.ui.theme.METADATA_TEXT_STYLE)
-            ]
         return [
             ft.TextButton(
                 content=project.title,
@@ -837,14 +829,12 @@ class PageView:
     def _owned_step_controls(self, result: afanes.core.connections.ConnectionSet) -> list[ft.Control]:
         """Build owned-step rows grouped by project."""
         rows: list[ft.Control] = []
-        shown = 0
         for owned in result.owned_projects:
             steps = list(owned.open_steps)
             if self._show_completed_steps:
                 steps.extend(owned.completed_steps)
             if not steps:
                 continue
-            shown += 1
             rows.append(
                 ft.TextButton(
                     content=ft.Text(owned.project.title, style=afanes.ui.theme.METADATA_TEXT_STYLE),
@@ -861,8 +851,6 @@ class PageView:
                 )
                 for step in steps
             )
-        if shown == 0:
-            return [ft.Text(afanes.ui.strings.PAGE_CONNECTIONS_EMPTY_STEPS, style=afanes.ui.theme.METADATA_TEXT_STYLE)]
         return rows
 
     def _requested_project_controls(self, result: afanes.core.connections.ConnectionSet) -> list[ft.Control]:
@@ -870,10 +858,6 @@ class PageView:
         projects = list(result.requested_projects)
         if self._show_finished_projects:
             projects.extend(result.finished_projects)
-        if not projects:
-            return [
-                ft.Text(afanes.ui.strings.PAGE_CONNECTIONS_EMPTY_PROJECTS, style=afanes.ui.theme.METADATA_TEXT_STYLE)
-            ]
         return [
             ft.TextButton(
                 content=project.title,

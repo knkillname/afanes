@@ -8,9 +8,9 @@
 
 ## 2. Connection sections
 
-- [ ] 2.1 Render only connection sections with at least one visible row, move both reveal toggles to the Connections panel actions row, and remove the empty-section placeholder strings; verify `tests/ui/test_page_view.py` passes with the updated expectations.
-- [ ] 2.2 Add view tests for a page with one connection kind (other headings absent), a page with only a finished owned project (section absent, finished-project control visible, enabling reveals it), and a page with only a completed owned step (same pattern); verify the tests pass.
-- [ ] 2.3 Update `docs/guide/pages-and-editing.md` to describe the footer reveal controls and hidden-only behavior; verify `hatch run docs:build` passes.
+- [x] 2.1 Render only connection sections with at least one visible row, move both reveal toggles to the Connections panel actions row, and remove the empty-section placeholder strings; verify `tests/ui/test_page_view.py` passes with the updated expectations.
+- [x] 2.2 Add view tests for a page with one connection kind (other headings absent), a page with only a finished owned project (section absent, finished-project control visible, enabling reveals it), and a page with only a completed owned step (same pattern); verify the tests pass.
+- [x] 2.3 Update `docs/guide/pages-and-editing.md` to describe the footer reveal controls and hidden-only behavior; verify `hatch run docs:build` passes.
 
 ## 3. Page starts at the top
 

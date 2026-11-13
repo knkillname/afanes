@@ -1277,6 +1277,21 @@ def _find_checkbox(control: ft.Control) -> ft.Control | None:
     return None
 
 
+def _connection_section(view: PageView, title: str) -> ft.Control:
+    for control in view.connections_body.controls:
+        if title in _texts(control):
+            return control
+    raise AssertionError(f"missing connection section {title!r}")
+
+
+def _panel_actions(panel: ft.Control) -> list[ft.Control]:
+    column = getattr(panel, "content", None)
+    assert isinstance(column, ft.Column)
+    actions = column.controls[-1]
+    assert isinstance(actions, ft.Row)
+    return list(actions.controls)
+
+
 def _find_text_button(control: ft.Control, label: str) -> ft.TextButton | None:
     if isinstance(control, ft.TextButton):
         content = control.content
@@ -1342,6 +1357,105 @@ class TestConnections:
         assert afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS in _texts(subsections[1])
         assert afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS in _texts(subsections[2])
         assert afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS in _texts(subsections[3])
+
+    def test_only_sections_with_visible_rows_are_rendered(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        person = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", category="person"),
+        )
+        _write_note(vault / "notes" / "Call.md", _note_text("# Call\n\n[Ada](<note:Ada>)\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(person)
+
+        asyncio.run(scenario())
+        view = PageView(lambda: None)
+        headings = [
+            title
+            for title in (
+                afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM,
+                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS,
+                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS,
+                afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
+            )
+            if any(title in _texts(control) for control in view.connections_body.controls)
+        ]
+
+        assert headings == [afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM]
+        assert view.connections_steps_toggle.visible is False
+        assert view.connections_projects_toggle.visible is False
+
+    def test_finished_owned_project_keeps_the_footer_control_available(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        person = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", category="person"),
+        )
+        _write_note(
+            vault / "projects" / "Old.md",
+            _typed_note("project", "# Old\n", extra="status: done\nowner: Ada"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(person)
+
+        asyncio.run(scenario())
+        view = PageView(lambda: None)
+
+        assert view.connections_body.controls == []
+        assert view.connections_panel.visible is True
+        assert view.connections_projects_toggle.visible is True
+        assert view.connections_steps_toggle.visible is False
+        assert view.connections_projects_toggle in _panel_actions(view.connections_panel)
+
+        view.connections_projects_toggle.value = True
+        asyncio.run(view.toggle_finished_projects(ft.Event(name="change", control=view.connections_projects_toggle)))
+
+        assert "Old" in _texts(_connection_section(view, afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS))
+
+    def test_completed_owned_step_keeps_the_footer_control_available(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        person = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", category="person"),
+        )
+        _write_note(
+            vault / "projects" / "Home.md",
+            _typed_note("project", "# Home\n\n- [x] Done <!-- {owners: [Ada]} -->\n"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(person)
+
+        asyncio.run(scenario())
+        view = PageView(lambda: None)
+
+        assert view.connections_body.controls == []
+        assert view.connections_panel.visible is True
+        assert view.connections_steps_toggle.visible is True
+        assert view.connections_projects_toggle.visible is False
+        assert view.connections_steps_toggle in _panel_actions(view.connections_panel)
+
+        view.connections_steps_toggle.value = True
+        asyncio.run(view.toggle_completed_steps(ft.Event(name="change", control=view.connections_steps_toggle)))
+
+        assert "Done" in _texts(_connection_section(view, afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS))
 
     def test_linked_from_rows_use_display_titles(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
@@ -1539,7 +1653,7 @@ class TestConnections:
 
         asyncio.run(scenario())
         view = PageView(lambda: None)
-        texts = _texts(view.connections_body.controls[2])
+        texts = _texts(_connection_section(view, afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS))
 
         assert (
             texts.index("Alpha")

@@ -32,11 +32,12 @@ is derived from the current vault scan and is never written to a note.
   grouped by project and keep their order in the project body.
 - **Requested projects** lists the open projects whose `asked_by` value resolves to this page.
 
-The sections always appear in that order and a section is omitted when it has no item. Completed owned
-steps stay behind **Show completed steps**, and finished owned and requested projects stay behind
-**Show finished projects**. The two toggles are independent and both start hidden; opening another page
-hides them again. Selecting a linked note or a project opens it, while selecting an owned step opens its
-project at the top.
+The sections always appear in that order, and a section is omitted when it has no visible item. The two
+reveal controls sit in the Connections footer: **Show completed steps** reveals completed owned steps,
+and **Show finished projects** reveals finished owned and requested projects. The controls remain
+available when a page has only hidden items, so those items stay reachable. The toggles are independent
+and both start hidden; opening another page hides them again. Selecting a linked note or a project opens
+it, while selecting an owned step opens its project at the top.
 
 Only a name that resolves to exactly one note creates a connection. Missing and ambiguous names
 contribute nothing, and notes under `trash/` never contribute. Edit mode and raw rescue mode hide the
