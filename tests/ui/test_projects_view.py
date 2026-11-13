@@ -109,6 +109,18 @@ def _row(view: afanes.ui.views.projects.ProjectsView, path: str) -> ft.Container
     return row
 
 
+def _button(view: afanes.ui.views.projects.ProjectsView, path: str) -> ft.TextButton:
+    button = _find_by_key(view.root, f"project-{path}")
+    assert isinstance(button, ft.TextButton)
+    return button
+
+
+def _ring(view: afanes.ui.views.projects.ProjectsView, path: str) -> object:
+    row = _row(view, path)
+    assert row.border is not None
+    return row.border.top.color
+
+
 def _titles(view: afanes.ui.views.projects.ProjectsView, stage: str) -> list[str]:
     titles: list[str] = []
     for button in _project_buttons(view, stage):
@@ -377,6 +389,67 @@ class TestProjectSelection:
         assert _project_buttons(view, "active")[0] is button
         assert _row(view, "projects/Launch.md") is row
         assert row.bgcolor == afanes.ui.theme.SELECTED_ROW_COLOR
+
+
+class TestProjectFocus:
+    def test_clicking_a_second_row_moves_the_ring_and_rejects_a_late_blur(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "projects" / "Launch.md", status="active")
+        _write_note(vault / "projects" / "Ship.md", status="active")
+        opened: list[Path] = []
+
+        async def select(path: Path) -> None:
+            opened.append(path)
+
+        view = _open_view(tmp_path, monkeypatch, on_select=select)
+        first = _button(view, "projects/Launch.md")
+        second = _button(view, "projects/Ship.md")
+
+        asyncio.run(typing.cast("FocusHandler", first.on_focus)(None))
+        assert _ring(view, "projects/Launch.md") == afanes.ui.theme.FOCUS_RING_COLOR
+
+        asyncio.run(_handler(second)())
+
+        assert _ring(view, "projects/Launch.md") == afanes.ui.theme.TRANSPARENT_COLOR
+        assert _ring(view, "projects/Ship.md") == afanes.ui.theme.FOCUS_RING_COLOR
+
+        asyncio.run(typing.cast("FocusHandler", first.on_blur)(None))
+
+        assert _ring(view, "projects/Launch.md") == afanes.ui.theme.TRANSPARENT_COLOR
+        assert _ring(view, "projects/Ship.md") == afanes.ui.theme.FOCUS_RING_COLOR
+        assert [path.name for path in opened] == ["Ship.md"]
+
+    def test_keyboard_focus_moves_the_ring_between_rows(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "projects" / "Launch.md", status="active")
+        _write_note(vault / "projects" / "Ship.md", status="active")
+        view = _open_view(tmp_path, monkeypatch)
+        first = _button(view, "projects/Launch.md")
+        second = _button(view, "projects/Ship.md")
+
+        asyncio.run(typing.cast("FocusHandler", first.on_focus)(None))
+        asyncio.run(typing.cast("FocusHandler", second.on_focus)(None))
+        asyncio.run(typing.cast("FocusHandler", first.on_blur)(None))
+
+        assert _ring(view, "projects/Launch.md") == afanes.ui.theme.TRANSPARENT_COLOR
+        assert _ring(view, "projects/Ship.md") == afanes.ui.theme.FOCUS_RING_COLOR
+
+    def test_a_content_rebuild_drops_the_old_ring(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "projects" / "Launch.md", status="active", body="# Launch\n\n- [ ] Write copy\n")
+        view = _open_view(tmp_path, monkeypatch)
+        button = _button(view, "projects/Launch.md")
+        asyncio.run(typing.cast("FocusHandler", button.on_focus)(None))
+        assert _ring(view, "projects/Launch.md") == afanes.ui.theme.FOCUS_RING_COLOR
+
+        _write_note(vault / "projects" / "Launch.md", status="active", body="# Launch\n\n- [x] Write copy\n")
+        asyncio.run(afanes.ui.state.app_state.workspace.refresh())
+        view.refresh()
+
+        assert _button(view, "projects/Launch.md") is not button
+        assert _ring(view, "projects/Launch.md") == afanes.ui.theme.TRANSPARENT_COLOR
 
 
 class TestProjectRefresh:

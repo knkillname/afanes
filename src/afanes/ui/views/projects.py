@@ -50,6 +50,7 @@ class ProjectsView:
         self._update = update
         self._on_select = on_select
         self._rows: dict[Path, ft.Container] = {}
+        self._focused: Path | None = None
         self._signature: tuple[object, ...] | None = None
         self.root = ft.Column(
             controls=[],
@@ -76,7 +77,8 @@ class ProjectsView:
         -----
         Search matching uses the shared browser query. A selection change keeps
         the existing row controls so keyboard focus stays on the row that was
-        clicked; a content change rebuilds the groups. This method performs no
+        clicked; a content change rebuilds the groups and clears the focus ring
+        because the replaced rows no longer own focus. This method performs no
         file I/O and never changes a project.
         """
         query = self._state.browser.query
@@ -92,6 +94,7 @@ class ProjectsView:
             self._apply_selection()
             return
         self._rows = {}
+        self._focused = None
         controls: list[ft.Control] = [self._expansion(group, projects) for group, projects in grouped]
         total = sum(len(projects) for _, projects in grouped)
         if total == 0 and query.strip():
@@ -158,7 +161,7 @@ class ProjectsView:
             border_radius=afanes.ui.theme.CONTROL_RADIUS,
             key=f"project-row-{note.relative_path.as_posix()}",
         )
-        row.content = ft.TextButton(
+        button = ft.TextButton(
             content=ft.Column(
                 controls=[
                     ft.Text(note.title, style=afanes.ui.theme.TEXT_ROLES["heading"]),
@@ -184,11 +187,12 @@ class ProjectsView:
                     ft.ControlState.PRESSED: afanes.ui.theme.SPLASH_COLOR,
                 },
             ),
+            on_focus=self._focus_handler(note.path),
+            on_blur=self._blur_handler(note.path),
             on_click=self._select_handler(note.path),
-            on_focus=self._focus_handler(row),
-            on_blur=self._blur_handler(row),
             key=f"project-{note.relative_path.as_posix()}",
         )
+        row.content = button
         self._rows[note.path] = row
         return row
 
@@ -229,34 +233,52 @@ class ProjectsView:
             ),
         )
 
-    def _focus_handler(self, row: ft.Container) -> Callable[[object], Awaitable[None]]:
+    def _focus_handler(self, path: Path) -> Callable[[object], Awaitable[None]]:
         """Bind the accent focus ring to one project row."""
 
         async def handle(_event: object = None) -> None:
-            row.border = ft.Border.all(
-                afanes.ui.theme.FOCUS_RING_WIDTH,
-                afanes.ui.theme.FOCUS_RING_COLOR,
-            )
+            self._focused = path
+            self._apply_focus()
             self._update()
 
         return handle
 
-    def _blur_handler(self, row: ft.Container) -> Callable[[object], Awaitable[None]]:
-        """Clear the focus ring from one project row."""
+    def _blur_handler(self, path: Path) -> Callable[[object], Awaitable[None]]:
+        """Clear the focus ring only while that row still owns focus."""
 
         async def handle(_event: object = None) -> None:
-            row.border = ft.Border.all(
-                afanes.ui.theme.FOCUS_RING_WIDTH,
-                afanes.ui.theme.TRANSPARENT_COLOR,
-            )
+            if self._focused != path:
+                return
+            self._focused = None
+            self._apply_focus()
             self._update()
 
         return handle
+
+    def _apply_focus(self) -> None:
+        """Paint the accent ring on the focused row and clear every other row."""
+        for path, row in self._rows.items():
+            color = afanes.ui.theme.FOCUS_RING_COLOR if path == self._focused else afanes.ui.theme.TRANSPARENT_COLOR
+            row.border = ft.Border.all(afanes.ui.theme.FOCUS_RING_WIDTH, color)
+
+    async def _focus_row(self, path: Path) -> None:
+        """Move the accent ring to one row and request toolkit focus."""
+        self._focused = path
+        self._apply_focus()
+        self._update()
+        row = self._rows.get(path)
+        if row is None or not isinstance(row.content, ft.TextButton):
+            return
+        try:
+            await row.content.focus()
+        except RuntimeError:
+            return
 
     def _select_handler(self, path: Path) -> Callable[[], Awaitable[None]]:
         """Bind a no-argument async handler to one project path."""
 
         async def handle() -> None:
+            await self._focus_row(path)
             await self._on_select(path)
 
         return handle
