@@ -274,7 +274,7 @@ class PageLabels:
 
         Notes
         -----
-        Validation and serialization stay in :class:`NoteDocument`. A malformed
+        Validation and serialization stay in ``NoteDocument``. A malformed
         non-blank note date already present in the document is left untouched
         so it can be corrected later; a blank date removes the key. Category,
         status, due date, and requester are removed when the note type does not

@@ -72,13 +72,13 @@
 
 ## 4. Integration verification
 
-- [ ] 4.1 Run `hatch check` and verify lint, formatting, and Pyrefly strict pass.
-- [ ] 4.2 Run `hatch test --cover` and verify the full suite passes at 85% coverage or higher.
-- [ ] 4.3 Run `hatch run docs:build` and verify the Sphinx build passes with no warnings.
-- [ ] 4.4 Run `openspec validate --all --strict` and `openspec doctor`, and verify both pass.
-- [ ] 4.5 Run the two vocabulary/compliance grep commands from `AGENTS.md` section 6.1 and verify
+- [x] 4.1 Run `hatch check` and verify lint, formatting, and Pyrefly strict pass.
+- [x] 4.2 Run `hatch test --cover` and verify the full suite passes at 85% coverage or higher.
+- [x] 4.3 Run `hatch run docs:build` and verify the Sphinx build passes with no warnings.
+- [x] 4.4 Run `openspec validate --all --strict` and `openspec doctor`, and verify both pass.
+- [x] 4.5 Run the two vocabulary/compliance grep commands from `AGENTS.md` section 6.1 and verify
   both exit 1 with no output.
-- [ ] 4.6 Review the final diff and verify it touches only the files listed in `proposal.md`, the
+- [x] 4.6 Review the final diff and verify it touches only the files listed in `proposal.md`, the
   change artifacts, and `CHANGELOG.md`, with no unrelated formatting churn.
 
 ## Workflow follow-up

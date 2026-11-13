@@ -496,4 +496,3 @@ def review_pending(count: int) -> str:
         Singular or plural pending label, including zero.
     """
     return REVIEW_PENDING_ONE if count == 1 else REVIEW_PENDING_MANY.format(count=count)
-

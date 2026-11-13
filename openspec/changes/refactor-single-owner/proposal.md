@@ -63,8 +63,8 @@ cards plus Empty in every picker. No requirement text or scenario changes.
 
 - Core: `core/labels.py`, `core/editing.py`, `core/processing.py`, `core/templates.py`,
   `core/vault/pages.py`, `core/vault/naming.py`, and `core/vault/service.py`.
-- UI: new `ui/components/template_cards.py`; `ui/views/processing.py`, `ui/views/inbox.py`,
-  `ui/app.py`, and `ui/strings.py`.
+- UI: new `ui/components/template_cards.py`; `ui/theme.py`, `ui/views/processing.py`,
+  `ui/views/inbox.py`, `ui/app.py`, and `ui/strings.py`.
 - Tests: a new `tests/core/test_labels.py`, picker tests, updates to the existing editing,
   processing, pages, naming, processing-view, inbox-view, and app tests, plus
   `tests/core/test_architecture.py`.
