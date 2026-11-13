@@ -38,7 +38,7 @@ class Banner:
         return ft.Container(
             bgcolor=afanes.ui.theme.ERROR_CONTAINER_COLOR,
             padding=afanes.ui.theme.BANNER_PADDING,
-            border_radius=afanes.ui.theme.CARD_RADIUS,
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
             content=ft.Row(
                 controls=[
                     ft.Icon(ft.Icons.ERROR_OUTLINE, color=afanes.ui.theme.ERROR_TEXT_COLOR, size=18),

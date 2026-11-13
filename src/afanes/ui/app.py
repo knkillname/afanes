@@ -70,8 +70,8 @@ class _Shell:
         """Apply page chrome and create the native picker when available."""
         self.page.title = afanes.ui.strings.APP_TITLE
         self.page.theme_mode = ft.ThemeMode.SYSTEM
-        self.page.theme = afanes.ui.theme.THEME
-        self.page.dark_theme = afanes.ui.theme.THEME
+        self.page.theme = afanes.ui.theme.LIGHT_THEME
+        self.page.dark_theme = afanes.ui.theme.DARK_THEME
         self.page.bgcolor = afanes.ui.theme.PAGE_SURFACE_COLOR
         self.page.padding = afanes.ui.theme.PAGE_PADDING
         self.page.on_disconnect = self.release_session
@@ -285,7 +285,7 @@ class _Shell:
             key="launch-digest",
             bgcolor=afanes.ui.theme.NOTICE_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.NOTICE_BORDER_COLOR),
-            border_radius=afanes.ui.theme.CARD_RADIUS,
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
             padding=afanes.ui.theme.ITEM_GAP,
             content=ft.Row(
                 controls=[
@@ -462,8 +462,7 @@ class _Shell:
         folders = ", ".join(f"{folder.as_posix()}/" for folder in afanes.core.vault.service.Vault.default_layout())
         preview = ft.Text(
             afanes.ui.strings.NEW_VAULT_PREVIEW_GUIDE.format(folders=folders),
-            size=12,
-            color=afanes.ui.theme.MUTED_TEXT_COLOR,
+            theme_style=ft.TextThemeStyle.BODY_SMALL,
             selectable=True,
             key="create-vault-preview",
         )

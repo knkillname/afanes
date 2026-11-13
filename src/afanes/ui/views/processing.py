@@ -81,7 +81,7 @@ class ProcessingView:
         self.capture_panel = ft.Container(
             bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
-            border_radius=afanes.ui.theme.CARD_RADIUS,
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
             padding=afanes.ui.theme.ITEM_GAP,
             content=ft.Column(
                 controls=[self.capture_title, self.capture_body],
@@ -229,7 +229,7 @@ class ProcessingView:
         self.plan_panel = ft.Container(
             bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
-            border_radius=afanes.ui.theme.CARD_RADIUS,
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
             padding=afanes.ui.theme.ITEM_GAP,
             visible=False,
             content=ft.Column(
@@ -260,7 +260,7 @@ class ProcessingView:
         self.success_panel = ft.Container(
             bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
-            border_radius=afanes.ui.theme.CARD_RADIUS,
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
             padding=afanes.ui.theme.ITEM_GAP,
             visible=False,
             content=ft.Column(

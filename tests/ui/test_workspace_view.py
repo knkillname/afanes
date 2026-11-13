@@ -212,14 +212,17 @@ class TestWorkspaceShell:
         assert view.change_button in view.status_bar.content.controls
         assert afanes.ui.strings.APP_TITLE not in _texts(view.root)
 
-    def test_sections_use_distinct_icon_tints(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_inactive_sections_share_one_icon_tint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
-        icons = [typing.cast("ft.Icon", tile.leading) for tile in view.section_tiles.values()]
         review_icon = typing.cast("ft.Icon", view.review_tile.leading)
+        active = afanes.ui.state.browser.WorkspaceSection.INBOX
 
-        assert len({icon.color for icon in icons}) == SECTION_COUNT
-        assert review_icon.color == afanes.ui.theme.REVIEW_SECTION_COLOR
-        assert afanes.ui.theme.REVIEW_SECTION_COLOR == afanes.ui.theme.ACCENT_COLOR
+        inactive = [icon for section, icon in view.section_icons.items() if section is not active]
+        assert len(inactive) == len(view.section_icons) - 1
+        assert len({icon.color for icon in inactive}) == 1
+        assert inactive[0].color == afanes.ui.theme.SECTION_ICON_COLOR
+        assert view.section_icons[active].color == afanes.ui.theme.ACCENT_FILL
+        assert review_icon.color == afanes.ui.theme.SECTION_ICON_COLOR
 
     def test_only_the_active_section_shows_an_accent_edge(
         self,
@@ -228,8 +231,12 @@ class TestWorkspaceShell:
     ) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
         inbox = afanes.ui.state.browser.WorkspaceSection.INBOX
+        edge = view.section_edges[inbox].border
 
-        assert view.section_edges[inbox].border is not None
+        assert edge is not None
+        assert edge.left is not None
+        assert edge.left.width == afanes.ui.theme.SECTION_EDGE_WIDTH
+        assert edge.left.color == afanes.ui.theme.ACCENT_FILL
         assert view.review_edge.border is None
         assert all(edge.border is None for section, edge in view.section_edges.items() if section is not inbox)
 

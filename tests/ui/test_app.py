@@ -373,8 +373,9 @@ class TestDesktopPresentation:
         assert page.window.height == WINDOW_HEIGHT
         assert len(page.services) == 1
         assert page.theme_mode is ft.ThemeMode.SYSTEM
-        assert page.theme is afanes.ui.theme.THEME
-        assert page.dark_theme is afanes.ui.theme.THEME
+        assert page.theme is afanes.ui.theme.LIGHT_THEME
+        assert page.dark_theme is afanes.ui.theme.DARK_THEME
+        assert page.theme is not page.dark_theme
         assert page.bgcolor == afanes.ui.theme.PAGE_SURFACE_COLOR
 
     def test_desktop_welcome_has_no_path_field(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

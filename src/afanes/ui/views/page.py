@@ -83,14 +83,14 @@ class PageView:
             tooltip=afanes.ui.strings.PAGE_BACK,
             on_click=self.go_back,
         )
-        self.title = ft.Text("", style=afanes.ui.theme.PAGE_TITLE_TEXT_STYLE)
+        self.title = ft.Text("", theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM)
         self.path = ft.Text(
             "",
-            style=afanes.ui.theme.METADATA_TEXT_STYLE,
+            theme_style=ft.TextThemeStyle.BODY_SMALL,
             selectable=True,
         )
-        self.meta_status = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
-        self.meta_owner = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
+        self.meta_status = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
+        self.meta_owner = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
         self.meta_owner_button = ft.IconButton(
             icon=ft.Icons.PERSON_ADD,
             tooltip=afanes.ui.strings.PAGE_OWNER_SET,
@@ -104,7 +104,7 @@ class PageView:
             ),
             key="page-owner-set",
         )
-        self.meta_asked = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
+        self.meta_asked = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
         self.meta_asked_button = ft.IconButton(
             icon=ft.Icons.PERSON_SEARCH,
             tooltip=afanes.ui.strings.PAGE_ASKED_BY_SET,
@@ -118,8 +118,8 @@ class PageView:
             ),
             key="page-asked-by-set",
         )
-        self.meta_due = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
-        self.meta_date = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
+        self.meta_due = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
+        self.meta_date = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
         self.meta_due_button = ft.IconButton(
             icon=ft.Icons.CALENDAR_MONTH,
             tooltip=afanes.ui.strings.PAGE_PROJECT_DUE_ADD,
@@ -169,7 +169,7 @@ class PageView:
         )
         self.status_text = ft.Text(
             "",
-            style=afanes.ui.theme.METADATA_TEXT_STYLE,
+            theme_style=ft.TextThemeStyle.BODY_SMALL,
         )
         self.process_button = ft.TextButton(
             content=afanes.ui.strings.PROCESS_ACTION,
@@ -198,6 +198,7 @@ class PageView:
             content=afanes.ui.strings.PAGE_TRASH,
             icon=ft.Icons.DELETE_OUTLINE,
             on_click=self.begin_trash,
+            style=afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE,
         )
         self.header = ft.Row(
             controls=[
@@ -255,7 +256,7 @@ class PageView:
         ).build()
         self.connections_panel.visible = False
 
-        self.identity_text = ft.Text("", selectable=True, size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
+        self.identity_text = ft.Text("", selectable=True, theme_style=ft.TextThemeStyle.BODY_SMALL)
         self.body_field = ft.TextField(
             label=afanes.ui.strings.PAGE_BODY_LABEL,
             multiline=True,
@@ -309,7 +310,7 @@ class PageView:
         )
         self.date_error = ft.Text(
             "",
-            size=12,
+            theme_style=ft.TextThemeStyle.BODY_SMALL,
             color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=False,
             selectable=True,
@@ -331,7 +332,7 @@ class PageView:
         self.name_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.due_error = ft.Text(
             "",
-            size=12,
+            theme_style=ft.TextThemeStyle.BODY_SMALL,
             color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=False,
             selectable=True,
@@ -513,7 +514,7 @@ class PageView:
         self.rename_panel = ft.Container(
             bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
-            border_radius=afanes.ui.theme.CARD_RADIUS,
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
             padding=afanes.ui.theme.ITEM_GAP,
             visible=False,
             content=ft.Column(
@@ -536,6 +537,7 @@ class PageView:
             content=afanes.ui.strings.PAGE_TRASH_CONFIRM,
             icon=ft.Icons.DELETE_OUTLINE,
             on_click=self.confirm_trash,
+            style=afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE,
         )
         self.trash_cancel_button = ft.TextButton(
             content=afanes.ui.strings.PAGE_CANCEL,
@@ -577,7 +579,7 @@ class PageView:
             padding=afanes.ui.theme.ITEM_GAP,
             bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
-            border_radius=afanes.ui.theme.CARD_RADIUS,
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
             content=ft.Column(
                 controls=[
                     self.header,
@@ -799,7 +801,7 @@ class PageView:
         """Build one labeled group of connection rows."""
         return ft.Column(
             controls=[
-                ft.Text(title, style=afanes.ui.theme.SECTION_LABEL_TEXT_STYLE),
+                ft.Text(title, theme_style=ft.TextThemeStyle.LABEL_MEDIUM),
                 *rows,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
@@ -839,7 +841,7 @@ class PageView:
                 continue
             rows.append(
                 ft.TextButton(
-                    content=ft.Text(owned.project.title, style=afanes.ui.theme.METADATA_TEXT_STYLE),
+                    content=ft.Text(owned.project.title, theme_style=ft.TextThemeStyle.BODY_SMALL),
                     on_click=self._connection_handler(owned.project.path),
                 )
             )

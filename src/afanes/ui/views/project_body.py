@@ -72,7 +72,7 @@ class ProjectBodyView:
         self._owner_query = ""
         self._error = ft.Text(
             "",
-            size=12,
+            theme_style=ft.TextThemeStyle.BODY_SMALL,
             color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=False,
             selectable=True,
@@ -169,7 +169,7 @@ class ProjectBodyView:
         return ft.Container(
             bgcolor=afanes.ui.theme.STEP_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
-            border_radius=afanes.ui.theme.CARD_RADIUS,
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
             padding=afanes.ui.theme.ITEM_GAP,
             content=ft.Column(
                 controls=rows,
@@ -264,7 +264,7 @@ class ProjectBodyView:
             if index:
                 spans.append(ft.TextSpan(", "))
             spans.append(self._role_span(owner))
-        return ft.Text(spans=spans, size=12, color=afanes.ui.theme.STEP_TEXT_COLOR)
+        return ft.Text(spans=spans, theme_style=ft.TextThemeStyle.BODY_SMALL)
 
     def _role_span(self, name: str) -> ft.TextSpan:
         """Build one link-styled span for a step owner name."""
@@ -313,8 +313,7 @@ class ProjectBodyView:
         """Render one metadata label on the step surface."""
         return ft.Text(
             text,
-            size=12,
-            color=afanes.ui.theme.STEP_TEXT_COLOR,
+            theme_style=ft.TextThemeStyle.BODY_SMALL,
         )
 
     def _step_action(

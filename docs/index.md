@@ -66,6 +66,7 @@ reference/troubleshooting
 
 develop/setup
 develop/architecture
+develop/interface-standard
 develop/testing
 develop/releasing
 develop/documentation

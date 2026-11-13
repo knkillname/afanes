@@ -45,7 +45,7 @@ class LogCalendar:
         self._on_select = on_select
         self._on_previous = on_previous
         self._on_next = on_next
-        self.title = ft.Text("", style=afanes.ui.theme.SECTION_LABEL_TEXT_STYLE)
+        self.title = ft.Text("", theme_style=ft.TextThemeStyle.LABEL_MEDIUM)
         self.month_dot = ft.Container(
             width=6,
             height=6,
@@ -76,9 +76,7 @@ class LogCalendar:
         )
         self.weekdays = ft.Row(
             controls=[
-                ft.Text(
-                    label, size=11, color=afanes.ui.theme.MUTED_TEXT_COLOR, expand=True, text_align=ft.TextAlign.CENTER
-                )
+                ft.Text(label, theme_style=ft.TextThemeStyle.LABEL_SMALL, expand=True, text_align=ft.TextAlign.CENTER)
                 for label in WEEKDAY_LABELS
             ],
             spacing=0,
@@ -142,7 +140,7 @@ class LogCalendar:
         )
         return ft.TextButton(
             content=ft.Column(
-                controls=[ft.Text(str(cell.day), size=11), dot],
+                controls=[ft.Text(str(cell.day), theme_style=ft.TextThemeStyle.LABEL_SMALL), dot],
                 spacing=1,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             ),

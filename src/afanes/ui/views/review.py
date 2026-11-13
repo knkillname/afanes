@@ -174,7 +174,7 @@ class ReviewView:
         controls: list[ft.Control] = [
             ft.Text(title, theme_style=ft.TextThemeStyle.LABEL_LARGE),
             ft.Text(summary.note.title, theme_style=ft.TextThemeStyle.TITLE_MEDIUM, selectable=True),
-            StepText(step.text, afanes.ui.theme.STEP_HEADLINE_TEXT_STYLE, selectable=True).build(),
+            StepText(step.text, afanes.ui.theme.STEP_MARKDOWN_TEXT_STYLE, selectable=True).build(),
         ]
         if step.owners:
             controls.append(
@@ -419,7 +419,7 @@ class ReviewView:
         return ft.Container(
             bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
-            border_radius=afanes.ui.theme.CARD_RADIUS,
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
             padding=afanes.ui.theme.ITEM_GAP,
             content=ft.Column(
                 controls=[

@@ -112,32 +112,33 @@ class ProjectsView:
         details: list[ft.Control] = [
             ft.Text(
                 afanes.ui.strings.PROJECT_STATUS.format(status=StatusLabel(note.status).text),
-                size=12,
-                color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                theme_style=ft.TextThemeStyle.BODY_SMALL,
             )
         ]
         if note.due_date is not None:
             details.append(
                 ft.Text(
                     afanes.ui.strings.PROJECT_DUE.format(date=note.due_date.isoformat()),
-                    size=12,
-                    color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                    theme_style=ft.TextThemeStyle.BODY_SMALL,
                 )
             )
         details.append(
             ft.Text(
                 afanes.ui.strings.open_step_count(summary.open_count),
-                size=12,
-                color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                theme_style=ft.TextThemeStyle.BODY_SMALL,
             )
         )
         if summary.next_step is None:
-            details.append(ft.Text(afanes.ui.strings.PROJECT_NO_NEXT_STEP, size=12, selectable=True))
+            details.append(
+                ft.Text(
+                    afanes.ui.strings.PROJECT_NO_NEXT_STEP, theme_style=ft.TextThemeStyle.BODY_SMALL, selectable=True
+                )
+            )
         else:
             details.append(
                 StepText(
                     afanes.ui.strings.PROJECT_NEXT_STEP.format(title=summary.next_step.text),
-                    ft.TextStyle(size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR),
+                    afanes.ui.theme.METADATA_MARKDOWN_TEXT_STYLE,
                     selectable=True,
                 ).build()
             )

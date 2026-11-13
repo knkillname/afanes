@@ -43,14 +43,6 @@ _SECTION_ICONS = {
     afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION: ft.Icons.WARNING_AMBER,
 }
 
-_SECTION_COLORS = {
-    afanes.ui.state.browser.WorkspaceSection.INBOX: afanes.ui.theme.INBOX_SECTION_COLOR,
-    afanes.ui.state.browser.WorkspaceSection.PROJECTS: afanes.ui.theme.PROJECTS_SECTION_COLOR,
-    afanes.ui.state.browser.WorkspaceSection.REFERENCES: afanes.ui.theme.REFERENCES_SECTION_COLOR,
-    afanes.ui.state.browser.WorkspaceSection.LOG: afanes.ui.theme.LOG_SECTION_COLOR,
-    afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION: afanes.ui.theme.ERROR_COLOR,
-}
-
 
 class WorkspaceView:
     """Browser sidebar, capture bar, and a main area for focused work.
@@ -138,7 +130,7 @@ class WorkspaceView:
         )
         self.vault_text = ft.Text(
             "",
-            style=afanes.ui.theme.METADATA_TEXT_STYLE,
+            theme_style=ft.TextThemeStyle.BODY_SMALL,
             selectable=True,
         )
         self.refresh_button = ft.IconButton(
@@ -194,27 +186,30 @@ class WorkspaceView:
             key="workspace-capture-button",
         )
 
-        self.review_count = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
+        self.review_count = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
+        self.review_icon = ft.Icon(ft.Icons.PLAY_ARROW, color=afanes.ui.theme.SECTION_ICON_COLOR)
         self.review_tile = ft.ListTile(
             title=afanes.ui.strings.REVIEW_TITLE,
-            leading=ft.Icon(ft.Icons.PLAY_ARROW, color=afanes.ui.theme.REVIEW_SECTION_COLOR),
+            leading=self.review_icon,
             trailing=self.review_count,
             selected=False,
             dense=True,
             on_click=self._select_review,
             key="review-entry",
         )
-        self.review_edge = ft.Container(content=self.review_tile, border_radius=afanes.ui.theme.CARD_RADIUS)
+        self.review_edge = ft.Container(content=self.review_tile, border_radius=afanes.ui.theme.SURFACE_RADIUS)
         self.section_counts: dict[afanes.ui.state.browser.WorkspaceSection, ft.Text] = {}
+        self.section_icons: dict[afanes.ui.state.browser.WorkspaceSection, ft.Icon] = {}
         self.section_tiles: dict[afanes.ui.state.browser.WorkspaceSection, ft.ListTile] = {}
         self.section_edges: dict[afanes.ui.state.browser.WorkspaceSection, ft.Container] = {}
         for section in afanes.ui.state.browser.WorkspaceSection:
             if section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
                 continue
-            self.section_counts[section] = ft.Text("", size=12, color=afanes.ui.theme.MUTED_TEXT_COLOR)
+            self.section_counts[section] = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
+            self.section_icons[section] = ft.Icon(_SECTION_ICONS[section], color=afanes.ui.theme.SECTION_ICON_COLOR)
             tile = ft.ListTile(
                 title=afanes.ui.strings.WORKSPACE_SECTION_LABELS[section.value],
-                leading=ft.Icon(_SECTION_ICONS[section], color=_SECTION_COLORS[section]),
+                leading=self.section_icons[section],
                 trailing=self.section_counts[section],
                 selected=False,
                 dense=True,
@@ -222,7 +217,7 @@ class WorkspaceView:
                 key=f"section-{section.value}",
             )
             self.section_tiles[section] = tile
-            self.section_edges[section] = ft.Container(content=tile, border_radius=afanes.ui.theme.CARD_RADIUS)
+            self.section_edges[section] = ft.Container(content=tile, border_radius=afanes.ui.theme.SURFACE_RADIUS)
 
         self.search_field = ft.TextField(
             label=afanes.ui.strings.BROWSER_SEARCH_LABEL,
@@ -244,7 +239,7 @@ class WorkspaceView:
             padding=afanes.ui.theme.ITEM_GAP,
             bgcolor=afanes.ui.theme.REGION_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
-            border_radius=afanes.ui.theme.CARD_RADIUS,
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
             content=ft.Column(
                 controls=[
                     self.review_edge,
@@ -486,7 +481,7 @@ class WorkspaceView:
         self.vault_text.value = str(state.session.vault_root) if state.session.vault_root is not None else ""
         listing = state.browser.listing()
         edge = ft.Border(
-            left=ft.BorderSide(afanes.ui.theme.SECTION_EDGE_WIDTH, afanes.ui.theme.ACCENT_COLOR),
+            left=ft.BorderSide(afanes.ui.theme.SECTION_EDGE_WIDTH, afanes.ui.theme.ACCENT_FILL),
         )
         for section, tile in self.section_tiles.items():
             browser_section = section.browser_section
@@ -499,10 +494,14 @@ class WorkspaceView:
             self.section_counts[section].value = str(count)
             active = state.browser.active_section is section
             tile.selected = active
+            self.section_icons[section].color = (
+                afanes.ui.theme.ACCENT_FILL if active else afanes.ui.theme.SECTION_ICON_COLOR
+            )
             self.section_edges[section].border = edge if active else None
         review_active = state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW
         self.review_count.value = afanes.ui.strings.review_pending(state.browser.pending_count())
         self.review_tile.selected = review_active
+        self.review_icon.color = afanes.ui.theme.ACCENT_FILL if review_active else afanes.ui.theme.SECTION_ICON_COLOR
         self.review_edge.border = edge if review_active else None
         self.search_field.value = state.browser.query
         self.browser_list.controls = self._browser_controls(listing)
@@ -554,7 +553,7 @@ class WorkspaceView:
                         padding=afanes.ui.theme.ITEM_GAP,
                         content=ft.Text(
                             group.title,
-                            style=afanes.ui.theme.SECTION_LABEL_TEXT_STYLE,
+                            theme_style=ft.TextThemeStyle.LABEL_MEDIUM,
                         ),
                     )
                 )
@@ -856,7 +855,7 @@ class WorkspaceView:
             ft.Divider(height=1),
             ft.Text(
                 afanes.ui.strings.BROWSER_FAILURES,
-                size=12,
+                theme_style=ft.TextThemeStyle.BODY_SMALL,
                 color=afanes.ui.theme.ERROR_TEXT_COLOR,
             ),
         ]

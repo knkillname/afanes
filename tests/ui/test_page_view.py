@@ -10,6 +10,7 @@ import pytest
 
 import afanes.core.settings
 import afanes.ui.state
+import afanes.ui.theme
 from afanes.core.editing import DraftMode
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.steps import StepDocument
@@ -710,6 +711,19 @@ class TestRawMode:
 
 
 class TestPanels:
+    def test_panels_use_the_container_surface(self) -> None:
+        view = PageView(lambda: None)
+
+        assert view.trash_panel.bgcolor == afanes.ui.theme.SURFACE_CONTAINER_COLOR
+        assert view.trash_panel.border_radius == afanes.ui.theme.SURFACE_RADIUS
+
+    def test_trash_actions_use_the_destructive_style(self) -> None:
+        view = PageView(lambda: None)
+
+        assert view.trash_confirm_button.style == afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE
+        assert view.trash_button.style == afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE
+        assert view.trash_cancel_button.style is None
+
     def test_conflict_panel_offers_reload_and_overwrite(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()

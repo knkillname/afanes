@@ -143,7 +143,9 @@ Strict NumPy-style docstrings are mandatory for every public module, class, enum
 - `core/` and `models/` stay synchronous. Async belongs to the UI boundary and the CLI's top-level orchestration; blocking core I/O is reached through `asyncio.to_thread`.
 - Never block the UI thread. Offload I/O with `asyncio.to_thread` or Flet's documented task mechanism and show progress. No `time.sleep` in UI code.
 - One writer per vault; serialize writes so two commands cannot replace the same file concurrently.
-- Colors, spacing, typography, and dimensions live in `ui/theme.py`; all user-facing copy lives in `ui/strings.py` (neutral, sentence case). No magic hex colors or pixel values in views.
+- Colors, spacing, typography, and dimensions live in `ui/theme.py`; all user-facing copy lives in `ui/strings.py` (neutral, sentence case). No magic hex colors or pixel values in views. The interface standard in `docs/develop/interface-standard.md` is the durable reference for the palette, surface roles, text-theme roles, and declared differences from the reference design language; `tests/ui/test_conformance.py` enforces it, and its baseline may only shrink.
+- The earlier per-section icon-hue requirement is retired. Browser section icons are monochrome, and the active section takes the accent in its icon, edge, and row tint. Do not reintroduce a per-section palette without an approved change.
+- Control labels move to header capitalization in the writing-style wave. Until that change lands, sentence case remains the rule for new copy; do not mix the two conventions in one view.
 - Read `page.web` once in the shell; views must not branch on presentation.
 - Show concise, actionable banners/dialogs, never tracebacks. Destructive actions require confirmation. Support light/dark, keyboard access, visible focus, and no color-only status.
 - Persist only UI preferences such as window size and last view; never persist vault data in UI state.

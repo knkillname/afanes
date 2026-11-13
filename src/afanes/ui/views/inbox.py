@@ -97,8 +97,7 @@ class WelcomeView:
         controls.append(
             ft.Text(
                 afanes.ui.strings.WELCOME_NOTE,
-                size=12,
-                color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                theme_style=ft.TextThemeStyle.BODY_SMALL,
                 text_align=ft.TextAlign.CENTER,
             ),
         )

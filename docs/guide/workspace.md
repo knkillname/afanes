@@ -62,16 +62,17 @@ first non-blank line becomes the filename and heading, and the note is written u
 ## 🎨 Appearance
 
 The interface follows the operating system's light or dark appearance and has no separate in-app
-switch. In both modes the page, the browser sidebar, and the content cards use distinct surface steps
-with a thin outline, so regions stay separated instead of blending together.
+switch. Each mode has its own palette. In light mode the note canvas is the brightest surface, the
+window sits below it, and the browser sidebar recedes one more step. In dark mode the canvas is darker
+than the chrome, so a panel reads as recessed rather than raised. A thin outline keeps the steps visible
+in both modes.
 
-A familiar engineering-tool palette keeps the interface recognizable: white surfaces separated by
-thin borders, one blue accent, and green filled primary buttons. The note canvas stays white in both
-the page and edit modes. Blue marks selection, links, and keyboard focus; green marks primary
-actions; the two never swap roles. Due-work notices use a warm attention surface. Each browser
-section tints only its leading icon, and the active entry also shows an accent edge, so the section
-stays identifiable without relying on color alone. Typography uses the platform font in one family;
-hierarchy comes from size, weight, and the muted metadata color.
+One blue accent marks suggested actions, selection, links, keyboard focus, and the active browser
+section. Selection adds a light accent tint and a 3px accent edge, so it stays readable without relying
+on color. Actions that move a note to the trash use a red destructive style. Due-work notices use a warm
+attention surface. Every browser section icon uses one muted tint; only the active section takes the
+accent, and its label and icon still identify the section when color is not perceived. Typography uses
+the platform font family in one hierarchy driven by the shared text theme.
 
 ## 🧭 See also
 

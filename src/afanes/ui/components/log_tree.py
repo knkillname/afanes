@@ -114,8 +114,7 @@ class LogTree:
                     ft.Text(str(year.year)),
                     ft.Text(
                         afanes.ui.strings.log_entry_count(year.count),
-                        size=11,
-                        color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                        theme_style=ft.TextThemeStyle.LABEL_SMALL,
                     ),
                     control,
                 ],
@@ -151,8 +150,7 @@ class LogTree:
                     ft.Text(name),
                     ft.Text(
                         afanes.ui.strings.log_entry_count(month.count),
-                        size=11,
-                        color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                        theme_style=ft.TextThemeStyle.LABEL_SMALL,
                     ),
                     control,
                 ],
@@ -185,8 +183,7 @@ class LogTree:
                     ft.Text(str(day.day)),
                     ft.Text(
                         afanes.ui.strings.log_entry_count(day.count),
-                        size=11,
-                        color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                        theme_style=ft.TextThemeStyle.LABEL_SMALL,
                     ),
                 ],
                 spacing=4,
@@ -221,8 +218,7 @@ class LogTree:
                     ft.Text(afanes.ui.strings.LOG_UNDATED),
                     ft.Text(
                         afanes.ui.strings.log_entry_count(len(notes)),
-                        size=11,
-                        color=afanes.ui.theme.MUTED_TEXT_COLOR,
+                        theme_style=ft.TextThemeStyle.LABEL_SMALL,
                     ),
                 ]
             ),
