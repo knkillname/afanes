@@ -555,7 +555,7 @@ class Vault:
             reference_root = self.existing_directory(self.root, REFERENCE_DIRECTORY)
             if category is None:
                 return reference_root
-            folder = Path(afanes.core.names.safe_filename(category.value))
+            folder = Path(afanes.core.names.NamePolicy.safe_filename(category.value))
             return self.existing_directory(reference_root, folder)
         return self.existing_directory(self.root, INBOX_DIRECTORY)
 
@@ -750,7 +750,7 @@ class Vault:
         taken = {note.name for note in snapshot.notes if ReferenceScheme.for_note(note.note_type) is scheme}
         taken.update(entry.stem for entry in target_directory.iterdir())
         taken.update(entry.name for entry in target_directory.iterdir())
-        name = afanes.core.names.unique_name(afanes.core.names.safe_filename(title), taken)
+        name = afanes.core.names.NamePolicy.unique(afanes.core.names.NamePolicy.safe_filename(title), taken)
 
         document = self.new_note_document(
             note_type,

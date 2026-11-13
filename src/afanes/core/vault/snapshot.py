@@ -85,8 +85,8 @@ class NoteOrder:
             undated=due_date is None,
             due=due_date or datetime.date.max,
             status_rank=status_rank,
-            title_key=afanes.core.names.normalize_name(note.title),
-            name_key=afanes.core.names.normalize_name(note.name),
+            title_key=afanes.core.names.NamePolicy.normalize(note.title),
+            name_key=afanes.core.names.NamePolicy.normalize(note.name),
             path_key=note.relative_path.as_posix(),
         )
 
@@ -109,8 +109,8 @@ class NoteOrder:
             undated=True,
             due=datetime.date.max,
             status_rank=0,
-            title_key=afanes.core.names.normalize_name(note.title),
-            name_key=afanes.core.names.normalize_name(note.name),
+            title_key=afanes.core.names.NamePolicy.normalize(note.title),
+            name_key=afanes.core.names.NamePolicy.normalize(note.name),
             path_key=note.relative_path.as_posix(),
         )
 
@@ -693,18 +693,18 @@ class VaultSnapshot:
         Notes
         -----
         This method performs no file I/O and no rescan. Identity and display
-        title are normalized with :func:`afanes.core.names.normalize_name`, so
+        title are normalized with :meth:`afanes.core.names.NamePolicy.normalize`, so
         matching follows the same rule as reference resolution. Display titles
         are only matched; they never become reference targets.
         """
-        normalized_query = afanes.core.names.normalize_name(query)
+        normalized_query = afanes.core.names.NamePolicy.normalize(query)
         matches = [
             note
             for note in self.notes
             if ReferenceScheme.for_note(note.note_type) is scheme
             and (
-                normalized_query in afanes.core.names.normalize_name(note.name)
-                or normalized_query in afanes.core.names.normalize_name(note.title)
+                normalized_query in afanes.core.names.NamePolicy.normalize(note.name)
+                or normalized_query in afanes.core.names.NamePolicy.normalize(note.title)
             )
         ]
         return tuple(
@@ -743,11 +743,11 @@ class VaultSnapshot:
         if resolution.outcome is ResolutionOutcome.AMBIGUOUS:
             return LinkTarget(reference=reference, outcome=LinkOutcome.AMBIGUOUS, paths=resolution.targets)
 
-        normalized = afanes.core.names.normalize_name(reference.name)
+        normalized = afanes.core.names.NamePolicy.normalize(reference.name)
         broken = tuple(
             self.root / failure.path
             for failure in self.failures
-            if afanes.core.names.normalize_name(failure.path.stem) == normalized
+            if afanes.core.names.NamePolicy.normalize(failure.path.stem) == normalized
         )
         if broken:
             return LinkTarget(reference=reference, outcome=LinkOutcome.BROKEN, paths=broken)

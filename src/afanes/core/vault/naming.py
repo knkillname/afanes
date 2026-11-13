@@ -261,10 +261,12 @@ class VaultNaming:
             message = f"Note is not part of the vault: {note_path}"
             raise VaultError(message)
 
-        new_name = afanes.core.names.safe_filename(new_title)
+        new_name = afanes.core.names.NamePolicy.safe_filename(new_title)
         scheme = ReferenceScheme.for_note(note.note_type)
         target = source.with_name(f"{new_name}{afanes.core.vault.snapshot.NOTE_SUFFIX}")
-        same_name = afanes.core.names.normalize_name(new_name) == afanes.core.names.normalize_name(note.name)
+        same_name = afanes.core.names.NamePolicy.normalize(new_name) == afanes.core.names.NamePolicy.normalize(
+            note.name
+        )
 
         if not same_name:
             existing = vault.catalog.candidates(scheme, new_name)
@@ -663,7 +665,7 @@ class VaultNaming:
         if trash_directory.is_dir():
             taken.update(entry.stem for entry in trash_directory.iterdir())
             taken.update(entry.name for entry in trash_directory.iterdir())
-        trash_name = afanes.core.names.unique_name(source.stem, taken)
+        trash_name = afanes.core.names.NamePolicy.unique(source.stem, taken)
         affected = vault.affected_sites(source)
         return TrashPreview(
             note_path=source,

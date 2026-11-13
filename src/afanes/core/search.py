@@ -358,7 +358,7 @@ class Browser:
             Notes to filter, in presentation order.
         query : str
             Free text typed by the user. Matching uses
-            :func:`afanes.core.names.normalize_name`, so case, Unicode form,
+            :meth:`afanes.core.names.NamePolicy.normalize`, so case, Unicode form,
             and repeated whitespace are ignored. An empty query keeps every
             note.
 
@@ -387,11 +387,11 @@ class Browser:
             display title, identity, or search text. Step metadata comments are
             absent from the search text.
         """
-        normalized_query = afanes.core.names.normalize_name(query)
+        normalized_query = afanes.core.names.NamePolicy.normalize(query)
         if not normalized_query:
             return True
         candidates = (note.title, note.name, note.search_text)
-        return any(normalized_query in afanes.core.names.normalize_name(value) for value in candidates)
+        return any(normalized_query in afanes.core.names.NamePolicy.normalize(value) for value in candidates)
 
     @staticmethod
     def _label_order(label: CategoryLabel | None) -> tuple[int, str]:

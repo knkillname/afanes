@@ -640,8 +640,8 @@ class PageEditorState:
         reference = page.reference
         if reference is None:
             return
-        safe_name = afanes.core.names.safe_filename(reference.name)
-        if afanes.core.names.normalize_name(safe_name) == afanes.core.names.normalize_name(reference.name):
+        safe_name = afanes.core.names.NamePolicy.safe_filename(reference.name)
+        if afanes.core.names.NamePolicy.normalize(safe_name) == afanes.core.names.NamePolicy.normalize(reference.name):
             return
         try:
             snapshot = await asyncio.to_thread(vault.scan)
@@ -673,8 +673,8 @@ class PageEditorState:
         vault: Vault,
     ) -> None:
         """Plan a reference repair and retain it for the dialog."""
-        safe_name = afanes.core.names.safe_filename(reference.name)
-        if afanes.core.names.normalize_name(safe_name) == afanes.core.names.normalize_name(reference.name):
+        safe_name = afanes.core.names.NamePolicy.safe_filename(reference.name)
+        if afanes.core.names.NamePolicy.normalize(safe_name) == afanes.core.names.NamePolicy.normalize(reference.name):
             return
         new = NoteReference(scheme=reference.scheme, name=safe_name)
         try:

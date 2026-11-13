@@ -146,7 +146,7 @@ class NormalDraft:
         )
         labels = PageLabels(note_type=note_type)
         document = labels.apply_to(document)
-        identity = afanes.core.names.safe_filename(reference.name)
+        identity = afanes.core.names.NamePolicy.safe_filename(reference.name)
         template = document.to_text()
         common = DraftCommon(
             path=None,

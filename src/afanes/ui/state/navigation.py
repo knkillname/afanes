@@ -555,8 +555,8 @@ class PageNavigator:
 
     def _existing_safe_page(self, reference: NoteReference) -> Path | None:
         """Return the parsed page whose safe identity matches an unsafe reference."""
-        safe_name = afanes.core.names.safe_filename(reference.name)
-        if afanes.core.names.normalize_name(safe_name) == afanes.core.names.normalize_name(reference.name):
+        safe_name = afanes.core.names.NamePolicy.safe_filename(reference.name)
+        if afanes.core.names.NamePolicy.normalize(safe_name) == afanes.core.names.NamePolicy.normalize(reference.name):
             return None
         snapshot = self.session.snapshot
         if snapshot is None:

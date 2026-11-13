@@ -566,9 +566,9 @@ class TemplateCatalog:
         TemplateContentError
             If a template note uses the reserved guide stem.
         """
-        reserved = afanes.core.names.normalize_name(GUIDE_STEM)
+        reserved = afanes.core.names.NamePolicy.normalize(GUIDE_STEM)
         for note in notes:
-            if afanes.core.names.normalize_name(note.stem) == reserved:
+            if afanes.core.names.NamePolicy.normalize(note.stem) == reserved:
                 self._refuse(
                     subject,
                     f"note {note.relative_path.as_posix()!r} uses the reserved guide name {GUIDE_STEM!r}",
@@ -633,9 +633,9 @@ class TemplateCatalog:
             if first in {INBOX_DIRECTORY.name.casefold(), TRASH_DIRECTORY.name.casefold()}:
                 self._refuse(subject, f"note {relative.as_posix()!r} is stored under {relative.parts[0]}/")
             stem = relative.stem
-            if afanes.core.names.safe_filename(stem) != stem:
+            if afanes.core.names.NamePolicy.safe_filename(stem) != stem:
                 self._refuse(subject, f"note {relative.as_posix()!r} is not a cross-platform filename")
-            key = afanes.core.names.normalize_name(stem)
+            key = afanes.core.names.NamePolicy.normalize(stem)
             if key in seen:
                 earlier = seen[key].as_posix()
                 self._refuse(subject, f"notes {earlier!r} and {relative.as_posix()!r} share the name {stem!r}")
@@ -685,7 +685,7 @@ class TemplateCatalog:
         category = note.category
         if category is None:
             return REFERENCE_DIRECTORY
-        return REFERENCE_DIRECTORY / afanes.core.names.safe_filename(category.value)
+        return REFERENCE_DIRECTORY / afanes.core.names.NamePolicy.safe_filename(category.value)
 
     def _validate_references(self, subject: str, notes: tuple[TemplateNote, ...]) -> None:
         """Verify every internal reference resolves to exactly one bundled note.

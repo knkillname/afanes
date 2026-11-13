@@ -253,7 +253,7 @@ class ReferenceKey:
     scheme : ReferenceScheme
         Namespace the reference addresses.
     name : str
-        Name normalized with :func:`afanes.core.names.normalize_name`.
+        Name normalized with :meth:`afanes.core.names.NamePolicy.normalize`.
     """
 
     scheme: ReferenceScheme
@@ -274,7 +274,7 @@ class ReferenceKey:
             Scheme plus normalized name, suitable as a catalog key and for
             equality checks during reference rewriting.
         """
-        return cls(scheme=reference.scheme, name=afanes.core.names.normalize_name(reference.name))
+        return cls(scheme=reference.scheme, name=afanes.core.names.NamePolicy.normalize(reference.name))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -326,7 +326,7 @@ class NameCatalog:
         grouped: dict[ReferenceKey, list[Path]] = {}
         for entry in entries:
             scheme = ReferenceScheme.for_note(entry.note_type)
-            name = afanes.core.names.normalize_name(entry.path.stem)
+            name = afanes.core.names.NamePolicy.normalize(entry.path.stem)
             if NameCatalog._has_path_syntax(name):
                 continue
             grouped.setdefault(ReferenceKey(scheme=scheme, name=name), []).append(entry.path)
@@ -355,7 +355,7 @@ class NameCatalog:
             Matching paths in deterministic order. Empty when the name is
             unknown or contains path syntax.
         """
-        normalized = afanes.core.names.normalize_name(name)
+        normalized = afanes.core.names.NamePolicy.normalize(name)
         if NameCatalog._has_path_syntax(normalized):
             return ()
         return self._entries.get(ReferenceKey(scheme=scheme, name=normalized), ())

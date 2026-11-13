@@ -192,7 +192,7 @@ class LogConversions:
             new_name = note.date.text
             target_directory = self.vault.contained(self.vault.log_directory(note.date))
         else:
-            new_name = afanes.core.names.safe_filename(note.title)
+            new_name = afanes.core.names.NamePolicy.safe_filename(note.title)
             target_directory = self.vault.contained(self.vault.directory_for(new_type))
         target = target_directory / f"{new_name}{afanes.core.vault.snapshot.NOTE_SUFFIX}"
 

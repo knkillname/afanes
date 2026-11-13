@@ -26,15 +26,6 @@ VIEW_ROOT = UI_ROOT / "views"
 # Migration debt: each entry is an existing free function, not a permission for
 # new ones. The list may only shrink as modules gain an owning class.
 FINAL_FUNCTION_ALLOWLIST: dict[str, frozenset[str] | None] = {
-    "core/names.py": frozenset(
-        {
-            "normalize_name",
-            "safe_filename",
-            "unique_name",
-            "_avoid_reserved_device_name",
-            "_truncate_to_utf8_bytes",
-        }
-    ),
     "core/atomic.py": frozenset({"write_text_exclusive", "write_text_atomic"}),
     "ui/strings.py": frozenset(
         {
@@ -416,7 +407,6 @@ class TestObjectOwnership:
 
     def test_final_allowlist_is_exact(self) -> None:
         assert set(FINAL_FUNCTION_ALLOWLIST) == {
-            "core/names.py",
             "core/atomic.py",
             "ui/strings.py",
             "ui/app.py",

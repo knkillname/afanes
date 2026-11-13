@@ -178,7 +178,7 @@ class VaultPages:
             message = f"Note directory is not a directory: {target_directory}"
             raise VaultError(message)
 
-        name = afanes.core.names.safe_filename(reference_name)
+        name = afanes.core.names.NamePolicy.safe_filename(reference_name)
         scheme = ReferenceScheme.for_note(note_type)
         snapshot = self.vault.scan()
         if snapshot.catalog.candidates(scheme, name):
