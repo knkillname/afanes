@@ -86,7 +86,9 @@ guidelines. The workspace divides the window into three regions with bounded wid
 At `SHELL_WIDE_MIN` and above the navigation, browser, and detail are side by side. Between
 `SHELL_MEDIUM_MIN` and `SHELL_WIDE_MIN` the navigation moves behind a transient toggle. A narrower
 presentation shows one region at a time, with the browser as the root and Back returning from the
-detail. Long-form content stays within `CONTENT_MAX_WIDTH` on very wide windows.
+detail. Long-form content stays within `CONTENT_MAX_WIDTH` on very wide windows. Below that width
+the page column tracks the detail card, and long forms wrap their fields instead of clipping, so
+every region adapts to the space the shell actually gives it.
 
 ## 🧱 Workspace regions
 

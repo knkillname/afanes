@@ -1968,3 +1968,28 @@ class TestPageDates:
         assert document.date is not None
         assert document.date.text == "2025-10"
         assert path.is_file()
+
+
+class TestPageWidth:
+    def test_column_caps_at_the_reading_width(self) -> None:
+        view = PageView(lambda: None)
+
+        view.fit_width(2000)
+
+        assert view.page_column.width == afanes.ui.theme.CONTENT_MAX_WIDTH
+
+    def test_column_shrinks_to_the_available_card_width(self) -> None:
+        view = PageView(lambda: None)
+
+        view.fit_width(600)
+
+        assert view.page_column.width == 600 - 2 * afanes.ui.theme.ITEM_GAP
+
+    def test_a_degenerate_width_keeps_the_current_column(self) -> None:
+        view = PageView(lambda: None)
+        view.fit_width(600)
+        assert view.page_column.width is not None
+
+        view.fit_width(10)
+
+        assert view.page_column.width == 600 - 2 * afanes.ui.theme.ITEM_GAP
