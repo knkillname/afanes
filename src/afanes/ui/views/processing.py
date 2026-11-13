@@ -180,6 +180,7 @@ class ProcessingView:
             content=afanes.ui.strings.PROCESSING_PREVIEW_ACTION,
             icon=ft.Icons.VISIBILITY_OUTLINED,
             on_click=self._preview,
+            disabled=True,
         )
         self.cancel_button = ft.TextButton(
             content=afanes.ui.strings.PROCESSING_CANCEL_ACTION,
@@ -386,6 +387,22 @@ class ProcessingView:
         self.form_error.visible = True
         self._update()
 
+    def _preview_available(self) -> bool:
+        """Return whether the current form can build a plan."""
+        outcome = self._selected_outcome()
+        if outcome is None:
+            return False
+        if outcome in (ProcessingOutcome.PROJECT, ProcessingOutcome.DONE_NOW):
+            due_text = (self.due_date.value or "").strip()
+            if due_text:
+                try:
+                    datetime.date.fromisoformat(due_text)
+                except ValueError:
+                    return False
+        if outcome is ProcessingOutcome.APPEND_STEP and not (self.project.value or "").strip():
+            return False
+        return True
+
     async def _preview(self) -> None:
         """Build a processing plan from the form values."""
         outcome = self._selected_outcome()
@@ -473,7 +490,7 @@ class ProcessingView:
         for control in self.role_suggestions.controls:
             if isinstance(control, ft.ListTile):
                 control.disabled = working
-        self.preview_button.disabled = working
+        self.preview_button.disabled = working or not self._preview_available()
         self.cancel_button.disabled = working
         self.confirm_button.disabled = working
         self.done_button.disabled = working
@@ -514,6 +531,8 @@ class ProcessingView:
         plan = state.processing.plan
         show_plan = plan is not None and not self._plan_hidden and not success
         self.plan_panel.visible = show_plan
+        self.preview_button.visible = not show_plan
+        self.preview_button.disabled = self._working or not self._preview_available()
         if show_plan:
             self._populate_plan(plan)
 

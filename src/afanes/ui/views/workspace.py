@@ -212,11 +212,13 @@ class WorkspaceView:
             min_lines=1,
             max_lines=4,
             on_submit=self._capture,
+            on_change=self._capture_changed,
             key="workspace-capture-field",
         )
         self.capture_button = ft.FilledButton(
             content=afanes.ui.strings.CAPTURE_ACTION,
             on_click=self._capture,
+            disabled=True,
             key="workspace-capture-button",
         )
         self.capture_actions = ft.Row(
@@ -574,7 +576,21 @@ class WorkspaceView:
             self._set_working(working=False)
         if path is not None:
             self.capture_field.value = ""
+        self._refresh_capture_action()
         self._refresh_dynamic()
+        self._update()
+
+    def _capture_available(self) -> bool:
+        """Return whether the composer has non-blank text."""
+        return bool((self.capture_field.value or "").strip())
+
+    def _refresh_capture_action(self) -> None:
+        """Disable Capture while the composer is blank."""
+        self.capture_button.disabled = not self._capture_available()
+
+    async def _capture_changed(self) -> None:
+        """Track the composer text as it changes."""
+        self._refresh_capture_action()
         self._update()
 
     async def _refresh(self) -> None:
@@ -740,7 +756,7 @@ class WorkspaceView:
         """Disable controls and show progress while a command runs."""
         self._own_controls()
         self.progress.visible = working
-        self.capture_button.disabled = working
+        self.capture_button.disabled = working or not self._capture_available()
         self.refresh_button.disabled = working
         self.change_button.disabled = working
         self.new_reference_button.disabled = working

@@ -16,8 +16,8 @@
 
 ## 3. Inbox and processing availability
 
-- [ ] 3.1 Make the Capture action insensitive while the composer is blank or whitespace-only, update it on change, and keep the command-level rejection. Verify `tests/ui/test_workspace_view.py` covers disabled, enabled, cleared, and direct-command cases.
-- [ ] 3.2 Make the Processing Preview action insensitive until an outcome is selected and its required project or date is valid. Verify `tests/ui/test_processing_view.py` covers each outcome and the invalid-date case.
+- [x] 3.1 Make the Capture action insensitive while the composer is blank or whitespace-only, update it on change, and keep the command-level rejection. Verify `tests/ui/test_workspace_view.py` covers disabled, enabled, cleared, and direct-command cases.
+- [x] 3.2 Make the Processing Preview action insensitive until an outcome is selected and its required project or date is valid. Verify `tests/ui/test_processing_view.py` covers each outcome and the invalid-date case.
 
 ## 4. Dialogs and review forms
 

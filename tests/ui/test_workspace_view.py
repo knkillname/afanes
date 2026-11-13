@@ -442,6 +442,21 @@ class TestFrozenControlRecovery:
 
 
 class TestCaptureBar:
+    def test_capture_action_tracks_the_composer(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        versioned(vault)
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        assert view.capture_button.disabled is True
+        view.capture_field.value = "Buy milk"
+        asyncio.run(_change_handler(view.capture_field)())
+        assert view.capture_button.disabled is False
+        view.capture_field.value = "   "
+        asyncio.run(_change_handler(view.capture_field)())
+        assert view.capture_button.disabled is True
+
     def test_capture_creates_a_note_and_clears_the_field(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         versioned(vault)
@@ -452,6 +467,7 @@ class TestCaptureBar:
 
         assert (vault / "inbox" / "Buy milk.md").is_file()
         assert view.capture_field.value == ""
+        assert view.capture_button.disabled is True
         assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.INBOX].value == "1"
 
     def test_empty_capture_keeps_the_field_and_reports(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -460,6 +476,7 @@ class TestCaptureBar:
         view = _open_workspace(tmp_path, monkeypatch)
         view.capture_field.value = "   "
 
+        assert view.capture_button.disabled is True
         asyncio.run(_handler(view.capture_button)())
 
         assert view.capture_field.value == "   "

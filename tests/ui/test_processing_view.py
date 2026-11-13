@@ -19,6 +19,7 @@ import afanes.ui.views.processing
 from afanes.core.processing import ProcessingOutcome, ProcessingPlan
 from afanes.models.note import CategoryLabel, NoteType, Status
 from tests.support import versioned
+from tests.ui.control_tree import emphasis_controls
 
 
 @pytest.fixture(autouse=True)
@@ -457,8 +458,11 @@ class TestProcessingView:
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
         assert view.plan_panel.visible is True
+        assert view.preview_button.visible is False
         assert str(plan.target_path) in view.plan_destination.value
         assert "Project" in view.plan_details.value
+        highlighted = emphasis_controls(view.form) + emphasis_controls(view.plan_panel)
+        assert highlighted == [view.confirm_button]
 
     def test_plan_preview_names_the_owner_and_requester(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -784,3 +788,37 @@ class TestProcessingView:
         asyncio.run(_click(view.cancel_button.on_click))
 
         assert called is True
+
+
+class TestPreviewAvailability:
+    def test_preview_is_insensitive_without_an_outcome(self) -> None:
+        _open_capture()
+
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+
+        assert view.preview_button.disabled is True
+
+    def test_preview_requires_a_valid_due_date(self) -> None:
+        _open_capture()
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.PROJECT.value
+        _select_outcome(view)
+
+        assert view.preview_button.disabled is False
+        view.due_date.value = "not-a-date"
+        _trigger(view.due_date.on_change)
+        assert view.preview_button.disabled is True
+        view.due_date.value = "2026-11-20"
+        _trigger(view.due_date.on_change)
+        assert view.preview_button.disabled is False
+
+    def test_append_step_requires_a_project(self) -> None:
+        _open_capture()
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.APPEND_STEP.value
+        _select_outcome(view)
+
+        assert view.preview_button.disabled is True
+        view.project.value = "Launch"
+        _trigger(view.project.on_change)
+        assert view.preview_button.disabled is False
