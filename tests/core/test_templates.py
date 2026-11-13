@@ -739,7 +739,7 @@ class TestCreationWritesBundledContent:
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        original = afanes.core.atomic.write_text_atomic
+        original = afanes.core.atomic.AtomicWriter.write_text_atomic
         calls: list[Path] = []
 
         def fail_on_fourth(path: Path, text: str) -> None:
@@ -749,7 +749,7 @@ class TestCreationWritesBundledContent:
                 raise OSError(message)
             original(path, text)
 
-        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail_on_fourth)
+        monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail_on_fourth)
         root = tmp_path / "vault"
 
         with pytest.raises(TemplateWriteError) as info:
@@ -825,7 +825,7 @@ class TestTemplateCardSeeding:
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        original = afanes.core.atomic.write_text_atomic
+        original = afanes.core.atomic.AtomicWriter.write_text_atomic
         calls: list[Path] = []
 
         def fail_on_fourth(path: Path, text: str) -> None:
@@ -835,7 +835,7 @@ class TestTemplateCardSeeding:
                 raise OSError(message)
             original(path, text)
 
-        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail_on_fourth)
+        monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail_on_fourth)
         root = tmp_path / "vault"
 
         with pytest.raises(TemplateCardWriteError) as info:

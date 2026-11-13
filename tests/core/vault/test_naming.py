@@ -250,7 +250,7 @@ class TestReferenceRepair:
         vault = afanes.core.vault.service.Vault(root)
         preview = afanes.core.vault.naming.VaultNaming(vault).plan_reference_repair(old, new, snapshot=vault.scan())
 
-        original_write = afanes.core.atomic.write_text_atomic
+        original_write = afanes.core.atomic.AtomicWriter.write_text_atomic
         state = {"failed": False}
 
         def flaky_write(path: Path, text: str) -> None:
@@ -260,7 +260,7 @@ class TestReferenceRepair:
                 raise OSError(message)
             original_write(path, text)
 
-        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", flaky_write)
+        monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", flaky_write)
         first_report = afanes.core.vault.naming.VaultNaming(vault).apply_reference_repair(preview, confirm=True)
         assert [failure.path for failure in first_report.failed] == [first.resolve()]
         assert first_report.updated == (second.resolve(),)
@@ -728,7 +728,7 @@ class TestApplyRename:
             note, "Ada King"
         )
 
-        original_write = afanes.core.atomic.write_text_atomic
+        original_write = afanes.core.atomic.AtomicWriter.write_text_atomic
         state = {"failed": False}
 
         def flaky_write(path: Path, text: str) -> None:
@@ -738,7 +738,7 @@ class TestApplyRename:
                 raise OSError(message)
             original_write(path, text)
 
-        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", flaky_write)
+        monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", flaky_write)
         first_report = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).apply_rename(
             preview, confirm=True
         )

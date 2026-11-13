@@ -311,7 +311,7 @@ class VaultSchemaStore:
         schema = VaultSchema(version=CURRENT_SCHEMA_VERSION)
         text = f"schema_version: {schema.version}\n"
         try:
-            afanes.core.atomic.write_text_exclusive(self.settings_path, text)
+            afanes.core.atomic.AtomicWriter.write_text_exclusive(self.settings_path, text)
         except (VaultError, OSError) as exc:
             message = f"Could not write {SCHEMA_FILENAME} in {self.root}: {exc}"
             raise VaultSchemaWriteError(message) from exc

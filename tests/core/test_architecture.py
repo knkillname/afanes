@@ -26,7 +26,6 @@ VIEW_ROOT = UI_ROOT / "views"
 # Migration debt: each entry is an existing free function, not a permission for
 # new ones. The list may only shrink as modules gain an owning class.
 FINAL_FUNCTION_ALLOWLIST: dict[str, frozenset[str] | None] = {
-    "core/atomic.py": frozenset({"write_text_exclusive", "write_text_atomic"}),
     "ui/strings.py": frozenset(
         {
             "log_entry_count",
@@ -407,7 +406,6 @@ class TestObjectOwnership:
 
     def test_final_allowlist_is_exact(self) -> None:
         assert set(FINAL_FUNCTION_ALLOWLIST) == {
-            "core/atomic.py",
             "ui/strings.py",
             "ui/app.py",
             "cli/main.py",

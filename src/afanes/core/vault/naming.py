@@ -207,7 +207,7 @@ class VaultNaming:
         target = self.vault.contained(preview.target_path)
         document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
         labels = PageLabels.from_document(document).with_category(preview.category)
-        afanes.core.atomic.write_text_atomic(source, labels.apply_to(document).to_text())
+        afanes.core.atomic.AtomicWriter.write_text_atomic(source, labels.apply_to(document).to_text())
         if VaultPath.same(source, target):
             return source
         if target.exists():
@@ -432,7 +432,7 @@ class VaultNaming:
             labels = labels.with_type(preview.new_type)
         if preview.new_date is not None:
             labels = labels.with_date_text(preview.new_date.text)
-        afanes.core.atomic.write_text_atomic(source, labels.apply_to(document).to_text())
+        afanes.core.atomic.AtomicWriter.write_text_atomic(source, labels.apply_to(document).to_text())
 
     def _apply_heading_update(
         self,
@@ -741,7 +741,7 @@ class VaultNaming:
         text = final.to_text()
         reader = afanes.core.links.ReferenceReader()
         VaultNaming._verify_rewrite(text, old, reader)
-        afanes.core.atomic.write_text_atomic(path, text)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(path, text)
         return True
 
     @staticmethod
@@ -763,7 +763,7 @@ class VaultNaming:
             return False
         reader = afanes.core.links.ReferenceReader()
         VaultNaming._verify_rewrite(text, old, reader)
-        afanes.core.atomic.write_text_atomic(path, text)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(path, text)
         return True
 
     @staticmethod

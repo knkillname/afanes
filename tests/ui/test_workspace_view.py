@@ -594,7 +594,7 @@ class TestWorkspaceRefresh:
         monkeypatch.setattr(afanes.core.vault.service.Vault, "scan", fail)
         monkeypatch.setattr(afanes.core.vault.service.Vault, "read_body", fail)
         monkeypatch.setattr(afanes.core.vault.service.Vault, "read_page", fail)
-        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail)
+        monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail)
 
         view.refresh()
 

@@ -301,7 +301,7 @@ class TestSettingsStoreSave:
             message = "simulated failure"
             raise VaultError(message)
 
-        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail_write)
+        monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail_write)
 
         with pytest.raises(ConfigurationError):
             SettingsStore(path).save(Settings(vault=second_vault))

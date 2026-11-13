@@ -896,7 +896,7 @@ class TestScanVault:
             message = "scan must not write"
             raise AssertionError(message)
 
-        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail_write)
+        monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail_write)
         afanes.core.vault.service.Vault(root).scan()
         assert _tree_state(root) == before
 

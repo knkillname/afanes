@@ -907,7 +907,7 @@ class TestApplyProcessing:
             message = "disk full"
             raise OSError(message)
 
-        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail_write)
+        monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail_write)
         with pytest.raises(OSError, match="disk full"):
             afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 

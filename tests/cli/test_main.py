@@ -252,7 +252,7 @@ class TestCreateCommand:
     ) -> None:
         settings = tmp_path / "settings.json"
         _use_settings_file(monkeypatch, settings)
-        original = afanes.core.atomic.write_text_atomic
+        original = afanes.core.atomic.AtomicWriter.write_text_atomic
         calls: list[Path] = []
 
         def fail_after_the_guide(path: Path, text: str) -> None:
@@ -262,7 +262,7 @@ class TestCreateCommand:
                 raise OSError(message)
             original(path, text)
 
-        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", fail_after_the_guide)
+        monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail_after_the_guide)
         target = tmp_path / "vault"
 
         status = afanes.cli.main.main(["vault", "create", str(target), "--template", "personal"])

@@ -285,7 +285,7 @@ class Vault:
             target = self.contained(note.relative_path)
             try:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                afanes.core.atomic.write_text_atomic(target, note.text)
+                afanes.core.atomic.AtomicWriter.write_text_atomic(target, note.text)
             except (OSError, VaultError) as exc:
                 already = ", ".join(path.relative_to(self.root).as_posix() for path in written) or "none"
                 message = (
@@ -322,7 +322,7 @@ class Vault:
             target = self.contained(directory / card.relative_path)
             try:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                afanes.core.atomic.write_text_atomic(target, card.text)
+                afanes.core.atomic.AtomicWriter.write_text_atomic(target, card.text)
             except (OSError, VaultError) as exc:
                 already = ", ".join(path.relative_to(self.root).as_posix() for path in written) or "none"
                 message = (
@@ -760,7 +760,7 @@ class Vault:
             date=NoteDate.from_date(self.today()),
         )
         path = target_directory / f"{name}{NOTE_SUFFIX}"
-        afanes.core.atomic.write_text_atomic(path, document.to_text())
+        afanes.core.atomic.AtomicWriter.write_text_atomic(path, document.to_text())
         return path
 
     @classmethod

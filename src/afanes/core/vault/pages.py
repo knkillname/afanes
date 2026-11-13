@@ -92,7 +92,7 @@ class VaultPages:
             message = f"Note changed on disk: {note_path}"
             raise ContentChangedError(message)
 
-        afanes.core.atomic.write_text_atomic(source, text)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(source, text)
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def create_page(
@@ -194,7 +194,7 @@ class VaultPages:
             raise NameCollisionError(message)
 
         target_directory.mkdir(parents=True, exist_ok=True)
-        afanes.core.atomic.write_text_atomic(target, content)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(target, content)
         return target
 
     def create_log_entry(
@@ -269,7 +269,7 @@ class VaultPages:
             date=date,
         ).to_text()
         target_directory.mkdir(parents=True, exist_ok=True)
-        afanes.core.atomic.write_text_atomic(target, content)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(target, content)
         return target
 
     def set_status(
@@ -338,7 +338,7 @@ class VaultPages:
         document = NoteDocument.from_text(data.decode("utf-8"))
         labels = dataclasses.replace(PageLabels.from_document(document), status=status)
         text = labels.apply_to(document).to_text()
-        afanes.core.atomic.write_text_atomic(source, text)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(source, text)
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def recreate_page(self, note_path: Path, text: str) -> str:
@@ -379,7 +379,7 @@ class VaultPages:
         if not source.parent.is_dir():
             message = f"Destination directory does not exist: {source.parent}"
             raise VaultError(message)
-        afanes.core.atomic.write_text_atomic(source, text)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(source, text)
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def capture(self, text: str) -> Path:

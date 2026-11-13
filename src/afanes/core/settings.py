@@ -272,7 +272,7 @@ class SettingsStore:
         resolved = dataclasses.replace(settings, vault=vault)
         payload = json.dumps(resolved.to_payload(), ensure_ascii=False, indent=2)
         try:
-            afanes.core.atomic.write_text_atomic(self.path, f"{payload}\n")
+            afanes.core.atomic.AtomicWriter.write_text_atomic(self.path, f"{payload}\n")
         except (OSError, VaultError) as exc:
             message = f"Could not write settings: {self.path}"
             raise ConfigurationError(message) from exc

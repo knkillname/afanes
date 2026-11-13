@@ -7,8 +7,8 @@
 
 ## 2. Give atomic writes an owner
 
-- [ ] 2.1 Add `AtomicWriter` to `src/afanes/core/atomic.py` with public classmethods `write_text_atomic` and `write_text_exclusive`, preserving the current filesystem behavior; verify `hatch test tests/core/test_atomic.py` passes with the classmethods.
-- [ ] 2.2 Update every call site in `core/` and `ui/` from `afanes.core.atomic.write_text_*` to `AtomicWriter`; verify `grep -rn "atomic\.write_text_" src tests` returns no output and the full suite passes.
+- [x] 2.1 Add `AtomicWriter` to `src/afanes/core/atomic.py` with public classmethods `write_text_atomic` and `write_text_exclusive`, preserving the current filesystem behavior; verify `hatch test tests/core/test_atomic.py` passes with the classmethods.
+- [x] 2.2 Update every call site in `core/` and `ui/` from `afanes.core.atomic.write_text_*` to `AtomicWriter`; verify `grep -rn "atomic\.write_text_" src tests` returns no output and the full suite passes.
 
 ## 3. Give copy formatting an owner
 

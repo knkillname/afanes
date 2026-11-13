@@ -462,7 +462,7 @@ class VaultProcessing:
                 message = "Target project changed after planning"
                 raise ProcessingError(message)
             body = step_document.append(plan.step_text, plan.detail)
-            afanes.core.atomic.write_text_atomic(project, document.with_body(body).to_text())
+            afanes.core.atomic.AtomicWriter.write_text_atomic(project, document.with_body(body).to_text())
         try:
             VaultNaming(self.vault).trash(capture, confirm=True)
         except (AfanesError, OSError) as exc:
@@ -522,7 +522,7 @@ class VaultProcessing:
         if processed_hash != plan.processed_hash:
             message = "Processed note does not match the plan"
             raise ProcessingError(message)
-        afanes.core.atomic.write_text_atomic(source, text)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(source, text)
 
     def _move_processing(self, source: Path, target: Path) -> Path:
         """Move a processed note to its destination."""

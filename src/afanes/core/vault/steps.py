@@ -245,7 +245,7 @@ class VaultSteps:
         step_document = afanes.core.steps.StepDocument(document.body)
         body = step_document.append(text, detail)
         text_out = self._with_body_text(source_text, document, body)
-        afanes.core.atomic.write_text_atomic(source, text_out)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(source, text_out)
         return hashlib.sha256(text_out.encode("utf-8")).hexdigest()
 
     @staticmethod
@@ -296,5 +296,5 @@ class VaultSteps:
             raise VaultError(message)
         body = transform(step_document, step)
         text_out = self._with_body_text(text, document, body)
-        afanes.core.atomic.write_text_atomic(source, text_out)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(source, text_out)
         return hashlib.sha256(text_out.encode("utf-8")).hexdigest()
