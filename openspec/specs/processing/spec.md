@@ -15,6 +15,16 @@ Processing SHALL operate only on a note under `inbox/` and SHALL require an expl
 - **WHEN** the user starts processing a capture
 - **THEN** the application shows the outcome and destination and writes nothing until the user confirms
 
+#### Scenario: Preview is insensitive without an outcome
+
+- **WHEN** no processing outcome is selected
+- **THEN** the Preview action is insensitive
+
+#### Scenario: Preview waits for required input
+
+- **WHEN** the selected outcome requires a project or a date that is missing or invalid
+- **THEN** the Preview action is insensitive
+
 #### Scenario: Cancel changes nothing
 
 - **WHEN** the user cancels the processing preview
@@ -24,7 +34,6 @@ Processing SHALL operate only on a note under `inbox/` and SHALL require an expl
 
 - **WHEN** processing targets a note outside `inbox/`
 - **THEN** the application reports an error and changes no file
-
 ### Requirement: The outcome set is fixed
 
 A processed capture SHALL become exactly one of Trash, Later, Reference, Project, Log entry, Append

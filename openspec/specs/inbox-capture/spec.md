@@ -27,10 +27,15 @@ NOT declare `status`. A successful capture SHALL clear the composer for the next
 - **WHEN** the vault has no `inbox/` directory and the user captures
 - **THEN** the directory is created and the note is written
 
+#### Scenario: The capture action is insensitive while blank
+
+- **WHEN** the composer is empty or contains only whitespace
+- **THEN** the Capture action is insensitive and no file is created
+
 #### Scenario: Empty capture is rejected
 
-- **WHEN** the captured text is empty or whitespace-only
-- **THEN** no file is created and the composer reports that a thought is required
+- **WHEN** a blank capture reaches the command without passing through the interface
+- **THEN** no file is created and the error is reported
 
 #### Scenario: Successful capture clears the composer
 
@@ -41,7 +46,6 @@ NOT declare `status`. A successful capture SHALL clear the composer for the next
 
 - **WHEN** the user captures on 12 October 2025
 - **THEN** the note declares `date: 2025-10-12`
-
 ### Requirement: The filename comes from the first non-blank line
 
 The filename stem SHALL be the first non-blank line of the captured text, processed by the vault's cross-platform name policy. That line SHALL become a level-1 heading at the start of the note body. The body SHALL be the captured text with `# ` inserted at the start of that line, unless the line already begins with `#`. All other captured text SHALL remain unchanged.

@@ -139,10 +139,15 @@ When a project has no open step, the review card SHALL offer adding a step, mark
 - **WHEN** the user cancels the next-step form
 - **THEN** the project body is unchanged
 
+#### Scenario: The add action is insensitive while blank
+
+- **WHEN** the next-step text is empty or contains only whitespace
+- **THEN** the Add Step action is insensitive and no step is added
+
 #### Scenario: Blank text is rejected
 
-- **WHEN** the user confirms an empty next-step text
-- **THEN** no step is added and the form reports that text is required
+- **WHEN** blank next-step text reaches the command without passing through the interface
+- **THEN** no step is added and the error is reported
 
 #### Scenario: Mark the project done
 
@@ -158,7 +163,6 @@ When a project has no open step, the review card SHALL offer adding a step, mark
 
 - **WHEN** the user skips a stalled project
 - **THEN** the project keeps its status and remains in the next review's pending count
-
 ### Requirement: Review advances, skips, and completes
 
 The session SHALL provide Next and Skip for every item. Skip SHALL move to the next item without changing the skipped item. After the last item, the session SHALL show a completion summary and return to the browser.

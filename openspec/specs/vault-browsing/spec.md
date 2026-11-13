@@ -338,16 +338,20 @@ Creating a reference from the browser SHALL write the note atomically and SHALL 
 - **WHEN** the user creates with Empty
 - **THEN** the note declares `category: general` and has no starter body
 
+#### Scenario: The create action is insensitive while blank
+
+- **WHEN** the name field is empty or contains only whitespace
+- **THEN** the Create action is insensitive and no note is created
+
 #### Scenario: A blank name is rejected
 
-- **WHEN** the user submits a blank name
-- **THEN** no note is created and the dialog reports that a name is required
+- **WHEN** a blank name reaches the command without passing through the interface
+- **THEN** no note is created and the error is reported
 
 #### Scenario: A collision is reported
 
 - **WHEN** the name already belongs to a note in the same scheme
 - **THEN** no note is created, no suffix is added, and the dialog reports the collision
-
 ### Requirement: A browser-created reference appears in its group
 
 After a browser creation succeeds, the application SHALL refresh the scan and SHALL show the new note under its category group. An active search query SHALL be cleared so the note is visible.

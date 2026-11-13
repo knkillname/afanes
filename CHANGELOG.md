@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   as absent on every note type. This implements the `restore-workspace-conformance` OpenSpec change,
   which also closed the scenario-to-test audit. README: no change required. Docs: the pages,
   workspace, processing, and frontmatter pages were updated during implementation.
+- **One affirmative action per surface.** Capture, Processing Preview, New Vault, New Reference,
+  Rename, and review forms keep their affirmative control insensitive until the input is valid, and
+  the action becomes available as the field changes. Each rendered surface shows at most one
+  suggested or destructive action; inline confirmations put Cancel first; buttons combine an icon
+  and a label only in a header bar; and list rows use the standard height. Disabled accent actions
+  use a muted fill so they no longer look available. This implements the `control-hierarchy`
+  OpenSpec change. README: no change required. Docs: the interface standard and the workspace and
+  processing guides were updated during implementation.
 
 ## [0.7.0] - 2026-11-12
 
