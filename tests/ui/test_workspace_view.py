@@ -90,7 +90,9 @@ def _write_note(
 def _open_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.views.workspace.WorkspaceView:
     _use_settings_file(monkeypatch, tmp_path / "settings.json")
     asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
-    return afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
+    return afanes.ui.views.workspace.WorkspaceView(
+        afanes.ui.views.workspace.WorkspaceActions(_noop, _change_vault, _create_vault, _close_vault)
+    )
 
 
 def _handler(control: ft.Control) -> Handler:
@@ -134,7 +136,9 @@ class TestWorkspaceShell:
         versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(
+            afanes.ui.views.workspace.WorkspaceActions(_noop, _change_vault, _create_vault, _close_vault)
+        )
 
         assert view.root.key == "workspace-view"
         assert isinstance(view.root, ft.Stack)
@@ -182,7 +186,9 @@ class TestWorkspaceShell:
         async def close() -> None:
             calls.append("close")
 
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, close)
+        view = afanes.ui.views.workspace.WorkspaceView(
+            afanes.ui.views.workspace.WorkspaceActions(_noop, _change_vault, _create_vault, close)
+        )
 
         assert [item.key for item in view.change_button.items] == [
             "workspace-change-open",
@@ -212,11 +218,13 @@ class TestWorkspaceShell:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
         view = afanes.ui.views.workspace.WorkspaceView(
-            _noop,
-            _change_vault,
-            _create_vault,
-            _close_vault,
-            on_about=about,
+            afanes.ui.views.workspace.WorkspaceActions(
+                _noop,
+                _change_vault,
+                _create_vault,
+                _close_vault,
+                on_about=about,
+            )
         )
 
         asyncio.run(_handler(view.change_button.items[3])())
@@ -234,7 +242,9 @@ class TestWorkspaceShell:
             await state.navigation.open_page(note)
 
         asyncio.run(scenario())
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(
+            afanes.ui.views.workspace.WorkspaceActions(_noop, _change_vault, _create_vault, _close_vault)
+        )
 
         assert view.navigation.visible is True
         assert view.page_view.title.value == "Buy milk"
@@ -319,7 +329,9 @@ class TestWorkspaceShell:
             await state.navigation.open_page(note)
 
         asyncio.run(scenario())
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(
+            afanes.ui.views.workspace.WorkspaceActions(_noop, _change_vault, _create_vault, _close_vault)
+        )
         handler = _handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.PROJECTS])
 
         asyncio.run(handler())
@@ -566,10 +578,12 @@ class TestWorkspaceRefresh:
         asyncio.run(state.workspace.choose_vault(vault))
         repaints: list[int] = []
         view = afanes.ui.views.workspace.WorkspaceView(
-            lambda: repaints.append(1),
-            _change_vault,
-            _create_vault,
-            _close_vault,
+            afanes.ui.views.workspace.WorkspaceActions(
+                lambda: repaints.append(1),
+                _change_vault,
+                _create_vault,
+                _close_vault,
+            )
         )
         _write_note(vault / "inbox" / "External.md", body="# External")
         asyncio.run(state.workspace.refresh())
@@ -585,7 +599,9 @@ class TestWorkspaceRefresh:
         versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(vault))
-        view = afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
+        view = afanes.ui.views.workspace.WorkspaceView(
+            afanes.ui.views.workspace.WorkspaceActions(_noop, _change_vault, _create_vault, _close_vault)
+        )
 
         def fail(*_args: object, **_kwargs: object) -> None:
             message = "the workspace refresh must not touch the filesystem"
@@ -625,11 +641,13 @@ class TestDatePickerWiring:
 
         asyncio.run(scenario())
         view = afanes.ui.views.workspace.WorkspaceView(
-            _noop,
-            _change_vault,
-            _create_vault,
-            _close_vault,
-            pick_date=pick_date,
+            afanes.ui.views.workspace.WorkspaceActions(
+                _noop,
+                _change_vault,
+                _create_vault,
+                _close_vault,
+                pick_date=pick_date,
+            )
         )
 
         asyncio.run(view.page_view.choose_due_date())
@@ -653,11 +671,13 @@ class TestBrowserCreationAction:
             calls.append("new")
 
         view = afanes.ui.views.workspace.WorkspaceView(
-            _noop,
-            _change_vault,
-            _create_vault,
-            _close_vault,
-            on_new_reference=new_reference,
+            afanes.ui.views.workspace.WorkspaceActions(
+                _noop,
+                _change_vault,
+                _create_vault,
+                _close_vault,
+                on_new_reference=new_reference,
+            )
         )
 
         assert _find_control(view.browser_actions, "browser-new-reference") is None
@@ -683,11 +703,13 @@ class TestBrowserCreationAction:
             observed.append(view.new_reference_button.disabled)
 
         view = afanes.ui.views.workspace.WorkspaceView(
-            _noop,
-            _change_vault,
-            _create_vault,
-            _close_vault,
-            on_new_reference=new_reference,
+            afanes.ui.views.workspace.WorkspaceActions(
+                _noop,
+                _change_vault,
+                _create_vault,
+                _close_vault,
+                on_new_reference=new_reference,
+            )
         )
         section = afanes.ui.state.browser.WorkspaceSection.REFERENCES
         asyncio.run(_handler(view.section_tiles[section])())
@@ -883,10 +905,12 @@ class TestCapturePlacement:
         asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
         calls: list[str] = []
         view = afanes.ui.views.workspace.WorkspaceView(
-            lambda: calls.append("update"),
-            _change_vault,
-            _create_vault,
-            _close_vault,
+            afanes.ui.views.workspace.WorkspaceActions(
+                lambda: calls.append("update"),
+                _change_vault,
+                _create_vault,
+                _close_vault,
+            )
         )
 
         async def focus(_field: ft.TextField) -> None:
@@ -948,7 +972,9 @@ class TestReviewQueue:
             await state.review.start()
 
         asyncio.run(scenario())
-        return afanes.ui.views.workspace.WorkspaceView(_noop, _change_vault, _create_vault, _close_vault)
+        return afanes.ui.views.workspace.WorkspaceView(
+            afanes.ui.views.workspace.WorkspaceActions(_noop, _change_vault, _create_vault, _close_vault)
+        )
 
     def _queue_cards(self, view: afanes.ui.views.workspace.WorkspaceView) -> list[ft.Container]:
         return [
@@ -1238,11 +1264,13 @@ class TestLogSection:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
         view = afanes.ui.views.workspace.WorkspaceView(
-            _noop,
-            _change_vault,
-            _create_vault,
-            _close_vault,
-            on_log_entry=on_log_entry,
+            afanes.ui.views.workspace.WorkspaceActions(
+                _noop,
+                _change_vault,
+                _create_vault,
+                _close_vault,
+                on_log_entry=on_log_entry,
+            )
         )
         asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.LOG])())
         return view

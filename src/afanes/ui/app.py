@@ -281,16 +281,18 @@ class AppShell:
                 )
         else:
             workspace = afanes.ui.views.workspace.WorkspaceView(
-                self.page.update,
-                self.choose_vault,
-                self.create_vault,
-                self.close_vault,
-                on_new_reference=self.show_new_reference_dialog,
-                pick_date=self.pick_date,
-                on_log_entry=self.show_log_entry_dialog,
-                on_missing_role=self.show_role_reference_dialog,
-                pick_role=self.pick_role,
-                on_about=self.show_about_dialog,
+                afanes.ui.views.workspace.WorkspaceActions(
+                    self.page.update,
+                    self.choose_vault,
+                    self.create_vault,
+                    self.close_vault,
+                    on_new_reference=self.show_new_reference_dialog,
+                    pick_date=self.pick_date,
+                    on_log_entry=self.show_log_entry_dialog,
+                    on_missing_role=self.show_role_reference_dialog,
+                    pick_role=self.pick_role,
+                    on_about=self.show_about_dialog,
+                )
             )
             self.workspace = workspace
             workspace.resize(self._viewport_width())

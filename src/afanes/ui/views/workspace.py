@@ -10,6 +10,7 @@ the Processing Wizard, or a guided review.
 """
 
 import asyncio
+import dataclasses
 import datetime
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -19,6 +20,7 @@ import flet as ft
 import afanes.core.log
 import afanes.core.search
 import afanes.ui.components.calendar
+import afanes.ui.components.capture_bar
 import afanes.ui.components.frozen
 import afanes.ui.components.log_tree
 import afanes.ui.state
@@ -44,79 +46,74 @@ _SECTION_ICONS = {
 }
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class WorkspaceActions:
+    """Callbacks and pickers supplied by the application to the workspace.
+
+    Attributes
+    ----------
+    update : collections.abc.Callable[[], None]
+        Requests a repaint of the page.
+    on_change_vault : collections.abc.Callable[[], collections.abc.Awaitable[None]]
+        Command that opens an existing vault.
+    on_create_vault : collections.abc.Callable[[], collections.abc.Awaitable[None]]
+        Command that creates a new vault.
+    on_close_vault : collections.abc.Callable[[], collections.abc.Awaitable[None]]
+        Command that closes the current vault.
+    on_new_reference : collections.abc.Callable[[], collections.abc.Awaitable[None]] | None
+        Command that opens the new-reference dialog.
+    pick_date : afanes.ui.views.page.PickDate | None
+        Command that opens the date picker for step and project dates.
+    on_log_entry : collections.abc.Callable[[afanes.models.note.NoteDate], collections.abc.Awaitable[None]] | None
+        Command that opens or creates a log entry for a date.
+    on_missing_role : collections.abc.Callable[[str], collections.abc.Awaitable[None]] | None
+        Command that asks for a category before creating a missing role.
+    pick_role : afanes.ui.views.page.PickRole | None
+        Command that asks for an owner or requester name in read mode.
+    on_about : collections.abc.Callable[[], collections.abc.Awaitable[None]] | None
+        Command that shows the About dialog.
+    """
+
+    update: Callable[[], None]
+    on_change_vault: Callable[[], Awaitable[None]]
+    on_create_vault: Callable[[], Awaitable[None]]
+    on_close_vault: Callable[[], Awaitable[None]]
+    on_new_reference: Callable[[], Awaitable[None]] | None = None
+    pick_date: afanes.ui.views.page.PickDate | None = None
+    on_log_entry: Callable[[NoteDate], Awaitable[None]] | None = None
+    on_missing_role: Callable[[str], Awaitable[None]] | None = None
+    pick_role: afanes.ui.views.page.PickRole | None = None
+    on_about: Callable[[], Awaitable[None]] | None = None
+
+
 class WorkspaceView:
     """Browser sidebar, capture bar, and a main area for focused work.
 
     Parameters
     ----------
-    update : Callable[[], None]
-        Requests a repaint of the page. Tests pass a no-op or a counter.
-    on_change_vault : Callable[[], Awaitable[None]]
-        Command that opens an existing vault through the folder picker or the
-        typed-path dialog.
-    on_create_vault : Callable[[], Awaitable[None]]
-        Command that asks for a new vault path and creates it.
-    on_close_vault : Callable[[], Awaitable[None]]
-        Command that closes the current vault and returns to the welcome state.
-    on_new_reference : Callable[[], Awaitable[None]] | None
-        Command that opens the new-reference dialog from the References
-        section.
-    on_log_entry : Callable[[NoteDate], Awaitable[None]] | None
-        Command that opens or creates the log entry for a date.
+    actions : WorkspaceActions
+        Callbacks and pickers supplied by the application shell.
     """
 
-    def __init__(
-        self,
-        update: Callable[[], None],
-        on_change_vault: Callable[[], Awaitable[None]],
-        on_create_vault: Callable[[], Awaitable[None]],
-        on_close_vault: Callable[[], Awaitable[None]],
-        on_new_reference: Callable[[], Awaitable[None]] | None = None,
-        pick_date: afanes.ui.views.page.PickDate | None = None,
-        on_log_entry: Callable[[NoteDate], Awaitable[None]] | None = None,
-        on_missing_role: Callable[[str], Awaitable[None]] | None = None,
-        pick_role: afanes.ui.views.page.PickRole | None = None,
-        on_about: Callable[[], Awaitable[None]] | None = None,
-    ) -> None:
+    def __init__(self, actions: WorkspaceActions) -> None:
         """Build the workspace controls against the shared application state.
 
         Parameters
         ----------
-        update : Callable[[], None]
-            Requests a repaint of the page.
-        on_change_vault : Callable[[], Awaitable[None]]
-            Command that opens an existing vault.
-        on_create_vault : Callable[[], Awaitable[None]]
-            Command that creates a new vault.
-        on_close_vault : Callable[[], Awaitable[None]]
-            Command that closes the current vault.
-        on_new_reference : Callable[[], Awaitable[None]] | None
-            Command that opens the new-reference dialog. ``None`` leaves the
-            action inert, which tests use for unrelated shell coverage.
-        pick_date : afanes.ui.views.page.PickDate | None
-            Command that opens the date picker for step and project dates.
-        on_log_entry : Callable[[NoteDate], Awaitable[None]] | None
-            Command that opens or creates a log entry for a date.
-        on_missing_role : Callable[[str], Awaitable[None]] | None
-            Command that asks for a category before creating a missing role
-            reference.
-        pick_role : afanes.ui.views.page.PickRole | None
-            Command that asks for an owner or requester name in read mode.
-        on_about : Callable[[], Awaitable[None]] | None
-            Command that shows the About dialog, or ``None`` when the host does
-            not provide one.
+        actions : WorkspaceActions
+            Callbacks and pickers supplied by the application shell.
         """
         self._state = afanes.ui.state.app_state
-        self._update = update
-        self._on_change_vault = on_change_vault
-        self._on_create_vault = on_create_vault
-        self._on_close_vault = on_close_vault
-        self._on_new_reference = on_new_reference
-        self._on_log_entry = on_log_entry
-        self._on_about = on_about
-        self._pick_date = pick_date
-        self._on_missing_role = on_missing_role
-        self._pick_role = pick_role
+        self._update = actions.update
+        self._on_change_vault = actions.on_change_vault
+        self._on_create_vault = actions.on_create_vault
+        self._on_close_vault = actions.on_close_vault
+        self._on_new_reference = actions.on_new_reference
+        self._on_log_entry = actions.on_log_entry
+        self._on_about = actions.on_about
+        self._pick_date = actions.pick_date
+        self._on_missing_role = actions.on_missing_role
+        self._pick_role = actions.pick_role
         self.log_calendar: afanes.ui.components.calendar.LogCalendar | None = None
         self.log_tree: afanes.ui.components.log_tree.LogTree | None = None
         self.log_today_button: ft.TextButton | None = None
@@ -129,7 +126,15 @@ class WorkspaceView:
         self._breakpoint = "wide"
         self._drawer_open = False
         self._show_detail = False
+        self._build_header()
+        self._build_navigation()
+        self._build_browser()
+        self._build_detail()
+        self._render_shell()
+        self._refresh_dynamic()
 
+    def _build_header(self) -> None:
+        """Build the toolbar, capture bar, and primary menu."""
         self.progress = ft.ProgressRing(
             width=16,
             height=16,
@@ -203,40 +208,15 @@ class WorkspaceView:
             on_click=self._new_capture,
             key="workspace-new-capture",
         )
-        # Flet 1.1.2 ignores a focus request on a field built with
-        # shift_enter=True, so the composer keeps Enter for new lines and the
-        # Capture button submits.
-        self.capture_field = ft.TextField(
-            hint_text=afanes.ui.strings.COMPOSER_HINT,
-            multiline=True,
-            min_lines=1,
-            max_lines=4,
-            on_submit=self._capture,
-            on_change=self._capture_changed,
-            key="workspace-capture-field",
-        )
-        self.capture_button = ft.FilledButton(
-            content=afanes.ui.strings.CAPTURE_ACTION,
-            on_click=self._capture,
-            disabled=True,
-            key="workspace-capture-button",
-        )
-        self.capture_actions = ft.Row(
-            controls=[self.capture_button],
-            alignment=ft.MainAxisAlignment.END,
-            key="workspace-capture-actions",
-        )
-        self.capture_label = ft.Text(
-            afanes.ui.strings.COMPOSER_LABEL,
-            style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
-        )
-        self.capture_section = ft.Column(
-            controls=[self.capture_label, self.capture_field, self.capture_actions],
-            spacing=afanes.ui.theme.ITEM_GAP,
-            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-            key="workspace-capture-section",
-        )
+        self.capture = afanes.ui.components.capture_bar.CaptureBar(self._capture, self._capture_changed)
+        self.capture_field = self.capture.field
+        self.capture_button = self.capture.button
+        self.capture_actions = self.capture.actions
+        self.capture_label = self.capture.label
+        self.capture_section = self.capture.section
 
+    def _build_navigation(self) -> None:
+        """Build the review entry and section navigation."""
         self.review_count = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.review_icon = ft.Icon(ft.Icons.PLAY_ARROW_OUTLINED, color=afanes.ui.theme.SECTION_ICON_COLOR)
         self.review_tile = ft.ListTile(
@@ -268,6 +248,32 @@ class WorkspaceView:
             self.section_tiles[section] = tile
             self.section_edges[section] = ft.Container(content=tile, border_radius=afanes.ui.theme.SURFACE_RADIUS)
 
+        self.navigation_header = ft.Container(
+            height=afanes.ui.theme.HEADER_HEIGHT,
+            content=ft.Row(
+                controls=[self.vault_text, self.change_button, self.drawer_close_button],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+        )
+        self.navigation = ft.Container(
+            width=afanes.ui.theme.NAVIGATION_WIDTH,
+            bgcolor=afanes.ui.theme.REGION_SURFACE_COLOR,
+            content=ft.Column(
+                controls=[
+                    self.navigation_header,
+                    ft.Divider(height=afanes.ui.theme.BORDER_WIDTH),
+                    self.review_edge,
+                    *self.section_edges.values(),
+                ],
+                spacing=0,
+                expand=True,
+            ),
+            key="workspace-navigation",
+        )
+
+    def _build_browser(self) -> None:
+        """Build the browser search, header, and list."""
         self.search_field = ft.TextField(
             hint_text=afanes.ui.strings.BROWSER_SEARCH_HINT,
             prefix_icon=ft.Icons.SEARCH_OUTLINED,
@@ -345,38 +351,19 @@ class WorkspaceView:
             ),
             key="workspace-browser",
         )
-        self.navigation_header = ft.Container(
-            height=afanes.ui.theme.HEADER_HEIGHT,
-            content=ft.Row(
-                controls=[self.vault_text, self.change_button, self.drawer_close_button],
-                spacing=afanes.ui.theme.ITEM_GAP,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            ),
-        )
-        self.navigation = ft.Container(
-            width=afanes.ui.theme.NAVIGATION_WIDTH,
-            bgcolor=afanes.ui.theme.REGION_SURFACE_COLOR,
-            content=ft.Column(
-                controls=[
-                    self.navigation_header,
-                    ft.Divider(height=afanes.ui.theme.BORDER_WIDTH),
-                    self.review_edge,
-                    *self.section_edges.values(),
-                ],
-                spacing=0,
-                expand=True,
-            ),
-            key="workspace-navigation",
-        )
 
+    def _build_detail(self) -> None:
+        """Build the detail pane and the root shell."""
         self.banners = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
         self.page_view = afanes.ui.views.page.PageView(
-            self._on_page_update,
-            self._process_note,
-            self._pick_date,
-            self._on_missing_role,
-            self._pick_role,
-            on_back=self._back_to_browser_if_empty,
+            afanes.ui.views.page.PageActions(
+                update=self._on_page_update,
+                on_process=self._process_note,
+                pick_date=self._pick_date,
+                on_missing_role=self._on_missing_role,
+                pick_role=self._pick_role,
+                on_back=self._back_to_browser_if_empty,
+            )
         )
         self.detail_title = ft.Text(
             "",
@@ -434,8 +421,6 @@ class WorkspaceView:
             fit=ft.StackFit.EXPAND,
             key="workspace-view",
         )
-        self._render_shell()
-        self._refresh_dynamic()
 
     def resize(self, width: int) -> None:
         """Choose the shell arrangement for one available width.

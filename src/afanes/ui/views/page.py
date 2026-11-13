@@ -8,6 +8,7 @@ commands. It performs no Markdown parsing, SQL, or file I/O. Confirmation
 flows are inline panels so the pane stays usable without a rendered dialog.
 """
 
+import dataclasses
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -16,6 +17,7 @@ import flet as ft
 import afanes.core.connections
 import afanes.core.search
 import afanes.core.vault.snapshot
+import afanes.ui.components.page_panels
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
@@ -32,57 +34,74 @@ from afanes.ui.views.project_body import PickDate, ProjectBodyView
 type PickRole = Callable[[str, str | None], Awaitable[str | None]]
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class PageActions:
+    """Callbacks and pickers supplied by the workspace to a page view.
+
+    Attributes
+    ----------
+    update : collections.abc.Callable[[], None]
+        Requests a repaint of the page.
+    on_process : collections.abc.Callable[[pathlib.Path], collections.abc.Awaitable[None]] | None
+        Command that opens the Processing Wizard for an Inbox capture.
+    pick_date : PickDate | None
+        Command that opens the date picker for step and project dates.
+    on_missing_role : collections.abc.Callable[[str], collections.abc.Awaitable[None]] | None
+        Command that asks for a category before creating a missing role
+        reference, or ``None`` when creation is unavailable.
+    pick_role : PickRole | None
+        Command that asks for an owner or requester name, or ``None`` when the
+        read-mode action is unavailable.
+    on_back : collections.abc.Callable[[], collections.abc.Awaitable[bool]] | None
+        Optional fallback tried before the page history. It returns ``True``
+        when the host handled the back request itself.
+    """
+
+    update: Callable[[], None]
+    on_process: Callable[[Path], Awaitable[None]] | None = None
+    pick_date: PickDate | None = None
+    on_missing_role: Callable[[str], Awaitable[None]] | None = None
+    pick_role: PickRole | None = None
+    on_back: Callable[[], Awaitable[bool]] | None = None
+
+
 class PageView:
     """Read, edit, and raw rescue modes for one note.
 
     Parameters
     ----------
-    update : Callable[[], None]
-        Requests a repaint of the page.
-    on_process : Callable[[Path], Awaitable[None]] | None
-        Command that opens the Processing Wizard for an Inbox capture, or
-        ``None`` when processing is unavailable.
+    actions : PageActions
+        Callbacks and pickers supplied by the host workspace.
     """
 
-    def __init__(
-        self,
-        update: Callable[[], None],
-        on_process: Callable[[Path], Awaitable[None]] | None = None,
-        pick_date: PickDate | None = None,
-        on_missing_role: Callable[[str], Awaitable[None]] | None = None,
-        pick_role: PickRole | None = None,
-        on_back: Callable[[], Awaitable[bool]] | None = None,
-    ) -> None:
+    def __init__(self, actions: PageActions) -> None:
         """Build the page controls against the shared application state.
 
         Parameters
         ----------
-        update : Callable[[], None]
-            Requests a repaint of the page.
-        on_process : Callable[[Path], Awaitable[None]] | None
-            Command that opens the Processing Wizard for an Inbox capture.
-        pick_date : PickDate | None
-            Command that opens the date picker for step and project dates.
-        on_missing_role : Callable[[str], Awaitable[None]] | None
-            Command that asks for a category before creating a missing role
-            reference, or ``None`` when creation is unavailable.
-        pick_role : PickRole | None
-            Command that asks for an owner or requester name, or ``None`` when
-            the read-mode action is unavailable.
-        on_back : Callable[[], Awaitable[bool]] | None
-            Optional fallback tried before the page history. It returns
-            ``True`` when the host handled the back request itself.
+        actions : PageActions
+            Callbacks and pickers supplied by the host workspace.
         """
         self._state = afanes.ui.state.app_state
-        self._update = update
-        self._on_process = on_process
-        self._pick_date = pick_date
-        self._on_missing_role = on_missing_role
-        self._pick_role = pick_role
-        self._on_back = on_back
+        self._update = actions.update
+        self._on_process = actions.on_process
+        self._pick_date = actions.pick_date
+        self._on_missing_role = actions.on_missing_role
+        self._pick_role = actions.pick_role
+        self._on_back = actions.on_back
         self._rename_open = False
         self._role_suggestion_field: str | None = None
+        self._build_header()
+        self._build_meta()
+        self._build_read_content()
+        self._build_edit_form()
+        self._build_raw_panel()
+        self._build_dialogs()
+        self._build_layout()
+        self.refresh()
 
+    def _build_header(self) -> None:
+        """Build the toolbar and its actions."""
         self.back_button = ft.IconButton(
             icon=ft.Icons.ARROW_BACK_OUTLINED,
             tooltip=afanes.ui.strings.PAGE_BACK,
@@ -102,6 +121,77 @@ class PageView:
             overflow=ft.TextOverflow.ELLIPSIS,
             expand=True,
         )
+        self.progress = ft.ProgressRing(
+            width=16,
+            height=16,
+            visible=False,
+            semantics_label=afanes.ui.strings.WORKING,
+        )
+        self.status_text = ft.Text(
+            "",
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
+        )
+        self.process_button = ft.TextButton(
+            content=afanes.ui.strings.PROCESS_ACTION,
+            icon=ft.Icons.PLAY_ARROW_OUTLINED,
+            on_click=self.process_current,
+            visible=False,
+            key="process-note",
+        )
+        self.edit_button = ft.FilledButton(
+            content=afanes.ui.strings.PAGE_EDIT,
+            icon=ft.Icons.EDIT_OUTLINED,
+            on_click=self.start_edit,
+            key="page-edit-action",
+        )
+        self.done_button = ft.FilledButton(
+            content=afanes.ui.strings.PAGE_DONE,
+            icon=ft.Icons.CHECK_OUTLINED,
+            on_click=self.finish_edit,
+            visible=False,
+            key="page-done-action",
+        )
+        self.edit_item = ft.PopupMenuItem(
+            content=afanes.ui.strings.PAGE_EDIT,
+            on_click=self.start_edit,
+            key="page-edit",
+        )
+        self.rename_item = ft.PopupMenuItem(
+            content=afanes.ui.strings.PAGE_RENAME,
+            icon=ft.Icons.DRIVE_FILE_RENAME_OUTLINE,
+            on_click=self.begin_rename,
+            key="page-rename",
+        )
+        self.trash_item = ft.PopupMenuItem(
+            content=afanes.ui.strings.PAGE_TRASH,
+            icon=ft.Icons.DELETE_OUTLINE,
+            on_click=self.begin_trash,
+            key="page-trash",
+        )
+        self.menu_button = ft.PopupMenuButton(
+            icon=ft.Icons.MORE_VERT_OUTLINED,
+            tooltip=afanes.ui.strings.PAGE_ACTIONS,
+            items=[self.edit_item, self.rename_item, self.trash_item],
+            key="page-menu",
+        )
+        self.header = ft.Row(
+            controls=[
+                self.back_button,
+                self.title,
+                self.progress,
+                self.process_button,
+                self.edit_button,
+                self.done_button,
+                self.menu_button,
+            ],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            expand=True,
+            key="page-toolbar",
+        )
+
+    def _build_meta(self) -> None:
+        """Build the metadata row."""
         self.meta_status = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.meta_owner = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.meta_owner_button = ft.IconButton(
@@ -174,75 +264,9 @@ class PageView:
             visible=False,
             key="page-meta",
         )
-        self.progress = ft.ProgressRing(
-            width=16,
-            height=16,
-            visible=False,
-            semantics_label=afanes.ui.strings.WORKING,
-        )
-        self.status_text = ft.Text(
-            "",
-            style=afanes.ui.theme.TEXT_ROLES["caption"],
-        )
-        self.process_button = ft.TextButton(
-            content=afanes.ui.strings.PROCESS_ACTION,
-            icon=ft.Icons.PLAY_ARROW_OUTLINED,
-            on_click=self.process_current,
-            visible=False,
-            key="process-note",
-        )
-        self.edit_button = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_EDIT,
-            icon=ft.Icons.EDIT_OUTLINED,
-            on_click=self.start_edit,
-            key="page-edit-action",
-        )
-        self.done_button = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_DONE,
-            icon=ft.Icons.CHECK_OUTLINED,
-            on_click=self.finish_edit,
-            visible=False,
-            key="page-done-action",
-        )
-        self.edit_item = ft.PopupMenuItem(
-            content=afanes.ui.strings.PAGE_EDIT,
-            on_click=self.start_edit,
-            key="page-edit",
-        )
-        self.rename_item = ft.PopupMenuItem(
-            content=afanes.ui.strings.PAGE_RENAME,
-            icon=ft.Icons.DRIVE_FILE_RENAME_OUTLINE,
-            on_click=self.begin_rename,
-            key="page-rename",
-        )
-        self.trash_item = ft.PopupMenuItem(
-            content=afanes.ui.strings.PAGE_TRASH,
-            icon=ft.Icons.DELETE_OUTLINE,
-            on_click=self.begin_trash,
-            key="page-trash",
-        )
-        self.menu_button = ft.PopupMenuButton(
-            icon=ft.Icons.MORE_VERT_OUTLINED,
-            tooltip=afanes.ui.strings.PAGE_ACTIONS,
-            items=[self.edit_item, self.rename_item, self.trash_item],
-            key="page-menu",
-        )
-        self.header = ft.Row(
-            controls=[
-                self.back_button,
-                self.title,
-                self.progress,
-                self.process_button,
-                self.edit_button,
-                self.done_button,
-                self.menu_button,
-            ],
-            spacing=afanes.ui.theme.ITEM_GAP,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            expand=True,
-            key="page-toolbar",
-        )
 
+    def _build_read_content(self) -> None:
+        """Build the read-mode content and connections panel."""
         self.banners = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
         self.empty_text = ft.Text(
             afanes.ui.strings.PAGE_EMPTY,
@@ -283,6 +307,8 @@ class PageView:
         ).build()
         self.connections_panel.visible = False
 
+    def _build_edit_form(self) -> None:
+        """Build the edit form controls."""
         self.identity_text = ft.Text("", selectable=True, style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.body_field = ft.TextField(
             label=afanes.ui.strings.PAGE_BODY_LABEL,
@@ -393,6 +419,8 @@ class PageView:
             visible=False,
         )
 
+    def _build_raw_panel(self) -> None:
+        """Build the raw rescue panel."""
         self.raw_warning = ft.Text(
             afanes.ui.strings.PAGE_RAW_WARNING,
             color=afanes.ui.theme.ERROR_TEXT_COLOR,
@@ -418,158 +446,70 @@ class PageView:
             visible=False,
         )
 
-        self.conflict_text = ft.Text("", selectable=True)
-        self.reload_button = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_CONFLICT_RELOAD,
-            on_click=self.reload_page,
+    def _build_dialogs(self) -> None:
+        """Build the inline confirmation panels."""
+        self.conflict = afanes.ui.components.page_panels.ConflictPanel(
+            self.reload_page,
+            self.overwrite_page,
+            self.recreate_page,
+            self.discard_draft,
         )
-        self.overwrite_button = ft.OutlinedButton(
-            content=afanes.ui.strings.PAGE_CONFLICT_OVERWRITE,
-            on_click=self.overwrite_page,
+        self.conflict_text = self.conflict.text
+        self.reload_button = self.conflict.reload
+        self.overwrite_button = self.conflict.overwrite
+        self.recreate_button = self.conflict.recreate
+        self.discard_button = self.conflict.discard
+        self.conflict_panel = self.conflict.panel
+        self.ambiguous = afanes.ui.components.page_panels.AmbiguousPanel(self.clear_ambiguous)
+        self.ambiguous_list = self.ambiguous.list
+        self.ambiguous_cancel_button = self.ambiguous.cancel
+        self.ambiguous_panel = self.ambiguous.panel
+        self.repair = afanes.ui.components.page_panels.RepairPanel(
+            self.rewrite_links,
+            self.keep_links,
+            self.cancel_repair,
         )
-        self.recreate_button = ft.OutlinedButton(
-            content=afanes.ui.strings.PAGE_CONFLICT_RECREATE,
-            on_click=self.recreate_page,
+        self.repair_text = self.repair.text
+        self.repair_rewrite_button = self.repair.rewrite
+        self.repair_keep_button = self.repair.keep
+        self.repair_cancel_button = self.repair.cancel
+        self.repair_panel = self.repair.panel
+        self.type_change = afanes.ui.components.page_panels.TypeChangePanel(
+            self.confirm_type_change,
+            self.cancel_type_change,
         )
-        self.discard_button = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CONFLICT_DISCARD,
-            on_click=self.discard_draft,
+        self.type_change_text = self.type_change.text
+        self.type_change_confirm_button = self.type_change.confirm
+        self.type_change_cancel_button = self.type_change.cancel
+        self.type_change_panel = self.type_change.panel
+        self.category_move = afanes.ui.components.page_panels.CategoryMovePanel(
+            self.confirm_category_move,
+            self.cancel_category_move,
         )
-        self.conflict_panel = Panel(
-            afanes.ui.strings.PAGE_CONFLICT_TITLE,
-            self.conflict_text,
-            [self.reload_button, self.overwrite_button, self.recreate_button, self.discard_button],
-        ).build()
-        self.conflict_panel.visible = False
-
-        self.ambiguous_list = ft.Column(controls=[], spacing=0)
-        self.ambiguous_cancel_button = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CANCEL,
-            on_click=self.clear_ambiguous,
+        self.category_move_text = self.category_move.text
+        self.category_move_confirm_button = self.category_move.confirm
+        self.category_move_cancel_button = self.category_move.cancel
+        self.category_move_panel = self.category_move.panel
+        self.rename = afanes.ui.components.page_panels.RenamePanel(
+            self.change_rename_text,
+            self.preview_rename,
+            self.confirm_rename,
+            self.cancel_rename,
         )
-        self.ambiguous_panel = Panel(
-            afanes.ui.strings.PAGE_AMBIGUOUS_TITLE,
-            ft.Column(
-                controls=[
-                    ft.Text(afanes.ui.strings.PAGE_AMBIGUOUS_BODY, selectable=True),
-                    self.ambiguous_list,
-                ],
-                spacing=afanes.ui.theme.ITEM_GAP,
-            ),
-            [self.ambiguous_cancel_button],
-        ).build()
-        self.ambiguous_panel.visible = False
-
-        self.repair_text = ft.Text("", selectable=True)
-        self.repair_rewrite_button = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_REPAIR_REWRITE,
-            on_click=self.rewrite_links,
+        self.rename_field = self.rename.field
+        self.rename_preview_text = self.rename.preview_text
+        self.rename_preview_button = self.rename.preview
+        self.rename_confirm_button = self.rename.confirm
+        self.rename_cancel_button = self.rename.cancel
+        self.rename_panel = self.rename.panel
+        self.trash = afanes.ui.components.page_panels.TrashPanel(
+            self.confirm_trash,
+            self.cancel_trash,
         )
-        self.repair_keep_button = ft.TextButton(
-            content=afanes.ui.strings.PAGE_REPAIR_KEEP,
-            on_click=self.keep_links,
-        )
-        self.repair_cancel_button = ft.TextButton(
-            content=afanes.ui.strings.PAGE_REPAIR_CANCEL,
-            on_click=self.cancel_repair,
-        )
-        self.repair_panel = Panel(
-            afanes.ui.strings.PAGE_REPAIR_TITLE,
-            self.repair_text,
-            [self.repair_cancel_button, self.repair_keep_button, self.repair_rewrite_button],
-        ).build()
-        self.repair_panel.visible = False
-
-        self.type_change_text = ft.Text("", selectable=True)
-        self.type_change_confirm_button = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_TYPE_CHANGE_CONFIRM,
-            on_click=self.confirm_type_change,
-        )
-        self.type_change_cancel_button = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CANCEL,
-            on_click=self.cancel_type_change,
-        )
-        self.type_change_panel = Panel(
-            afanes.ui.strings.PAGE_TYPE_CHANGE_TITLE,
-            self.type_change_text,
-            [self.type_change_cancel_button, self.type_change_confirm_button],
-        ).build()
-        self.type_change_panel.visible = False
-
-        self.category_move_text = ft.Text("", selectable=True)
-        self.category_move_confirm_button = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_CATEGORY_MOVE_CONFIRM,
-            on_click=self.confirm_category_move,
-        )
-        self.category_move_cancel_button = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CANCEL,
-            on_click=self.cancel_category_move,
-        )
-        self.category_move_panel = Panel(
-            afanes.ui.strings.PAGE_CATEGORY_MOVE_TITLE,
-            self.category_move_text,
-            [self.category_move_cancel_button, self.category_move_confirm_button],
-        ).build()
-        self.category_move_panel.visible = False
-
-        self.rename_field = ft.TextField(
-            label=afanes.ui.strings.PAGE_RENAME_LABEL,
-            width=afanes.ui.theme.PAGE_RENAME_WIDTH,
-            on_change=self.change_rename_text,
-        )
-        self.rename_preview_text = ft.Text("", selectable=True)
-        self.rename_preview_button = ft.OutlinedButton(
-            content=afanes.ui.strings.PAGE_RENAME_PREVIEW_ACTION,
-            on_click=self.preview_rename,
-            disabled=True,
-        )
-        self.rename_confirm_button = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_RENAME_CONFIRM,
-            on_click=self.confirm_rename,
-            disabled=True,
-        )
-        self.rename_cancel_button = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CANCEL,
-            on_click=self.cancel_rename,
-        )
-        self.rename_panel = ft.Container(
-            bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
-            border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
-            border_radius=afanes.ui.theme.SURFACE_RADIUS,
-            padding=afanes.ui.theme.ITEM_GAP,
-            visible=False,
-            content=ft.Column(
-                controls=[
-                    ft.Text(afanes.ui.strings.PAGE_RENAME_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-4"]),
-                    self.rename_field,
-                    self.rename_preview_text,
-                    ft.Row(
-                        controls=[self.rename_cancel_button, self.rename_preview_button, self.rename_confirm_button],
-                        spacing=afanes.ui.theme.ITEM_GAP,
-                        wrap=True,
-                    ),
-                ],
-                spacing=afanes.ui.theme.ITEM_GAP,
-            ),
-        )
-
-        self.trash_text = ft.Text("", selectable=True)
-        self.trash_confirm_button = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_TRASH_CONFIRM,
-            on_click=self.confirm_trash,
-            style=afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE,
-        )
-        self.trash_cancel_button = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CANCEL,
-            on_click=self.cancel_trash,
-        )
-        self.trash_panel = Panel(
-            afanes.ui.strings.PAGE_TRASH_TITLE,
-            self.trash_text,
-            [self.trash_cancel_button, self.trash_confirm_button],
-        ).build()
-        self.trash_panel.visible = False
-
+        self.trash_text = self.trash.text
+        self.trash_confirm_button = self.trash.confirm
+        self.trash_cancel_button = self.trash.cancel
+        self.trash_panel = self.trash.panel
         self.dialogs = ft.Column(
             controls=[
                 self.conflict_panel,
@@ -582,6 +522,9 @@ class PageView:
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
         )
+
+    def _build_layout(self) -> None:
+        """Assemble the page surface."""
         self.content = ft.Column(
             controls=[self.empty_text, self.project_body.build(), self.read_body, self.connections_panel],
             spacing=afanes.ui.theme.ITEM_GAP,
@@ -629,7 +572,6 @@ class PageView:
                 expand=True,
             ),
         )
-        self.refresh()
 
     def toolbar(self) -> ft.Control:
         """Return the page toolbar for a host that owns the detail region.

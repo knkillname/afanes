@@ -17,7 +17,7 @@ from afanes.core.frontmatter import NoteDocument
 from afanes.core.steps import StepDocument
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import NoteType
-from afanes.ui.views.page import PageView
+from afanes.ui.views.page import PageActions, PageView
 from tests.support import ensure_vault, versioned
 from tests.ui.control_tree import emphasis_controls
 from tests.ui.test_conformance import HEADER_ACTION_KEYS
@@ -77,7 +77,7 @@ class TestReadMode:
             await state.navigation.open_page(path)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.title.value == "Ada"
         assert view.path.value == "notes/Ada.md"
@@ -89,7 +89,7 @@ class TestReadMode:
         assert view.done_button.visible is False
 
     def test_empty_page_shows_the_placeholder(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.empty_text.visible is True
         assert view.read_body.visible is False
@@ -97,7 +97,7 @@ class TestReadMode:
         assert view.raw_panel.visible is False
 
     def test_scroll_to_top_tolerates_an_unattached_pane(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         asyncio.run(view.scroll_to_top())
 
@@ -112,7 +112,7 @@ class TestReadMode:
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         scrolls = _record_scroll(view)
 
         async def scenario() -> None:
@@ -133,7 +133,7 @@ class TestReadMode:
         path = _write_note(vault / "projects" / "Launch.md", _typed_note("project", body))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -151,7 +151,7 @@ class TestReadMode:
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -186,7 +186,7 @@ class TestReadMode:
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -209,7 +209,7 @@ class TestReadMode:
         path = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -229,7 +229,7 @@ class TestReadMode:
         second = _write_note(vault / "notes" / "Second.md", _note_text("# Second\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         scrolls = _record_scroll(view)
 
         async def scenario() -> None:
@@ -261,7 +261,7 @@ class TestEditMode:
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -305,7 +305,7 @@ class TestEditMode:
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -330,7 +330,7 @@ class TestEditMode:
         path = _write_note(vault / "notes" / "Ada.md", _typed_note(note_type, "# Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -348,7 +348,7 @@ class TestEditMode:
         path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -374,7 +374,7 @@ class TestEditMode:
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -399,7 +399,7 @@ class TestEditMode:
         path = _write_note(vault / "notes" / "Ada.md", _typed_note(note_type, "# Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -417,7 +417,7 @@ class TestEditMode:
         path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -444,7 +444,7 @@ class TestEditMode:
         path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -478,7 +478,7 @@ class TestEditMode:
         path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -500,7 +500,7 @@ class TestEditMode:
         path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -527,7 +527,7 @@ class TestEditMode:
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -546,7 +546,7 @@ class TestEditMode:
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -568,7 +568,7 @@ class TestEditMode:
         path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -592,7 +592,7 @@ class TestEditMode:
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -625,7 +625,7 @@ class TestEditMode:
         _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<note:Ada>)\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -655,7 +655,7 @@ class TestEditMode:
         _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<note:Ada>)\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -681,7 +681,7 @@ class TestRawMode:
         _write_note(vault / "reference" / "Broken.md", "---\ntype: refrence\n---\nBody\n")
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -710,7 +710,7 @@ class TestRawMode:
         _write_note(vault / "reference" / "Broken.md", "---\ntype: refrence\n---\nBody\n")
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         fixed = "---\ntype: note\n---\n\n# Fixed\nBody.\n"
 
         async def scenario() -> None:
@@ -730,13 +730,13 @@ class TestRawMode:
 
 class TestPanels:
     def test_panels_use_the_container_surface(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.trash_panel.bgcolor == afanes.ui.theme.SURFACE_CONTAINER_COLOR
         assert view.trash_panel.border_radius == afanes.ui.theme.SURFACE_RADIUS
 
     def test_trash_actions_use_the_destructive_style(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.trash_confirm_button.style == afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE
         assert view.trash_cancel_button.style is None
@@ -749,7 +749,7 @@ class TestPanels:
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -778,7 +778,7 @@ class TestPanels:
         path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -811,7 +811,7 @@ class TestPanels:
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         scrolls = _record_scroll(view)
 
         async def scenario() -> None:
@@ -840,7 +840,7 @@ class TestPanels:
         source = _write_note(vault / "notes" / "Source.md", _note_text("[Q1](<note:Q1: Planning?>)\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -864,7 +864,7 @@ class TestPanels:
         note = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -889,7 +889,7 @@ class TestPanels:
         note = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -916,7 +916,7 @@ class TestPanels:
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -954,7 +954,7 @@ class TestSteps:
     def test_steps_render_as_rows_and_hide_the_comment(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._project(tmp_path, monkeypatch)
 
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         texts = _texts(view.project_body.root)
 
         assert view.project_body.root.visible is True
@@ -969,7 +969,7 @@ class TestSteps:
 
     def test_ticking_a_step_rewrites_only_its_line(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         path, _state = self._project(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         checkbox = _find_checkbox(view.project_body.root)
         assert isinstance(checkbox, ft.Checkbox)
         checkbox.value = True
@@ -996,7 +996,7 @@ class TestSteps:
             await state.navigation.open_page(path)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         checkbox = _find_checkbox(view.project_body.root)
         assert isinstance(checkbox, ft.Checkbox)
         checkbox.value = False
@@ -1042,7 +1042,7 @@ class TestProjectMeta:
     def test_project_meta_row_shows_status_and_due_date(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._project(tmp_path, monkeypatch)
 
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_row.visible is True
         assert view.meta_status.value == afanes.ui.strings.PROJECT_STATUS.format(status="Waiting")
@@ -1053,7 +1053,7 @@ class TestProjectMeta:
     def test_project_without_due_date_offers_the_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._project(tmp_path, monkeypatch, due_date=None)
 
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_row.visible is True
         assert view.meta_due.value == afanes.ui.strings.PAGE_PROJECT_NO_DUE
@@ -1062,7 +1062,7 @@ class TestProjectMeta:
     def test_project_meta_row_shows_the_requester(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._project(tmp_path, monkeypatch, asked_by="Priya Nair")
 
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_asked.visible is True
         assert _spans_text(view.meta_asked) == "Asked by Priya Nair"
@@ -1070,7 +1070,7 @@ class TestProjectMeta:
     def test_project_meta_row_shows_the_owner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._project(tmp_path, monkeypatch, owner="Sam Rivera")
 
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_owner.visible is True
         assert _spans_text(view.meta_owner) == "Owner Sam Rivera"
@@ -1078,7 +1078,7 @@ class TestProjectMeta:
     def test_owner_is_shown_before_the_requester(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._project(tmp_path, monkeypatch, owner="Sam Rivera", asked_by="Priya Nair")
 
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         controls = list(view.meta_row.controls)
         assert controls.index(view.meta_owner) < controls.index(view.meta_asked)
@@ -1086,7 +1086,7 @@ class TestProjectMeta:
     def test_project_without_an_owner_omits_the_label(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._project(tmp_path, monkeypatch)
 
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_owner.visible is False
         assert view.meta_owner.spans == []
@@ -1099,7 +1099,7 @@ class TestProjectMeta:
             calls.append((role, current))
             return "Grace Hopper"
 
-        view = PageView(lambda: None, pick_role=pick)
+        view = PageView(PageActions(update=lambda: None, pick_role=pick))
 
         asyncio.run(view.choose_owner())
 
@@ -1114,7 +1114,7 @@ class TestProjectMeta:
         async def pick(_role: str, _current: str | None) -> str | None:
             return ""
 
-        view = PageView(lambda: None, pick_role=pick)
+        view = PageView(PageActions(update=lambda: None, pick_role=pick))
 
         asyncio.run(view.choose_owner())
 
@@ -1129,7 +1129,7 @@ class TestProjectMeta:
             calls.append((role, current))
             return "Priya Nair"
 
-        view = PageView(lambda: None, pick_role=pick)
+        view = PageView(PageActions(update=lambda: None, pick_role=pick))
 
         asyncio.run(view.choose_asked_by())
 
@@ -1143,7 +1143,7 @@ class TestProjectMeta:
         vault = tmp_path / "vault"
         note = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
         self._project(tmp_path, monkeypatch)
-        project_view = PageView(lambda: None)
+        project_view = PageView(PageActions(update=lambda: None))
         assert project_view.meta_owner_button.visible is True
         assert project_view.meta_asked_button.visible is True
 
@@ -1153,7 +1153,7 @@ class TestProjectMeta:
             await state.navigation.open_page(note)
 
         asyncio.run(scenario())
-        note_view = PageView(lambda: None)
+        note_view = PageView(PageActions(update=lambda: None))
 
         assert note_view.meta_owner_button.visible is False
         assert note_view.meta_asked_button.visible is False
@@ -1176,7 +1176,7 @@ class TestProjectMeta:
             await state.navigation.open_page(project)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         scrolls = _record_scroll(view)
         name_span = (view.meta_owner.spans or [])[1]
 
@@ -1206,7 +1206,7 @@ class TestProjectMeta:
             await state.navigation.open_page(project)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None, on_missing_role=missing)
+        view = PageView(PageActions(update=lambda: None, on_missing_role=missing))
         name_span = (view.meta_owner.spans or [])[1]
 
         assert name_span.style is afanes.ui.theme.ROLE_BROKEN_TEXT_STYLE
@@ -1220,7 +1220,7 @@ class TestProjectMeta:
     def test_project_without_a_requester_omits_the_label(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._project(tmp_path, monkeypatch)
 
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_asked.visible is False
         assert view.meta_asked.spans == []
@@ -1236,7 +1236,7 @@ class TestProjectMeta:
             await state.navigation.open_page(path)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_row.visible is True
         assert view.meta_date.value == afanes.ui.strings.PAGE_NO_DATE
@@ -1253,7 +1253,7 @@ class TestProjectMeta:
         async def pick_date(_current: datetime.date | None) -> datetime.date | None:
             return datetime.date(2026, 12, 5)
 
-        view = PageView(lambda: None, pick_date=pick_date)
+        view = PageView(PageActions(update=lambda: None, pick_date=pick_date))
         asyncio.run(view.choose_due_date())
 
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
@@ -1264,7 +1264,7 @@ class TestProjectMeta:
         path, _state = self._project(tmp_path, monkeypatch)
         body_before = NoteDocument.from_text(path.read_text(encoding="utf-8")).body
 
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         asyncio.run(view.clear_due_date())
 
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
@@ -1273,7 +1273,7 @@ class TestProjectMeta:
 
     def test_edit_mode_keeps_the_due_field(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._project(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         asyncio.run(view.start_edit())
 
@@ -1292,7 +1292,7 @@ class TestProjectMeta:
             await state.navigation.open_page(path)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.read_body.extension_set is ft.MarkdownExtensionSet.GITHUB_FLAVORED
 
@@ -1423,7 +1423,7 @@ class TestConnections:
 
     def test_section_lists_all_four_subsections(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         subsections = view.connections_body.controls
 
         assert view.connections_panel.visible is True
@@ -1450,7 +1450,7 @@ class TestConnections:
             await state.navigation.open_page(person)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         headings = [
             title
             for title in (
@@ -1484,7 +1484,7 @@ class TestConnections:
             await state.navigation.open_page(person)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         headings = [
             title
             for title in (
@@ -1516,7 +1516,7 @@ class TestConnections:
             await state.navigation.open_page(person)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         headings = [
             title
             for title in (
@@ -1551,7 +1551,7 @@ class TestConnections:
             await state.navigation.open_page(person)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.connections_body.controls == []
         assert view.connections_panel.visible is True
@@ -1584,7 +1584,7 @@ class TestConnections:
             await state.navigation.open_page(person)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.connections_body.controls == []
         assert view.connections_panel.visible is True
@@ -1599,13 +1599,13 @@ class TestConnections:
 
     def test_linked_from_rows_use_display_titles(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert "Call" in _texts(view.connections_body.controls[0])
 
     def test_owned_projects_list_open_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         texts = _texts(view.connections_body.controls[1])
 
         assert "Home" in texts
@@ -1613,7 +1613,7 @@ class TestConnections:
 
     def test_owned_steps_group_under_project_headings(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         texts = _texts(view.connections_body.controls[2])
 
         assert "Home" in texts
@@ -1622,7 +1622,7 @@ class TestConnections:
 
     def test_requested_projects_list_open_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         texts = _texts(view.connections_body.controls[3])
 
         assert "Home" in texts
@@ -1631,7 +1631,7 @@ class TestConnections:
 
     def test_selecting_a_linked_note_opens_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         scrolls = _record_scroll(view)
         button = _find_text_button(view.connections_body.controls[0], "Call")
         assert button is not None
@@ -1643,7 +1643,7 @@ class TestConnections:
 
     def test_selecting_an_owned_step_opens_its_project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         scrolls = _record_scroll(view)
         button = _find_text_button(view.connections_body.controls[2], "Review")
         assert button is not None
@@ -1657,7 +1657,7 @@ class TestConnections:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         scrolls = _record_scroll(view)
         button = _find_text_button(view.connections_body.controls[2], "Home")
         assert button is not None
@@ -1669,7 +1669,7 @@ class TestConnections:
 
     def test_selecting_an_owned_project_opens_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         scrolls = _record_scroll(view)
         button = _find_text_button(view.connections_body.controls[1], "Home")
         assert button is not None
@@ -1681,7 +1681,7 @@ class TestConnections:
 
     def test_enabling_completed_steps_reveals_them(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         assert view.connections_steps_toggle.visible is True
         assert view.connections_steps_toggle.value is False
         assert "Done" not in _texts(view.connections_body.controls[2])
@@ -1696,7 +1696,7 @@ class TestConnections:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         assert view.connections_projects_toggle.visible is True
         assert view.connections_projects_toggle.value is False
         assert "Old" not in _texts(view.connections_body.controls[1])
@@ -1711,7 +1711,7 @@ class TestConnections:
 
     def test_changing_the_page_resets_both_toggles(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         view.connections_steps_toggle.value = True
         asyncio.run(view.toggle_completed_steps(ft.Event(name="change", control=view.connections_steps_toggle)))
         view.connections_projects_toggle.value = True
@@ -1736,7 +1736,7 @@ class TestConnections:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         vault = tmp_path / "vault"
         before = _tree_state(vault)
 
@@ -1758,14 +1758,14 @@ class TestConnections:
             await state.navigation.open_page(path)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.connections_panel.visible is False
         assert view.connections_body.controls == []
 
     def test_edit_mode_hides_the_section(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         assert view.connections_panel.visible is True
 
         asyncio.run(view.start_edit())
@@ -1783,7 +1783,7 @@ class TestConnections:
             await state.navigation.open_failure(Path("reference/Broken.md"))
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.raw_panel.visible is True
         assert view.connections_panel.visible is False
@@ -1815,7 +1815,7 @@ class TestConnections:
             await state.navigation.open_page(person)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         texts = _texts(_connection_section(view, afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS))
 
         assert (
@@ -1830,7 +1830,7 @@ class TestConnections:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         view.connections_steps_toggle.value = True
         asyncio.run(view.toggle_completed_steps(ft.Event(name="change", control=view.connections_steps_toggle)))
@@ -1843,7 +1843,7 @@ class TestConnections:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._open_person(tmp_path, monkeypatch)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         view.connections_projects_toggle.value = True
         asyncio.run(view.toggle_finished_projects(ft.Event(name="change", control=view.connections_projects_toggle)))
@@ -1865,7 +1865,7 @@ class TestFrozenPageRecovery:
             await state.navigation.open_page(path)
 
         asyncio.run(scenario())
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         _freeze(view.content)
 
         view.refresh()
@@ -1893,7 +1893,7 @@ class TestPageDates:
         vault = tmp_path / "vault"
         path = _write_note(vault / "notes" / "Ada.md", _typed_note("note", "# Ada\n", extra="date: 2025-10"))
         self._open(tmp_path, monkeypatch, path)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_row.visible is True
         assert view.meta_date.value == afanes.ui.strings.PAGE_DATE.format(date="2025-10")
@@ -1906,7 +1906,7 @@ class TestPageDates:
             _typed_note("project", "# Launch\n", extra="date: 2025-10"),
         )
         self._open(tmp_path, monkeypatch, path)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert afanes.ui.strings.PAGE_DATE.format(date="2025-10") == view.meta_date.value
         assert view.meta_due.value == afanes.ui.strings.PAGE_PROJECT_NO_DUE
@@ -1918,7 +1918,7 @@ class TestPageDates:
             _typed_note("log", "# Tuesday\n", extra="date: 2025-10-12"),
         )
         self._open(tmp_path, monkeypatch, path)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         asyncio.run(view.start_edit())
 
@@ -1936,7 +1936,7 @@ class TestPageDates:
             _typed_note("note", "# Ada\n", extra="date: last Tuesday"),
         )
         self._open(tmp_path, monkeypatch, path)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         asyncio.run(view.start_edit())
 
@@ -1950,7 +1950,7 @@ class TestPageDates:
             _typed_note("log", "# Tuesday\n", extra="date: 2025-10-12"),
         )
         self._open(tmp_path, monkeypatch, path)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         asyncio.run(view.start_edit())
         view.date_field.value = "2025-10-13"
 
@@ -1969,7 +1969,7 @@ class TestPageDates:
             _typed_note("reference", "# Ada\n"),
         )
         self._open(tmp_path, monkeypatch, path)
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         asyncio.run(view.start_edit())
         view.date_field.value = "2025-10"
 
@@ -1983,21 +1983,21 @@ class TestPageDates:
 
 class TestPageWidth:
     def test_column_caps_at_the_reading_width(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         view.fit_width(2000)
 
         assert view.page_column.width == afanes.ui.theme.CONTENT_MAX_WIDTH
 
     def test_column_shrinks_to_the_available_card_width(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         view.fit_width(600)
 
         assert view.page_column.width == 600 - 2 * afanes.ui.theme.ITEM_GAP
 
     def test_a_degenerate_width_keeps_the_current_column(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         view.fit_width(600)
         assert view.page_column.width is not None
 
@@ -2008,7 +2008,7 @@ class TestPageWidth:
 
 class TestConflictActions:
     def test_the_conflict_panel_shows_one_suggested_action(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         view.conflict_panel.visible = True
         view.reload_button.visible = True
         view.overwrite_button.visible = True
@@ -2023,7 +2023,7 @@ class TestConflictActions:
 
 class TestRenameAndRepairActions:
     def test_the_rename_panel_shows_one_suggested_action(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         view.rename_panel.visible = True
         view.rename_preview_button.visible = False
         view.rename_confirm_button.visible = True
@@ -2035,7 +2035,7 @@ class TestRenameAndRepairActions:
         assert not isinstance(view.rename_preview_button, ft.FilledButton)
 
     def test_the_repair_panel_shows_one_suggested_action(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         view.repair_panel.visible = True
 
         highlighted = emphasis_controls(view.repair_panel)
@@ -2046,7 +2046,7 @@ class TestRenameAndRepairActions:
 
 class TestConfirmationOrder:
     def test_trash_puts_cancel_first(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert _action_labels(view.trash_panel) == [
             afanes.ui.strings.PAGE_CANCEL,
@@ -2054,7 +2054,7 @@ class TestConfirmationOrder:
         ]
 
     def test_type_change_puts_cancel_first(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert _action_labels(view.type_change_panel) == [
             afanes.ui.strings.PAGE_CANCEL,
@@ -2062,7 +2062,7 @@ class TestConfirmationOrder:
         ]
 
     def test_category_move_puts_cancel_first(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert _action_labels(view.category_move_panel) == [
             afanes.ui.strings.PAGE_CANCEL,
@@ -2070,7 +2070,7 @@ class TestConfirmationOrder:
         ]
 
     def test_rename_puts_cancel_first(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert _action_labels(view.rename_panel) == [
             afanes.ui.strings.PAGE_CANCEL,
@@ -2079,7 +2079,7 @@ class TestConfirmationOrder:
         ]
 
     def test_repair_puts_cancel_first(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert _action_labels(view.repair_panel) == [
             afanes.ui.strings.PAGE_REPAIR_CANCEL,
@@ -2090,13 +2090,13 @@ class TestConfirmationOrder:
 
 class TestRenameAvailability:
     def test_the_rename_actions_start_insensitive(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
 
         assert view.rename_preview_button.disabled is True
         assert view.rename_confirm_button.disabled is True
 
     def test_a_non_blank_name_enables_both_actions(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         view.rename_field.value = "New name"
 
         asyncio.run(view.change_rename_text())
@@ -2105,7 +2105,7 @@ class TestRenameAvailability:
         assert view.rename_confirm_button.disabled is False
 
     def test_a_blank_name_disables_both_actions(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         view.rename_field.value = "New name"
         asyncio.run(view.change_rename_text())
         view.rename_field.value = "   "
@@ -2118,7 +2118,7 @@ class TestRenameAvailability:
 
 class TestToolbarActions:
     def test_the_toolbar_actions_match_the_gate_allowlist(self) -> None:
-        view = PageView(lambda: None)
+        view = PageView(PageActions(update=lambda: None))
         keys = {control.key for control in view.header.controls if getattr(control, "key", None) in HEADER_ACTION_KEYS}
 
         assert keys == HEADER_ACTION_KEYS
