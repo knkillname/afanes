@@ -17,11 +17,11 @@
 
 ## 4. Reduce entry points to one free function
 
-- [ ] 4.1 Replace `cli/main.py:main` with `CommandLine.main(cls, *args: str) -> int`; make `Launcher.dispatch` call `CommandLine.main(*argv)` and update `tests/cli/test_main.py`; verify the CLI tests pass.
-- [ ] 4.2 Replace `__main__.py:main` with `Launcher.main(cls, *args: str) -> int`; add `entrypoint() -> int` as the sole free function, update the `__main__` block, and point `[project.scripts] afanes` at `afanes.__main__:entrypoint`; verify the launcher and CLI tests pass.
-- [ ] 4.3 Move `__main__._port_number` to `LaunchOptions.port_number` as a staticmethod passed to `argparse`; update the parser and port tests; verify `hatch test -k "port or launch"` passes.
-- [ ] 4.4 Rename `ui/app.py`'s `_Shell` to `AppShell`, add `async main(cls, page, launch_vault=None)` as a classmethod, remove `ui/app.py:main`, and update `Launcher` plus `tests/ui/test_app.py`; verify the UI app tests pass and `grep -rn "ui\.app\.main\|_Shell" src tests` returns no output.
-- [ ] 4.5 Verify entry-point coverage: `grep -rn "^def \|^async def " src/afanes` lists only `src/afanes/__main__.py:def entrypoint`; record that the local `entry(page)` closures are the callback objects passed to `flet.run`.
+- [x] 4.1 Replace `cli/main.py:main` with `CommandLine.main(cls, *args: str) -> int`; make `Launcher.dispatch` call `CommandLine.main(*argv)` and update `tests/cli/test_main.py`; verify the CLI tests pass.
+- [x] 4.2 Replace `__main__.py:main` with `Launcher.main(cls, *args: str) -> int`; add `entrypoint() -> int` as the sole free function, update the `__main__` block, and point `[project.scripts] afanes` at `afanes.__main__:entrypoint`; verify the launcher and CLI tests pass.
+- [x] 4.3 Move `__main__._port_number` to `LaunchOptions.port_number` as a staticmethod passed to `argparse`; update the parser and port tests; verify `hatch test -k "port or launch"` passes.
+- [x] 4.4 Rename `ui/app.py`'s `_Shell` to `AppShell`, add `async main(cls, page, launch_vault=None)` as a classmethod, remove `ui/app.py:main`, and update `Launcher` plus `tests/ui/test_app.py`; verify the UI app tests pass and `grep -rn "ui\.app\.main\|_Shell" src tests` returns no output.
+- [x] 4.5 Verify entry-point coverage: `grep -rn "^def \|^async def " src/afanes` lists only `src/afanes/__main__.py:def entrypoint`; record that the local `entry(page)` closures are the callback objects passed to `flet.run`.
 
 ## 5. Refactor the PLR findings
 

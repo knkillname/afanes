@@ -33,7 +33,7 @@ desktop = ["flet[desktop]>=1.0.4,<2"]
 web = ["flet[web]>=1.0.4,<2"]
 
 [project.scripts]
-afanes = "afanes.__main__:main"
+afanes = "afanes.__main__:entrypoint"
 
 [project.urls]
 Documentation = "https://github.com/knkillname/afanes#readme"

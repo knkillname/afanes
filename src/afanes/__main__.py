@@ -87,12 +87,41 @@ class LaunchOptions:
         parser.add_argument(
             "--port",
             metavar="N",
-            type=_port_number,
+            type=cls.port_number,
             default=0,
             help=afanes.ui.strings.LAUNCH_PORT_HELP,
         )
         namespace = parser.parse_args(list(argv))
         return cls(web=bool(namespace.web), vault=namespace.vault, port=namespace.port)
+
+    @staticmethod
+    def port_number(text: str) -> int:
+        """Parse a TCP port number for ``argparse``.
+
+        Parameters
+        ----------
+        text : str
+            Raw command-line value.
+
+        Returns
+        -------
+        int
+            Port between ``0`` and :data:`PORT_LIMIT` inclusive.
+
+        Raises
+        ------
+        argparse.ArgumentTypeError
+            If the value is not a whole number or is outside the valid range.
+        """
+        try:
+            port = int(text)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(afanes.ui.strings.LAUNCH_PORT_NOT_NUMBER) from exc
+        if not 0 <= port <= PORT_LIMIT:
+            raise argparse.ArgumentTypeError(
+                afanes.ui.strings.LAUNCH_PORT_OUT_OF_RANGE.format(limit=PORT_LIMIT),
+            )
+        return port
 
 
 class Launcher:
@@ -121,7 +150,7 @@ class Launcher:
         """
         if not argv or argv[0] not in SUBCOMMANDS:
             return None
-        return afanes.cli.main.main(argv)
+        return afanes.cli.main.CommandLine.main(*argv)
 
     @staticmethod
     def launch_packaged() -> None:
@@ -144,7 +173,7 @@ class Launcher:
             Launcher.fail(_SDK_MISSING_MESSAGE)
 
         async def entry(page: ft.Page) -> None:
-            await afanes.ui.app.main(page)
+            await afanes.ui.app.AppShell.main(page)
 
         try:
             ft.run(entry)
@@ -222,92 +251,81 @@ class Launcher:
         except (VaultError, OSError) as exc:
             Launcher.fail(afanes.ui.strings.LAUNCH_VAULT_INVALID.format(path=path, detail=exc))
 
+    @classmethod
+    def main(cls, *args: str) -> int:
+        """Launch Afanes in the requested presentation.
 
-def _port_number(text: str) -> int:
-    """Parse a TCP port number for ``argparse``.
+        Parameters
+        ----------
+        *args : str
+            Arguments after the program name.
 
-    Parameters
-    ----------
-    text : str
-        Raw command-line value.
+        Returns
+        -------
+        int
+            Exit status: the subcommand status, or ``0`` after the interface
+            closes.
+
+        Raises
+        ------
+        SystemExit
+            If the arguments are invalid, a runtime package is missing, a
+            supplied vault is unusable, or the desktop window cannot start.
+
+        Notes
+        -----
+        The interface modules are imported inside this method so a missing Flet
+        SDK produces one actionable message instead of an import traceback. The
+        import is a deliberate runtime check, not an attempt to hide a
+        dependency cycle.
+        """
+        arguments = list(args)
+        status = cls.dispatch(arguments)
+        if status is not None:
+            return status
+        options = LaunchOptions.parse(arguments)
+        logging.basicConfig(level=logging.INFO)
+        cls.require_runtime(web=options.web)
+        launch_vault = cls.checked_vault(options.vault)
+        try:
+            # The interface is imported here on purpose: a missing SDK must be
+            # reported as one message, not as an import traceback. This is a
+            # runtime availability check, not a dependency cycle.
+            import flet as ft  # noqa: PLC0415
+
+            import afanes.ui.app  # noqa: PLC0415
+        except ModuleNotFoundError:
+            cls.fail(_SDK_MISSING_MESSAGE)
+
+        async def entry(page: ft.Page) -> None:
+            await afanes.ui.app.AppShell.main(page, launch_vault=launch_vault)
+
+        if options.web:
+            ft.run(
+                entry,
+                view=ft.AppView.WEB_BROWSER,
+                host=LOOPBACK_HOST,
+                port=options.port,
+                no_cdn=True,
+            )
+            return 0
+        try:
+            ft.run(entry)
+        except (OSError, SystemExit) as exc:
+            cls.fail(afanes.ui.strings.LAUNCH_DESKTOP_FAILED.format(detail=exc))
+        return 0
+
+
+def entrypoint() -> int:
+    """Run the installed command and return its exit status.
 
     Returns
     -------
     int
-        Port between ``0`` and :data:`PORT_LIMIT` inclusive.
-
-    Raises
-    ------
-    argparse.ArgumentTypeError
-        If the value is not a whole number or is outside the valid range.
+        Exit status from :meth:`Launcher.main`.
     """
-    try:
-        port = int(text)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError(afanes.ui.strings.LAUNCH_PORT_NOT_NUMBER) from exc
-    if not 0 <= port <= PORT_LIMIT:
-        raise argparse.ArgumentTypeError(
-            afanes.ui.strings.LAUNCH_PORT_OUT_OF_RANGE.format(limit=PORT_LIMIT),
-        )
-    return port
-
-
-def main(argv: Sequence[str] | None = None) -> None:
-    """Launch Afanes in the requested presentation.
-
-    Parameters
-    ----------
-    argv : collections.abc.Sequence[str] | None
-        Arguments after the program name. ``None`` reads :data:`sys.argv`.
-
-    Raises
-    ------
-    SystemExit
-        If the arguments are invalid, a runtime package is missing, a supplied
-        vault is unusable, or the desktop window cannot start.
-
-    Notes
-    -----
-    The interface modules are imported inside this function so a missing Flet
-    SDK produces one actionable message instead of an import traceback. The
-    import is a deliberate runtime check, not an attempt to hide a dependency
-    cycle.
-    """
-    arguments = list(sys.argv[1:] if argv is None else argv)
-    status = Launcher.dispatch(arguments)
-    if status is not None:
-        raise SystemExit(status)
-    options = LaunchOptions.parse(arguments)
-    logging.basicConfig(level=logging.INFO)
-    Launcher.require_runtime(web=options.web)
-    launch_vault = Launcher.checked_vault(options.vault)
-    try:
-        # The interface is imported here on purpose: a missing SDK must be
-        # reported as one message, not as an import traceback. This is a
-        # runtime availability check, not a dependency cycle.
-        import flet as ft  # noqa: PLC0415
-
-        import afanes.ui.app  # noqa: PLC0415
-    except ModuleNotFoundError:
-        Launcher.fail(_SDK_MISSING_MESSAGE)
-
-    async def entry(page: ft.Page) -> None:
-        await afanes.ui.app.main(page, launch_vault=launch_vault)
-
-    if options.web:
-        ft.run(
-            entry,
-            view=ft.AppView.WEB_BROWSER,
-            host=LOOPBACK_HOST,
-            port=options.port,
-            no_cdn=True,
-        )
-        return
-    try:
-        ft.run(entry)
-    except (OSError, SystemExit) as exc:
-        Launcher.fail(afanes.ui.strings.LAUNCH_DESKTOP_FAILED.format(detail=exc))
+    return Launcher.main(*sys.argv[1:])
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(entrypoint())

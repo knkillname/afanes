@@ -74,7 +74,7 @@ BASELINE: dict[str, dict[str, int]] = {
         "views/workspace.py": 11,
     },
     "suggested_or_destructive_buttons": {
-        "app.py::_Shell": 6,
+        "app.py::AppShell": 6,
         "components/role_name.py::RoleNameDialog": 1,
         "components/role_reference.py::RoleReferenceDialog": 1,
         "views/inbox.py::SessionNotice": 1,

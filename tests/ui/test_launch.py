@@ -26,7 +26,7 @@ class TestConsoleEntryPoint:
     def test_console_script_targets_the_launch_function(self) -> None:
         scripts = _project_scripts()
 
-        assert scripts["afanes"] == "afanes.__main__:main"
+        assert scripts["afanes"] == "afanes.__main__:entrypoint"
 
     def test_console_script_target_resolves_to_a_callable(self) -> None:
         target = _project_scripts()["afanes"]
@@ -78,7 +78,7 @@ class TestRuntimeGuards:
         calls = _record_run(monkeypatch)
 
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.main([])
+            afanes.__main__.Launcher.main(*[])
 
         assert excinfo.value.code == 1
         assert "afanes[desktop]" in capsys.readouterr().err
@@ -91,7 +91,7 @@ class TestRuntimeGuards:
         calls = _record_run(monkeypatch)
 
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.main(["--web"])
+            afanes.__main__.Launcher.main(*["--web"])
 
         assert excinfo.value.code == 1
         assert "afanes[web]" in capsys.readouterr().err
@@ -120,7 +120,7 @@ class TestRuntimeGuards:
         calls = _record_run(monkeypatch)
 
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.main([])
+            afanes.__main__.Launcher.main(*[])
 
         assert excinfo.value.code == 1
         assert afanes.ui.strings.LAUNCH_MISSING_SDK in capsys.readouterr().err
@@ -132,7 +132,7 @@ class TestLaunchDispatch:
         _allow_runtime(monkeypatch, afanes.__main__.DESKTOP_RUNTIME_MODULE)
         calls = _record_run(monkeypatch)
 
-        afanes.__main__.main([])
+        afanes.__main__.Launcher.main(*[])
 
         assert len(calls) == 1
         assert calls[0][1] == {}
@@ -141,7 +141,7 @@ class TestLaunchDispatch:
         _allow_runtime(monkeypatch, afanes.__main__.WEB_RUNTIME_MODULE)
         calls = _record_run(monkeypatch)
 
-        afanes.__main__.main(["--web", "--port", str(TEST_PORT)])
+        afanes.__main__.Launcher.main(*["--web", "--port", str(TEST_PORT)])
 
         assert len(calls) == 1
         kwargs = calls[0][1]
@@ -161,7 +161,7 @@ class TestLaunchDispatch:
         monkeypatch.setattr(ft, "run", blocked)
 
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.main([])
+            afanes.__main__.Launcher.main(*[])
 
         assert excinfo.value.code == 1
         stderr = capsys.readouterr().err
@@ -176,7 +176,7 @@ class TestLaunchDispatch:
         calls = _record_run(monkeypatch)
 
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.main(["--vault", str(missing)])
+            afanes.__main__.Launcher.main(*["--vault", str(missing)])
 
         assert excinfo.value.code == 1
         assert str(missing) in capsys.readouterr().err
@@ -190,7 +190,7 @@ class TestLaunchDispatch:
         calls = _record_run(monkeypatch)
 
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.main(["--vault", str(vault)])
+            afanes.__main__.Launcher.main(*["--vault", str(vault)])
 
         assert excinfo.value.code == 1
         assert "afanes.yaml" in capsys.readouterr().err
@@ -206,7 +206,7 @@ class TestLaunchDispatch:
         calls = _record_run(monkeypatch)
 
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.main(["--vault", str(vault)])
+            afanes.__main__.Launcher.main(*["--vault", str(vault)])
 
         assert excinfo.value.code == 1
         assert "afanes.yaml" in capsys.readouterr().err
@@ -225,7 +225,7 @@ class TestLaunchDispatch:
         calls = _record_run(monkeypatch)
 
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.main(["--vault", str(vault)])
+            afanes.__main__.Launcher.main(*["--vault", str(vault)])
 
         assert excinfo.value.code == 1
         assert "afanes.yaml" in capsys.readouterr().err
@@ -244,7 +244,7 @@ class TestLaunchDispatch:
             lambda _path, mode: mode == os.R_OK,
         )
 
-        afanes.__main__.main(["--vault", str(vault)])
+        afanes.__main__.Launcher.main(*["--vault", str(vault)])
 
         assert len(calls) == 1
 
@@ -270,10 +270,9 @@ class TestSubcommandDispatch:
         monkeypatch.setattr(afanes.__main__.Launcher, "require_runtime", unexpected)
         target = tmp_path / "vault"
 
-        with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.main(["vault", "create", str(target)])
+        status = afanes.__main__.Launcher.main("vault", "create", str(target))
 
-        assert excinfo.value.code == 0
+        assert status == 0
         assert (target / "inbox").is_dir()
         assert "Created vault" in capsys.readouterr().out
 

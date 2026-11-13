@@ -59,31 +59,31 @@ class TestHeadlessIsolation:
 
 class TestUsage:
     def test_missing_command_is_a_usage_error(self, capsys: pytest.CaptureFixture[str]) -> None:
-        status = afanes.cli.main.main([])
+        status = afanes.cli.main.CommandLine.main(*[])
 
         assert status == afanes.cli.main.USAGE_EXIT_CODE
         assert "usage" in capsys.readouterr().err.lower()
 
     def test_missing_action_is_a_usage_error(self, capsys: pytest.CaptureFixture[str]) -> None:
-        status = afanes.cli.main.main(["vault"])
+        status = afanes.cli.main.CommandLine.main(*["vault"])
 
         assert status == afanes.cli.main.USAGE_EXIT_CODE
         assert "usage" in capsys.readouterr().err.lower()
 
     def test_unknown_action_is_a_usage_error(self, capsys: pytest.CaptureFixture[str]) -> None:
-        status = afanes.cli.main.main(["vault", "unknown"])
+        status = afanes.cli.main.CommandLine.main(*["vault", "unknown"])
 
         assert status == afanes.cli.main.USAGE_EXIT_CODE
         assert "usage" in capsys.readouterr().err.lower()
 
     def test_missing_directory_is_a_usage_error(self, capsys: pytest.CaptureFixture[str]) -> None:
-        status = afanes.cli.main.main(["vault", "create"])
+        status = afanes.cli.main.CommandLine.main(*["vault", "create"])
 
         assert status == afanes.cli.main.USAGE_EXIT_CODE
         assert "usage" in capsys.readouterr().err.lower()
 
     def test_help_exits_successfully(self, capsys: pytest.CaptureFixture[str]) -> None:
-        status = afanes.cli.main.main(["vault", "create", "--help"])
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", "--help"])
 
         assert status == 0
         captured = capsys.readouterr().out
@@ -102,7 +102,7 @@ class TestCreateCommand:
         _use_settings_file(monkeypatch, settings)
         target = tmp_path / "notes" / "vault"
 
-        status = afanes.cli.main.main(["vault", "create", str(target)])
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", str(target)])
 
         captured = capsys.readouterr()
         assert status == 0
@@ -133,7 +133,7 @@ class TestCreateCommand:
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=remembered))
 
-        status = afanes.cli.main.main(["vault", "create", str(tmp_path / "new"), "--no-remember"])
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", str(tmp_path / "new"), "--no-remember"])
 
         captured = capsys.readouterr()
         assert status == 0
@@ -152,7 +152,7 @@ class TestCreateCommand:
         target.mkdir()
         (target / "photo.jpg").write_text("data", encoding="utf-8")
 
-        status = afanes.cli.main.main(["vault", "create", str(target)])
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", str(target)])
 
         captured = capsys.readouterr()
         assert status == 1
@@ -171,7 +171,7 @@ class TestCreateCommand:
         target = tmp_path / "note.md"
         target.write_text("body", encoding="utf-8")
 
-        status = afanes.cli.main.main(["vault", "create", str(target)])
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", str(target)])
 
         captured = capsys.readouterr()
         assert status == 1
@@ -193,7 +193,7 @@ class TestCreateCommand:
 
         monkeypatch.setattr(afanes.core.settings.SettingsStore, "save", fail_save)
 
-        status = afanes.cli.main.main(["vault", "create", str(target)])
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", str(target)])
 
         captured = capsys.readouterr()
         assert status == 1
@@ -211,7 +211,7 @@ class TestCreateCommand:
         _use_settings_file(monkeypatch, settings)
         target = tmp_path / "vault"
 
-        status = afanes.cli.main.main(["vault", "create", str(target), "--template", "personal"])
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", str(target), "--template", "personal"])
 
         captured = capsys.readouterr()
         assert status == 0
@@ -232,7 +232,7 @@ class TestCreateCommand:
         _use_settings_file(monkeypatch, settings)
         target = tmp_path / "vault"
 
-        status = afanes.cli.main.main(["vault", "create", str(target), "--template", "mystery"])
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", str(target), "--template", "mystery"])
 
         captured = capsys.readouterr()
         assert status == 1
@@ -265,7 +265,7 @@ class TestCreateCommand:
         monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail_after_the_guide)
         target = tmp_path / "vault"
 
-        status = afanes.cli.main.main(["vault", "create", str(target), "--template", "personal"])
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", str(target), "--template", "personal"])
 
         captured = capsys.readouterr()
         assert status == 1
@@ -287,7 +287,7 @@ class TestAdoptCommand:
         _use_settings_file(monkeypatch, settings)
         target = _adoptable(tmp_path / "vault")
 
-        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+        status = afanes.cli.main.CommandLine.main(*["vault", "adopt", str(target)])
 
         captured = capsys.readouterr()
         assert status == 0
@@ -310,7 +310,7 @@ class TestAdoptCommand:
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=remembered))
         target = _adoptable(tmp_path / "vault")
 
-        status = afanes.cli.main.main(["vault", "adopt", str(target), "--no-remember"])
+        status = afanes.cli.main.CommandLine.main(*["vault", "adopt", str(target), "--no-remember"])
 
         captured = capsys.readouterr()
         assert status == 0
@@ -328,7 +328,7 @@ class TestAdoptCommand:
         target = _adoptable(tmp_path / "vault")
         (target / "log").rmdir()
 
-        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+        status = afanes.cli.main.CommandLine.main(*["vault", "adopt", str(target)])
 
         captured = capsys.readouterr()
         assert status == 1
@@ -352,7 +352,7 @@ class TestAdoptCommand:
             lambda _path, _mode: False,
         )
 
-        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+        status = afanes.cli.main.CommandLine.main(*["vault", "adopt", str(target)])
 
         captured = capsys.readouterr()
         assert status == 1
@@ -373,7 +373,7 @@ class TestAdoptCommand:
         path.write_text("schema_version: 2\n", encoding="utf-8")
         before = path.read_bytes()
 
-        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+        status = afanes.cli.main.CommandLine.main(*["vault", "adopt", str(target)])
 
         captured = capsys.readouterr()
         assert status == 1
@@ -394,7 +394,7 @@ class TestAdoptCommand:
         path.write_text("schema_version: 1\n", encoding="utf-8")
         before = path.read_bytes()
 
-        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+        status = afanes.cli.main.CommandLine.main(*["vault", "adopt", str(target)])
 
         captured = capsys.readouterr()
         assert status == 0
@@ -413,7 +413,7 @@ class TestAdoptCommand:
         note.write_text("---\ntype: note\n---\n# Buy milk\n", encoding="utf-8")
         before = _tree_state(target)
 
-        status = afanes.cli.main.main(["vault", "adopt", str(target), "--no-remember"])
+        status = afanes.cli.main.CommandLine.main(*["vault", "adopt", str(target), "--no-remember"])
 
         assert status == 0
         after = _tree_state(target)
@@ -435,7 +435,7 @@ class TestAdoptCommand:
 
         monkeypatch.setattr(afanes.core.settings.SettingsStore, "save", fail_save)
 
-        status = afanes.cli.main.main(["vault", "adopt", str(target)])
+        status = afanes.cli.main.CommandLine.main(*["vault", "adopt", str(target)])
 
         captured = capsys.readouterr()
         assert status == 1
@@ -454,7 +454,7 @@ class TestTemplatesCommand:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         monkeypatch.chdir(tmp_path)
 
-        status = afanes.cli.main.main(["vault", "templates"])
+        status = afanes.cli.main.CommandLine.main(*["vault", "templates"])
 
         captured = capsys.readouterr()
         assert status == 0

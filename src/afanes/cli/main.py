@@ -10,7 +10,6 @@ the graphical runtime is checked. Parsing uses the standard-library
 """
 
 import argparse
-import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -142,18 +141,18 @@ class CommandLine:
             return afanes.cli.vault.VaultCommand.templates()
         return USAGE_EXIT_CODE
 
+    @classmethod
+    def main(cls, *args: str) -> int:
+        """Run the headless command surface.
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Run the headless command surface.
+        Parameters
+        ----------
+        *args : str
+            Arguments after the program name.
 
-    Parameters
-    ----------
-    argv : collections.abc.Sequence[str] | None
-        Arguments after the program name. ``None`` reads :data:`sys.argv`.
-
-    Returns
-    -------
-    int
-        Exit status for the process.
-    """
-    return CommandLine.run(sys.argv[1:] if argv is None else list(argv))
+        Returns
+        -------
+        int
+            Exit status for the process.
+        """
+        return cls.run(list(args))

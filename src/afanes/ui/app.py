@@ -29,7 +29,7 @@ from afanes.ui.components.template_cards import TemplateCardContext, TemplateCar
 REFRESH_TASK_NAME = "workspace-refresh"
 
 
-class _Shell:
+class AppShell:
     """Own one page's presentation setup and first-run routing.
 
     Parameters
@@ -48,6 +48,26 @@ class _Shell:
     file dialog cannot return a directory path. Only one session may drive the
     workspace; a second one gets a notice and no vault access.
     """
+
+    @classmethod
+    async def main(cls, page: ft.Page, launch_vault: Path | None = None) -> None:
+        """Start the Afanes interface in the presentation Flet chose.
+
+        Parameters
+        ----------
+        page : ft.Page
+            Page created by :func:`flet.run`.
+        launch_vault : pathlib.Path | None
+            Vault supplied when the process started. It takes precedence over
+            the remembered vault and is never written to the settings file.
+
+        Notes
+        -----
+        The shell performs no network I/O. The first development run may
+        provision the Flet desktop client; that provisioning is an environment
+        step, not product behavior.
+        """
+        await cls(page, launch_vault).start()
 
     def __init__(self, page: ft.Page, launch_vault: Path | None) -> None:
         self.page = page
@@ -928,23 +948,3 @@ class _Shell:
             ),
         )
         self.page.update()
-
-
-async def main(page: ft.Page, launch_vault: Path | None = None) -> None:
-    """Start the Afanes interface in the presentation Flet chose.
-
-    Parameters
-    ----------
-    page : ft.Page
-        Page created by :func:`flet.run`.
-    launch_vault : pathlib.Path | None
-        Vault supplied when the process started. It takes precedence over the
-        remembered vault and is never written to the settings file.
-
-    Notes
-    -----
-    The shell performs no network I/O. The first development run may provision
-    the Flet desktop client; that provisioning is an environment step, not
-    product behavior.
-    """
-    await _Shell(page, launch_vault).start()

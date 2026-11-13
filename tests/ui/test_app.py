@@ -183,7 +183,7 @@ class TestAppShell:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         page = FakePage()
 
-        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
         assert isinstance(page.controls[0], ft.Container)
         assert afanes.ui.state.app_state.session.vault_root is None
@@ -198,7 +198,7 @@ class TestAppShell:
         page = FakePage()
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             button = _welcome_button(page.controls[0])
             handler = typing.cast("Handler", button.on_click)
             await handler()
@@ -217,7 +217,7 @@ class TestAppShell:
         page = FakePage()
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             button = _welcome_button(page.controls[0])
             handler = typing.cast("Handler", button.on_click)
             await handler()
@@ -236,7 +236,7 @@ class TestAppShell:
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
         page = FakePage()
 
-        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
         assert afanes.ui.state.app_state.session.vault_root == vault.resolve()
         assert isinstance(page.controls[0], ft.Stack)
@@ -254,7 +254,7 @@ class TestAppShell:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             await state.navigation.open_page(state.session.notes[0].path)
             process_button = _find_by_key(page.controls[0], "process-note")
             assert isinstance(process_button, ft.TextButton)
@@ -288,7 +288,7 @@ class TestLogEntryDialog:
         page = FakePage()
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             section = _typed(_find_by_key(page.controls[0], "section-log"), ft.ListTile)
             await typing.cast("Handler", section.on_click)()
             today = _typed(_find_by_key(page.controls[0], "log-today-entry"), ft.TextButton)
@@ -313,7 +313,7 @@ class TestAdoptionPanel:
         page = FakePage()
         state = afanes.ui.state.app_state
 
-        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
         panel = _find_by_key(page.controls[0], "adoption-panel")
         assert isinstance(panel, ft.Container)
@@ -337,7 +337,7 @@ class TestAdoptionPanel:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             panel = _typed(_find_by_key(page.controls[0], "adoption-panel"), ft.Container)
             confirm = _typed(_find_by_key(panel, "adoption-confirm"), ft.FilledButton)
             await typing.cast("Handler", confirm.on_click)()
@@ -360,7 +360,7 @@ class TestAdoptionPanel:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             panel = _typed(_find_by_key(page.controls[0], "adoption-panel"), ft.Container)
             cancel = _typed(_find_by_key(panel, "adoption-cancel"), ft.TextButton)
             await typing.cast("Handler", cancel.on_click)()
@@ -379,7 +379,7 @@ class TestDesktopPresentation:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         page = FakePage()
 
-        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
         assert page.window.width == WINDOW_WIDTH
         assert page.window.height == WINDOW_HEIGHT
@@ -394,7 +394,7 @@ class TestDesktopPresentation:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         page = FakePage()
 
-        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
         assert _find_by_key(page.controls[0], "welcome-path") is None
         assert _welcome_button(page.controls[0]).content == afanes.ui.strings.WELCOME_CHOOSE
@@ -407,7 +407,7 @@ class TestWebPresentation:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         page = FakePage(web=True)
 
-        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
         assert page.window.width == 0
         assert page.window.height == 0
@@ -417,7 +417,7 @@ class TestWebPresentation:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         page = FakePage(web=True)
 
-        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
         field = _typed(_find_by_key(page.controls[0], "welcome-path"), ft.TextField)
         assert field.label == afanes.ui.strings.WELCOME_PATH_LABEL
@@ -434,7 +434,7 @@ class TestWebPresentation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             field = _typed(_find_by_key(page.controls[0], "welcome-path"), ft.TextField)
             field.value = str(vault)
             button = _typed(_find_by_key(page.controls[0], "welcome-open"), ft.FilledButton)
@@ -455,7 +455,7 @@ class TestWebPresentation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             field = _typed(_find_by_key(page.controls[0], "welcome-path"), ft.TextField)
             field.value = str(tmp_path / "missing")
             button = _typed(_find_by_key(page.controls[0], "welcome-open"), ft.FilledButton)
@@ -481,7 +481,7 @@ class TestWebPresentation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             change = _typed(_find_by_key(page.controls[0], "workspace-change-open"), ft.PopupMenuItem)
             change_handler = typing.cast("Handler", change.on_click)
             await change_handler()
@@ -508,7 +508,7 @@ class TestWebPresentation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             change = _typed(_find_by_key(page.controls[0], "workspace-change-open"), ft.PopupMenuItem)
             change_handler = typing.cast("Handler", change.on_click)
             await change_handler()
@@ -534,7 +534,7 @@ class TestLaunchVault:
         page = FakePage()
         state = afanes.ui.state.app_state
 
-        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page), launch_vault=supplied))
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page), launch_vault=supplied))
 
         assert state.session.vault_root == supplied.resolve()
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(remembered.resolve())
@@ -553,8 +553,8 @@ class TestSessionGuard:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", first))
-            await afanes.ui.app.main(typing.cast("ft.Page", second))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", first))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", second))
 
         asyncio.run(scenario())
 
@@ -575,8 +575,8 @@ class TestSessionGuard:
         second = FakePage(web=True)
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", first))
-            await afanes.ui.app.main(typing.cast("ft.Page", second))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", first))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", second))
 
         asyncio.run(scenario())
 
@@ -591,8 +591,8 @@ class TestSessionGuard:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", first))
-            await afanes.ui.app.main(typing.cast("ft.Page", second))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", first))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", second))
             assert first.on_disconnect is not None
             first.on_disconnect()
 
@@ -630,7 +630,7 @@ class TestRefreshLoop:
         page = FakePage()
 
         async def scenario() -> int:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             return len(_refresh_tasks())
 
         assert asyncio.run(scenario()) == 1
@@ -649,8 +649,8 @@ class TestRefreshLoop:
         second = FakePage(web=True)
 
         async def scenario() -> int:
-            await afanes.ui.app.main(typing.cast("ft.Page", first))
-            await afanes.ui.app.main(typing.cast("ft.Page", second))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", first))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", second))
             return len(_refresh_tasks())
 
         assert asyncio.run(scenario()) == 1
@@ -672,7 +672,7 @@ class TestRefreshLoop:
 
         async def scenario() -> None:
             nonlocal scans
-            await afanes.ui.app.main(typing.cast("ft.Page", first))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", first))
 
             def counting_scan(current: afanes.core.vault.service.Vault) -> afanes.core.vault.snapshot.VaultSnapshot:
                 nonlocal scans
@@ -680,7 +680,7 @@ class TestRefreshLoop:
                 return original(current)
 
             monkeypatch.setattr(afanes.core.vault.service.Vault, "scan", counting_scan)
-            await afanes.ui.app.main(typing.cast("ft.Page", second))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", second))
 
         asyncio.run(scenario())
 
@@ -701,7 +701,7 @@ class TestRefreshLoop:
         state = afanes.ui.state.app_state
 
         async def scenario() -> int:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             close = _typed(_find_by_key(page.controls[0], "workspace-close-vault"), ft.PopupMenuItem)
             handler = typing.cast("Handler", close.on_click)
             await handler()
@@ -769,7 +769,7 @@ class TestCreation:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         page = FakePage()
 
-        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
         assert _welcome_button(page.controls[0], "welcome-create").content == afanes.ui.strings.NEW_VAULT_ACTION
 
@@ -777,7 +777,7 @@ class TestCreation:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         page = FakePage(web=True)
 
-        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page)))
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
         assert _welcome_button(page.controls[0], "welcome-create").content == afanes.ui.strings.NEW_VAULT_ACTION
 
@@ -794,7 +794,7 @@ class TestCreation:
         page = FakePage()
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
 
@@ -816,7 +816,7 @@ class TestCreation:
         page = FakePage()
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
             submit = _typed(_find_by_key(page.dialogs[-1], "create-vault-submit"), ft.FilledButton)
@@ -843,7 +843,7 @@ class TestCreation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
             await _browse_creation(page)
@@ -876,7 +876,7 @@ class TestCreation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
             await _browse_creation(page)
@@ -909,7 +909,7 @@ class TestCreation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
             await _browse_creation(page)
@@ -937,7 +937,7 @@ class TestCreation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
             preview = _typed(_find_by_key(page.dialogs[0], "create-vault-preview"), ft.Text)
@@ -975,7 +975,7 @@ class TestCreation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
             await _submit_creation(page, occupied)
@@ -1000,7 +1000,7 @@ class TestCreation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
             cancel = _typed(_find_by_key(page.dialogs[0], "create-vault-cancel"), ft.TextButton)
@@ -1021,7 +1021,7 @@ class TestCreation:
         page = FakePage(web=True)
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
 
@@ -1045,7 +1045,7 @@ class TestCreation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
             preview = _typed(_find_by_key(page.dialogs[0], "create-vault-preview"), ft.Text)
@@ -1084,7 +1084,7 @@ class TestCreation:
         monkeypatch.setattr(afanes.core.templates.TemplateCatalog, "summaries", refuse)
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _welcome_button(page.controls[0], "welcome-create")
             await typing.cast("Handler", create.on_click)()
             warning = _typed(_find_by_key(page.dialogs[0], "create-vault-templates-error"), ft.Text)
@@ -1117,7 +1117,7 @@ class TestCreation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             create = _typed(_find_by_key(page.controls[0], "workspace-change-create"), ft.PopupMenuItem)
             await typing.cast("Handler", create.on_click)()
             _select_template(page, "study")
@@ -1147,7 +1147,7 @@ class TestCreation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             close = _typed(_find_by_key(page.controls[0], "workspace-close-vault"), ft.PopupMenuItem)
             await typing.cast("Handler", close.on_click)()
 
@@ -1179,7 +1179,7 @@ class TestLaunchDigest:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page), vault)
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page), vault)
             digest = _find_by_key(page.controls[0], "launch-digest")
             assert isinstance(digest, ft.Container)
             assert digest.bgcolor == afanes.ui.theme.NOTICE_SURFACE_COLOR
@@ -1200,7 +1200,7 @@ class TestLaunchDigest:
         versioned(vault)
         page = FakePage()
 
-        asyncio.run(afanes.ui.app.main(typing.cast("ft.Page", page), vault))
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page), vault))
 
         assert _find_by_key(page.controls[0], "launch-digest") is None
 
@@ -1240,7 +1240,7 @@ class TestRoleReferenceCreation:
         monkeypatch.setattr(afanes.ui.views.page.PageView, "scroll_to_top", ignore_scroll)
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             workspace = page.controls[0]
             projects = _typed(_find_by_key(workspace, "section-projects"), ft.ListTile)
             await typing.cast("Handler", projects.on_click)()
@@ -1288,7 +1288,7 @@ class TestBrowserReferenceCreation:
         page, _vault = self._open_vault(tmp_path, monkeypatch)
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             await _open_reference_dialog(page)
             submit = _typed(_find_by_key(page.dialogs[-1], "new-reference-submit"), ft.FilledButton)
             assert submit.disabled is True
@@ -1306,7 +1306,7 @@ class TestBrowserReferenceCreation:
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             state.browser.query = "stale"
             await _open_reference_dialog(page)
             await _submit_reference(page, "Priya Nair", "card:person.md")
@@ -1326,7 +1326,7 @@ class TestBrowserReferenceCreation:
         page, vault = self._open_vault(tmp_path, monkeypatch)
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             await _open_reference_dialog(page)
             await _submit_reference(page, "Inbox thought", "empty")
 
@@ -1341,7 +1341,7 @@ class TestBrowserReferenceCreation:
         page, vault = self._open_vault(tmp_path, monkeypatch)
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             await _open_reference_dialog(page)
             await _submit_reference(page, "   ", "empty")
 
@@ -1360,7 +1360,7 @@ class TestBrowserReferenceCreation:
         existing.write_text("---\ntype: reference\n---\n# Ada\n", encoding="utf-8")
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             await _open_reference_dialog(page)
             await _submit_reference(page, "Ada", "empty")
 
@@ -1378,7 +1378,7 @@ class TestBrowserReferenceCreation:
         broken.write_text("---\ntype: reference\n---\n", encoding="utf-8")
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             await _open_reference_dialog(page)
 
         asyncio.run(scenario())
@@ -1420,7 +1420,7 @@ class TestAdaptiveShell:
         page = FakePage()
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
 
         asyncio.run(scenario())
 
@@ -1452,7 +1452,7 @@ class TestAdaptiveShell:
         monkeypatch.setattr(afanes.ui.views.workspace.WorkspaceView, "focus_search", focus_search)
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             assert page.on_keyboard_event is not None
             await page.on_keyboard_event(_keyboard("n", ctrl=True))
             await page.on_keyboard_event(_keyboard("f", ctrl=True))
@@ -1472,7 +1472,7 @@ class TestAdaptiveShell:
         page.width = afanes.ui.theme.SHELL_MEDIUM_MIN
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             toggle = _typed(_find_by_key(page.controls[0], "workspace-navigation-toggle"), ft.IconButton)
             await typing.cast("Handler", toggle.on_click)()
             assert _find_by_key(page.controls[0], "workspace-drawer") is not None
@@ -1505,7 +1505,7 @@ class TestAdaptiveShell:
         monkeypatch.setattr(afanes.ui.views.workspace.WorkspaceView, "close_drawer", close_drawer)
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             assert page.on_keyboard_event is not None
             await page.on_keyboard_event(_keyboard("Escape", ctrl=False))
 
@@ -1535,7 +1535,7 @@ class TestAdaptiveShell:
         monkeypatch.setattr(afanes.ui.views.workspace.WorkspaceView, "close_drawer", close_drawer)
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             assert page.on_keyboard_event is not None
             await page.on_keyboard_event(_keyboard("Escape", ctrl=False))
 
@@ -1555,7 +1555,7 @@ class TestAboutDialog:
         page = FakePage()
 
         async def scenario() -> None:
-            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             menu = _typed(_find_by_key(page.controls[0], "workspace-change"), ft.PopupMenuButton)
             item = typing.cast(
                 "ft.PopupMenuItem",
