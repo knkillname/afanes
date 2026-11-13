@@ -16,6 +16,7 @@ import afanes.core.vault.pages
 import afanes.core.vault.processing
 import afanes.core.vault.service
 import afanes.core.vault.steps
+import afanes.core.vault.trash
 from afanes.core.errors import (
     ContentChangedError,
     NameCollisionError,
@@ -1052,6 +1053,99 @@ class TestTrash:
 
         assert preview.trash_path.is_file()
 
+    def test_restore_falls_back_to_an_exclusive_copy(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person", body="# Ada\n")
+        original = note.read_bytes()
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+        preview = naming.trash(note, confirm=True)
+
+        def refuse_hard_link(_source: Path, _target: Path) -> None:
+            message = "hard links are unavailable"
+            raise OSError(message)
+
+        monkeypatch.setattr(os, "link", refuse_hard_link)
+
+        restored = naming.restore_from_trash(preview, confirm=True)
+
+        assert restored.read_bytes() == original
+        assert not preview.trash_path.exists()
+
+    def test_restore_reports_a_publish_race(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+        preview = naming.trash(note, confirm=True)
+
+        def collide(_source: Path, _target: Path) -> None:
+            raise FileExistsError
+
+        monkeypatch.setattr(os, "link", collide)
+
+        with pytest.raises(NameCollisionError):
+            naming.restore_from_trash(preview, confirm=True)
+
+        assert preview.trash_path.is_file()
+        assert not note.exists()
+
+    def test_restore_rolls_back_when_the_trash_copy_cannot_be_removed(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+        preview = naming.trash(note, confirm=True)
+        original_unlink = Path.unlink
+
+        def fail_source_unlink(path: Path, *, missing_ok: bool = False) -> None:
+            if path == preview.trash_path:
+                message = "read only"
+                raise OSError(message)
+            original_unlink(path, missing_ok=missing_ok)
+
+        monkeypatch.setattr(Path, "unlink", fail_source_unlink)
+
+        with pytest.raises(VaultError):
+            naming.restore_from_trash(preview, confirm=True)
+
+        assert preview.trash_path.is_file()
+        assert not note.exists()
+
+    def test_restore_reports_a_parent_creation_failure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+        preview = naming.trash(note, confirm=True)
+        note.parent.rmdir()
+
+        def fail_mkdir(_path: Path, *_args: object, **_kwargs: object) -> None:
+            message = "read only"
+            raise OSError(message)
+
+        monkeypatch.setattr(Path, "mkdir", fail_mkdir)
+
+        with pytest.raises(VaultError):
+            naming.restore_from_trash(preview, confirm=True)
+
+        assert preview.trash_path.is_file()
+
+    def test_trash_reports_a_move_failure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+
+        def fail_replace(_path: Path, _target: Path) -> None:
+            message = "read only"
+            raise OSError(message)
+
+        monkeypatch.setattr(Path, "replace", fail_replace)
+
+        with pytest.raises(VaultError):
+            naming.trash(note, confirm=True)
+
+        assert note.is_file()
+        assert not (root / "trash" / "Ada.md").exists()
+
     def test_restoring_resolves_inbound_references_again(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         note = _write_note(root / "people/Ada.md", "person")
@@ -1199,7 +1293,7 @@ class TestNamingGuards:
         preview.trash_path.parent.mkdir(parents=True)
         preview.trash_path.write_text("---\ntype: note\n---\n", encoding="utf-8")
         monkeypatch.setattr(
-            afanes.core.vault.naming.VaultNaming,
+            afanes.core.vault.trash.TrashService,
             "plan_trash",
             lambda _self, _path, **_kwargs: preview,
         )

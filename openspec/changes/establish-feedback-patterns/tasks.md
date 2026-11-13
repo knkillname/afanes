@@ -42,9 +42,9 @@
 
 - [x] 7.1 Update `AGENTS.md` 4.5 and 4.6 so a destructive action requires a confirmation or a visible undo path, trash is immediate and undoable, and the feedback channels are named; verify the old confirmation wording is gone.
 - [x] 7.2 Update `docs/develop/interface-standard.md` with the feedback channels, the toast and banner rules, the overlay audit, the trash undo, and wave 4 marked landed; verify `hatch run docs:build` passes.
-- [ ] 7.3 Update the guide pages that describe trash, editing, inbox, review, processing, and workspace behavior; verify quoted labels match the catalog and `hatch run docs:build` passes.
-- [ ] 7.4 Add one `Unreleased` changelog entry naming the change, the feedback channels, the trash undo, the `VaultNaming.trash` return change, `restore_from_trash`, the `UiStatus.show_message` removal, and `README: no change required` / `Docs: updated`; verify no version bump.
-- [ ] 7.5 Run `hatch check`, `hatch test --cover`, `hatch run docs:build`, `openspec validate --all --strict`, `openspec doctor`, both vocabulary greps, and `git diff --check`; verify coverage stays at or above 85%.
+- [x] 7.3 Update the guide pages that describe trash, editing, inbox, review, processing, and workspace behavior; verify quoted labels match the catalog and `hatch run docs:build` passes.
+- [x] 7.4 Add one `Unreleased` changelog entry naming the change, the feedback channels, the trash undo, the `VaultNaming.trash` return change, `restore_from_trash`, the `UiStatus.show_message` removal, and `README: no change required` / `Docs: updated`; verify no version bump.
+- [x] 7.5 Run `hatch check`, `hatch test --cover`, `hatch run docs:build`, `openspec validate --all --strict`, `openspec doctor`, both vocabulary greps, and `git diff --check`; verify coverage stays at or above 85%.
 - [ ] 7.6 Review the final diff for scope: no vault schema, `afanes.yaml`, trash frontmatter, retention, sidebar, dependency, CLI, or runtime-network change.
 
 ## Workflow follow-up

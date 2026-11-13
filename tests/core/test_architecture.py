@@ -65,11 +65,37 @@ def _state_paths() -> list[Path]:
     return [UI_ROOT / "state.py"]
 
 
+def _is_property(member: ast.stmt) -> bool:
+    if not isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef):
+        return False
+    return any(
+        (isinstance(decorator, ast.Name) and decorator.id == "property")
+        or (isinstance(decorator, ast.Attribute) and decorator.attr == "setter")
+        for decorator in member.decorator_list
+    )
+
+
+def _is_frozen_dataclass(node: ast.ClassDef) -> bool:
+    for decorator in node.decorator_list:
+        if not (isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Attribute)):
+            continue
+        if decorator.func.attr != "dataclass":
+            continue
+        if any(
+            keyword.arg == "frozen" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True
+            for keyword in decorator.keywords
+        ):
+            return True
+    return False
+
+
 def _class_surface(members: list[ast.stmt]) -> int:
     names = {
         member.name
         for member in members
-        if isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef) and not member.name.startswith("_")
+        if isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef)
+        and not member.name.startswith("_")
+        and not _is_property(member)
     }
     return len(names)
 
@@ -79,12 +105,7 @@ def _class_commands(members: list[ast.stmt]) -> int:
     for member in members:
         if not isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef) or member.name.startswith("_"):
             continue
-        decorated_as_property = any(
-            (isinstance(decorator, ast.Name) and decorator.id == "property")
-            or (isinstance(decorator, ast.Attribute) and decorator.attr == "setter")
-            for decorator in member.decorator_list
-        )
-        if not decorated_as_property:
+        if not _is_property(member):
             commands.add(member.name)
     return len(commands)
 
@@ -95,6 +116,8 @@ def _state_shapes() -> list[tuple[Path, str, bool, int]]:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in tree.body:
             if not isinstance(node, ast.ClassDef):
+                continue
+            if _is_frozen_dataclass(node):
                 continue
             fields = any(isinstance(member, ast.AnnAssign) for member in node.body)
             shapes.append((path, node.name, fields, _class_commands(node.body)))
