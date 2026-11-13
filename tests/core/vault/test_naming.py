@@ -1,5 +1,6 @@
 """Tests for reference-safe naming, moves, repairs, and trash."""
 
+import dataclasses
 import datetime
 import hashlib
 import os
@@ -931,10 +932,10 @@ class TestTrash:
         note_bytes = note.read_bytes()
         referring_bytes = referring.read_bytes()
 
-        count = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).trash(note, confirm=True)
+        preview = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).trash(note, confirm=True)
 
         trashed = root / "trash" / "Ada.md"
-        assert count == ONE
+        assert preview.reference_count == ONE
         assert not note.exists()
         assert trashed.read_bytes() == note_bytes
         assert referring.read_bytes() == referring_bytes
@@ -950,9 +951,13 @@ class TestTrash:
     def test_trashing_an_unreferenced_note_reports_zero(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         note = _write_note(root / "people/Ada.md", "person")
-        assert (
-            afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).trash(note, confirm=True) == 0
+
+        preview = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).trash(
+            note,
+            confirm=True,
         )
+
+        assert preview.reference_count == 0
 
     def test_reuses_an_existing_trash_case_variant(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -973,6 +978,92 @@ class TestTrash:
         afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).trash(note, confirm=True)
 
         assert (root / "trash" / "Ada 2.md").is_file()
+
+    def test_restore_returns_the_note_to_its_original_path(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person", body="# Ada\n\nBody.\n")
+        original = note.read_bytes()
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+        preview = naming.trash(note, confirm=True)
+
+        restored = naming.restore_from_trash(preview, confirm=True)
+
+        assert restored == note
+        assert note.read_bytes() == original
+        assert not preview.trash_path.exists()
+
+    def test_restore_requires_confirmation(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+        preview = naming.trash(note, confirm=True)
+
+        with pytest.raises(VaultError):
+            naming.restore_from_trash(preview)
+
+        assert not note.exists()
+        assert preview.trash_path.is_file()
+
+    def test_restore_refuses_an_occupied_original_path(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person", body="# Ada\n")
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+        preview = naming.trash(note, confirm=True)
+        trashed = preview.trash_path.read_bytes()
+        note.write_text("---\ntype: note\n---\n# Replacement\n", encoding="utf-8")
+
+        with pytest.raises(NameCollisionError):
+            naming.restore_from_trash(preview, confirm=True)
+
+        assert preview.trash_path.read_bytes() == trashed
+        assert note.read_text(encoding="utf-8").endswith("# Replacement\n")
+
+    def test_restore_refuses_a_missing_trash_file(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+        preview = naming.plan_trash(note)
+
+        with pytest.raises(VaultError):
+            naming.restore_from_trash(preview, confirm=True)
+
+        assert note.is_file()
+
+    def test_restore_creates_the_original_parent_folder(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+        preview = naming.trash(note, confirm=True)
+        note.parent.rmdir()
+
+        naming.restore_from_trash(preview, confirm=True)
+
+        assert note.is_file()
+
+    def test_restore_rejects_a_path_outside_the_vault(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+        preview = naming.trash(note, confirm=True)
+        escaped = dataclasses.replace(preview, trash_path=tmp_path / "outside" / "Ada.md")
+
+        with pytest.raises(VaultPathError):
+            naming.restore_from_trash(escaped, confirm=True)
+
+        assert preview.trash_path.is_file()
+
+    def test_restoring_resolves_inbound_references_again(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        _write_note(root / "inbox/Note.md", body="[Ada](<note:Ada>)")
+        naming = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root))
+        preview = naming.trash(note, confirm=True)
+        reference = NoteReference(scheme=ReferenceScheme.NOTE, name="Ada")
+
+        naming.restore_from_trash(preview, confirm=True)
+
+        result = afanes.core.vault.service.Vault(root).scan().catalog.resolve(reference)
+        assert result.targets == (note.resolve(),)
 
 
 class TestCategoryMoveErrors:

@@ -10,6 +10,7 @@ import afanes.core.atomic
 import afanes.core.processing
 import afanes.core.template_cards
 import afanes.core.vault.naming
+import afanes.core.vault.naming_reports
 import afanes.core.vault.pages
 import afanes.core.vault.processing
 import afanes.core.vault.service
@@ -1138,7 +1139,11 @@ class TestApplyAppend:
             _request(source, ProcessingOutcome.APPEND_STEP, project="Home")
         )
 
-        def fail_trash(_self: afanes.core.vault.naming.VaultNaming, *_args: object, **_kwargs: object) -> int:
+        def fail_trash(
+            _self: afanes.core.vault.naming.VaultNaming,
+            *_args: object,
+            **_kwargs: object,
+        ) -> afanes.core.vault.naming_reports.TrashPreview:
             message = "busy"
             raise VaultError(message)
 

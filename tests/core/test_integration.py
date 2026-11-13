@@ -98,9 +98,9 @@ class TestVaultLayoutAndTrash:
         referring = vault.create(afanes.core.vault.service.NoteDraft("Note", NoteType.NOTE, body="[Ada](<note:Ada>)\n"))
         reference = NoteReference(scheme=ReferenceScheme.NOTE, name="Ada")
 
-        count = afanes.core.vault.naming.VaultNaming(vault).trash(ada, confirm=True)
+        preview = afanes.core.vault.naming.VaultNaming(vault).trash(ada, confirm=True)
 
-        assert count == 1
+        assert preview.reference_count == 1
         assert not ada.exists()
         assert (root / "trash" / "Ada.md").is_file()
         assert vault.scan().catalog.resolve(reference).outcome is ResolutionOutcome.UNRESOLVED

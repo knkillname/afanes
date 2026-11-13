@@ -10,11 +10,11 @@
 
 - [x] 2.1 Add `src/afanes/ui/components/toast.py` with a `ToastPresenter` that wraps Flet `SnackBar`, closes only its own current snackbar, and exposes `show` and `close`; add the toast surface, text, action, duration, margin, and padding tokens to `theme.py`; verify focused tests cover show, replacement, action, dismissal, and that `pop_dialog` is never called.
 - [x] 2.2 Add an `on_notice` callback to `WorkspaceActions`, consume `take_notice()` in `WorkspaceView`, and own the presenter in `AppShell`; verify `tests/ui/test_workspace_view.py` and `tests/ui/test_app.py` pass with a fake presenter.
-- [ ] 2.3 Render the toast in both appearance modes with the themed tokens; verify `hatch test tests/ui/test_theme.py tests/ui/test_conformance.py` passes and the conformance baseline does not grow.
+- [x] 2.3 Render the toast in both appearance modes with the themed tokens; verify `hatch test tests/ui/test_theme.py tests/ui/test_conformance.py` passes and the conformance baseline does not grow.
 
 ## 3. Core trash return and restore
 
-- [ ] 3.1 Change `VaultNaming.trash` to return the `TrashPreview` it actually used instead of an integer, update the processing caller that ignores it, and verify `hatch test tests/core/vault/test_naming.py tests/core/vault/test_processing.py tests/core/test_processing.py` passes.
+- [x] 3.1 Change `VaultNaming.trash` to return the `TrashPreview` it actually used instead of an integer, update the processing caller that ignores it, and verify `hatch test tests/core/vault/test_naming.py tests/core/vault/test_processing.py tests/core/test_processing.py` passes.
 - [ ] 3.2 Add `VaultNaming.restore_from_trash(preview, confirm=True)` with vault containment, missing-trash refusal, occupied-source refusal, parent creation, and an exclusive publish that never overwrites; verify focused tests cover success, collision, missing file, path escape, and no overwrite.
 - [ ] 3.3 Verify a restored note's inbound references resolve on the next scan and a collision leaves the trash file byte-identical; run `hatch test tests/core/vault/test_naming.py tests/core/vault/test_service.py`.
 
