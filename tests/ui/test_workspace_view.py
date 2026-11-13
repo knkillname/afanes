@@ -1010,6 +1010,40 @@ class TestAdaptiveLayout:
 
         assert view.shell_row.controls == [view.browser_region]
 
+    def test_back_keeps_the_browser_after_a_narrow_resize(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "One.md", body="# One")
+        view = _open_workspace(tmp_path, monkeypatch)
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN - 1)
+        _record_page_scroll(view)
+        asyncio.run(_handler(_row_for(view.browser_list, "One"))())
+        asyncio.run(view.page_view.go_back())
+        assert view.shell_row.controls == [view.browser_region]
+
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN - 2)
+
+        assert view.shell_row.controls == [view.browser_region]
+
+    def test_a_page_action_keeps_the_detail_when_the_window_narrows(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        note = _write_note(vault / "inbox" / "One.md", body="# One")
+        view = _open_workspace(tmp_path, monkeypatch)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.navigation.open_page(note)
+            await view.page_view.start_edit()
+
+        asyncio.run(scenario())
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN - 1)
+
+        assert view.shell_row.controls == [view.detail_region]
+        assert view.page_view.edit_form.visible is True
+
     def test_a_resize_preserves_the_page_destination_and_query(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

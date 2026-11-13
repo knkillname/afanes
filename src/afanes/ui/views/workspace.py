@@ -714,7 +714,15 @@ class WorkspaceView:
         self._update()
 
     def _on_page_update(self) -> None:
-        """Refresh the workspace after a page command changes state."""
+        """Refresh the workspace after a page command changes state.
+
+        Notes
+        -----
+        Any page command means the detail is the region the user is working in.
+        Marking it here keeps an edit, a link, or a page action visible when the
+        window later collapses to the one-region presentation.
+        """
+        self._show_detail = True
         self._refresh_dynamic()
         self._update()
 

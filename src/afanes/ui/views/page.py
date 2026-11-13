@@ -1206,9 +1206,6 @@ class PageView:
         """Return to the previous page or let the host close the detail."""
         self._rename_open = False
         if self._on_back is not None and await self._on_back():
-            self.refresh()
-            await self.scroll_to_top()
-            self._update()
             return
         await self._state.navigation.back()
         self.refresh()
