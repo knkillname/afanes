@@ -58,6 +58,9 @@ class WorkspaceController:
         Shared banner and busy flags.
     command_lock : CommandLock
         Shared command lock.
+    banner : str | None
+        Persistent vault or selection condition shown on the welcome surface
+        or the workspace shell, or ``None`` when no condition is active.
     """
 
     session: VaultSession
@@ -69,6 +72,7 @@ class WorkspaceController:
     review: ReviewState
     status: UiStatus
     command_lock: CommandLock
+    banner: str | None = None
 
     async def start(self) -> None:
         """Load saved settings and open the remembered vault.

@@ -60,6 +60,9 @@ class PageEditorState:
         ``None`` when a pending dialog does not block navigation.
     repair_preview : ReferenceRepairPreview | None
         Unsafe-name repair waiting for the user to choose an action.
+    report : str | None
+        Persistent partial-rewrite report shown with the page, or ``None``
+        when the last rewrite completed without a problem.
     """
 
     session: VaultSession
@@ -72,6 +75,28 @@ class PageEditorState:
     autosave_task: asyncio.Task[None] | None = None
     blocking_message: str | None = None
     repair_preview: ReferenceRepairPreview | None = None
+    report: str | None = None
+
+    @property
+    def banner(self) -> str | None:
+        """Return the persistent condition that belongs to the open page.
+
+        Returns
+        -------
+        str | None
+            Conflict text, blocking text, repair text, or a partial-rewrite
+            report, in that order of precedence. ``None`` when the page has no
+            persistent condition.
+        """
+        if self.conflict == "missing":
+            return afanes.ui.strings.PAGE_CONFLICT_MISSING
+        if self.conflict == "changed":
+            return afanes.ui.strings.PAGE_CONFLICT_CHANGED
+        if self.blocking_message is not None:
+            return self.blocking_message
+        if self.repair_preview is not None:
+            return afanes.ui.strings.PAGE_REPAIR_PENDING
+        return self.report
 
     async def follow_external_change(self, snapshot: VaultSnapshot) -> None:
         """Reconcile the open page after a background rescan.
@@ -747,11 +772,14 @@ class PageEditorState:
             await self.autosave()
 
     def clear(self) -> None:
-        """Clear the page and its conflict state."""
+        """Clear the page and its persistent conditions."""
         self.page = None
         self.editing = False
         self.conflict = None
         self.saving = False
+        self.blocking_message = None
+        self.repair_preview = None
+        self.report = None
 
     def start_new(self, reference: NoteReference) -> None:
         """Open an unwritten draft for a missing reference.
@@ -776,3 +804,4 @@ class PageEditorState:
         self.saving = False
         self.blocking_message = None
         self.repair_preview = None
+        self.report = None

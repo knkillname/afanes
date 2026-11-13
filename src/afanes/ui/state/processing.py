@@ -43,6 +43,9 @@ class ProcessingState:
         Valid template cards read when the wizard opened, ordered by title.
     card_issues : tuple[TemplateCardIssue, ...]
         Template card files that could not be read or validated.
+    banner : str | None
+        Persistent post-apply refresh failure shown after the wizard closes,
+        or ``None`` when the last apply refreshed the scan.
     """
 
     session: VaultSession
@@ -54,6 +57,7 @@ class ProcessingState:
     result: Path | None = None
     cards: tuple[TemplateCard, ...] = ()
     card_issues: tuple[TemplateCardIssue, ...] = ()
+    banner: str | None = None
 
     def reset(self) -> None:
         """Clear the wizard session."""
@@ -63,6 +67,7 @@ class ProcessingState:
         self.result = None
         self.cards = ()
         self.card_issues = ()
+        self.banner = None
 
     async def begin(self, path: Path) -> bool:
         """Open the Processing Wizard for an Inbox capture.
@@ -249,6 +254,7 @@ class ProcessingState:
         self.result = None
         self.cards = ()
         self.card_issues = ()
+        self.banner = None
 
     @staticmethod
     def _load_cards(vault: afanes.core.vault.service.Vault) -> TemplateCardListing:

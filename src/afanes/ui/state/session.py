@@ -170,6 +170,9 @@ class VaultSession:
     adoption_target : Path | None
         Resolved unversioned folder awaiting an explicit adoption decision, or
         ``None`` when no adoption offer is pending.
+    banner : str | None
+        Persistent scan or refresh failure shown until the next successful
+        scan, or ``None`` when no failure is active.
     """
 
     status: UiStatus
@@ -182,6 +185,7 @@ class VaultSession:
     preview_body: str | None = None
     fingerprint: tuple[tuple[str, int, int], ...] | None = None
     adoption_target: Path | None = None
+    banner: str | None = None
     _connections: afanes.core.connections.Connections | None = dataclasses.field(default=None, repr=False)
     _connections_snapshot: VaultSnapshot | None = dataclasses.field(default=None, repr=False)
 
@@ -231,6 +235,7 @@ class VaultSession:
         self.preview_body = None
         self.fingerprint = None
         self.adoption_target = None
+        self.banner = None
         self._connections = None
         self._connections_snapshot = None
 

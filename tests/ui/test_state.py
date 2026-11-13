@@ -4758,3 +4758,91 @@ class TestRewriteReports:
         assert f"notes/Skipped.md ({afanes.ui.strings.PAGE_REWRITE_CHANGED_ON_DISK})" in message
         assert "notes/Failed.md (permission denied)" in message
         assert source.is_file()
+
+
+class TestUiStatusNotice:
+    def test_latest_notice_replaces_the_previous_one(self) -> None:
+        status = afanes.ui.state.status.UiStatus()
+
+        status.show_notice("First")
+        status.show_notice("Second", action=afanes.ui.state.status.NoticeAction.UNDO_TRASH)
+
+        assert status.notice == afanes.ui.state.status.Notice(
+            message="Second",
+            action=afanes.ui.state.status.NoticeAction.UNDO_TRASH,
+        )
+
+    def test_taking_the_notice_consumes_it_once(self) -> None:
+        status = afanes.ui.state.status.UiStatus()
+        status.show_notice("Moved to Trash")
+
+        notice = status.take_notice()
+
+        assert notice is not None
+        assert notice.message == "Moved to Trash"
+        assert status.take_notice() is None
+
+    def test_reset_clears_the_notice(self) -> None:
+        status = afanes.ui.state.status.UiStatus()
+        status.show_notice("Moved to Trash")
+
+        status.reset()
+
+        assert status.notice is None
+
+
+class TestOwnedBanners:
+    def test_workspace_banner_is_isolated(self) -> None:
+        state = afanes.ui.state.app_state
+
+        state.workspace.banner = afanes.ui.strings.VAULT_MISSING
+
+        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
+        assert state.session.banner is None
+        assert state.pages.banner is None
+        assert state.processing.banner is None
+        state.workspace.banner = None
+        assert state.workspace.banner is None
+
+    def test_session_banner_is_isolated(self) -> None:
+        state = afanes.ui.state.app_state
+
+        state.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail="disk full")
+
+        assert state.session.banner == afanes.ui.strings.REFRESH_FAILED.format(detail="disk full")
+        assert state.workspace.banner is None
+        assert state.pages.banner is None
+        assert state.processing.banner is None
+        state.session.banner = None
+        assert state.session.banner is None
+
+    def test_page_banner_derives_from_conflict_and_blocking_state(self) -> None:
+        state = afanes.ui.state.app_state
+
+        state.pages.conflict = "changed"
+        assert state.pages.banner == afanes.ui.strings.PAGE_CONFLICT_CHANGED
+        state.pages.conflict = "missing"
+        assert state.pages.banner == afanes.ui.strings.PAGE_CONFLICT_MISSING
+        state.pages.conflict = None
+        state.pages.blocking_message = afanes.ui.strings.PAGE_PENDING_DIALOG
+        assert state.pages.banner == afanes.ui.strings.PAGE_PENDING_DIALOG
+        state.pages.blocking_message = None
+        state.pages.report = afanes.ui.strings.PAGE_RENAME_PARTIAL.format(report="partial")
+        assert state.pages.banner == afanes.ui.strings.PAGE_RENAME_PARTIAL.format(report="partial")
+        state.pages.report = None
+        assert state.pages.banner is None
+        assert state.workspace.banner is None
+        assert state.session.banner is None
+        assert state.processing.banner is None
+
+    def test_processing_banner_is_isolated(self) -> None:
+        state = afanes.ui.state.app_state
+
+        state.processing.banner = afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail="disk full")
+
+        assert state.processing.banner == afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail="disk full")
+        assert state.workspace.banner is None
+        assert state.session.banner is None
+        assert state.pages.banner is None
+        state.processing.banner = None
+        assert state.processing.banner is None
