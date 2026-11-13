@@ -82,7 +82,7 @@ class TestProcessingEdgeCases:
         root = tmp_path / "vault"
         root.mkdir()
         vault = afanes.core.vault.service.Vault(root)
-        project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
+        project = vault.create(afanes.core.vault.service.NoteDraft("Home", NoteType.PROJECT, body="# Home\n"))
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Call")
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
             processing_request(capture, ProcessingOutcome.APPEND_STEP, project="Home")
@@ -112,8 +112,8 @@ class TestProcessingEdgeCases:
         root = tmp_path / "vault"
         root.mkdir()
         vault = afanes.core.vault.service.Vault(root)
-        project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
-        capture = vault.create("Blank", NoteType.NOTE)
+        project = vault.create(afanes.core.vault.service.NoteDraft("Home", NoteType.PROJECT, body="# Home\n"))
+        capture = vault.create(afanes.core.vault.service.NoteDraft("Blank", NoteType.NOTE))
         capture.write_text("---\ntype: note\n---\n", encoding="utf-8")
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
             processing_request(capture, ProcessingOutcome.APPEND_STEP, project="Home")
@@ -232,7 +232,7 @@ class TestProcessingGuards:
         root = tmp_path / "vault"
         root.mkdir()
         vault = afanes.core.vault.service.Vault(root)
-        project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
+        project = vault.create(afanes.core.vault.service.NoteDraft("Home", NoteType.PROJECT, body="# Home\n"))
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
         service = afanes.core.vault.processing.VaultProcessing(vault)
 

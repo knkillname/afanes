@@ -980,7 +980,7 @@ class TestCategoryMoveErrors:
         root = tmp_path / "vault"
         root.mkdir()
         vault = afanes.core.vault.service.Vault(root)
-        project = vault.create("Home", NoteType.PROJECT)
+        project = vault.create(afanes.core.vault.service.NoteDraft("Home", NoteType.PROJECT))
 
         with pytest.raises(VaultError):
             afanes.core.vault.naming.VaultNaming(vault).plan_category_move(project, CategoryLabel("place"))
@@ -989,7 +989,7 @@ class TestCategoryMoveErrors:
         root = tmp_path / "vault"
         root.mkdir()
         vault = afanes.core.vault.service.Vault(root)
-        reference = vault.create("Ada", NoteType.REFERENCE)
+        reference = vault.create(afanes.core.vault.service.NoteDraft("Ada", NoteType.REFERENCE))
         (root / "reference" / "place").mkdir(parents=True)
         (root / "reference" / "place" / "Ada.md").write_text("---\ntype: reference\n---\n", encoding="utf-8")
 

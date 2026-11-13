@@ -47,8 +47,14 @@ class TestReferenceLifecycle:
         root = tmp_path / "vault"
         versioned(root)
         vault = Vault(root)
-        ada = vault.create("Ada Lovelace", NoteType.REFERENCE, category=CategoryLabel("person"))
-        note = vault.create("Prepare report", NoteType.NOTE, body="Ask [Ada Lovelace](<note:Ada Lovelace>).\n")
+        ada = vault.create(
+            afanes.core.vault.service.NoteDraft("Ada Lovelace", NoteType.REFERENCE, category=CategoryLabel("person"))
+        )
+        note = vault.create(
+            afanes.core.vault.service.NoteDraft(
+                "Prepare report", NoteType.NOTE, body="Ask [Ada Lovelace](<note:Ada Lovelace>).\n"
+            )
+        )
 
         reference = NoteReference(scheme=ReferenceScheme.NOTE, name="Ada Lovelace")
         assert vault.scan().catalog.resolve(reference).targets == (ada,)
@@ -72,9 +78,11 @@ class TestVaultLayoutAndTrash:
         versioned(root)
         vault = Vault(root)
 
-        project = vault.create("Launch", NoteType.PROJECT)
-        reference = vault.create("Reading", NoteType.REFERENCE)
-        categorized = vault.create("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
+        project = vault.create(afanes.core.vault.service.NoteDraft("Launch", NoteType.PROJECT))
+        reference = vault.create(afanes.core.vault.service.NoteDraft("Reading", NoteType.REFERENCE))
+        categorized = vault.create(
+            afanes.core.vault.service.NoteDraft("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
+        )
 
         assert project.parent == root / "projects"
         assert reference.parent == root / "reference"
@@ -84,8 +92,10 @@ class TestVaultLayoutAndTrash:
         root = tmp_path / "vault"
         versioned(root)
         vault = Vault(root)
-        ada = vault.create("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
-        referring = vault.create("Note", NoteType.NOTE, body="[Ada](<note:Ada>)\n")
+        ada = vault.create(
+            afanes.core.vault.service.NoteDraft("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
+        )
+        referring = vault.create(afanes.core.vault.service.NoteDraft("Note", NoteType.NOTE, body="[Ada](<note:Ada>)\n"))
         reference = NoteReference(scheme=ReferenceScheme.NOTE, name="Ada")
 
         count = afanes.core.vault.naming.VaultNaming(vault).trash(ada, confirm=True)
@@ -171,7 +181,7 @@ class TestProcessingLifecycle:
         root = tmp_path / "vault"
         versioned(root)
         vault = Vault(root)
-        project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
+        project = vault.create(afanes.core.vault.service.NoteDraft("Home", NoteType.PROJECT, body="# Home\n"))
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Call the plumber\n\nAsk about the boiler")
 
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
@@ -226,11 +236,15 @@ class TestPageEditingLifecycle:
         root = tmp_path / "vault"
         versioned(root)
         vault = Vault(root)
-        ada = vault.create("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
+        ada = vault.create(
+            afanes.core.vault.service.NoteDraft("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
+        )
         capture = vault.create(
-            "Planning",
-            NoteType.NOTE,
-            body="[Ada](<note:Ada>) and [Budget](<note:Budget>)\n",
+            afanes.core.vault.service.NoteDraft(
+                "Planning",
+                NoteType.NOTE,
+                body="[Ada](<note:Ada>) and [Budget](<note:Budget>)\n",
+            )
         )
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
@@ -459,7 +473,9 @@ class TestWorkspaceLiveness:
         root = tmp_path / "vault"
         versioned(root)
         vault = Vault(root)
-        vault.create("Launch", NoteType.PROJECT, body="# Launch\n\n- [ ] Old step\n")
+        vault.create(
+            afanes.core.vault.service.NoteDraft("Launch", NoteType.PROJECT, body="# Launch\n\n- [ ] Old step\n")
+        )
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",

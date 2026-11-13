@@ -61,6 +61,36 @@ TEMPLATES_DIRECTORY = afanes.core.vault.snapshot.TEMPLATES_DIRECTORY
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class NoteDraft:
+    """Initial data for one note creation.
+
+    Attributes
+    ----------
+    title : str
+        Name to sanitize into the identity filename. The new note's display
+        title is derived separately from its body.
+    note_type : NoteType
+        Declared type for the new note.
+    category : CategoryLabel | None
+        Reference category. Only valid when ``note_type`` is a reference.
+    directory : pathlib.Path | None
+        Vault-relative or absolute classification directory. ``None`` uses the
+        layout destination for the type and category.
+    body : str
+        Initial Markdown body.
+    status : Status | None
+        Initial status value. ``None`` omits the ``status`` key entirely.
+    """
+
+    title: str
+    note_type: NoteType
+    category: CategoryLabel | None = None
+    directory: Path | None = None
+    body: str = ""
+    status: Status | None = None
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class Vault:
     """A resolved vault root and the operations scoped to it.
 
@@ -687,37 +717,14 @@ class Vault:
             return UnparsedPage(file=file, failure="Note has no type")
         return ParsedPage(file=file, document=document)
 
-    def create(
-        self,
-        title: str,
-        note_type: NoteType,
-        *,
-        category: CategoryLabel | None = None,
-        directory: Path | None = None,
-        body: str = "",
-        status: Status | None = None,
-    ) -> Path:
+    def create(self, draft: NoteDraft) -> Path:
         """Create a note whose sanitized filename stem becomes its identity.
 
         Parameters
         ----------
-        title : str
-            Name to sanitize into the identity filename. The new note's display
-            title is derived separately from its body.
-        note_type : NoteType
-            Declared type for the new note.
-        category : CategoryLabel | None
-            Reference category. Only valid when ``note_type`` is
-            :attr:`afanes.models.note.NoteType.REFERENCE`; ``None`` creates an uncategorized
-            reference.
-        directory : Path | None
-            Vault-relative or absolute classification directory. Defaults to
-            the layout destination for ``note_type`` and ``category``. Missing
-            directories are created.
-        body : str
-            Initial Markdown body. New files use LF and UTF-8 without a BOM.
-        status : Status | None
-            Initial status value. ``None`` omits the ``status`` key entirely.
+        draft : NoteDraft
+            Title, type, optional category, directory, body, and status for the
+            new note.
 
         Returns
         -------
@@ -733,6 +740,12 @@ class Vault:
         VaultError
             If the target path is not a directory.
         """
+        title = draft.title
+        note_type = draft.note_type
+        category = draft.category
+        directory = draft.directory
+        body = draft.body
+        status = draft.status
         if category is not None and note_type is not NoteType.REFERENCE:
             message = "Only reference notes can declare a category"
             raise NoteParseError(message)

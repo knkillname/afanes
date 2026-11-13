@@ -564,7 +564,9 @@ class TestProcessingView:
         root = tmp_path / "vault"
         versioned(root)
         vault = afanes.core.vault.service.Vault(root)
-        note = vault.create("Note", NoteType.REFERENCE, body="[Launch](<note:Launch>)\n")
+        note = vault.create(
+            afanes.core.vault.service.NoteDraft("Note", NoteType.REFERENCE, body="[Launch](<note:Launch>)\n")
+        )
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Launch")
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
             _plan_request(capture, ProcessingOutcome.PROJECT)
@@ -610,7 +612,7 @@ class TestProcessingView:
         root = tmp_path / "vault"
         versioned(root)
         vault = afanes.core.vault.service.Vault(root)
-        project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
+        project = vault.create(afanes.core.vault.service.NoteDraft("Home", NoteType.PROJECT, body="# Home\n"))
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Call the plumber")
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
             _plan_request(capture, ProcessingOutcome.APPEND_STEP, project="Home")
@@ -767,7 +769,7 @@ class TestProcessingView:
         root = tmp_path / "vault"
         versioned(root)
         vault = afanes.core.vault.service.Vault(root)
-        vault.create("Launch", NoteType.PROJECT, body="# Launch the product\n")
+        vault.create(afanes.core.vault.service.NoteDraft("Launch", NoteType.PROJECT, body="# Launch the product\n"))
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Plan")
         _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
@@ -792,8 +794,8 @@ class TestProcessingView:
         root = tmp_path / "vault"
         versioned(root)
         vault = afanes.core.vault.service.Vault(root)
-        vault.create("Home", NoteType.PROJECT, body="# Home improvements\n")
-        vault.create("Cabin", NoteType.PROJECT, body="# Home improvements\n")
+        vault.create(afanes.core.vault.service.NoteDraft("Home", NoteType.PROJECT, body="# Home improvements\n"))
+        vault.create(afanes.core.vault.service.NoteDraft("Cabin", NoteType.PROJECT, body="# Home improvements\n"))
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Plan")
         _open_vault_capture(root, capture, monkeypatch)
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)

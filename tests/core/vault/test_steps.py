@@ -61,7 +61,9 @@ class TestStepWrites:
         root = tmp_path / "vault"
         root.mkdir()
         vault = afanes.core.vault.service.Vault(root)
-        project = vault.create("Home", NoteType.PROJECT, body="# Home\n\n- [ ] One\n- [ ] Two\n")
+        project = vault.create(
+            afanes.core.vault.service.NoteDraft("Home", NoteType.PROJECT, body="# Home\n\n- [ ] One\n- [ ] Two\n")
+        )
         return vault, project
 
     def test_tick_and_untick_rewrite_one_line(self, tmp_path: Path) -> None:
@@ -113,7 +115,7 @@ class TestStepWrites:
 
     def test_step_writes_require_confirmation_and_a_project(self, tmp_path: Path) -> None:
         vault, project = self._project(tmp_path)
-        reference = vault.create("Ref", NoteType.REFERENCE)
+        reference = vault.create(afanes.core.vault.service.NoteDraft("Ref", NoteType.REFERENCE))
         index = 2
 
         with pytest.raises(VaultError):
@@ -127,7 +129,7 @@ class TestStepWrites:
 
     def test_append_step_requires_confirmation_and_a_project(self, tmp_path: Path) -> None:
         vault, project = self._project(tmp_path)
-        reference = vault.create("Ref", NoteType.REFERENCE)
+        reference = vault.create(afanes.core.vault.service.NoteDraft("Ref", NoteType.REFERENCE))
 
         with pytest.raises(VaultError):
             afanes.core.vault.steps.VaultSteps(vault).append_step(project, "Three")

@@ -1042,7 +1042,9 @@ class TestCreateNote:
     def test_sanitizes_the_title_into_the_filename(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        path = afanes.core.vault.service.Vault(root).create("Q1: Planning?", NoteType.NOTE, body="Body")
+        path = afanes.core.vault.service.Vault(root).create(
+            afanes.core.vault.service.NoteDraft("Q1: Planning?", NoteType.NOTE, body="Body")
+        )
         assert path.name == "Q1 Planning.md"
         assert NoteDocument.from_text(path.read_text(encoding="utf-8")).note_type is NoteType.NOTE
 
@@ -1050,7 +1052,7 @@ class TestCreateNote:
         root = tmp_path / "vault"
         root.mkdir()
 
-        path = afanes.core.vault.service.Vault(root).create("Ada", NoteType.NOTE)
+        path = afanes.core.vault.service.Vault(root).create(afanes.core.vault.service.NoteDraft("Ada", NoteType.NOTE))
 
         assert path == root / "inbox" / "Ada.md"
 
@@ -1058,7 +1060,9 @@ class TestCreateNote:
         root = tmp_path / "vault"
         root.mkdir()
 
-        path = afanes.core.vault.service.Vault(root).create("Ada", NoteType.PROJECT, status=Status.ACTIVE)
+        path = afanes.core.vault.service.Vault(root).create(
+            afanes.core.vault.service.NoteDraft("Ada", NoteType.PROJECT, status=Status.ACTIVE)
+        )
 
         assert path == root / "projects" / "Ada.md"
 
@@ -1066,7 +1070,9 @@ class TestCreateNote:
         root = tmp_path / "vault"
         root.mkdir()
 
-        path = afanes.core.vault.service.Vault(root).create("Ada", NoteType.REFERENCE)
+        path = afanes.core.vault.service.Vault(root).create(
+            afanes.core.vault.service.NoteDraft("Ada", NoteType.REFERENCE)
+        )
 
         assert path == root / "reference" / "Ada.md"
 
@@ -1075,9 +1081,11 @@ class TestCreateNote:
         root.mkdir()
 
         path = afanes.core.vault.service.Vault(root).create(
-            "Ada",
-            NoteType.REFERENCE,
-            category=CategoryLabel("person"),
+            afanes.core.vault.service.NoteDraft(
+                "Ada",
+                NoteType.REFERENCE,
+                category=CategoryLabel("person"),
+            )
         )
 
         assert path == root / "reference" / "person" / "Ada.md"
@@ -1085,9 +1093,11 @@ class TestCreateNote:
     def test_suffixes_a_collision_within_the_scheme(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        afanes.core.vault.service.Vault(root).create("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
+        afanes.core.vault.service.Vault(root).create(
+            afanes.core.vault.service.NoteDraft("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
+        )
         second = afanes.core.vault.service.Vault(root).create(
-            "Ada", NoteType.REFERENCE, category=CategoryLabel("person")
+            afanes.core.vault.service.NoteDraft("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
         )
         assert second.name == "Ada 2.md"
 
@@ -1095,30 +1105,38 @@ class TestCreateNote:
         root = tmp_path / "vault"
         (root / "reference" / "person").mkdir(parents=True)
         (root / "reference" / "person" / "Ada.txt").write_text("occupied", encoding="utf-8")
-        path = afanes.core.vault.service.Vault(root).create("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
+        path = afanes.core.vault.service.Vault(root).create(
+            afanes.core.vault.service.NoteDraft("Ada", NoteType.REFERENCE, category=CategoryLabel("person"))
+        )
         assert path.name == "Ada 2.md"
 
     def test_allows_cross_scheme_reuse_in_different_directories(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
         person = afanes.core.vault.service.Vault(root).create(
-            "Ada", NoteType.REFERENCE, category=CategoryLabel("person"), directory=Path("people")
+            afanes.core.vault.service.NoteDraft(
+                "Ada", NoteType.REFERENCE, category=CategoryLabel("person"), directory=Path("people")
+            )
         )
-        project = afanes.core.vault.service.Vault(root).create("Ada", NoteType.PROJECT, directory=Path("work"))
+        project = afanes.core.vault.service.Vault(root).create(
+            afanes.core.vault.service.NoteDraft("Ada", NoteType.PROJECT, directory=Path("work"))
+        )
         assert person.name == "Ada.md"
         assert project.name == "Ada.md"
 
     def test_avoids_reserved_device_names(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        path = afanes.core.vault.service.Vault(root).create("CON", NoteType.NOTE)
+        path = afanes.core.vault.service.Vault(root).create(afanes.core.vault.service.NoteDraft("CON", NoteType.NOTE))
         assert path.name == "CON-note.md"
 
     def test_creates_a_missing_classification_directory(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
         path = afanes.core.vault.service.Vault(root).create(
-            "Ada", NoteType.REFERENCE, category=CategoryLabel("person"), directory=Path("people")
+            afanes.core.vault.service.NoteDraft(
+                "Ada", NoteType.REFERENCE, category=CategoryLabel("person"), directory=Path("people")
+            )
         )
         assert path.parent.is_dir()
 
@@ -1127,14 +1145,18 @@ class TestCreateNote:
         root.mkdir()
         with pytest.raises(VaultPathError):
             afanes.core.vault.service.Vault(root).create(
-                "Ada", NoteType.REFERENCE, category=CategoryLabel("person"), directory=Path("../outside")
+                afanes.core.vault.service.NoteDraft(
+                    "Ada", NoteType.REFERENCE, category=CategoryLabel("person"), directory=Path("../outside")
+                )
             )
 
     def test_new_note_is_valid_markdown(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
         path = afanes.core.vault.service.Vault(root).create(
-            "Ada", NoteType.REFERENCE, category=CategoryLabel("person"), body="Hello\n"
+            afanes.core.vault.service.NoteDraft(
+                "Ada", NoteType.REFERENCE, category=CategoryLabel("person"), body="Hello\n"
+            )
         )
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
         assert document.note_type is NoteType.REFERENCE
@@ -1145,7 +1167,9 @@ class TestCreateNote:
     def test_new_note_normalizes_line_endings_and_removes_a_bom(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        path = afanes.core.vault.service.Vault(root).create("Ada", NoteType.NOTE, body="\ufeffone\r\ntwo\r")
+        path = afanes.core.vault.service.Vault(root).create(
+            afanes.core.vault.service.NoteDraft("Ada", NoteType.NOTE, body="\ufeffone\r\ntwo\r")
+        )
         data = path.read_bytes()
         assert b"\r" not in data
         assert not data.startswith(b"\xef\xbb\xbf")
@@ -1154,7 +1178,7 @@ class TestCreateNote:
     def test_default_omits_the_status_key(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        path = afanes.core.vault.service.Vault(root).create("Ada", NoteType.NOTE)
+        path = afanes.core.vault.service.Vault(root).create(afanes.core.vault.service.NoteDraft("Ada", NoteType.NOTE))
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
         assert document.raw["type"] == "note"
         assert document.date is not None
@@ -1163,7 +1187,9 @@ class TestCreateNote:
     def test_explicit_status_is_written(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        path = afanes.core.vault.service.Vault(root).create("Ada", NoteType.PROJECT, status=Status.ACTIVE)
+        path = afanes.core.vault.service.Vault(root).create(
+            afanes.core.vault.service.NoteDraft("Ada", NoteType.PROJECT, status=Status.ACTIVE)
+        )
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
         assert document.status is Status.ACTIVE
 
@@ -1173,9 +1199,11 @@ class TestCreateNote:
 
         with pytest.raises(NoteParseError):
             afanes.core.vault.service.Vault(root).create(
-                "Ada",
-                NoteType.NOTE,
-                category=CategoryLabel("person"),
+                afanes.core.vault.service.NoteDraft(
+                    "Ada",
+                    NoteType.NOTE,
+                    category=CategoryLabel("person"),
+                )
             )
 
 
