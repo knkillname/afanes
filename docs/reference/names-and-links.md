@@ -54,9 +54,10 @@ matching template card and opens it in edit mode. Cancelling writes nothing.
 
 A rename updates the first heading only when it still matches the old identity; a custom heading is
 preserved. Renaming a note also rewrites every resolving body reference and every metadata role name
-that uses it: a project's `owner` and `asked_by` values and a step's `owners`. Moving a note to
-`trash/` makes its inbound references unresolved without rewriting the referring notes, including role
-names. Moving the note back restores them.
+that uses it: a project's `owner` and `asked_by` values and a step's `owners`. When a rewrite cannot
+update every note, the report names the updated notes and the skipped or failed ones with the reason,
+using vault-relative paths. Moving a note to `trash/` makes its inbound references unresolved without
+rewriting the referring notes, including role names. Moving the note back restores them.
 
 If a reference name was unsafe as a filename, the first save offers to rewrite the references that still
 use it, including role names. If the safe name already belongs to a page in the same scheme, that page

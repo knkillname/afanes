@@ -20,9 +20,9 @@
 
 ## 4. Rewrite reports
 
-- [ ] 4.1 Add the private rewrite-report formatter on `PageDialogState`, the partial-success strings, and the updated/not-updated/reason wording; use it in rename, type change, date change, and repair; verify the affected UI tests pass.
-- [ ] 4.2 Add one UI test per rewrite path that simulates a partial failure and asserts the status message names the updated and not-updated notes with relative paths and the reason; verify all four tests pass.
-- [ ] 4.3 Check whether the user documentation describes partial-failure messages and update it if needed; verify `hatch run docs:build` passes.
+- [x] 4.1 Add the private rewrite-report formatter on `PageDialogState`, the partial-success strings, and the updated/not-updated/reason wording; use it in rename, type change, date change, and repair; verify the affected UI tests pass.
+- [x] 4.2 Add one UI test per rewrite path that simulates a partial failure and asserts the status message names the updated and not-updated notes with relative paths and the reason; verify all four tests pass.
+- [x] 4.3 Check whether the user documentation describes partial-failure messages and update it if needed; verify `hatch run docs:build` passes.
 
 ## 5. Search and null specifications
 

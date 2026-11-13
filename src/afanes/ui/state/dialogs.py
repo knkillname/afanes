@@ -12,7 +12,13 @@ from afanes.core.editing import NormalDraft, PageDraftFactory
 from afanes.core.errors import AfanesError, ContentChangedError, NoteParseError, VaultError
 from afanes.core.labels import PageLabels
 from afanes.core.vault.log_conversions import LogConversions
-from afanes.core.vault.naming_reports import CategoryMovePreview, RenamePreview, TrashPreview
+from afanes.core.vault.naming_reports import (
+    CategoryMovePreview,
+    RenamePreview,
+    RenameReport,
+    RewriteReport,
+    TrashPreview,
+)
 from afanes.core.vault.snapshot import ReferenceSite, VaultPath
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 from afanes.ui.state.lock import CommandLock
@@ -153,11 +159,9 @@ class PageDialogState:
         await self.session.refresh_snapshot()
         if not await self.pages.load(preview.target_path, editing=True):
             return False
-        remaining = len(report.failed) + len(report.skipped)
-        if remaining:
-            self.status.show_message(
-                afanes.ui.strings.PAGE_TYPE_CHANGE_FAILED.format(detail=f"{remaining} notes were not updated")
-            )
+        report_text = self._rewrite_report(report)
+        if report_text is not None:
+            self.status.show_message(afanes.ui.strings.PAGE_TYPE_CHANGE_PARTIAL.format(report=report_text))
         return True
 
     async def set_page_category(self, category: CategoryLabel | None) -> bool:
@@ -341,11 +345,9 @@ class PageDialogState:
         await self.session.refresh_snapshot()
         if not await self.pages.load(preview.target_path, editing=True):
             return False
-        remaining = len(report.failed) + len(report.skipped)
-        if remaining:
-            self.status.show_message(
-                afanes.ui.strings.PAGE_DATE_CHANGE_FAILED.format(detail=f"{remaining} notes were not updated")
-            )
+        report_text = self._rewrite_report(report)
+        if report_text is not None:
+            self.status.show_message(afanes.ui.strings.PAGE_DATE_CHANGE_PARTIAL.format(report=report_text))
         return True
 
     async def _save_in_place_date(self, page: NormalDraft, text: str) -> bool:
@@ -519,11 +521,9 @@ class PageDialogState:
                     return False
                 self.pages.repair_preview = None
                 await self.session.refresh_snapshot()
-                remaining = len(report.failed) + len(report.skipped)
-                if remaining:
-                    self.status.show_message(
-                        afanes.ui.strings.PAGE_REPAIR_FAILED.format(detail=f"{remaining} notes were not updated")
-                    )
+                report_text = self._rewrite_report(report)
+                if report_text is not None:
+                    self.status.show_message(afanes.ui.strings.PAGE_REPAIR_PARTIAL.format(report=report_text))
                 return True
             finally:
                 self.status.set_busy(busy=False)
@@ -639,11 +639,9 @@ class PageDialogState:
                     return False
                 self.pages.editing = False
                 await self.session.refresh_snapshot()
-                remaining = len(report.failed) + len(report.skipped)
-                if remaining:
-                    self.status.show_message(
-                        afanes.ui.strings.PAGE_RENAME_FAILED.format(detail=f"{remaining} notes were not updated")
-                    )
+                report_text = self._rewrite_report(report)
+                if report_text is not None:
+                    self.status.show_message(afanes.ui.strings.PAGE_RENAME_PARTIAL.format(report=report_text))
                 return True
             finally:
                 self.status.set_busy(busy=False)
@@ -654,6 +652,56 @@ class PageDialogState:
             self.rename_preview = None
             self.pages.blocking_message = None
             self.status.clear_message()
+
+    def _rewrite_report(self, report: RenameReport | RewriteReport) -> str | None:
+        """Format a partial reference rewrite, or return ``None`` when complete.
+
+        Parameters
+        ----------
+        report : RenameReport | RewriteReport
+            Outcome of a rename, type change, date change, or link repair.
+
+        Returns
+        -------
+        str | None
+            Relative updated and not-updated paths with each reason, or
+            ``None`` when every note was rewritten.
+        """
+        if not report.skipped and not report.failed:
+            return None
+        updated = ", ".join(self._relative_report_path(path) for path in report.updated)
+        if not updated:
+            updated = afanes.ui.strings.PAGE_REWRITE_NONE
+        problems = [
+            afanes.ui.strings.PAGE_REWRITE_PROBLEM.format(
+                path=self._relative_report_path(path),
+                reason=afanes.ui.strings.PAGE_REWRITE_CHANGED_ON_DISK,
+            )
+            for path in report.skipped
+        ]
+        problems.extend(
+            afanes.ui.strings.PAGE_REWRITE_PROBLEM.format(
+                path=self._relative_report_path(failure.path),
+                reason=failure.message,
+            )
+            for failure in report.failed
+        )
+        return " ".join(
+            [
+                afanes.ui.strings.PAGE_REWRITE_UPDATED.format(paths=updated),
+                afanes.ui.strings.PAGE_REWRITE_NOT_UPDATED.format(paths="; ".join(problems)),
+            ]
+        )
+
+    def _relative_report_path(self, path: Path) -> str:
+        """Return a report path relative to the active vault root."""
+        root = self.session.vault_root
+        if root is None:
+            return path.as_posix()
+        try:
+            return path.relative_to(root).as_posix()
+        except ValueError:
+            return path.as_posix()
 
     async def begin_trash(self) -> TrashPreview | None:
         """Plan moving the current page to trash and retain it for confirmation.

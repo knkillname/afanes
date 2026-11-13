@@ -1,6 +1,7 @@
 """Tests for the single application state controller."""
 
 import asyncio
+import dataclasses
 import datetime
 import json
 import os
@@ -12,6 +13,9 @@ import pytest
 import afanes.core.connections
 import afanes.core.settings
 import afanes.core.templates
+import afanes.core.vault.log_conversions
+import afanes.core.vault.naming
+import afanes.core.vault.naming_reports
 import afanes.core.vault.pages
 import afanes.core.vault.processing
 import afanes.core.vault.schema
@@ -4475,3 +4479,227 @@ class TestLogTypeChange:
         assert asyncio.run(scenario()) is False
         assert state.status.message is not None
         assert path.is_file()
+
+
+class TestRewriteReports:
+    def test_rename_reports_updated_and_skipped_notes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        person = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", category="person"),
+        )
+        _write_note(vault / "notes" / "Ref.md", _note_text("[Ada](<note:Ada>)\n"))
+        skipped = _write_note(vault / "notes" / "Skipped.md", _note_text("# Skipped\n"))
+        failed = _write_note(vault / "notes" / "Failed.md", _note_text("# Failed\n"))
+        original = afanes.core.vault.naming.VaultNaming.apply_rename
+
+        def apply_with_partial(
+            vault_naming: afanes.core.vault.naming.VaultNaming,
+            preview: afanes.core.vault.naming_reports.RenamePreview,
+            *,
+            confirm: bool = False,
+        ) -> afanes.core.vault.naming_reports.RenameReport:
+            report = original(vault_naming, preview, confirm=confirm)
+            return dataclasses.replace(
+                report,
+                skipped=(skipped.resolve(),),
+                failed=(
+                    afanes.core.vault.naming_reports.RewriteFailure(
+                        path=failed.resolve(),
+                        message="permission denied",
+                    ),
+                ),
+            )
+
+        monkeypatch.setattr(
+            afanes.core.vault.naming.VaultNaming,
+            "apply_rename",
+            apply_with_partial,
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(person)
+            assert await state.dialogs.begin_rename("Ada King") is not None
+            return await state.dialogs.apply_rename()
+
+        assert asyncio.run(scenario()) is True
+        message = state.status.message
+        assert message is not None
+        assert "Updated: " in message
+        assert "reference/people/Ada King.md" in message
+        assert "notes/Ref.md" in message
+        assert "notes/Skipped.md (changed on disk after planning)" in message
+        assert "notes/Failed.md (permission denied)" in message
+
+    def test_type_change_reports_updated_and_failed_notes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "reference" / "A quiet Tuesday.md",
+            "---\ntype: reference\ndate: 2025-10-12\n---\n\n# A quiet Tuesday\n",
+        )
+        referrer = _write_note(
+            vault / "notes" / "Ref.md",
+            _note_text("[Tuesday](<note:A quiet Tuesday>)\n"),
+        )
+        skipped = _write_note(vault / "notes" / "Skipped.md", _note_text("# Skipped\n"))
+        failed = _write_note(vault / "notes" / "Failed.md", _note_text("# Failed\n"))
+        original = afanes.core.vault.naming.VaultNaming.apply_rename
+
+        def apply_with_partial(
+            vault_naming: afanes.core.vault.naming.VaultNaming,
+            preview: afanes.core.vault.naming_reports.RenamePreview,
+            *,
+            confirm: bool = False,
+        ) -> afanes.core.vault.naming_reports.RenameReport:
+            report = original(vault_naming, preview, confirm=confirm)
+            return dataclasses.replace(
+                report,
+                skipped=(skipped.resolve(),),
+                failed=(
+                    afanes.core.vault.naming_reports.RewriteFailure(
+                        path=failed.resolve(),
+                        message="permission denied",
+                    ),
+                ),
+            )
+
+        monkeypatch.setattr(
+            afanes.core.vault.naming.VaultNaming,
+            "apply_rename",
+            apply_with_partial,
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            return await state.dialogs.set_page_type(NoteType.LOG)
+
+        assert asyncio.run(scenario()) is True
+        message = state.status.message
+        assert message is not None
+        assert "Updated: " in message
+        assert "notes/Ref.md" in message
+        assert "notes/Skipped.md (changed on disk after planning)" in message
+        assert "notes/Failed.md (permission denied)" in message
+        assert (vault / "log" / "2025" / "10" / "2025-10-12.md").is_file()
+        assert "log:2025-10-12" in referrer.read_text(encoding="utf-8")
+
+    def test_date_change_reports_updated_and_skipped_notes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        path = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            "---\ntype: log\ndate: 2025-10-12\n---\n\n# A quiet Tuesday\n",
+        )
+        referrer = _write_note(
+            vault / "notes" / "Ref.md",
+            _note_text("[Tuesday](<log:2025-10-12>)\n"),
+        )
+        skipped = _write_note(vault / "notes" / "Skipped.md", _note_text("# Skipped\n"))
+        failed = _write_note(vault / "notes" / "Failed.md", _note_text("# Failed\n"))
+        original = afanes.core.vault.naming.VaultNaming.apply_rename
+
+        def apply_with_partial(
+            vault_naming: afanes.core.vault.naming.VaultNaming,
+            preview: afanes.core.vault.naming_reports.RenamePreview,
+            *,
+            confirm: bool = False,
+        ) -> afanes.core.vault.naming_reports.RenameReport:
+            report = original(vault_naming, preview, confirm=confirm)
+            return dataclasses.replace(
+                report,
+                skipped=(skipped.resolve(),),
+                failed=(
+                    afanes.core.vault.naming_reports.RewriteFailure(
+                        path=failed.resolve(),
+                        message="permission denied",
+                    ),
+                ),
+            )
+
+        monkeypatch.setattr(
+            afanes.core.vault.naming.VaultNaming,
+            "apply_rename",
+            apply_with_partial,
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            return await state.dialogs.save_page_date("2025-10-13")
+
+        assert asyncio.run(scenario()) is True
+        message = state.status.message
+        assert message is not None
+        assert "Updated: " in message
+        assert "notes/Ref.md" in message
+        assert "notes/Skipped.md (changed on disk after planning)" in message
+        assert "notes/Failed.md (permission denied)" in message
+        assert (vault / "log" / "2025" / "10" / "2025-10-13.md").is_file()
+        assert "log:2025-10-13" in referrer.read_text(encoding="utf-8")
+
+    def test_repair_reports_updated_and_failed_notes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        source = _write_note(vault / "notes" / "Source.md", _note_text("[Q1](<note:Q1: Planning?>)\n"))
+        skipped = _write_note(vault / "notes" / "Skipped.md", _note_text("# Skipped\n"))
+        failed = _write_note(vault / "notes" / "Failed.md", _note_text("# Failed\n"))
+        original = afanes.core.vault.naming.VaultNaming.apply_reference_repair
+
+        def apply_with_partial(
+            vault_naming: afanes.core.vault.naming.VaultNaming,
+            preview: afanes.core.vault.naming_reports.ReferenceRepairPreview,
+            *,
+            confirm: bool = False,
+        ) -> afanes.core.vault.naming_reports.RewriteReport:
+            report = original(vault_naming, preview, confirm=confirm)
+            return dataclasses.replace(
+                report,
+                skipped=(skipped.resolve(),),
+                failed=(
+                    afanes.core.vault.naming_reports.RewriteFailure(
+                        path=failed.resolve(),
+                        message="permission denied",
+                    ),
+                ),
+            )
+
+        monkeypatch.setattr(
+            afanes.core.vault.naming.VaultNaming,
+            "apply_reference_repair",
+            apply_with_partial,
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.follow_link("note:Q1: Planning?")
+            await state.pages.set_page_body("# Q1: Planning?\n\nDraft.\n")
+            await state.pages.autosave()
+            return await state.dialogs.apply_repair()
+
+        assert asyncio.run(scenario()) is True
+        message = state.status.message
+        assert message is not None
+        assert "Updated: " in message
+        assert "notes/Source.md" in message
+        assert "notes/Skipped.md (changed on disk after planning)" in message
+        assert "notes/Failed.md (permission denied)" in message
+        assert source.is_file()
