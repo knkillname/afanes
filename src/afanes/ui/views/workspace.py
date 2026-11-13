@@ -183,6 +183,13 @@ class WorkspaceView:
             ],
             key="workspace-change",
         )
+        self.drawer_close_button = ft.IconButton(
+            icon=ft.Icons.CLOSE_OUTLINED,
+            tooltip=afanes.ui.strings.CLOSE_NAVIGATION,
+            on_click=self._close_drawer,
+            visible=False,
+            key="workspace-drawer-close",
+        )
         self.nav_toggle = ft.IconButton(
             icon=ft.Icons.MENU_OUTLINED,
             tooltip=afanes.ui.strings.WORKSPACE_NAVIGATION,
@@ -311,7 +318,7 @@ class WorkspaceView:
         self.navigation_header = ft.Container(
             height=afanes.ui.theme.HEADER_HEIGHT,
             content=ft.Row(
-                controls=[self.vault_text, self.change_button],
+                controls=[self.vault_text, self.change_button, self.drawer_close_button],
                 spacing=afanes.ui.theme.ITEM_GAP,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
@@ -438,6 +445,13 @@ class WorkspaceView:
         if wide:
             self._drawer_open = False
         self.nav_toggle.visible = not wide
+        self.drawer_close_button.visible = not wide
+        self.navigation.border = (
+            None
+            if wide
+            else ft.Border.only(right=ft.BorderSide(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR))
+        )
+        self.navigation.shadow = None if wide else afanes.ui.theme.DRAWER_SHADOW
         if wide:
             self.browser_region.width = afanes.ui.theme.BROWSER_MAX_WIDTH
             self.browser_region.expand = False

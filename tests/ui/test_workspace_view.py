@@ -885,6 +885,9 @@ class TestAdaptiveLayout:
 
         assert view.shell_row.controls == [view.navigation, view.browser_region, view.detail_region]
         assert view.nav_toggle.visible is False
+        assert view.drawer_close_button.visible is False
+        assert view.navigation.border is None
+        assert view.navigation.shadow is None
 
     def test_a_medium_window_keeps_browser_and_detail(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
@@ -893,6 +896,9 @@ class TestAdaptiveLayout:
 
         assert view.shell_row.controls == [view.browser_region, view.detail_region]
         assert view.nav_toggle.visible is True
+        assert view.drawer_close_button.visible is True
+        assert view.navigation.border is not None
+        assert view.navigation.shadow == afanes.ui.theme.DRAWER_SHADOW
 
     def test_a_narrow_presentation_starts_with_the_browser(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -963,6 +969,15 @@ class TestAdaptiveLayout:
         asyncio.run(_handler(view.nav_toggle)())
 
         view.close_drawer()
+
+        assert view.root.controls == [view.shell_column]
+
+    def test_the_drawer_close_button_closes_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN)
+        asyncio.run(_handler(view.nav_toggle)())
+
+        asyncio.run(_handler(view.drawer_close_button)())
 
         assert view.root.controls == [view.shell_column]
 

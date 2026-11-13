@@ -144,7 +144,11 @@ SPLASH_COLOR = ft.Colors.with_opacity(0.08, ft.Colors.ON_SURFACE)
 HIGHLIGHT_COLOR = ft.Colors.with_opacity(0.08, ft.Colors.ON_SURFACE)
 HOVER_COLOR = ft.Colors.with_opacity(0.05, ft.Colors.ON_SURFACE)
 FOCUS_COLOR = ft.Colors.with_opacity(0.15, ft.Colors.PRIMARY)
-DRAWER_SCRIM_COLOR = ft.Colors.with_opacity(0.32, "#000000")
+DRAWER_SCRIM_COLOR = ft.Colors.with_opacity(0.14, "#000000")
+DRAWER_SHADOW = ft.BoxShadow(
+    blur_radius=16,
+    color=ft.Colors.with_opacity(0.18, "#000000"),
+)
 
 BASE_FONT_SIZE = 15
 CAPTION_SIZE = round(BASE_FONT_SIZE * 0.82)
