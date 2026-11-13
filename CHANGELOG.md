@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- **Roadmap record.** `RELEASE.md` now records the candidate themes after the 1.0 gate (HIG
+  conformance completion, internationalization, and note reminders), the open scope decisions, and
+  the explicit non-goals and reversed plans; the stale `0.6.0` checkpoint is retired. This
+  implements the `define-roadmap` OpenSpec change. README: no change required. Docs: no change
+  required.
 - **Global search has its own browser row.** The browser header now holds only the destination title,
   refresh, and destination actions, with a permanent full-width search row beneath it and a clear
   action. While a query is active the title reads **Search results**, destination-specific controls

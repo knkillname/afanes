@@ -1,7 +1,8 @@
 # Release readiness
 
-This file is the single definition of the first usable MVP and the evidence
-required before version `1.0.0`. `AGENTS.md` section 5.3, `CHANGELOG.md`, and
+This file is the single definition of the first usable MVP, the platform
+evidence required before version `1.0.0`, the version path, and the candidate
+themes after the 1.0 gate. `AGENTS.md` section 5.3, `CHANGELOG.md`, and
 `README.md` point here instead of restating the criteria.
 
 ## `1.0.0` definition
@@ -48,12 +49,59 @@ assumption.
 
 ## Version path
 
-1. `0.6.0` is the checkpoint that groups the remaining work: the macOS and
-   Windows manual checks above, the cross-reference updates in this change, and
-   any documentation drift those checks expose. The maintainer confirms the
-   checkpoint when its grouped work is merged and the automated gates pass.
-2. `1.0.0` follows only when every checklist row and every platform cell is
-   green. The maintainer confirms the transition after reviewing the recorded
-   evidence in this file.
-3. An archive that completes neither condition keeps its changelog entry under
-   `Unreleased` and does not bump the version.
+`0.7.0` is the current version. The next bump follows the existing milestone
+rule: an archive that completes no milestone keeps its entry under `Unreleased`
+and does not bump the version, and a completed milestone that includes the
+queued breaking UI changes is a MINOR release. `1.0.0` follows only when every
+checklist row and every platform cell is green. The maintainer confirms the
+transition after reviewing the recorded evidence in this file.
+
+## Candidate themes after the 1.0 gate
+
+These themes are candidates, not commitments, and they are not ordered. None is
+part of the `1.0.0` checklist today; moving one into `1.0.0` requires a change
+to this file. Each theme becomes work only through its own approved OpenSpec
+change.
+
+### HIG conformance completion
+
+The remaining migration waves are 3 (writing style and a copy gate), 4
+(feedback: undo, toasts, banners, overlays), 5 (keyboard and accessibility), and
+7 (app identity, placeholder pages, final palette, and an empty conformance
+baseline). The wave detail, the five bounded Flet differences, and the baseline
+rule live in `docs/develop/interface-standard.md`; that document remains the
+owner of HIG conformance.
+
+### Interface internationalization
+
+Locale-aware copy, date and number formatting, and bundled template content.
+The target languages, catalog mechanism, runtime language switch, and the
+treatment of the command-line copy remain open.
+
+### Note reminders
+
+Recurring schedules for notes, including daily, weekly, monthly, and
+nth-weekday patterns; the in-app or native delivery channel; where the schedule
+lives; how missed occurrences are caught up; and whether the reminder key
+changes the vault schema.
+
+## Open decisions
+
+- Whether any candidate theme moves into `1.0.0`, or all remain after the gate.
+- Which languages interface internationalization targets.
+- Whether reminders fire only while the application is running or also need
+  native notifications or OS-level scheduling.
+- Whether a reminder key changes the vault schema, and if so whether it lands
+  before or after `1.0.0`.
+
+## Not planned
+
+**Non-goals.** Code signing, notarization, auto-update, and package-index or
+GitHub release publishing remain outside the project.
+
+**Deferred.** Docs-site deployment, versioned documentation, the export
+capability, and a persistent reference cache are deferred; none has a scheduled
+change.
+
+**Reversed.** The SQLite index, `afanes index`, and `afanes doctor` are not
+planned. `AGENTS.md` requires an approved change before any of them is added.
