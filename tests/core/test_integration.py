@@ -28,7 +28,7 @@ from afanes.core.vault.snapshot import UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType, Status
 from afanes.models.step import StepEdit, StepEditKind
-from tests.support import processing_request, versioned
+from tests.support import constant, processing_request, versioned
 
 TODAY = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
 TWO_OPEN_STEPS = 2
@@ -249,7 +249,7 @@ class TestPageEditingLifecycle:
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",
-            classmethod(lambda _cls: tmp_path / "settings.json"),
+            classmethod(constant(tmp_path / "settings.json")),
         )
         state = afanes.ui.state.app_state
         state.reset()
@@ -297,7 +297,7 @@ class TestPageEditingLifecycle:
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",
-            classmethod(lambda _cls: tmp_path / "settings.json"),
+            classmethod(constant(tmp_path / "settings.json")),
         )
         state = afanes.ui.state.app_state
         state.reset()
@@ -416,7 +416,7 @@ class TestReviewWorkflow:
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",
-            classmethod(lambda _cls: tmp_path / "settings.json"),
+            classmethod(constant(tmp_path / "settings.json")),
         )
         state = afanes.ui.state.app_state
         state.reset()
@@ -479,7 +479,7 @@ class TestWorkspaceLiveness:
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",
-            classmethod(lambda _cls: tmp_path / "settings.json"),
+            classmethod(constant(tmp_path / "settings.json")),
         )
         state = afanes.ui.state.app_state
         state.reset()
@@ -592,7 +592,7 @@ class TestStepAwareProjectPageIntegration:
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",
-            classmethod(lambda _cls: tmp_path / "settings.json"),
+            classmethod(constant(tmp_path / "settings.json")),
         )
         state = afanes.ui.state.app_state
 

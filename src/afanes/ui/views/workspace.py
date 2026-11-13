@@ -24,6 +24,7 @@ import afanes.ui.components.capture_bar
 import afanes.ui.components.frozen
 import afanes.ui.components.log_tree
 import afanes.ui.state
+import afanes.ui.state.browser
 import afanes.ui.state.status
 import afanes.ui.strings
 import afanes.ui.theme

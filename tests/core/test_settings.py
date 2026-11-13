@@ -11,6 +11,7 @@ import afanes.core.atomic
 import afanes.core.settings
 from afanes.core.errors import ConfigurationError, VaultError
 from afanes.core.settings import Settings, SettingsStore
+from tests.support import constant
 
 
 class TestConfigDirectory:
@@ -57,7 +58,7 @@ class TestConfigDirectory:
         assert SettingsStore.config_directory() == expected
 
     def test_settings_path_appends_the_filename(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(SettingsStore, "config_directory", classmethod(lambda _cls: _config_directory()))
+        monkeypatch.setattr(SettingsStore, "config_directory", classmethod(constant(_config_directory())))
 
         assert SettingsStore.settings_path() == Path("config/afanes/settings.json")
 
@@ -237,7 +238,7 @@ class TestSettingsStoreLoad:
 
 class TestSettingsStoreSave:
     def test_default_uses_the_platform_settings_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(SettingsStore, "settings_path", classmethod(lambda _cls: tmp_path / "settings.json"))
+        monkeypatch.setattr(SettingsStore, "settings_path", classmethod(constant(tmp_path / "settings.json")))
 
         assert SettingsStore.default() == SettingsStore(tmp_path / "settings.json")
 

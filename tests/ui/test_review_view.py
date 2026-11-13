@@ -16,7 +16,7 @@ import afanes.ui.views.review
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.steps import StepDocument
 from afanes.models.note import Status
-from tests.support import ensure_vault, versioned
+from tests.support import constant, ensure_vault, versioned
 from tests.ui.control_tree import emphasis_controls
 
 TODAY = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
@@ -56,7 +56,7 @@ def _choose_vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.
     monkeypatch.setattr(
         afanes.core.settings.SettingsStore,
         "settings_path",
-        classmethod(lambda _cls: tmp_path / "settings.json"),
+        classmethod(constant(tmp_path / "settings.json")),
     )
     state = afanes.ui.state.app_state
     asyncio.run(state.workspace.choose_vault(versioned(tmp_path / "vault")))
@@ -265,10 +265,10 @@ class TestDueStepCard:
         assert submit.disabled is True
         field.value = "soon"
         asyncio.run(_change_handler(field)())
-        assert submit.disabled is True
+        assert submit.disabled
         field.value = "2026-12-01"
         asyncio.run(_change_handler(field)())
-        assert submit.disabled is False
+        assert not submit.disabled
 
     def test_the_open_form_is_the_only_suggested_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._due_step(tmp_path, monkeypatch)
@@ -478,7 +478,7 @@ class TestStalledProject:
         assert submit.disabled is True
         field.value = "Call the plumber"
         asyncio.run(_change_handler(field)())
-        assert submit.disabled is False
+        assert not submit.disabled
         field.value = "   "
         asyncio.run(_change_handler(field)())
         assert submit.disabled is True

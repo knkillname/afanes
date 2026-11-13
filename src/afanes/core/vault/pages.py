@@ -14,6 +14,7 @@ from pathlib import Path
 
 import afanes.core.atomic
 import afanes.core.names
+import afanes.core.vault.snapshot
 from afanes.core.errors import (
     ContentChangedError,
     EmptyCaptureError,

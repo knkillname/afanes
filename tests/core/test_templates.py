@@ -21,6 +21,7 @@ from afanes.core.errors import (
     UnknownTemplateError,
 )
 from afanes.models.note import NoteDate, NoteType, Status
+from tests.support import constant
 
 GUIDE_TEXT = "---\ntype: reference\n---\n\n# Getting started\n\nA guide.\n"
 PROJECT_TEXT = "---\ntype: project\nstatus: active\n---\n\n# Home\n\n- [ ] Ask [Sam](<note:Sam>)\n"
@@ -39,7 +40,7 @@ def fixed_today(monkeypatch: pytest.MonkeyPatch) -> datetime.date:
     monkeypatch.setattr(
         afanes.core.templates.TemplateCatalog,
         "today",
-        classmethod(lambda _cls: TODAY),
+        classmethod(constant(TODAY)),
     )
     return TODAY
 
@@ -703,7 +704,7 @@ class TestCreationWritesBundledContent:
         monkeypatch.setattr(
             afanes.core.templates.TemplateCatalog,
             "bundled",
-            classmethod(lambda _cls: catalog),
+            classmethod(constant(catalog)),
         )
         target = tmp_path / "vault"
 
@@ -724,7 +725,7 @@ class TestCreationWritesBundledContent:
         monkeypatch.setattr(
             afanes.core.templates.TemplateCatalog,
             "bundled",
-            classmethod(lambda _cls: catalog),
+            classmethod(constant(catalog)),
         )
         target = tmp_path / "vault"
         target.mkdir()
@@ -811,7 +812,7 @@ class TestTemplateCardSeeding:
         monkeypatch.setattr(
             afanes.core.template_cards.TemplateCardCatalog,
             "bundled",
-            classmethod(lambda _cls: catalog),
+            classmethod(constant(catalog)),
         )
         target = tmp_path / "vault"
 

@@ -14,13 +14,14 @@ import afanes.core.vault.schema
 import afanes.core.vault.service
 from afanes.core.errors import ConfigurationError
 from afanes.core.settings import Settings
+from tests.support import constant
 
 CLI_ROOT = Path(afanes.cli.__file__).parent
 FAILING_WRITE_CALL = 2
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
-    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
+    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(constant(path)))
 
 
 def _adoptable(root: Path) -> Path:
@@ -349,7 +350,7 @@ class TestAdoptCommand:
         monkeypatch.setattr(
             afanes.core.vault.schema.os,
             "access",
-            lambda _path, _mode: False,
+            constant(False),
         )
 
         status = afanes.cli.main.CommandLine.main(*["vault", "adopt", str(target)])

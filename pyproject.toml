@@ -59,6 +59,7 @@ dev = [
   "pytest-rerunfailures~=14.0",
   "pytest-xdist[psutil]~=3.5",
   "ruff==0.13.2",
+  "types-PyYAML==6.0.12.20261113",
 ]
 docs = [
   "furo==2025.12.19",
@@ -109,8 +110,14 @@ matrix.deps.extra-dependencies = [
 ]
 
 [tool.hatch.envs.hatch-check-types]
-dependency-groups = ["test"]
-dependencies = ["pyrefly==1.4.1"]
+dependency-groups = ["dev"]
+dependencies = []
+
+[tool.hatch.envs.hatch-check-types.scripts]
+check = "pyrefly check{env:HATCH_CHECK_TYPES_ARGS:} --min-severity=warn {args}"
+check-summarize = "pyrefly check{env:HATCH_CHECK_TYPES_ARGS:} --summarize-errors --min-severity=warn {args}"
+coverage = "pyrefly report{env:HATCH_CHECK_TYPES_ARGS:} {args}"
+config = "pyrefly dump-config {args}"
 
 [tool.ruff]
 line-length = 120
@@ -137,12 +144,6 @@ search-path = ["src", "."]
 python-version = "3.13"
 preset = "strict"
 disable-search-path-heuristics = true
-
-# Newer Pyrefly releases infer an implicit Any for untyped lambda parameters.
-# Tests use these lambdas for monkeypatch shims; keep the diagnostic visible as
-# a warning instead of failing the type gate.
-[tool.pyrefly.errors]
-implicit-any-lambda = "warn"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

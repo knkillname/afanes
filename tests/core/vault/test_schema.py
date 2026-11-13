@@ -14,6 +14,7 @@ from afanes.core.errors import (
     VaultSchemaNotAdoptableError,
     VaultSchemaUnsupportedError,
 )
+from tests.support import constant
 
 
 def _write_settings(root: Path, text: str) -> Path:
@@ -253,13 +254,13 @@ class TestAdoptionEligibility:
 
     def test_an_unwritable_folder_is_not_adoptable(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _make_adoptable(tmp_path)
-        monkeypatch.setattr(afanes.core.vault.schema.os, "access", lambda _path, _mode: False)
+        monkeypatch.setattr(afanes.core.vault.schema.os, "access", constant(False))
 
         assert _store(tmp_path).is_adoptable() is False
 
     def test_an_unwritable_folder_cannot_be_adopted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _make_adoptable(tmp_path)
-        monkeypatch.setattr(afanes.core.vault.schema.os, "access", lambda _path, _mode: False)
+        monkeypatch.setattr(afanes.core.vault.schema.os, "access", constant(False))
 
         with pytest.raises(VaultSchemaNotAdoptableError, match="not writable"):
             _store(tmp_path).adopt()

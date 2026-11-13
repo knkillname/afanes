@@ -18,7 +18,7 @@ import afanes.ui.theme
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.steps import StepDocument
 from afanes.ui.views.project_body import ProjectBodyView
-from tests.support import ensure_vault
+from tests.support import constant, ensure_vault
 
 PLAN = datetime.date(2026, 12, 1)
 
@@ -29,7 +29,7 @@ def _reset_state() -> None:
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
-    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
+    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(constant(path)))
 
 
 def _write_note(path: Path, content: str) -> Path:

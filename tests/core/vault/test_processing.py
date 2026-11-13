@@ -8,6 +8,7 @@ import pytest
 
 import afanes.core.atomic
 import afanes.core.links
+import afanes.core.steps
 import afanes.core.vault.naming
 import afanes.core.vault.pages
 import afanes.core.vault.processing

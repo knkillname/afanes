@@ -11,8 +11,9 @@ import pytest
 import afanes.core.settings
 import afanes.ui.state
 import afanes.ui.strings
+import afanes.ui.theme
 import afanes.ui.views.projects
-from tests.support import ensure_vault, versioned
+from tests.support import constant, ensure_vault, versioned
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
 FocusHandler = Callable[[object], Coroutine[typing.Any, typing.Any, None]]
@@ -66,7 +67,7 @@ def _open_view(
     on_select: Callable[[Path], Awaitable[None]] = _select,
 ) -> afanes.ui.views.projects.ProjectsView:
     monkeypatch.setattr(
-        afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: tmp_path / "settings.json")
+        afanes.core.settings.SettingsStore, "settings_path", classmethod(constant(tmp_path / "settings.json"))
     )
     asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
     return afanes.ui.views.projects.ProjectsView(_noop, on_select)

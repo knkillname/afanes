@@ -10,6 +10,7 @@ import pytest
 
 import afanes.core.settings
 import afanes.ui.state
+import afanes.ui.state.status
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.editing import DraftMode
@@ -18,7 +19,7 @@ from afanes.core.steps import StepDocument
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import NoteType
 from afanes.ui.views.page import PageActions, PageView
-from tests.support import ensure_vault, versioned
+from tests.support import constant, ensure_vault, versioned
 from tests.ui.control_tree import emphasis_controls
 from tests.ui.test_conformance import HEADER_ACTION_KEYS
 
@@ -33,7 +34,7 @@ def _reset_state() -> None:
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
-    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
+    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(constant(path)))
 
 
 def _write_note(path: Path, content: str) -> Path:
@@ -1388,11 +1389,11 @@ def _record_scroll(view: PageView) -> list[float | None]:
 def _texts(control: ft.Control) -> list[str]:
     values: list[str] = []
     if isinstance(control, ft.Text):
-        values.append(str(control.value))
+        values.append(control.value)
     if isinstance(control, ft.Checkbox):
         values.append(str(control.label))
     if isinstance(control, ft.Markdown):
-        values.append(str(control.value))
+        values.append(control.value)
     values.extend(str(span.text) for span in getattr(control, "spans", []) or [] if isinstance(span, ft.TextSpan))
     for child in getattr(control, "controls", []) or []:
         values.extend(_texts(child))
@@ -1756,7 +1757,7 @@ class TestConnections:
         asyncio.run(view.toggle_completed_steps(ft.Event(name="change", control=view.connections_steps_toggle)))
 
         assert "Done" in _texts(view.connections_body.controls[2])
-        assert view.connections_steps_toggle.value is True
+        assert view.connections_steps_toggle.value
 
     def test_enabling_finished_projects_reveals_both_roles(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1773,7 +1774,7 @@ class TestConnections:
 
         assert "Old" in _texts(view.connections_body.controls[1])
         assert "Finished" in _texts(view.connections_body.controls[3])
-        assert view.connections_projects_toggle.value is True
+        assert view.connections_projects_toggle.value
 
     def test_changing_the_page_resets_both_toggles(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
@@ -1792,8 +1793,8 @@ class TestConnections:
 
         asyncio.run(scenario())
 
-        assert view.connections_steps_toggle.value is False
-        assert view.connections_projects_toggle.value is False
+        assert not view.connections_steps_toggle.value
+        assert not view.connections_projects_toggle.value
         assert "Done" not in _texts(view.connections_body.controls[2])
         assert "Old" not in _texts(view.connections_body.controls[1])
         assert "Finished" not in _texts(view.connections_body.controls[3])
@@ -1836,7 +1837,7 @@ class TestConnections:
 
         asyncio.run(view.start_edit())
 
-        assert view.connections_panel.visible is False
+        assert not view.connections_panel.visible
 
     def test_raw_rescue_hides_the_section(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

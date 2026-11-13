@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 
 import afanes.core.connections
+import afanes.core.editing
+import afanes.core.search
 import afanes.core.settings
 import afanes.core.template_cards
 import afanes.core.templates
@@ -23,6 +25,7 @@ import afanes.core.vault.schema
 import afanes.core.vault.service
 import afanes.core.vault.snapshot
 import afanes.ui.state
+import afanes.ui.state.browser
 import afanes.ui.state.controller
 import afanes.ui.state.lock
 import afanes.ui.state.navigation
@@ -45,6 +48,7 @@ from afanes.core.steps import StepDocument
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 from afanes.models.step import ProjectStep, StepEdit, StepEditKind
+from tests.support import access_readable, constant
 from tests.support import ensure_vault as _ensure_vault
 from tests.support import versioned as _versioned
 
@@ -88,7 +92,7 @@ def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
     monkeypatch.setattr(
         afanes.core.settings.SettingsStore,
         "settings_path",
-        classmethod(lambda _cls: path),
+        classmethod(constant(path)),
     )
 
 
@@ -1187,7 +1191,7 @@ class TestAdoption:
         monkeypatch.setattr(
             afanes.core.vault.schema.os,
             "access",
-            lambda _path, mode: mode == os.R_OK,
+            access_readable,
         )
         state = afanes.ui.state.app_state
 
@@ -2029,7 +2033,7 @@ class TestConcurrency:
             assert second.done() is False
             release.set()
             await asyncio.gather(first, second)
-            assert state.status.busy is False
+            assert not state.status.busy
 
         asyncio.run(scenario())
 
@@ -3437,7 +3441,7 @@ class TestPageRescue:
 
         asyncio.run(finish())
 
-        assert state.pages.editing is False
+        assert not state.pages.editing
         assert state.pages.page is not None
         assert state.pages.page.mode is afanes.core.editing.DraftMode.NORMAL
 

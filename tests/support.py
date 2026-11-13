@@ -1,6 +1,8 @@
 """Shared fixture helpers for the test suite."""
 
 import datetime
+import os
+import typing
 from pathlib import Path
 
 import afanes.core.template_cards
@@ -9,6 +11,44 @@ import afanes.core.vault.schema
 import afanes.core.vault.snapshot
 from afanes.core.processing import ProcessingOutcome
 from afanes.models.note import Status
+
+
+def constant[T](value: T) -> typing.Callable[..., T]:
+    """Build an annotated callable that ignores its arguments and returns a value.
+
+    Parameters
+    ----------
+    value : T
+        Value returned by every call.
+
+    Returns
+    -------
+    typing.Callable[..., T]
+        Callable suitable for a constant-return ``monkeypatch`` replacement.
+    """
+
+    def supply(*_args: object, **_kwargs: object) -> T:
+        return value
+
+    return supply
+
+
+def access_readable(_path: object, mode: int) -> bool:
+    """Stand in for :func:`os.access` and report only readability.
+
+    Parameters
+    ----------
+    _path : object
+        Path passed by the caller and ignored.
+    mode : int
+        Requested access mode.
+
+    Returns
+    -------
+    bool
+        Whether the caller requested read access.
+    """
+    return mode == os.R_OK
 
 
 def processing_request(

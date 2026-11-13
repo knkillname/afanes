@@ -26,7 +26,7 @@ from afanes.core.errors import TemplateContentError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.settings import Settings
 from afanes.models.note import CategoryLabel, NoteDate
-from tests.support import versioned
+from tests.support import constant, versioned
 
 Handler = Callable[[], Awaitable[None]]
 WINDOW_WIDTH = 1100
@@ -101,7 +101,7 @@ def _welcome_button(
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
-    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
+    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(constant(path)))
 
 
 def _adoptable(root: Path) -> Path:
@@ -822,7 +822,7 @@ class TestCreation:
             submit = _typed(_find_by_key(page.dialogs[-1], "create-vault-submit"), ft.FilledButton)
             assert submit.disabled is True
             _set_creation_path(page, str(tmp_path / "vault"))
-            assert submit.disabled is False
+            assert not submit.disabled
             _set_creation_path(page, "   ")
             assert submit.disabled is True
 
@@ -1209,7 +1209,7 @@ class TestLaunchDigest:
 def _all_texts(control: ft.Control) -> list[str]:
     values: list[str] = []
     if isinstance(control, ft.Text):
-        values.append(str(control.value))
+        values.append(control.value)
     for child in getattr(control, "controls", []) or []:
         values.extend(_all_texts(child))
     content = getattr(control, "content", None)
@@ -1294,7 +1294,7 @@ class TestBrowserReferenceCreation:
             submit = _typed(_find_by_key(page.dialogs[-1], "new-reference-submit"), ft.FilledButton)
             assert submit.disabled is True
             _set_reference_name(page, "Priya Nair")
-            assert submit.disabled is False
+            assert not submit.disabled
             _set_reference_name(page, "   ")
             assert submit.disabled is True
 
@@ -1558,13 +1558,8 @@ class TestAboutDialog:
         async def scenario() -> None:
             await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             menu = _typed(_find_by_key(page.controls[0], "workspace-change"), ft.PopupMenuButton)
-            item = typing.cast(
-                "ft.PopupMenuItem",
-                next(
-                    entry
-                    for entry in menu.items
-                    if isinstance(entry, ft.PopupMenuItem) and entry.key == "workspace-about"
-                ),
+            item = next(
+                entry for entry in menu.items if isinstance(entry, ft.PopupMenuItem) and entry.key == "workspace-about"
             )
             await typing.cast("Handler", item.on_click)()
 
@@ -1593,15 +1588,15 @@ class TestDialogAudit:
             ft.AlertDialog,
         ]:
             await shell.show_about_dialog()
-            about = typing.cast("ft.AlertDialog", page.dialogs.pop())
+            about = page.dialogs.pop()
             await shell.show_create_dialog()
-            create = typing.cast("ft.AlertDialog", page.dialogs.pop())
+            create = page.dialogs.pop()
             await shell.show_new_reference_dialog()
-            reference = typing.cast("ft.AlertDialog", page.dialogs.pop())
+            reference = page.dialogs.pop()
             await shell.show_log_entry_dialog(NoteDate.from_text("2025-10-12"))
-            log = typing.cast("ft.AlertDialog", page.dialogs.pop())
+            log = page.dialogs.pop()
             shell.show_vault_dialog()
-            vault = typing.cast("ft.AlertDialog", page.dialogs.pop())
+            vault = page.dialogs.pop()
             return about, create, reference, log, vault
 
         about, create, reference, log, vault = asyncio.run(scenario())

@@ -10,11 +10,13 @@ import flet as ft
 import pytest
 
 import afanes.core.atomic
+import afanes.core.frontmatter
 import afanes.core.log
 import afanes.core.search
 import afanes.core.settings
 import afanes.core.vault.service
 import afanes.ui.state
+import afanes.ui.state.browser
 import afanes.ui.state.status
 import afanes.ui.strings
 import afanes.ui.theme
@@ -22,7 +24,7 @@ import afanes.ui.views.workspace
 from afanes.core.editing import DraftMode
 from afanes.core.log import LogMode
 from afanes.models.note import NoteDate
-from tests.support import ensure_vault, versioned
+from tests.support import constant, ensure_vault, versioned
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
 SECTION_COUNT = 5
@@ -64,7 +66,7 @@ async def _close_vault() -> None:
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
-    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
+    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(constant(path)))
 
 
 def _write_note(
@@ -463,7 +465,7 @@ class TestFrozenControlRecovery:
         asyncio.run(_handler(tile)())
 
         assert not hasattr(tile, "_frozen")
-        assert tile.selected is True
+        assert tile.selected
         assert afanes.ui.state.app_state.browser.active_section is projects
 
     def test_refresh_recovers_a_frozen_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -476,7 +478,7 @@ class TestFrozenControlRecovery:
         view.refresh()
 
         assert not hasattr(tile, "_frozen")
-        assert tile.selected is False
+        assert not tile.selected
 
     def test_refresh_recovers_a_frozen_count(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -510,7 +512,7 @@ class TestCaptureBar:
         assert view.capture_button.disabled is True
         view.capture_field.value = "Buy milk"
         asyncio.run(_change_handler(view.capture_field)())
-        assert view.capture_button.disabled is False
+        assert not view.capture_button.disabled
         view.capture_field.value = "   "
         asyncio.run(_change_handler(view.capture_field)())
         assert view.capture_button.disabled is True
@@ -816,7 +818,7 @@ class TestGlobalSearch:
         asyncio.run(_change_handler(view.search_field)())
 
         assert view.browser_title.value == afanes.ui.strings.BROWSER_SEARCH_TITLE
-        assert view.browser_search_clear.visible is True
+        assert view.browser_search_clear.visible
 
         asyncio.run(view.clear_search())
 
@@ -852,7 +854,7 @@ class TestGlobalSearch:
         view.search_field.value = "term"
         asyncio.run(_change_handler(view.search_field)())
 
-        assert view.capture_section.visible is False
+        assert not view.capture_section.visible
 
         asyncio.run(view.clear_search())
 
@@ -868,7 +870,7 @@ class TestGlobalSearch:
         view.search_field.value = "ada"
         asyncio.run(_change_handler(view.search_field)())
 
-        assert view.new_reference_button.visible is False
+        assert not view.new_reference_button.visible
         assert view.browser_actions.controls == []
 
     def test_clearing_restores_the_active_destination(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -915,7 +917,7 @@ class TestCapturePlacement:
         assert view.capture_section.visible is True
         asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.PROJECTS])())
 
-        assert view.capture_section.visible is False
+        assert not view.capture_section.visible
 
     def test_the_composer_is_labeled_and_separated_from_search(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1272,7 +1274,7 @@ def _row_for(browser: ft.ListView, title: str) -> ft.ListTile:
 def _texts(control: ft.Control) -> list[str]:
     values: list[str] = []
     if isinstance(control, ft.Text):
-        values.append(str(control.value))
+        values.append(control.value)
     for child in getattr(control, "controls", []) or []:
         values.extend(_texts(child))
     content = getattr(control, "content", None)

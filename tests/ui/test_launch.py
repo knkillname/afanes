@@ -3,7 +3,6 @@
 import builtins
 import importlib
 import importlib.util
-import os
 import tomllib
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -16,6 +15,7 @@ import afanes.core.settings
 import afanes.core.vault.schema
 import afanes.core.vault.service
 import afanes.ui.strings
+from tests.support import access_readable, constant
 
 USAGE_EXIT_CODE = 2
 TEST_PORT = 8765
@@ -241,7 +241,7 @@ class TestLaunchDispatch:
         monkeypatch.setattr(
             afanes.core.vault.service.os,
             "access",
-            lambda _path, mode: mode == os.R_OK,
+            access_readable,
         )
 
         afanes.__main__.Launcher.main(*["--vault", str(vault)])
@@ -278,7 +278,7 @@ class TestSubcommandDispatch:
 
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
-    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: path))
+    monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(constant(path)))
 
 
 def _adoptable(root: Path) -> Path:

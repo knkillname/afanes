@@ -34,6 +34,7 @@ from afanes.core.links import ResolutionOutcome
 from afanes.core.vault.snapshot import ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
+from tests.support import access_readable, constant
 
 ONE = 1
 TWO = 2
@@ -155,7 +156,7 @@ class TestVaultOpen:
     def test_rejects_an_unreadable_directory(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "vault"
         root.mkdir()
-        monkeypatch.setattr(afanes.core.vault.service.os, "access", lambda _path, _mode: False)
+        monkeypatch.setattr(afanes.core.vault.service.os, "access", constant(False))
 
         with pytest.raises(VaultUnreadableError):
             afanes.core.vault.service.Vault.open(root)
@@ -218,7 +219,7 @@ class TestVaultOpen:
         monkeypatch.setattr(
             afanes.core.vault.service.os,
             "access",
-            lambda _path, mode: mode == os.R_OK,
+            access_readable,
         )
 
         vault = afanes.core.vault.service.Vault.open(root)

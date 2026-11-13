@@ -28,6 +28,7 @@ from afanes.core.links import ResolutionOutcome
 from afanes.core.vault.snapshot import ReferenceSite
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType
+from tests.support import constant
 
 ONE = 1
 TWO = 2
@@ -1295,7 +1296,7 @@ class TestNamingGuards:
         monkeypatch.setattr(
             afanes.core.vault.trash.TrashService,
             "plan_trash",
-            lambda _self, _path, **_kwargs: preview,
+            constant(preview),
         )
 
         with pytest.raises(NameCollisionError):

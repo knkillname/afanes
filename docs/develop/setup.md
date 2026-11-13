@@ -40,8 +40,11 @@ hatch test --cover
 hatch test --all
 ```
 
-- `hatch check` runs Ruff lint, Ruff format verification, and Pyrefly strict type checking.
-- `hatch check --fix` applies lint and format fixes; type errors still need manual changes.
+- `hatch check` runs Ruff lint, Ruff format verification, and Pyrefly strict type checking. Pyrefly
+  warnings fail the gate; fix the diagnostic instead of suppressing it.
+- `hatch check --fix` applies lint and format fixes; type diagnostics still need manual changes.
+- The `hatch-check-types` environment installs the `dev` dependency group, so Pyrefly resolves the
+  same packages as the development environment, including the PyYAML type stubs.
 - `hatch test --cover` runs the suite with the coverage floor.
 - `hatch test --all` runs the supported interpreters and the oldest dependency floor.
 

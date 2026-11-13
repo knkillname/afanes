@@ -14,6 +14,7 @@ import afanes.__about__
 import afanes.core.vault.service
 import afanes.ui.components.toast
 import afanes.ui.state
+import afanes.ui.state.session
 import afanes.ui.state.status
 import afanes.ui.strings
 import afanes.ui.theme

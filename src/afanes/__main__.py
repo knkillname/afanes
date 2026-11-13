@@ -168,12 +168,12 @@ class Launcher:
             # instead of an import traceback, matching the source entry point.
             import flet as ft  # noqa: PLC0415
 
-            import afanes.ui.app  # noqa: PLC0415
+            import afanes.ui.app as ui_app  # noqa: PLC0415
         except ModuleNotFoundError:
             Launcher.fail(_SDK_MISSING_MESSAGE)
 
         async def entry(page: ft.Page) -> None:
-            await afanes.ui.app.AppShell.main(page)
+            await ui_app.AppShell.main(page)
 
         try:
             ft.run(entry)
@@ -293,12 +293,12 @@ class Launcher:
             # runtime availability check, not a dependency cycle.
             import flet as ft  # noqa: PLC0415
 
-            import afanes.ui.app  # noqa: PLC0415
+            import afanes.ui.app as ui_app  # noqa: PLC0415
         except ModuleNotFoundError:
             cls.fail(_SDK_MISSING_MESSAGE)
 
         async def entry(page: ft.Page) -> None:
-            await afanes.ui.app.AppShell.main(page, launch_vault=launch_vault)
+            await ui_app.AppShell.main(page, launch_vault=launch_vault)
 
         if options.web:
             ft.run(

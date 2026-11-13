@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import afanes.core.vault.naming
+import afanes.core.vault.pages
 import afanes.ui.strings
 from afanes.core.editing import NormalDraft, PageDraftFactory
 from afanes.core.errors import AfanesError, ContentChangedError, NoteParseError, VaultError

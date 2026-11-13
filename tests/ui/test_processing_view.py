@@ -15,11 +15,12 @@ import afanes.core.vault.processing
 import afanes.core.vault.service
 import afanes.core.vault.snapshot
 import afanes.ui.state
+import afanes.ui.state.processing
 import afanes.ui.strings
 import afanes.ui.views.processing
 from afanes.core.processing import ProcessingOutcome, ProcessingPlan
 from afanes.models.note import CategoryLabel, NoteType, Status
-from tests.support import versioned
+from tests.support import constant, versioned
 from tests.ui.control_tree import emphasis_controls
 
 
@@ -86,7 +87,7 @@ def _open_capture(body: str = "Buy milk") -> afanes.ui.state.controller.AppState
 
 def _open_vault_capture(root: Path, capture: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        afanes.core.settings.SettingsStore, "settings_path", classmethod(lambda _cls: root.parent / "settings.json")
+        afanes.core.settings.SettingsStore, "settings_path", classmethod(constant(root.parent / "settings.json"))
     )
     state = afanes.ui.state.app_state
 
@@ -316,7 +317,7 @@ class TestProcessingView:
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",
-            classmethod(lambda _cls: root.parent / "settings.json"),
+            classmethod(constant(root.parent / "settings.json")),
         )
         state = afanes.ui.state.app_state
         assert capture.is_file()
@@ -813,7 +814,7 @@ class TestProcessingView:
         assert view.cancel_button.on_click is not None
         asyncio.run(_click(view.cancel_button.on_click))
 
-        assert called is True
+        assert called
 
 
 class TestPreviewAvailability:
@@ -833,7 +834,7 @@ class TestPreviewAvailability:
         assert view.preview_button.disabled is False
         view.due_date.value = "not-a-date"
         _trigger(view.due_date.on_change)
-        assert view.preview_button.disabled is True
+        assert view.preview_button.disabled
         view.due_date.value = "2026-11-20"
         _trigger(view.due_date.on_change)
         assert view.preview_button.disabled is False
@@ -847,4 +848,4 @@ class TestPreviewAvailability:
         assert view.preview_button.disabled is True
         view.project.value = "Launch"
         _trigger(view.project.on_change)
-        assert view.preview_button.disabled is False
+        assert not view.preview_button.disabled

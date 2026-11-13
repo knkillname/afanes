@@ -18,7 +18,7 @@ from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import PageContent, PageFile, ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
-from tests.support import versioned
+from tests.support import constant, versioned
 
 PROJECT_NOTE = """---
 type: project
@@ -572,7 +572,7 @@ class TestCategoryMoveAndTypeChange:
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",
-            classmethod(lambda _cls: tmp_path / "settings.json"),
+            classmethod(constant(tmp_path / "settings.json")),
         )
         state = afanes.ui.state.app_state
         state.reset()
@@ -628,7 +628,7 @@ class TestCategoryMoveAndTypeChange:
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",
-            classmethod(lambda _cls: tmp_path / "settings.json"),
+            classmethod(constant(tmp_path / "settings.json")),
         )
         state = afanes.ui.state.app_state
         state.reset()
@@ -658,7 +658,7 @@ class TestCategoryMoveAndTypeChange:
         monkeypatch.setattr(
             afanes.core.settings.SettingsStore,
             "settings_path",
-            classmethod(lambda _cls: tmp_path / "settings.json"),
+            classmethod(constant(tmp_path / "settings.json")),
         )
         state = afanes.ui.state.app_state
         state.reset()
