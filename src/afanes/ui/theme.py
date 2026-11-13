@@ -24,6 +24,7 @@ ADOPTION_PANEL_GAP = SECTION_GAP
 ITEM_GAP = 12
 SIDEBAR_WIDTH = 260
 NAVIGATION_WIDTH = 220
+DRAWER_WIDTH = 280
 BROWSER_MIN_WIDTH = 320
 BROWSER_MAX_WIDTH = 360
 PAGE_MIN_WIDTH = 420
@@ -146,8 +147,9 @@ HOVER_COLOR = ft.Colors.with_opacity(0.05, ft.Colors.ON_SURFACE)
 FOCUS_COLOR = ft.Colors.with_opacity(0.15, ft.Colors.PRIMARY)
 DRAWER_SCRIM_COLOR = ft.Colors.with_opacity(0.14, "#000000")
 DRAWER_SHADOW = ft.BoxShadow(
-    blur_radius=16,
-    color=ft.Colors.with_opacity(0.18, "#000000"),
+    blur_radius=28,
+    color=ft.Colors.with_opacity(0.34, "#000000"),
+    offset=ft.Offset(2, 0),
 )
 
 BASE_FONT_SIZE = 15

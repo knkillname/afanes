@@ -887,7 +887,11 @@ class TestAdaptiveLayout:
         assert view.nav_toggle.visible is False
         assert view.drawer_close_button.visible is False
         assert view.navigation.border is None
+        assert view.navigation.border_radius is None
         assert view.navigation.shadow is None
+        assert view.navigation.padding is None
+        assert view.navigation.left is None
+        assert view.navigation.width == afanes.ui.theme.NAVIGATION_WIDTH
 
     def test_a_medium_window_keeps_browser_and_detail(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
@@ -898,7 +902,11 @@ class TestAdaptiveLayout:
         assert view.nav_toggle.visible is True
         assert view.drawer_close_button.visible is True
         assert view.navigation.border is not None
+        assert view.navigation.border_radius == afanes.ui.theme.SURFACE_RADIUS
         assert view.navigation.shadow == afanes.ui.theme.DRAWER_SHADOW
+        assert view.navigation.padding == afanes.ui.theme.ITEM_GAP
+        assert view.navigation.left == afanes.ui.theme.PAGE_PADDING
+        assert view.navigation.width == afanes.ui.theme.DRAWER_WIDTH
 
     def test_a_narrow_presentation_starts_with_the_browser(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -957,7 +965,7 @@ class TestAdaptiveLayout:
         asyncio.run(_handler(view.nav_toggle)())
 
         drawer = next(control for control in view.root.controls if getattr(control, "key", None) == "workspace-drawer")
-        assert view.navigation in typing.cast("ft.Row", drawer).controls
+        assert view.navigation in typing.cast("ft.Stack", drawer).controls
 
         asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.PROJECTS])())
 

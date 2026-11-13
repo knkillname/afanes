@@ -77,6 +77,7 @@ LIST_ROW_MIN_HEIGHT = 36
 WINDOW_MIN_WIDTH_VALUE = 1024
 WINDOW_MIN_HEIGHT_VALUE = 600
 NAVIGATION_WIDTH_VALUE = 220
+DRAWER_WIDTH_VALUE = 280
 BROWSER_MIN_WIDTH_VALUE = 320
 BROWSER_MAX_WIDTH_VALUE = 360
 PAGE_MIN_WIDTH_VALUE = 420
@@ -294,6 +295,7 @@ class TestTheme:
 
     def test_shell_tokens_match_the_designed_widths(self) -> None:
         assert afanes.ui.theme.NAVIGATION_WIDTH == NAVIGATION_WIDTH_VALUE
+        assert afanes.ui.theme.DRAWER_WIDTH == DRAWER_WIDTH_VALUE
         assert afanes.ui.theme.BROWSER_MIN_WIDTH == BROWSER_MIN_WIDTH_VALUE
         assert afanes.ui.theme.BROWSER_MAX_WIDTH == BROWSER_MAX_WIDTH_VALUE
         assert afanes.ui.theme.PAGE_MIN_WIDTH == PAGE_MIN_WIDTH_VALUE
@@ -311,6 +313,7 @@ class TestTheme:
         assert theme.SHELL_MEDIUM_MIN < theme.SHELL_WIDE_MIN
         assert theme.HEADER_HEIGHT > 0
         assert theme.NAVIGATION_WIDTH > 0
+        assert theme.NAVIGATION_WIDTH < theme.DRAWER_WIDTH
 
     def test_the_shell_fits_its_breakpoints(self) -> None:
         theme = afanes.ui.theme

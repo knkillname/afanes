@@ -74,6 +74,7 @@ guidelines. The workspace divides the window into three regions with bounded wid
 | Token | Value | Use |
 | --- | --- | --- |
 | `NAVIGATION_WIDTH` | 220 | Destinations, counts, vault identity, primary menu |
+| `DRAWER_WIDTH` | 280 | Transient navigation drawer at medium widths |
 | `BROWSER_MIN_WIDTH` | 320 | Smallest usable browser column |
 | `BROWSER_MAX_WIDTH` | 360 | Browser column ceiling |
 | `PAGE_MIN_WIDTH` | 420 | Smallest detail region |

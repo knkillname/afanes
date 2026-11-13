@@ -446,12 +446,27 @@ class WorkspaceView:
             self._drawer_open = False
         self.nav_toggle.visible = not wide
         self.drawer_close_button.visible = not wide
-        self.navigation.border = (
-            None
-            if wide
-            else ft.Border.only(right=ft.BorderSide(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR))
-        )
-        self.navigation.shadow = None if wide else afanes.ui.theme.DRAWER_SHADOW
+        if wide:
+            self.navigation.border = None
+            self.navigation.border_radius = None
+            self.navigation.shadow = None
+            self.navigation.padding = None
+            self.navigation.left = None
+            self.navigation.top = None
+            self.navigation.bottom = None
+            self.navigation.width = afanes.ui.theme.NAVIGATION_WIDTH
+        else:
+            self.navigation.border = ft.Border.all(
+                afanes.ui.theme.BORDER_WIDTH,
+                afanes.ui.theme.BORDER_COLOR,
+            )
+            self.navigation.border_radius = afanes.ui.theme.SURFACE_RADIUS
+            self.navigation.shadow = afanes.ui.theme.DRAWER_SHADOW
+            self.navigation.padding = afanes.ui.theme.ITEM_GAP
+            self.navigation.left = afanes.ui.theme.PAGE_PADDING
+            self.navigation.top = afanes.ui.theme.PAGE_PADDING
+            self.navigation.bottom = afanes.ui.theme.PAGE_PADDING
+            self.navigation.width = afanes.ui.theme.DRAWER_WIDTH
         if wide:
             self.browser_region.width = afanes.ui.theme.BROWSER_MAX_WIDTH
             self.browser_region.expand = False
@@ -471,17 +486,18 @@ class WorkspaceView:
 
     def _drawer_control(self) -> ft.Control:
         """Return the transient navigation overlay with its scrim."""
-        return ft.Row(
+        return ft.Stack(
             controls=[
-                self.navigation,
                 ft.Container(
                     expand=True,
                     bgcolor=afanes.ui.theme.DRAWER_SCRIM_COLOR,
                     on_click=self._close_drawer,
                     key="workspace-drawer-scrim",
                 ),
+                self.navigation,
             ],
             expand=True,
+            fit=ft.StackFit.EXPAND,
             key="workspace-drawer",
         )
 
