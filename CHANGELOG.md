@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-13
+
 ### Changed
 
 - **Feedback channels, trash undo, and overlays.** Feedback now follows the lifetime of the event:
