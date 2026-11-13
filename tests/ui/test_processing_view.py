@@ -101,8 +101,18 @@ class TestProcessingView:
             "done_now",
             "append_step",
             "reference",
+            "log",
             "later",
             "trash",
+        ]
+        assert [option.text for option in view.outcome.options] == [
+            "Project",
+            "Done now",
+            "Append step",
+            "Reference",
+            "Log entry",
+            "Later",
+            "Trash",
         ]
         assert view.plan_panel.visible is False
         assert view.success_panel.visible is False
@@ -486,6 +496,35 @@ class TestProcessingView:
         assert view.plan_warnings.visible is True
         texts = [control.value for control in view.plan_warnings.controls if isinstance(control, ft.Text)]
         assert any("changes scheme" in text for text in texts)
+
+    def test_log_outcome_hides_project_fields_and_previews_the_log(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        root = tmp_path / "vault"
+        versioned(root)
+        capture = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).capture(
+            "Met with Ada"
+        )
+        _open_vault_capture(root, capture, monkeypatch)
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.LOG.value
+
+        _select_outcome(view)
+
+        assert view.status.visible is False
+        assert view.due_date.visible is False
+        assert view.project.visible is False
+        assert view.template.visible is False
+        assert view.owner.visible is False
+        assert view.asked_by.visible is False
+
+        assert view.preview_button.on_click is not None
+        asyncio.run(_click(view.preview_button.on_click))
+
+        plan = afanes.ui.state.app_state.processing.plan
+        assert isinstance(plan, ProcessingPlan)
+        assert "Log entry" in view.plan_details.value
+        assert str(plan.target_path) in view.plan_destination.value
 
     def test_append_preview_shows_the_project_and_step(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

@@ -213,6 +213,7 @@ PROCESSING_OUTCOME_LABELS = MappingProxyType(
         "later": "Later",
         "reference": "Reference",
         "project": "Project",
+        "log": "Log entry",
         "append_step": "Append step",
         "done_now": "Done now",
     }

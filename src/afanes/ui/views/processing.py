@@ -101,6 +101,7 @@ class ProcessingView:
             ProcessingOutcome.DONE_NOW,
             ProcessingOutcome.APPEND_STEP,
             ProcessingOutcome.REFERENCE,
+            ProcessingOutcome.LOG,
             ProcessingOutcome.LATER,
             ProcessingOutcome.TRASH,
         )
