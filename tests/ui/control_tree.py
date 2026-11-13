@@ -51,4 +51,8 @@ def _is_emphasis(control: ft.Control) -> bool:
     if isinstance(control, ft.FilledButton):
         return True
     style = getattr(control, "style", None)
-    return isinstance(style, ft.ButtonStyle) and style.bgcolor == afanes.ui.theme.DESTRUCTIVE
+    if not isinstance(style, ft.ButtonStyle) or style.bgcolor is None:
+        return False
+    if isinstance(style.bgcolor, dict):
+        return style.bgcolor.get(ft.ControlState.DEFAULT) == afanes.ui.theme.DESTRUCTIVE
+    return style.bgcolor == afanes.ui.theme.DESTRUCTIVE

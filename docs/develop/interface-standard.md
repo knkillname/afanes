@@ -127,6 +127,15 @@ Destructive actions use Red 3 in light mode and Red 4 in dark mode. The header t
 confirmation action both carry the destructive style. The accent is never used to distinguish one
 browser section from another; log marks use the accent.
 
+## 🎚️ Control states
+
+An affirmative action is insensitive until its input can succeed; the command still rejects invalid
+input as a guard, but the interface does not invite a click that must fail. An insensitive control
+uses the muted disabled fill and label rather than the accent, and availability updates as the field
+changes. A rendered surface shows at most one suggested or destructive control, and a dialog or
+inline panel counts on its own. Confirmation surfaces put Cancel before the affirmative action, and
+the affirmative action names the operation.
+
 ## 🔤 Typography
 
 `BASE_FONT_SIZE` is 15 logical pixels (about 11 pt). Every role is a percentage of that base, so the
@@ -151,13 +160,13 @@ checked per platform at release.
 ## 📋 Lists and rows
 
 Browser lists follow the reference list view rather than a card grid: a row keeps a heading title,
-at most one body-weight supporting line, and one muted caption line for metadata. Rows do not use
-the toolkit's dense mode. The standard row height and the type roles carry the hierarchy, so a list
-does not become a wall of equally muted text. Row text is not selectable: the row is one click
-target, so a text-selection surface must not sit inside it. A preview link keeps the body style
-instead of the link underline and acts like a click on the row. A selected row keeps the neutral
-selected-row fill; focus adds an accent ring and never a second fill. The ring clears as soon as
-the open page is not that row, so no second row can read as a selection.
+at most one body-weight supporting line, and one muted caption line for metadata. Rows use the
+standard list-row height and padding; the dense treatment is not used. The standard row height and
+the type roles carry the hierarchy, so a list does not become a wall of equally muted text. Row text
+is not selectable: the row is one click target, so a text-selection surface must not sit inside it. A
+preview link keeps the body style instead of the link underline and acts like a click on the row. A
+selected row keeps the neutral selected-row fill; focus adds an accent ring and never a second fill.
+The ring clears as soon as the open page is not that row, so no second row can read as a selection.
 
 ## 🖼️ Icons
 
@@ -215,12 +224,13 @@ Header-bar actions are exempt from the icon-or-label rule through an explicit ke
 gate; the spec allows the combination there, and a focused test asserts the allowlist matches the
 controls actually placed in the toolbar.
 
-The value rules count per module; the button rules count within each class scope, so a module with
-several dialogs is measured per view. The comparison fails in both directions. A count above its
+The value rules count per module; the button rules count within each view class. That class scope is
+a conservative upper bound for a class that owns several dialogs, so view-level tests check the
+rendered surface for the one-action rule. The comparison fails in both directions. A count above its
 baseline entry is a new violation; a baseline entry above the measured count is stale and must be
-deleted in the same change. The baseline is a debt ledger: it starts at the values measured when
-the gate landed and must reach empty before the standard is complete. Never add an entry to make a
-change pass.
+deleted in the same change. The baseline is a debt ledger: it starts at the values measured when the
+gate landed and must reach empty before the standard is complete. Never add an entry to make a
+change pass. The icon-or-label and dense-row ledgers are empty after wave 2.
 
 ## 🧭 Migration waves
 
@@ -232,9 +242,10 @@ WAVE 0  tokens, two palettes, four surfaces, neutral selection, GNOME type
         scale, outlined icons, 1024x600 minimum, expanded gate
 WAVE 1  landed: three regions, aligned headers, global search, primary menu,
         max content width, panel/radius/spacing sweep
-WAVE 2  control hierarchy: one suggested or destructive action per view,
-        icon XOR label, dense rows, insensitive invalid actions instead of
-        error-on-click
+WAVE 2  landed: control hierarchy: one suggested or destructive action
+        per rendered surface, icon XOR label outside header bars,
+        standard list rows, insensitive invalid actions, cancel-first
+        confirmations
 WAVE 3  writing style: header capitalization, ellipses, final periods,
         neutral tone (avoid you/my), typographic apostrophes and ellipsis,
         copy gate, AGENTS.md 4.6

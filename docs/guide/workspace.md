@@ -72,8 +72,9 @@ Switching destinations clears the query and returns to that destination's normal
 
 The capture field sits at the top of the Inbox browser region. It behaves exactly like the Inbox
 composer: the first non-blank line becomes the filename and heading, and the note is written under
-`inbox/` with only `type: note`. Press **Ctrl+N** or choose the **New capture** toolbar action to switch
-to the Inbox and focus the field from any other destination.
+`inbox/` with only `type: note`. **Capture** stays insensitive while the field is blank. Press
+**Ctrl+N** or choose the **New capture** toolbar action to switch to the Inbox and focus the field
+from any other destination.
 
 ## 🧱 Detail toolbar
 

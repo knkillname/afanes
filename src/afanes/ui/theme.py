@@ -149,6 +149,8 @@ SPLASH_COLOR = ft.Colors.with_opacity(0.08, ft.Colors.ON_SURFACE)
 HIGHLIGHT_COLOR = ft.Colors.with_opacity(0.08, ft.Colors.ON_SURFACE)
 HOVER_COLOR = ft.Colors.with_opacity(0.05, ft.Colors.ON_SURFACE)
 FOCUS_COLOR = ft.Colors.with_opacity(0.15, ft.Colors.PRIMARY)
+DISABLED_FILL_COLOR = ft.Colors.with_opacity(0.12, ft.Colors.ON_SURFACE)
+DISABLED_TEXT_COLOR = ft.Colors.with_opacity(0.38, ft.Colors.ON_SURFACE)
 FOCUS_RING_COLOR = ft.Colors.PRIMARY
 DRAWER_SCRIM_COLOR = ft.Colors.with_opacity(0.14, "#000000")
 DRAWER_SHADOW = ft.BoxShadow(
@@ -232,11 +234,31 @@ TEXT_THEME = ft.TextTheme(
 BUTTON_SHAPE = ft.RoundedRectangleBorder(radius=CONTROL_RADIUS)
 
 FILLED_BUTTON_THEME = ft.FilledButtonTheme(
-    style=ft.ButtonStyle(bgcolor=ACCENT_FILL, color=ON_ACCENT, shape=BUTTON_SHAPE),
+    style=ft.ButtonStyle(
+        bgcolor={
+            ft.ControlState.DEFAULT: ACCENT_FILL,
+            ft.ControlState.DISABLED: DISABLED_FILL_COLOR,
+        },
+        color={
+            ft.ControlState.DEFAULT: ON_ACCENT,
+            ft.ControlState.DISABLED: DISABLED_TEXT_COLOR,
+        },
+        shape=BUTTON_SHAPE,
+    ),
 )
 TEXT_BUTTON_THEME = ft.TextButtonTheme(style=ft.ButtonStyle(shape=BUTTON_SHAPE))
 OUTLINED_BUTTON_THEME = ft.OutlinedButtonTheme(style=ft.ButtonStyle(shape=BUTTON_SHAPE))
-DESTRUCTIVE_BUTTON_STYLE = ft.ButtonStyle(bgcolor=DESTRUCTIVE, color=ON_ACCENT, shape=BUTTON_SHAPE)
+DESTRUCTIVE_BUTTON_STYLE = ft.ButtonStyle(
+    bgcolor={
+        ft.ControlState.DEFAULT: DESTRUCTIVE,
+        ft.ControlState.DISABLED: DISABLED_FILL_COLOR,
+    },
+    color={
+        ft.ControlState.DEFAULT: ON_ACCENT,
+        ft.ControlState.DISABLED: DISABLED_TEXT_COLOR,
+    },
+    shape=BUTTON_SHAPE,
+)
 
 INPUT_DECORATION_THEME = ft.InputDecorationTheme(
     border=ft.OutlineInputBorder(

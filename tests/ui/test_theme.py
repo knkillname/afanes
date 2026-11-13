@@ -237,13 +237,33 @@ class TestTheme:
 
             assert filled is not None
             assert filled.style is not None
-            assert filled.style.bgcolor == afanes.ui.theme.ACCENT_FILL
+            bgcolor = filled.style.bgcolor
+            assert isinstance(bgcolor, dict)
+            assert bgcolor[ft.ControlState.DEFAULT] == afanes.ui.theme.ACCENT_FILL
             assert tiles is not None
             assert tiles.selected_tile_color == afanes.ui.theme.SELECTED_ROW_COLOR
 
     def test_destructive_style_uses_the_error_fill(self) -> None:
         assert afanes.ui.theme.DESTRUCTIVE == ft.Colors.ERROR
-        assert afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE.bgcolor == ft.Colors.ERROR
+        style = afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE
+        bgcolor = style.bgcolor
+        assert isinstance(bgcolor, dict)
+        assert bgcolor[ft.ControlState.DEFAULT] == ft.Colors.ERROR
+
+    def test_disabled_actions_look_insensitive(self) -> None:
+        filled = afanes.ui.theme.FILLED_BUTTON_THEME.style
+        destructive = afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE
+        assert filled is not None
+        filled_bgcolor = filled.bgcolor
+        filled_color = filled.color
+        destructive_bgcolor = destructive.bgcolor
+        assert isinstance(filled_bgcolor, dict)
+        assert isinstance(filled_color, dict)
+        assert isinstance(destructive_bgcolor, dict)
+        assert filled_bgcolor[ft.ControlState.DISABLED] == afanes.ui.theme.DISABLED_FILL_COLOR
+        assert filled_color[ft.ControlState.DISABLED] == afanes.ui.theme.DISABLED_TEXT_COLOR
+        assert filled_bgcolor[ft.ControlState.DISABLED] != filled_bgcolor[ft.ControlState.DEFAULT]
+        assert destructive_bgcolor[ft.ControlState.DISABLED] == afanes.ui.theme.DISABLED_FILL_COLOR
 
     def test_controls_take_the_reference_corner_radius(self) -> None:
         filled = afanes.ui.theme.FILLED_BUTTON_THEME.style

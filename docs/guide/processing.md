@@ -36,7 +36,8 @@ later by clicking it on the project page. Append step keeps its current behavior
 no owner, and the project's owner is not copied to it.
 
 The preview shows the destination and, when the outcome changes scheme, how many inbound references
-will be affected. A Log entry outcome rewrites `note:` links to the new `log:<date>` destination; an
+will be affected. **Preview** stays insensitive until an outcome is chosen and its required project
+or date is valid. A Log entry outcome rewrites `note:` links to the new `log:<date>` destination; an
 undated capture uses its last-modified date for this conversion. A date that already has a log entry
 is refused.
 
