@@ -14,9 +14,9 @@
 
 ## 3. Page starts at the top
 
-- [ ] 3.1 Add `PageView.scroll_to_top()` and call it after every page change in browser selection, links, connection entries, owned steps, and Back; verify the page-view and workspace tests pass.
-- [ ] 3.2 Add tests that each page-change path calls `content.scroll_to` with offset zero, and harden the existing owned-step test to assert both the project title and the scroll reset; verify the tests pass.
-- [ ] 3.3 Update the affected workspace or page documentation to state that a page change starts at the top; verify `hatch run docs:build` passes.
+- [x] 3.1 Add `PageView.scroll_to_top()` and call it after every page change in browser selection, links, connection entries, owned steps, and Back; verify the page-view and workspace tests pass.
+- [x] 3.2 Add tests that each page-change path calls `content.scroll_to` with offset zero, and harden the existing owned-step test to assert both the project title and the scroll reset; verify the tests pass.
+- [x] 3.3 Update the affected workspace or page documentation to state that a page change starts at the top; verify `hatch run docs:build` passes.
 
 ## 4. Rewrite reports
 

@@ -15,7 +15,8 @@ the file before every write and stops if another program changed it.
 
 Read mode renders the display title and the Markdown body. Tapping an internal reference opens its page.
 External links, attachments, and unsafe destinations do nothing. **Back** returns through the pages you
-opened, whether they came from the browser or a link.
+opened, whether they came from the browser or a link. A page always opens at the top, whether it came
+from the browser, a link, a connection entry, or **Back**.
 
 A project renders as one step-aware body. Prose stays Markdown, and task lists become interactive step
 rows. See [Projects and steps](projects-and-steps.md) for the step actions.

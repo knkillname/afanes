@@ -94,6 +94,7 @@ class TestReadMode:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         view = PageView(lambda: None)
+        scrolls = _record_scroll(view)
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -104,6 +105,7 @@ class TestReadMode:
 
         assert state.pages.page is not None
         assert state.pages.page.path == person.resolve()
+        assert scrolls == [0]
 
     def test_edit_button_switches_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -190,6 +192,7 @@ class TestReadMode:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         view = PageView(lambda: None)
+        scrolls = _record_scroll(view)
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -200,6 +203,7 @@ class TestReadMode:
 
         asyncio.run(scenario())
 
+        assert scrolls == [0]
         assert state.pages.page is not None
         assert state.pages.page.path == first.resolve()
         assert view.title.value == "First"
@@ -756,6 +760,7 @@ class TestPanels:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
         view = PageView(lambda: None)
+        scrolls = _record_scroll(view)
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
@@ -771,6 +776,7 @@ class TestPanels:
 
         asyncio.run(scenario())
 
+        assert scrolls == [0]
         assert state.navigation.ambiguous == ()
         assert state.pages.page is not None
         assert state.pages.page.path in {first.resolve(), second.resolve()}
@@ -1119,10 +1125,12 @@ class TestProjectMeta:
 
         asyncio.run(scenario())
         view = PageView(lambda: None)
+        scrolls = _record_scroll(view)
         name_span = (view.meta_owner.spans or [])[1]
 
         asyncio.run(typing.cast("typing.Any", name_span.on_click)())
 
+        assert scrolls == [0]
         assert state.pages.page is not None
         assert state.pages.page.path == person.resolve()
 
@@ -1243,6 +1251,23 @@ def _spans_text(control: ft.Text) -> str:
 
 def _freeze(control: ft.Control) -> None:
     object.__setattr__(control, "_frozen", True)
+
+
+def _record_scroll(view: PageView) -> list[float | None]:
+    positions: list[float | None] = []
+
+    async def recorder(
+        *,
+        offset: float | None = None,
+        delta: float | None = None,
+        scroll_key: object = None,
+        duration: float = 0,
+        curve: object = None,
+    ) -> None:
+        positions.append(offset)
+
+    object.__setattr__(view.content, "scroll_to", recorder)
+    return positions
 
 
 def _texts(control: ft.Control) -> list[str]:
@@ -1492,44 +1517,52 @@ class TestConnections:
     def test_selecting_a_linked_note_opens_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
         view = PageView(lambda: None)
+        scrolls = _record_scroll(view)
         button = _find_text_button(view.connections_body.controls[0], "Call")
         assert button is not None
 
         asyncio.run(typing.cast("typing.Any", button.on_click)())
 
+        assert scrolls == [0]
         assert view.title.value == "Call"
 
     def test_selecting_an_owned_step_opens_its_project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
         view = PageView(lambda: None)
+        scrolls = _record_scroll(view)
         button = _find_text_button(view.connections_body.controls[2], "Review")
         assert button is not None
 
         asyncio.run(typing.cast("typing.Any", button.on_click)())
 
         assert view.title.value == "Home"
+        assert scrolls == [0]
 
     def test_selecting_a_project_heading_opens_its_project(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._open_person(tmp_path, monkeypatch)
         view = PageView(lambda: None)
+        scrolls = _record_scroll(view)
         button = _find_text_button(view.connections_body.controls[2], "Home")
         assert button is not None
 
         asyncio.run(typing.cast("typing.Any", button.on_click)())
 
         assert view.title.value == "Home"
+        assert scrolls == [0]
 
     def test_selecting_an_owned_project_opens_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
         view = PageView(lambda: None)
+        scrolls = _record_scroll(view)
         button = _find_text_button(view.connections_body.controls[1], "Home")
         assert button is not None
 
         asyncio.run(typing.cast("typing.Any", button.on_click)())
 
         assert view.title.value == "Home"
+        assert scrolls == [0]
 
     def test_enabling_completed_steps_reveals_them(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)

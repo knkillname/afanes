@@ -602,6 +602,10 @@ class PageView:
         """
         return self.root
 
+    async def scroll_to_top(self) -> None:
+        """Move the reusable page pane to its starting scroll position."""
+        await self.content.scroll_to(offset=0, duration=0)
+
     async def handle_link(self, event: ft.Event[ft.Markdown]) -> None:
         """Route a tapped Markdown link.
 
@@ -624,6 +628,7 @@ class PageView:
         """
         await self._state.navigation.follow_link(destination)
         self.refresh()
+        await self.scroll_to_top()
         self._update()
 
     async def follow_role(self, name: str) -> None:
@@ -646,6 +651,7 @@ class PageView:
                 await self._on_missing_role(name)
             return
         self.refresh()
+        await self.scroll_to_top()
         self._update()
 
     def _role_outcome(self, name: str) -> LinkOutcome:
@@ -1092,6 +1098,7 @@ class PageView:
         self._rename_open = False
         await self._state.navigation.back()
         self.refresh()
+        await self.scroll_to_top()
         self._update()
 
     async def start_edit(self) -> None:
@@ -1336,6 +1343,7 @@ class PageView:
         """
         await self._state.navigation.open_page(path)
         self.refresh()
+        await self.scroll_to_top()
         self._update()
 
     async def toggle_completed_steps(self, event: ft.Event[ft.Checkbox]) -> None:
@@ -1375,6 +1383,7 @@ class PageView:
         self._rename_open = False
         await self._state.navigation.choose_candidate(path)
         self.refresh()
+        await self.scroll_to_top()
         self._update()
 
     def _candidate_handler(self, path: Path) -> Callable[[], Awaitable[None]]:

@@ -100,6 +100,23 @@ def _freeze(control: ft.Control) -> None:
     object.__setattr__(control, "_frozen", True)
 
 
+def _record_page_scroll(view: afanes.ui.views.workspace.WorkspaceView) -> list[float | None]:
+    positions: list[float | None] = []
+
+    async def recorder(
+        *,
+        offset: float | None = None,
+        delta: float | None = None,
+        scroll_key: object = None,
+        duration: float = 0,
+        curve: object = None,
+    ) -> None:
+        positions.append(offset)
+
+    object.__setattr__(view.page_view.content, "scroll_to", recorder)
+    return positions
+
+
 def _change_handler(control: ft.Control) -> Handler:
     return typing.cast("Handler", control.__getattribute__("on_change"))
 
@@ -441,12 +458,14 @@ class TestBrowserHistory:
         first = _write_note(vault / "reference" / "Ada.md", note_type="reference", body="# Ada")
         _write_note(vault / "reference" / "Grace.md", note_type="reference", body="# Grace")
         view = _open_workspace(tmp_path, monkeypatch)
+        scrolls = _record_page_scroll(view)
         asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.REFERENCES])())
 
         asyncio.run(_handler(_row_for(view.browser_list, "Ada"))())
         asyncio.run(_handler(_row_for(view.browser_list, "Grace"))())
         asyncio.run(view.page_view.go_back())
 
+        assert scrolls == [0, 0, 0]
         assert afanes.ui.state.app_state.pages.page is not None
         assert afanes.ui.state.app_state.pages.page.path == first
         assert view.page_view.title.value == "Ada"
@@ -658,6 +677,7 @@ class TestLogSection:
         today = _today()
         self._log_path(vault, today, "Today")
         view = self._open_log(tmp_path, monkeypatch)
+        _record_page_scroll(view)
 
         asyncio.run(view.open_log_day(today.day))
 
@@ -757,6 +777,7 @@ class TestLogSection:
         first = self._log_path(vault, today, "First")
         second = self._log_path(vault, _other_day(today), "Second")
         view = self._open_log(tmp_path, monkeypatch)
+        scrolls = _record_page_scroll(view)
 
         async def scenario() -> None:
             await view.open_note(first)
@@ -765,5 +786,6 @@ class TestLogSection:
 
         asyncio.run(scenario())
 
+        assert scrolls == [0, 0]
         assert afanes.ui.state.app_state.pages.page is not None
         assert afanes.ui.state.app_state.pages.page.path == first

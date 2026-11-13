@@ -391,6 +391,7 @@ class WorkspaceView:
         finally:
             self._set_working(working=False)
         self._refresh_dynamic()
+        await self.page_view.scroll_to_top()
         self._update()
 
     async def _select_section(self, section: afanes.ui.state.browser.WorkspaceSection) -> None:
