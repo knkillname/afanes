@@ -15,6 +15,7 @@ import afanes.ui.views.projects
 from tests.support import ensure_vault, versioned
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
+FocusHandler = Callable[[object], Coroutine[typing.Any, typing.Any, None]]
 
 
 @pytest.fixture(autouse=True)
@@ -74,18 +75,55 @@ def _group(view: afanes.ui.views.projects.ProjectsView, stage: str) -> ft.Expans
     )
 
 
-def _project_tiles(view: afanes.ui.views.projects.ProjectsView, stage: str) -> list[ft.ListTile]:
-    return [control for control in _group(view, stage).controls or [] if isinstance(control, ft.ListTile)]
+def _project_buttons(view: afanes.ui.views.projects.ProjectsView, stage: str) -> list[ft.TextButton]:
+    controls = _group(view, stage).controls or []
+    if not controls:
+        return []
+    rows = controls[0]
+    assert isinstance(rows, ft.Column)
+    buttons: list[ft.TextButton] = []
+    for row in rows.controls:
+        assert isinstance(row, ft.Container)
+        content = row.content
+        assert isinstance(content, ft.TextButton)
+        buttons.append(content)
+    return buttons
+
+
+def _find_by_key(control: ft.Control, key: str) -> ft.Control | None:
+    if getattr(control, "key", None) == key:
+        return control
+    for child in getattr(control, "controls", None) or []:
+        found = _find_by_key(child, key)
+        if found is not None:
+            return found
+    content = getattr(control, "content", None)
+    if content is not None:
+        return _find_by_key(content, key)
+    return None
+
+
+def _row(view: afanes.ui.views.projects.ProjectsView, path: str) -> ft.Container:
+    row = _find_by_key(view.root, f"project-row-{path}")
+    assert isinstance(row, ft.Container)
+    return row
 
 
 def _titles(view: afanes.ui.views.projects.ProjectsView, stage: str) -> list[str]:
-    return [control.title.value for control in _project_tiles(view, stage) if isinstance(control.title, ft.Text)]
+    titles: list[str] = []
+    for button in _project_buttons(view, stage):
+        content = button.content
+        assert isinstance(content, ft.Column)
+        title = content.controls[0]
+        assert isinstance(title, ft.Text)
+        titles.append(title.value)
+    return titles
 
 
-def _details(tile: ft.ListTile) -> list[str]:
-    subtitle = tile.subtitle
-    assert isinstance(subtitle, ft.Column)
-    return [control.value for control in subtitle.controls if isinstance(control, (ft.Text, ft.Markdown))]
+def _details(button: ft.TextButton) -> list[str]:
+    content = button.content
+    assert isinstance(content, ft.Column)
+    return [control.value for control in content.controls[1:] if isinstance(control, (ft.Text, ft.Markdown))]
 
 
 def _handler(control: ft.Control) -> Handler:
@@ -124,8 +162,8 @@ class TestProjectGrouping:
         view = _open_view(tmp_path, monkeypatch)
         expected = afanes.ui.strings.PROJECT_META_SEPARATOR.join(["Active", afanes.ui.strings.open_step_count(0)])
 
-        active_details = _details(_project_tiles(view, "active")[0])
-        plain_details = _details(_project_tiles(view, "active")[1])
+        active_details = _details(_project_buttons(view, "active")[0])
+        plain_details = _details(_project_buttons(view, "active")[1])
 
         assert active_details[-1] == expected
         assert plain_details[-1] == expected
@@ -142,7 +180,7 @@ class TestProjectRows:
         )
         view = _open_view(tmp_path, monkeypatch)
 
-        details = _details(_project_tiles(view, "active")[0])
+        details = _details(_project_buttons(view, "active")[0])
 
         assert "Due 2026-11-20" in details[-1]
         assert "1 open step" in details[-1]
@@ -159,28 +197,43 @@ class TestProjectRows:
             body="# Launch\n\n- [ ] Write copy\n",
         )
         view = _open_view(tmp_path, monkeypatch)
-        tile = _project_tiles(view, "active")[0]
-        subtitle = tile.subtitle
+        button = _project_buttons(view, "active")[0]
+        content = button.content
+        row = _row(view, "projects/Launch.md")
 
-        assert isinstance(tile.title, ft.Text)
-        assert tile.title.style == afanes.ui.theme.TEXT_ROLES["heading"]
-        assert isinstance(subtitle, ft.Column)
-        next_step, metadata = subtitle.controls
+        assert isinstance(content, ft.Column)
+        title, next_step, metadata = content.controls
+        assert isinstance(title, ft.Text)
+        assert title.value == "Launch"
+        assert title.style == afanes.ui.theme.TEXT_ROLES["heading"]
         assert isinstance(next_step, ft.Markdown)
         style_sheet = next_step.md_style_sheet
         assert style_sheet is not None
         assert style_sheet.p_text_style == afanes.ui.theme.TEXT_ROLES["body"]
         assert isinstance(metadata, ft.Text)
         assert metadata.style == afanes.ui.theme.TEXT_ROLES["caption"]
-        assert not tile.dense
         assert not _group(view, "active").dense
+        assert row.bgcolor == afanes.ui.theme.TRANSPARENT_COLOR
+        assert row.border is not None
+        assert row.border.top.color == afanes.ui.theme.TRANSPARENT_COLOR
+
+        focus = typing.cast("FocusHandler", button.on_focus)
+        asyncio.run(focus(None))
+
+        assert row.border.top.color == afanes.ui.theme.FOCUS_RING_COLOR
+        assert row.bgcolor == afanes.ui.theme.TRANSPARENT_COLOR
+
+        blur = typing.cast("FocusHandler", button.on_blur)
+        asyncio.run(blur(None))
+
+        assert row.border.top.color == afanes.ui.theme.TRANSPARENT_COLOR
 
     def test_row_without_due_date_omits_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _write_note(vault / "projects" / "Launch.md", status="active")
         view = _open_view(tmp_path, monkeypatch)
 
-        details = _details(_project_tiles(view, "active")[0])
+        details = _details(_project_buttons(view, "active")[0])
 
         assert all(not detail.startswith("Due ") for detail in details)
 
@@ -195,8 +248,8 @@ class TestProjectRows:
         )
         view = _open_view(tmp_path, monkeypatch)
 
-        tiles = _project_tiles(view, "waiting")
-        assert [tile.title.value for tile in tiles if isinstance(tile.title, ft.Text)] == ["Launch"]
+        tiles = _project_buttons(view, "waiting")
+        assert _titles(view, "waiting") == ["Launch"]
         details = _details(tiles[0])
         assert "Waiting" in details[-1]
         assert afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01") in details[-1]
@@ -224,8 +277,8 @@ class TestProjectRows:
         asyncio.run(scenario())
         view.refresh()
 
-        tiles = _project_tiles(view, "waiting")
-        assert [tile.title.value for tile in tiles if isinstance(tile.title, ft.Text)] == ["Launch"]
+        tiles = _project_buttons(view, "waiting")
+        assert _titles(view, "waiting") == ["Launch"]
         details = _details(tiles[0])
         assert "Waiting" in details[-1]
         assert afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01") in details[-1]
@@ -238,7 +291,7 @@ class TestProjectRows:
         _write_note(vault / "projects" / "Launch.md", status="active", body="# Launch\n\n- [x] Someday\n")
         view = _open_view(tmp_path, monkeypatch)
 
-        details = _details(_project_tiles(view, "active")[0])
+        details = _details(_project_buttons(view, "active")[0])
 
         assert "0 open steps" in details[-1]
         assert "No next step" in details
@@ -251,12 +304,12 @@ class TestProjectRows:
             body="# Launch\n\n- [ ] **Write** [copy](<note:Copy>)\n",
         )
         view = _open_view(tmp_path, monkeypatch)
-        tile = _project_tiles(view, "active")[0]
-        subtitle = tile.subtitle
-        assert isinstance(subtitle, ft.Column)
+        button = _project_buttons(view, "active")[0]
+        content = button.content
+        assert isinstance(content, ft.Column)
 
-        rendered = [control for control in subtitle.controls if isinstance(control, ft.Markdown)]
-        plain = [control.value for control in subtitle.controls if isinstance(control, ft.Text)]
+        rendered = [control for control in content.controls[1:] if isinstance(control, ft.Markdown)]
+        plain = [control.value for control in content.controls[1:] if isinstance(control, ft.Text)]
 
         assert [control.value for control in rendered] == ["Next: **Write** [copy](<note:Copy>)"]
         assert rendered[0].on_tap_link is None
@@ -271,7 +324,7 @@ class TestProjectRows:
         )
         view = _open_view(tmp_path, monkeypatch)
 
-        details = _details(_project_tiles(view, "active")[0])
+        details = _details(_project_buttons(view, "active")[0])
 
         assert "2 open steps" in details[-1]
 
@@ -287,7 +340,7 @@ class TestProjectSelection:
 
         view = _open_view(tmp_path, monkeypatch, on_select=open_page)
 
-        asyncio.run(_handler(_project_tiles(view, "active")[0])())
+        asyncio.run(_handler(_project_buttons(view, "active")[0])())
 
         assert state.pages.page is not None
         assert state.pages.page.path == project
@@ -301,9 +354,29 @@ class TestProjectSelection:
             opened.append(path)
 
         view = _open_view(tmp_path, monkeypatch, on_select=select)
-        asyncio.run(_handler(_project_tiles(view, "active")[0])())
+        asyncio.run(_handler(_project_buttons(view, "active")[0])())
 
         assert [path.name for path in opened] == ["Launch.md"]
+
+    def test_selection_updates_in_place(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "projects" / "Launch.md", status="active", body="# Launch")
+        state = afanes.ui.state.app_state
+
+        async def open_page(path: Path) -> None:
+            await state.navigation.open_page(path)
+
+        view = _open_view(tmp_path, monkeypatch, on_select=open_page)
+        button = _project_buttons(view, "active")[0]
+        row = _row(view, "projects/Launch.md")
+        assert row.bgcolor == afanes.ui.theme.TRANSPARENT_COLOR
+
+        asyncio.run(_handler(button)())
+        view.refresh()
+
+        assert _project_buttons(view, "active")[0] is button
+        assert _row(view, "projects/Launch.md") is row
+        assert row.bgcolor == afanes.ui.theme.SELECTED_ROW_COLOR
 
 
 class TestProjectRefresh:
@@ -317,7 +390,7 @@ class TestProjectRefresh:
             body="# Launch\n\n- [ ] Write copy\n",
         )
         view = _open_view(tmp_path, monkeypatch)
-        assert "1 open step" in _details(_project_tiles(view, "active")[0])[-1]
+        assert "1 open step" in _details(_project_buttons(view, "active")[0])[-1]
 
         _write_note(
             vault / "projects" / "Launch.md",
@@ -327,7 +400,7 @@ class TestProjectRefresh:
         asyncio.run(afanes.ui.state.app_state.workspace.refresh())
         view.refresh()
 
-        details = _details(_project_tiles(view, "active")[0])
+        details = _details(_project_buttons(view, "active")[0])
         assert "0 open steps" in details[-1]
         assert "No next step" in details
 
@@ -357,7 +430,7 @@ class TestProjectRefresh:
 
         view.refresh()
 
-        tiles = _project_tiles(view, "active")
+        tiles = _project_buttons(view, "active")
         assert _titles(view, "active") == ["Launch"]
         details = _details(tiles[0])
         assert any("Write copy" in detail for detail in details)

@@ -49,7 +49,14 @@ class ProjectsView:
         self._state = afanes.ui.state.app_state
         self._update = update
         self._on_select = on_select
-        self.root = ft.Column(controls=[], spacing=0, key="projects-view")
+        self._rows: dict[Path, ft.Container] = {}
+        self._signature: tuple[object, ...] | None = None
+        self.root = ft.Column(
+            controls=[],
+            spacing=0,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+            key="projects-view",
+        )
         self.refresh()
 
     def build(self) -> ft.Control:
@@ -63,23 +70,30 @@ class ProjectsView:
         return self.root
 
     def refresh(self) -> None:
-        """Rebuild every project group from the latest scan.
+        """Rebuild project groups or update the selection in place.
 
         Notes
         -----
-        Search matching uses the shared browser query. This method performs no
+        Search matching uses the shared browser query. A selection change keeps
+        the existing row controls so keyboard focus stays on the row that was
+        clicked; a content change rebuilds the groups. This method performs no
         file I/O and never changes a project.
         """
         query = self._state.browser.query
-        groups = self._state.browser.project_groups()
-        controls: list[ft.Control] = []
-        total = 0
-        for group in groups:
-            projects = tuple(
-                summary for summary in group.projects if afanes.core.search.Browser.matches(summary.note, query)
+        grouped: list[tuple[ProjectGroup, tuple[ProjectSummary, ...]]] = [
+            (
+                group,
+                tuple(summary for summary in group.projects if afanes.core.search.Browser.matches(summary.note, query)),
             )
-            total += len(projects)
-            controls.append(self._expansion(group, projects))
+            for group in self._state.browser.project_groups()
+        ]
+        signature = self._signature_for(grouped, query)
+        if signature == self._signature and self._rows:
+            self._apply_selection()
+            return
+        self._rows = {}
+        controls: list[ft.Control] = [self._expansion(group, projects) for group, projects in grouped]
+        total = sum(len(projects) for _, projects in grouped)
         if total == 0 and query.strip():
             controls.insert(
                 0,
@@ -93,20 +107,32 @@ class ProjectsView:
                 ),
             )
         self.root.controls = controls
+        self._signature = signature
 
     def _expansion(self, group: ProjectGroup, projects: tuple[ProjectSummary, ...]) -> ft.ExpansionTile:
         """Build one collapsible status group."""
         label = afanes.ui.strings.PROJECT_GROUP_LABELS[group.stage.value]
+        rows = [self._project_row(summary) for summary in projects]
+        controls: list[ft.Control] = []
+        if rows:
+            controls.append(
+                ft.Column(
+                    controls=rows,
+                    spacing=afanes.ui.theme.ROW_GAP,
+                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                )
+            )
         return ft.ExpansionTile(
             title=ft.Text(f"{label} ({len(projects)})", style=afanes.ui.theme.TEXT_ROLES["heading"]),
-            controls=[self._project_tile(summary) for summary in projects],
+            controls=controls,
             expanded=group.stage is not ProjectStage.CLOSED,
+            expanded_cross_axis_alignment=ft.CrossAxisAlignment.STRETCH,
             maintain_state=True,
             key=f"project-group-{group.stage.value}",
         )
 
-    def _project_tile(self, summary: ProjectSummary) -> ft.Control:
-        """Build one clickable project row with its next step and metadata."""
+    def _project_row(self, summary: ProjectSummary) -> ft.Control:
+        """Build one focusable project row with its next step and metadata."""
         note = summary.note
         if summary.next_step is None:
             next_step: ft.Control = ft.Text(
@@ -125,10 +151,17 @@ class ProjectsView:
             meta.append(afanes.ui.strings.PROJECT_DUE.format(date=note.due_date.isoformat()))
         meta.append(afanes.ui.strings.open_step_count(summary.open_count))
         page = self._state.pages.page
-        return ft.ListTile(
-            title=ft.Text(note.title, style=afanes.ui.theme.TEXT_ROLES["heading"]),
-            subtitle=ft.Column(
+        selected = page is not None and page.path == note.path
+        row = ft.Container(
+            bgcolor=afanes.ui.theme.SELECTED_ROW_COLOR if selected else afanes.ui.theme.TRANSPARENT_COLOR,
+            border=ft.Border.all(afanes.ui.theme.FOCUS_RING_WIDTH, afanes.ui.theme.TRANSPARENT_COLOR),
+            border_radius=afanes.ui.theme.CONTROL_RADIUS,
+            key=f"project-row-{note.relative_path.as_posix()}",
+        )
+        row.content = ft.TextButton(
+            content=ft.Column(
                 controls=[
+                    ft.Text(note.title, style=afanes.ui.theme.TEXT_ROLES["heading"]),
                     next_step,
                     ft.Text(
                         afanes.ui.strings.PROJECT_META_SEPARATOR.join(meta),
@@ -136,11 +169,89 @@ class ProjectsView:
                     ),
                 ],
                 spacing=0,
+                expand=True,
             ),
-            selected=page is not None and page.path == note.path,
+            style=ft.ButtonStyle(
+                padding=ft.Padding.symmetric(
+                    horizontal=afanes.ui.theme.ITEM_GAP,
+                    vertical=afanes.ui.theme.ITEM_GAP,
+                ),
+                alignment=ft.Alignment.CENTER_LEFT,
+                shape=ft.RoundedRectangleBorder(radius=afanes.ui.theme.CONTROL_RADIUS),
+                overlay_color={
+                    ft.ControlState.FOCUSED: afanes.ui.theme.TRANSPARENT_COLOR,
+                    ft.ControlState.HOVERED: afanes.ui.theme.HOVER_COLOR,
+                    ft.ControlState.PRESSED: afanes.ui.theme.SPLASH_COLOR,
+                },
+            ),
             on_click=self._select_handler(note.path),
+            on_focus=self._focus_handler(row),
+            on_blur=self._blur_handler(row),
             key=f"project-{note.relative_path.as_posix()}",
         )
+        self._rows[note.path] = row
+        return row
+
+    def _apply_selection(self) -> None:
+        """Mark the open project row without replacing any row control."""
+        page = self._state.pages.page
+        for path, row in self._rows.items():
+            row.bgcolor = (
+                afanes.ui.theme.SELECTED_ROW_COLOR
+                if page is not None and page.path == path
+                else afanes.ui.theme.TRANSPARENT_COLOR
+            )
+
+    def _signature_for(
+        self,
+        grouped: list[tuple[ProjectGroup, tuple[ProjectSummary, ...]]],
+        query: str,
+    ) -> tuple[object, ...]:
+        """Return the content signature that decides whether rows rebuild."""
+        return (
+            query,
+            tuple(
+                (
+                    group.stage,
+                    tuple(
+                        (
+                            summary.note.path,
+                            summary.note.title,
+                            summary.note.status,
+                            summary.note.due_date,
+                            summary.open_count,
+                            summary.next_step.text if summary.next_step is not None else None,
+                        )
+                        for summary in projects
+                    ),
+                )
+                for group, projects in grouped
+            ),
+        )
+
+    def _focus_handler(self, row: ft.Container) -> Callable[[object], Awaitable[None]]:
+        """Bind the accent focus ring to one project row."""
+
+        async def handle(_event: object = None) -> None:
+            row.border = ft.Border.all(
+                afanes.ui.theme.FOCUS_RING_WIDTH,
+                afanes.ui.theme.FOCUS_RING_COLOR,
+            )
+            self._update()
+
+        return handle
+
+    def _blur_handler(self, row: ft.Container) -> Callable[[object], Awaitable[None]]:
+        """Clear the focus ring from one project row."""
+
+        async def handle(_event: object = None) -> None:
+            row.border = ft.Border.all(
+                afanes.ui.theme.FOCUS_RING_WIDTH,
+                afanes.ui.theme.TRANSPARENT_COLOR,
+            )
+            self._update()
+
+        return handle
 
     def _select_handler(self, path: Path) -> Callable[[], Awaitable[None]]:
         """Bind a no-argument async handler to one project path."""

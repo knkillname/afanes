@@ -322,12 +322,13 @@ class TestWorkspaceShell:
             for control in projects_root.controls
             if isinstance(control, ft.ExpansionTile) and control.key == "project-group-active"
         )
-        titles = [
-            control.title.value
-            for control in active_group.controls or []
-            if isinstance(control, ft.ListTile) and isinstance(control.title, ft.Text)
-        ]
-        assert titles == ["Launch"]
+        button = _find_control(active_group, "project-projects/Launch.md")
+        assert isinstance(button, ft.TextButton)
+        content = button.content
+        assert isinstance(content, ft.Column)
+        title = content.controls[0]
+        assert isinstance(title, ft.Text)
+        assert title.value == "Launch"
 
     def test_section_counts_follow_the_scan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

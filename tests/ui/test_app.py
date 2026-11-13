@@ -1205,7 +1205,7 @@ class TestRoleReferenceCreation:
             workspace = page.controls[0]
             projects = _typed(_find_by_key(workspace, "section-projects"), ft.ListTile)
             await typing.cast("Handler", projects.on_click)()
-            follow = _typed(_find_by_key(page.controls[0], "project-projects/Follow.md"), ft.ListTile)
+            follow = _typed(_find_by_key(page.controls[0], "project-projects/Follow.md"), ft.TextButton)
             await typing.cast("Handler", follow.on_click)()
             link = _find_span(page.controls[0], "Ghost")
             assert link is not None
