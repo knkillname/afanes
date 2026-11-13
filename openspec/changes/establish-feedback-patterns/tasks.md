@@ -8,8 +8,8 @@
 
 ## 2. Toast presenter and shell wiring
 
-- [ ] 2.1 Add `src/afanes/ui/components/toast.py` with a `ToastPresenter` that wraps Flet `SnackBar`, closes only its own current snackbar, and exposes `show` and `close`; add the toast surface, text, action, duration, margin, and padding tokens to `theme.py`; verify focused tests cover show, replacement, action, dismissal, and that `pop_dialog` is never called.
-- [ ] 2.2 Add an `on_notice` callback to `WorkspaceActions`, consume `take_notice()` in `WorkspaceView`, and own the presenter in `AppShell`; verify `tests/ui/test_workspace_view.py` and `tests/ui/test_app.py` pass with a fake presenter.
+- [x] 2.1 Add `src/afanes/ui/components/toast.py` with a `ToastPresenter` that wraps Flet `SnackBar`, closes only its own current snackbar, and exposes `show` and `close`; add the toast surface, text, action, duration, margin, and padding tokens to `theme.py`; verify focused tests cover show, replacement, action, dismissal, and that `pop_dialog` is never called.
+- [x] 2.2 Add an `on_notice` callback to `WorkspaceActions`, consume `take_notice()` in `WorkspaceView`, and own the presenter in `AppShell`; verify `tests/ui/test_workspace_view.py` and `tests/ui/test_app.py` pass with a fake presenter.
 - [ ] 2.3 Render the toast in both appearance modes with the themed tokens; verify `hatch test tests/ui/test_theme.py tests/ui/test_conformance.py` passes and the conformance baseline does not grow.
 
 ## 3. Core trash return and restore

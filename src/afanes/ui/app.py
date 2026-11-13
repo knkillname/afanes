@@ -12,7 +12,9 @@ import flet as ft
 
 import afanes.__about__
 import afanes.core.vault.service
+import afanes.ui.components.toast
 import afanes.ui.state
+import afanes.ui.state.status
 import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.inbox
@@ -76,6 +78,7 @@ class AppShell:
         self.is_desktop = not page.web
         self.picker: ft.FilePicker | None = None
         self.workspace: afanes.ui.views.workspace.WorkspaceView | None = None
+        self.toast = afanes.ui.components.toast.ToastPresenter(page, self._handle_notice_action)
         self.refresh_task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
@@ -257,9 +260,20 @@ class AppShell:
         )
         self.page.update()
 
+    async def _handle_notice_action(self, _action: afanes.ui.state.status.NoticeAction) -> None:
+        """Run the reversible command carried by a toast action.
+
+        Parameters
+        ----------
+        _action : afanes.ui.state.status.NoticeAction
+            Action selected in the toast.
+        """
+        self._refresh_current_workspace()
+
     async def render(self) -> None:
         """Render the welcome state or the workspace for the current session."""
         await self._stop_refresh_loop()
+        self.toast.close()
         self.workspace = None
         self.page.controls.clear()
         if self.state.session.adoption_target is not None:
@@ -292,6 +306,7 @@ class AppShell:
                     on_missing_role=self.show_role_reference_dialog,
                     pick_role=self.pick_role,
                     on_about=self.show_about_dialog,
+                    on_notice=self.toast.show,
                 )
             )
             self.workspace = workspace

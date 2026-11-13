@@ -24,6 +24,7 @@ import afanes.ui.components.capture_bar
 import afanes.ui.components.frozen
 import afanes.ui.components.log_tree
 import afanes.ui.state
+import afanes.ui.state.status
 import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.page
@@ -72,6 +73,9 @@ class WorkspaceActions:
         Command that asks for an owner or requester name in read mode.
     on_about : collections.abc.Callable[[], collections.abc.Awaitable[None]] | None
         Command that shows the About dialog.
+    on_notice : collections.abc.Callable[[afanes.ui.state.status.Notice], None] | None
+        Command that shows one transient notice, or ``None`` when the view is
+        used without a toast presenter.
     """
 
     update: Callable[[], None]
@@ -84,6 +88,7 @@ class WorkspaceActions:
     on_missing_role: Callable[[str], Awaitable[None]] | None = None
     pick_role: afanes.ui.views.page.PickRole | None = None
     on_about: Callable[[], Awaitable[None]] | None = None
+    on_notice: Callable[[afanes.ui.state.status.Notice], None] | None = None
 
 
 class WorkspaceView:
@@ -114,6 +119,7 @@ class WorkspaceView:
         self._pick_date = actions.pick_date
         self._on_missing_role = actions.on_missing_role
         self._pick_role = actions.pick_role
+        self._on_notice = actions.on_notice
         self.log_calendar: afanes.ui.components.calendar.LogCalendar | None = None
         self.log_tree: afanes.ui.components.log_tree.LogTree | None = None
         self.log_today_button: ft.TextButton | None = None
@@ -840,6 +846,7 @@ class WorkspaceView:
         self.browser_list.controls = self._browser_controls(listing)
         self._refresh_failures()
         self._refresh_banners()
+        self._consume_notice()
         self._refresh_main()
         self.progress.visible = state.status.busy
 
@@ -1373,13 +1380,21 @@ class WorkspaceView:
         return handle
 
     def _refresh_banners(self) -> None:
-        """Refresh the warning banners."""
-        banners: list[ft.Control] = []
-        message = self._state.status.message
-        if message is not None:
-            banners.append(Banner(message).build())
+        """Refresh the persistent banners owned by the workspace states."""
+        messages = (
+            self._state.workspace.banner,
+            self._state.session.banner,
+            self._state.processing.banner,
+        )
+        banners = [Banner(message).build() for message in messages if message is not None]
         self.banners.controls = banners
         self.banners.visible = bool(banners)
+
+    def _consume_notice(self) -> None:
+        """Take one transient notice and forward it to the toast presenter."""
+        notice = self._state.status.take_notice()
+        if notice is not None and self._on_notice is not None:
+            self._on_notice(notice)
 
     def _refresh_main(self) -> None:
         """Show the page pane, the Processing Wizard, or the review area."""

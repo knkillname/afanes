@@ -57,6 +57,7 @@ NEW_VAULT_PREVIEW_TEMPLATE = "Creates: {folders} and afanes.yaml. Writes {notes}
 NEW_VAULT_CREATE = "Create"
 CANCEL_ACTION = "Cancel"
 CLOSE_ACTION = "Close"
+UNDO_ACTION = "Undo"
 SESSION_ACTIVE_TITLE = "Afanes Is Open in Another Window"
 SESSION_ACTIVE_BODY = "Only one window can use the vault at a time. Close the other window and try again"
 SESSION_RETRY = "Try Again"

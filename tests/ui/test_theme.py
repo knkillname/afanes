@@ -296,6 +296,19 @@ class TestTheme:
         assert ft.Colors.with_opacity(0.08, ft.Colors.ON_SURFACE) == afanes.ui.theme.SPLASH_COLOR
         assert ft.Colors.with_opacity(0.15, ft.Colors.PRIMARY) == afanes.ui.theme.FOCUS_COLOR
 
+    def test_toast_tokens_use_the_overlay_roles(self) -> None:
+        assert afanes.ui.theme.TOAST_SURFACE_COLOR == ft.Colors.INVERSE_SURFACE
+        assert afanes.ui.theme.TOAST_TEXT_COLOR == ft.Colors.ON_INVERSE_SURFACE
+        assert afanes.ui.theme.TOAST_ACTION_COLOR == ft.Colors.INVERSE_PRIMARY
+        assert afanes.ui.theme.TOAST_DURATION_MS > 0
+        assert afanes.ui.theme.TOAST_MARGIN == afanes.ui.theme.ITEM_GAP
+        assert afanes.ui.theme.TOAST_PADDING == afanes.ui.theme.ITEM_GAP
+
+    def test_toast_roles_are_defined_in_both_palettes(self) -> None:
+        for palette in (afanes.ui.theme.LIGHT_PALETTE, afanes.ui.theme.DARK_PALETTE):
+            assert palette["inverse_surface"]
+            assert palette["on_inverse_surface"]
+
     def test_icons_use_the_reference_size_tokens(self) -> None:
         assert afanes.ui.theme.ICON_SIZE == ICON_SIZE_VALUE
         assert afanes.ui.theme.ICON_SIZE_LARGE == ICON_SIZE_LARGE_VALUE
