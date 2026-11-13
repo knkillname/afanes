@@ -81,7 +81,6 @@ BASELINE: dict[str, dict[str, int]] = {
         "components/page_panels.py::ConflictPanel": 1,
         "components/page_panels.py::RenamePanel": 1,
         "components/page_panels.py::RepairPanel": 1,
-        "components/page_panels.py::TrashPanel": 1,
         "components/page_panels.py::TypeChangePanel": 1,
         "components/role_name.py::RoleNameDialog": 1,
         "components/role_reference.py::RoleReferenceDialog": 1,

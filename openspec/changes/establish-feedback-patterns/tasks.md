@@ -15,12 +15,12 @@
 ## 3. Core trash return and restore
 
 - [x] 3.1 Change `VaultNaming.trash` to return the `TrashPreview` it actually used instead of an integer, update the processing caller that ignores it, and verify `hatch test tests/core/vault/test_naming.py tests/core/vault/test_processing.py tests/core/test_processing.py` passes.
-- [ ] 3.2 Add `VaultNaming.restore_from_trash(preview, confirm=True)` with vault containment, missing-trash refusal, occupied-source refusal, parent creation, and an exclusive publish that never overwrites; verify focused tests cover success, collision, missing file, path escape, and no overwrite.
-- [ ] 3.3 Verify a restored note's inbound references resolve on the next scan and a collision leaves the trash file byte-identical; run `hatch test tests/core/vault/test_naming.py tests/core/vault/test_service.py`.
+- [x] 3.2 Add `VaultNaming.restore_from_trash(preview, confirm=True)` with vault containment, missing-trash refusal, occupied-source refusal, parent creation, and an exclusive publish that never overwrites; verify focused tests cover success, collision, missing file, path escape, and no overwrite.
+- [x] 3.3 Verify a restored note's inbound references resolve on the next scan and a collision leaves the trash file byte-identical; run `hatch test tests/core/vault/test_naming.py tests/core/vault/test_service.py`.
 
 ## 4. Immediate trash flow
 
-- [ ] 4.1 Replace `PageDialogState.begin_trash`, `apply_trash`, and `cancel_trash` with one immediate trash command and an `undo_trash` command, keep one in-memory undo record, and emit the moved, restored, and failure notices; verify focused state tests cover immediate move, undo, collision, replacement by a second trash, and restart loss.
+- [x] 4.1 Replace `PageDialogState.begin_trash`, `apply_trash`, and `cancel_trash` with one immediate trash command and an `undo_trash` command, keep one in-memory undo record, and emit the moved, restored, and failure notices; verify focused state tests cover immediate move, undo, collision, replacement by a second trash, and restart loss.
 - [ ] 4.2 Update `PageView` so the Trash menu action calls the immediate command, remove its trash confirmation methods and panel wiring, delete `TrashPanel` from `page_panels.py`, and verify `hatch test tests/ui/test_page_view.py` passes.
 - [ ] 4.3 Update the copy: `PAGE_TRASH` loses its ellipsis, remove `PAGE_TRASH_TITLE`, `PAGE_TRASH_BODY`, and `PAGE_TRASH_CONFIRM`, add the moved, restored, failure, and Undo constants, update the copy-gate classifications and `ELLIPSIS_ACTIONS`, and verify `hatch test tests/ui/test_copy.py` passes.
 - [ ] 4.4 Remove the `TrashPanel` entry from the conformance baseline, verify the baseline still only shrinks, and run `hatch test tests/ui/test_conformance.py`.

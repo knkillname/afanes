@@ -165,7 +165,7 @@ class PageView:
         self.trash_item = ft.PopupMenuItem(
             content=afanes.ui.strings.PAGE_TRASH,
             icon=ft.Icons.DELETE_OUTLINE,
-            on_click=self.begin_trash,
+            on_click=self.trash_page,
             key="page-trash",
         )
         self.menu_button = ft.PopupMenuButton(
@@ -502,14 +502,6 @@ class PageView:
         self.rename_confirm_button = self.rename.confirm
         self.rename_cancel_button = self.rename.cancel
         self.rename_panel = self.rename.panel
-        self.trash = afanes.ui.components.page_panels.TrashPanel(
-            self.confirm_trash,
-            self.cancel_trash,
-        )
-        self.trash_text = self.trash.text
-        self.trash_confirm_button = self.trash.confirm
-        self.trash_cancel_button = self.trash.cancel
-        self.trash_panel = self.trash.panel
         self.dialogs = ft.Column(
             controls=[
                 self.conflict_panel,
@@ -518,7 +510,6 @@ class PageView:
                 self.type_change_panel,
                 self.category_move_panel,
                 self.rename_panel,
-                self.trash_panel,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
         )
@@ -755,7 +746,6 @@ class PageView:
         self._refresh_type_change()
         self._refresh_category_move()
         self._refresh_rename()
-        self._refresh_trash()
 
     def _refresh_header(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the header, mode buttons, and write status."""
@@ -1121,19 +1111,6 @@ class PageView:
         valid = bool((self.rename_field.value or "").strip())
         self.rename_preview_button.disabled = not valid
         self.rename_confirm_button.disabled = not valid
-
-    def _refresh_trash(self) -> None:
-        """Refresh the trash confirmation panel."""
-        preview = self._state.dialogs.trash_preview
-        self.trash_panel.visible = preview is not None
-        if preview is None:
-            return
-        self.trash_text.value = afanes.ui.strings.PAGE_TRASH_BODY.format(
-            path=preview.trash_path,
-            detail=afanes.ui.strings.CopyFormatter.reference_count(
-                preview.reference_count, len(preview.affected_notes)
-            ),
-        )
 
     def _refresh_category_move(self) -> None:
         """Refresh the category move confirmation panel."""
@@ -1566,20 +1543,8 @@ class PageView:
         self.refresh()
         self._update()
 
-    async def begin_trash(self) -> None:
-        """Plan moving the page to trash."""
-        await self._state.dialogs.begin_trash()
-        self.refresh()
-        self._update()
-
-    async def confirm_trash(self) -> None:
-        """Move the page to trash."""
-        await self._state.dialogs.apply_trash()
-        self.refresh()
-        self._update()
-
-    async def cancel_trash(self) -> None:
-        """Close the trash panel without moving the page."""
-        await self._state.dialogs.cancel_trash()
+    async def trash_page(self) -> None:
+        """Move the open page to trash and offer its undo."""
+        await self._state.dialogs.trash_page()
         self.refresh()
         self._update()

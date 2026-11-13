@@ -260,14 +260,16 @@ class AppShell:
         )
         self.page.update()
 
-    async def _handle_notice_action(self, _action: afanes.ui.state.status.NoticeAction) -> None:
+    async def _handle_notice_action(self, action: afanes.ui.state.status.NoticeAction) -> None:
         """Run the reversible command carried by a toast action.
 
         Parameters
         ----------
-        _action : afanes.ui.state.status.NoticeAction
+        action : afanes.ui.state.status.NoticeAction
             Action selected in the toast.
         """
+        if action is afanes.ui.state.status.NoticeAction.UNDO_TRASH:
+            await self.state.dialogs.undo_trash()
         self._refresh_current_workspace()
 
     async def render(self) -> None:

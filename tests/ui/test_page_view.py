@@ -732,15 +732,14 @@ class TestPanels:
     def test_panels_use_the_container_surface(self) -> None:
         view = PageView(PageActions(update=lambda: None))
 
-        assert view.trash_panel.bgcolor == afanes.ui.theme.SURFACE_CONTAINER_COLOR
-        assert view.trash_panel.border_radius == afanes.ui.theme.SURFACE_RADIUS
+        assert view.conflict_panel.bgcolor == afanes.ui.theme.SURFACE_CONTAINER_COLOR
+        assert view.conflict_panel.border_radius == afanes.ui.theme.SURFACE_RADIUS
 
-    def test_trash_actions_use_the_destructive_style(self) -> None:
+    def test_trash_is_available_from_the_page_menu(self) -> None:
         view = PageView(PageActions(update=lambda: None))
 
-        assert view.trash_confirm_button.style == afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE
-        assert view.trash_cancel_button.style is None
         assert view.trash_item.content == afanes.ui.strings.PAGE_TRASH
+        assert view.trash_item.key == "page-trash"
         assert view.menu_button.icon == ft.Icons.MORE_VERT_OUTLINED
 
     def test_conflict_panel_offers_reload_and_overwrite(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -883,7 +882,7 @@ class TestPanels:
         assert (vault / "notes" / "Ada King.md").exists()
         assert view.rename_panel.visible is False
 
-    def test_trash_panel_confirms(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_trash_moves_immediately_and_offers_undo(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
         note = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
@@ -895,17 +894,17 @@ class TestPanels:
             await state.workspace.choose_vault(vault)
             await state.navigation.open_page(note)
             view.refresh()
-            await view.begin_trash()
-            assert view.trash_panel.visible is True
-            assert view.trash_text.value
-            await view.confirm_trash()
+            await view.trash_page()
 
         asyncio.run(scenario())
 
         assert not note.exists()
         assert (vault / "trash" / "Ada.md").exists()
         assert state.pages.page is None
-        assert view.trash_panel.visible is False
+        notice = state.status.take_notice()
+        assert notice is not None
+        assert notice.message == afanes.ui.strings.PAGE_TRASH_MOVED
+        assert notice.action is afanes.ui.state.status.NoticeAction.UNDO_TRASH
 
     def test_log_page_hides_rename_and_keeps_trash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -2045,14 +2044,6 @@ class TestRenameAndRepairActions:
 
 
 class TestConfirmationOrder:
-    def test_trash_puts_cancel_first(self) -> None:
-        view = PageView(PageActions(update=lambda: None))
-
-        assert _action_labels(view.trash_panel) == [
-            afanes.ui.strings.PAGE_CANCEL,
-            afanes.ui.strings.PAGE_TRASH_CONFIRM,
-        ]
-
     def test_type_change_puts_cancel_first(self) -> None:
         view = PageView(PageActions(update=lambda: None))
 

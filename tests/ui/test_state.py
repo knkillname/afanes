@@ -3204,7 +3204,7 @@ class TestPageRenameTrash:
         assert _tree_state(vault) == before
         assert "note:Ada" in referrer.read_text(encoding="utf-8")
 
-    def test_trash_is_previewed_and_returns_through_history(
+    def test_trash_is_immediate_and_returns_through_history(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
@@ -3220,11 +3220,13 @@ class TestPageRenameTrash:
             await state.navigation.open_page(second)
             await state.navigation.open_page(first)
             await state.navigation.open_page(second)
-            preview = await state.dialogs.begin_trash()
-            assert preview is not None
-            assert preview.reference_count == 1
-            assert state.dialogs.trash_preview is not None
-            assert await state.dialogs.apply_trash() is True
+            assert await state.dialogs.trash_page() is True
+            assert state.dialogs.trash_undo is not None
+            notice = state.status.take_notice()
+            assert notice == afanes.ui.state.status.Notice(
+                message=afanes.ui.strings.PAGE_TRASH_MOVED,
+                action=afanes.ui.state.status.NoticeAction.UNDO_TRASH,
+            )
 
         asyncio.run(scenario())
 
@@ -3233,26 +3235,97 @@ class TestPageRenameTrash:
         assert state.pages.page is not None
         assert state.pages.page.path == first.resolve()
         assert state.navigation.history == ()
-        assert state.dialogs.trash_preview is None
+        assert state.dialogs.trash_undo is not None
+        assert state.dialogs.trash_undo.note_path == second.resolve()
 
-    def test_cancelling_trash_changes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_trash_undo_restores_the_note(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _versioned(vault)
+        note = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
+            assert await state.dialogs.trash_page() is True
+            state.status.take_notice()
+            return await state.dialogs.undo_trash()
+
+        restored = asyncio.run(scenario())
+
+        assert restored is True
+        assert note.is_file()
+        assert not (vault / "trash" / "Ada.md").exists()
+        assert state.dialogs.trash_undo is None
+        notice = state.status.take_notice()
+        assert notice == afanes.ui.state.status.Notice(message=afanes.ui.strings.PAGE_TRASH_RESTORED)
+
+    def test_trash_undo_reports_a_collision(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        note = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
+            assert await state.dialogs.trash_page() is True
+            note.write_text(_note_text("# Replacement\n"), encoding="utf-8")
+            state.status.take_notice()
+            return await state.dialogs.undo_trash()
+
+        restored = asyncio.run(scenario())
+
+        assert restored is False
+        assert note.read_text(encoding="utf-8") == _note_text("# Replacement\n")
+        assert (vault / "trash" / "Ada.md").is_file()
+        assert state.dialogs.trash_undo is not None
+        notice = state.status.take_notice()
+        assert notice is not None
+        assert notice.message.startswith(afanes.ui.strings.PAGE_TRASH_RESTORE_FAILED.format(detail=""))
+
+    def test_a_second_trash_replaces_the_undo_record(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        first = _write_note(vault / "notes" / "First.md", _note_text("# First\n"))
         second = _write_note(vault / "notes" / "Second.md", _note_text("# Second\n"))
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(first)
+            assert await state.dialogs.trash_page() is True
             await state.navigation.open_page(second)
-            await state.dialogs.begin_trash()
-            await state.dialogs.cancel_trash()
+            assert await state.dialogs.trash_page() is True
 
         asyncio.run(scenario())
 
-        assert second.exists()
-        assert not (vault / "trash").exists()
-        assert state.dialogs.trash_preview is None
+        assert state.dialogs.trash_undo is not None
+        assert state.dialogs.trash_undo.note_path == second.resolve()
+
+    def test_reset_discards_the_trash_undo_record(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        note = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(note)
+            assert await state.dialogs.trash_page() is True
+            state.dialogs.reset()
+            return await state.dialogs.undo_trash()
+
+        restored = asyncio.run(scenario())
+
+        assert restored is False
+        assert state.dialogs.trash_undo is None
+        assert (vault / "trash" / "Ada.md").is_file()
+        assert not note.exists()
 
 
 class TestPageRescue:
@@ -3389,8 +3462,7 @@ class TestPageRecoveryLifecycle:
             renamed = vault / "reference" / "Recovered page.md"
             assert renamed.exists()
 
-            assert await state.dialogs.begin_trash() is not None
-            assert await state.dialogs.apply_trash() is True
+            assert await state.dialogs.trash_page() is True
 
         asyncio.run(scenario())
 
@@ -4078,7 +4150,6 @@ class TestCloseVault:
             ("repair_preview", afanes.ui.strings.PAGE_REPAIR_PENDING),
             ("pending_labels", afanes.ui.strings.PAGE_TYPE_CHANGE_LEAVE),
             ("rename_preview", afanes.ui.strings.PAGE_PENDING_DIALOG),
-            ("trash_preview", afanes.ui.strings.PAGE_PENDING_DIALOG),
         ],
     )
     def test_pending_page_action_blocks_the_close(
@@ -4101,7 +4172,6 @@ class TestCloseVault:
                 "repair_preview": state.pages,
                 "pending_labels": state.dialogs,
                 "rename_preview": state.dialogs,
-                "trash_preview": state.dialogs,
             }[attribute]
             monkeypatch.setattr(target, attribute, object())
             if attribute != "repair_preview":

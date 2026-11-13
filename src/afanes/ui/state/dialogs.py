@@ -25,7 +25,7 @@ from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.navigation import PageNavigator
 from afanes.ui.state.pages import PageEditorState
 from afanes.ui.state.session import VaultSession
-from afanes.ui.state.status import UiStatus
+from afanes.ui.state.status import NoticeAction, UiStatus
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +55,9 @@ class PageDialogState:
         Category move waiting for confirmation.
     rename_preview : RenamePreview | None
         Rename preview waiting for confirmation.
-    trash_preview : TrashPreview | None
-        Trash preview waiting for confirmation.
+    trash_undo : TrashPreview | None
+        Note moved to trash by the current session, waiting for undo, or
+        ``None`` when no undo is available.
     """
 
     session: VaultSession
@@ -68,15 +69,15 @@ class PageDialogState:
     type_change_sites: tuple[ReferenceSite, ...] = ()
     category_move: CategoryMovePreview | None = None
     rename_preview: RenamePreview | None = None
-    trash_preview: TrashPreview | None = None
+    trash_undo: TrashPreview | None = None
 
     def reset(self) -> None:
-        """Clear every pending dialog and its leave guard."""
+        """Clear every pending dialog, its leave guard, and trash undo."""
         self.pending_labels = None
         self.type_change_sites = ()
         self.category_move = None
         self.rename_preview = None
-        self.trash_preview = None
+        self.trash_undo = None
         self.pages.blocking_message = None
 
     async def set_page_type(self, note_type: NoteType) -> bool:
@@ -714,52 +715,78 @@ class PageDialogState:
         except ValueError:
             return path.as_posix()
 
-    async def begin_trash(self) -> TrashPreview | None:
-        """Plan moving the current page to trash and retain it for confirmation.
+    async def trash_page(self) -> bool:
+        """Move the open page to trash immediately and offer its undo.
 
         Returns
         -------
-        TrashPreview | None
-            Preview to show, or ``None`` when planning failed.
+        bool
+            ``True`` when the note moved to trash.
+
+        Notes
+        -----
+        The draft is committed first. The move uses the preview actually
+        returned by the core service, updates the history and scan, and leaves
+        one in-memory undo record. A failed move is a transient notice and
+        leaves the page open.
         """
         async with self.command_lock:
             page = self.pages.page
             vault = self.session.vault
             if page is None or page.path is None or vault is None:
-                return None
+                return False
             if not await self.pages.commit():
-                return None
+                return False
             current = self.pages.page
             path = current.path if current is not None else page.path
             if path is None:
-                return None
+                return False
             self.status.set_busy(busy=True)
             try:
                 try:
                     preview = await asyncio.to_thread(
-                        afanes.core.vault.naming.VaultNaming(vault).plan_trash, path, snapshot=self.session.snapshot
+                        afanes.core.vault.naming.VaultNaming(vault).trash,
+                        path,
+                        confirm=True,
+                        snapshot=self.session.snapshot,
                     )
                 except (AfanesError, OSError) as exc:
-                    logger.debug("Trash planning failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_TRASH_FAILED.format(detail=str(exc)))
-                    return None
-                self.trash_preview = preview
-                self.pages.blocking_message = afanes.ui.strings.PAGE_PENDING_DIALOG
-                self.status.clear_message()
-                return preview
+                    logger.debug("Trash failed", exc_info=True)
+                    self.status.show_notice(afanes.ui.strings.PAGE_TRASH_FAILED.format(detail=str(exc)))
+                    return False
+                self.trash_undo = preview
+                self.pages.blocking_message = None
+                self.navigation.history = tuple(
+                    history_path for history_path in self.navigation.history if history_path != preview.note_path
+                )
+                self.pages.clear()
+                await self.session.refresh_snapshot()
+                self.status.show_notice(
+                    afanes.ui.strings.PAGE_TRASH_MOVED,
+                    action=NoticeAction.UNDO_TRASH,
+                )
             finally:
                 self.status.set_busy(busy=False)
+        await self.navigation.back()
+        return True
 
-    async def apply_trash(self) -> bool:
-        """Move the current page to trash and return through history.
+    async def undo_trash(self) -> bool:
+        """Restore the note moved to trash by the current session.
 
         Returns
         -------
         bool
-            ``True`` when the page was moved.
+            ``True`` when the note returned to its original path.
+
+        Notes
+        -----
+        The restore never overwrites an occupied path. A collision or read
+        failure is a transient notice and keeps the undo record, so the user
+        can resolve the path and try again. A successful restore clears the
+        record and refreshes the scan.
         """
         async with self.command_lock:
-            preview = self.trash_preview
+            preview = self.trash_undo
             vault = self.session.vault
             if preview is None or vault is None:
                 return False
@@ -767,30 +794,22 @@ class PageDialogState:
             try:
                 try:
                     await asyncio.to_thread(
-                        afanes.core.vault.naming.VaultNaming(vault).trash,
-                        preview.note_path,
+                        afanes.core.vault.naming.VaultNaming(vault).restore_from_trash,
+                        preview,
                         confirm=True,
-                        snapshot=self.session.snapshot,
                     )
                 except (AfanesError, OSError) as exc:
-                    logger.debug("Trash failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_TRASH_FAILED.format(detail=str(exc)))
+                    logger.debug("Trash undo failed", exc_info=True)
+                    self.status.show_notice(
+                        afanes.ui.strings.PAGE_TRASH_RESTORE_FAILED.format(detail=str(exc)),
+                    )
                     return False
-                self.trash_preview = None
-                self.pages.blocking_message = None
-                self.navigation.history = tuple(path for path in self.navigation.history if path != preview.note_path)
-                self.pages.clear()
+                self.trash_undo = None
                 await self.session.refresh_snapshot()
+                self.status.show_notice(afanes.ui.strings.PAGE_TRASH_RESTORED)
+                return True
             finally:
                 self.status.set_busy(busy=False)
-        return await self.navigation.back()
-
-    async def cancel_trash(self) -> None:
-        """Discard the retained trash preview."""
-        async with self.command_lock:
-            self.trash_preview = None
-            self.pages.blocking_message = None
-            self.status.clear_message()
 
     async def _mutate_labels(self, transform: Callable[[PageLabels], PageLabels]) -> bool:
         """Apply a label transformation that cannot change the scheme."""
@@ -855,7 +874,7 @@ class PageDialogState:
         self.type_change_sites = ()
         self.pages.repair_preview = None
         self.rename_preview = None
-        self.trash_preview = None
+        self.trash_undo = None
         self.pages.blocking_message = None
 
     async def reload_page(self) -> bool:

@@ -266,38 +266,3 @@ class RenamePanel:
                 spacing=afanes.ui.theme.ITEM_GAP,
             ),
         )
-
-
-class TrashPanel:
-    """Confirm moving a page to the vault trash."""
-
-    def __init__(
-        self,
-        on_confirm: Callable[[], Awaitable[None]],
-        on_cancel: Callable[[], Awaitable[None]],
-    ) -> None:
-        """Build the trash panel.
-
-        Parameters
-        ----------
-        on_confirm : collections.abc.Callable[[], collections.abc.Awaitable[None]]
-            Move the page to trash.
-        on_cancel : collections.abc.Callable[[], collections.abc.Awaitable[None]]
-            Keep the page.
-        """
-        self.text = ft.Text("", selectable=True)
-        self.confirm = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_TRASH_CONFIRM,
-            on_click=on_confirm,
-            style=afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE,
-        )
-        self.cancel = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CANCEL,
-            on_click=on_cancel,
-        )
-        self.panel = Panel(
-            afanes.ui.strings.PAGE_TRASH_TITLE,
-            self.text,
-            [self.cancel, self.confirm],
-        ).build()
-        self.panel.visible = False
