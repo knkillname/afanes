@@ -10,6 +10,7 @@ import pytest
 
 import afanes.core.settings
 import afanes.ui.state
+import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.editing import DraftMode
 from afanes.core.frontmatter import NoteDocument
@@ -18,6 +19,7 @@ from afanes.models.link import ReferenceScheme
 from afanes.models.note import NoteType
 from afanes.ui.views.page import PageView
 from tests.support import ensure_vault, versioned
+from tests.ui.control_tree import emphasis_controls
 from tests.ui.test_conformance import HEADER_ACTION_KEYS
 
 TWO_CANDIDATES = 2
@@ -52,6 +54,14 @@ def _typed_note(note_type: str, body: str, *, category: str | None = None, extra
         lines.append(extra)
     lines.extend(["---", body])
     return "\n".join(lines)
+
+
+def _action_labels(panel: ft.Control) -> list[str]:
+    content = panel.content
+    assert isinstance(content, ft.Column)
+    row = content.controls[-1]
+    assert isinstance(row, ft.Row)
+    return [str(control.content) for control in row.controls]
 
 
 class TestReadMode:
@@ -1994,6 +2004,116 @@ class TestPageWidth:
         view.fit_width(10)
 
         assert view.page_column.width == 600 - 2 * afanes.ui.theme.ITEM_GAP
+
+
+class TestConflictActions:
+    def test_the_conflict_panel_shows_one_suggested_action(self) -> None:
+        view = PageView(lambda: None)
+        view.conflict_panel.visible = True
+        view.reload_button.visible = True
+        view.overwrite_button.visible = True
+
+        highlighted = emphasis_controls(view.conflict_panel)
+
+        assert len(highlighted) == 1
+        assert highlighted[0] is view.reload_button
+        assert not isinstance(view.overwrite_button, ft.FilledButton)
+        assert not isinstance(view.recreate_button, ft.FilledButton)
+
+
+class TestRenameAndRepairActions:
+    def test_the_rename_panel_shows_one_suggested_action(self) -> None:
+        view = PageView(lambda: None)
+        view.rename_panel.visible = True
+        view.rename_preview_button.visible = False
+        view.rename_confirm_button.visible = True
+
+        highlighted = emphasis_controls(view.rename_panel)
+
+        assert len(highlighted) == 1
+        assert highlighted[0] is view.rename_confirm_button
+        assert not isinstance(view.rename_preview_button, ft.FilledButton)
+
+    def test_the_repair_panel_shows_one_suggested_action(self) -> None:
+        view = PageView(lambda: None)
+        view.repair_panel.visible = True
+
+        highlighted = emphasis_controls(view.repair_panel)
+
+        assert len(highlighted) == 1
+        assert highlighted[0] is view.repair_rewrite_button
+
+
+class TestConfirmationOrder:
+    def test_trash_puts_cancel_first(self) -> None:
+        view = PageView(lambda: None)
+
+        assert _action_labels(view.trash_panel) == [
+            afanes.ui.strings.PAGE_CANCEL,
+            afanes.ui.strings.PAGE_TRASH_CONFIRM,
+        ]
+
+    def test_type_change_puts_cancel_first(self) -> None:
+        view = PageView(lambda: None)
+
+        assert _action_labels(view.type_change_panel) == [
+            afanes.ui.strings.PAGE_CANCEL,
+            afanes.ui.strings.PAGE_TYPE_CHANGE_CONFIRM,
+        ]
+
+    def test_category_move_puts_cancel_first(self) -> None:
+        view = PageView(lambda: None)
+
+        assert _action_labels(view.category_move_panel) == [
+            afanes.ui.strings.PAGE_CANCEL,
+            afanes.ui.strings.PAGE_CATEGORY_MOVE_CONFIRM,
+        ]
+
+    def test_rename_puts_cancel_first(self) -> None:
+        view = PageView(lambda: None)
+
+        assert _action_labels(view.rename_panel) == [
+            afanes.ui.strings.PAGE_CANCEL,
+            afanes.ui.strings.PAGE_RENAME,
+            afanes.ui.strings.PAGE_RENAME_CONFIRM,
+        ]
+
+    def test_repair_puts_cancel_first(self) -> None:
+        view = PageView(lambda: None)
+
+        assert _action_labels(view.repair_panel) == [
+            afanes.ui.strings.PAGE_REPAIR_CANCEL,
+            afanes.ui.strings.PAGE_REPAIR_KEEP,
+            afanes.ui.strings.PAGE_REPAIR_REWRITE,
+        ]
+
+
+class TestRenameAvailability:
+    def test_the_rename_actions_start_insensitive(self) -> None:
+        view = PageView(lambda: None)
+
+        assert view.rename_preview_button.disabled is True
+        assert view.rename_confirm_button.disabled is True
+
+    def test_a_non_blank_name_enables_both_actions(self) -> None:
+        view = PageView(lambda: None)
+        view.rename_field.value = "New name"
+
+        asyncio.run(view.change_rename_text())
+
+        assert view.rename_preview_button.disabled is False
+        assert view.rename_confirm_button.disabled is False
+
+    def test_a_blank_name_disables_both_actions(self) -> None:
+        view = PageView(lambda: None)
+        view.rename_field.value = "New name"
+        asyncio.run(view.change_rename_text())
+        view.rename_field.value = "   "
+
+        asyncio.run(view.change_rename_text())
+
+        assert view.rename_preview_button.disabled is True
+        assert view.rename_confirm_button.disabled is True
 
 
 class TestToolbarActions:

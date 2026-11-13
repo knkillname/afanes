@@ -87,7 +87,7 @@ class WelcomeView:
             controls.extend(self._vault_path_entry(self._on_open_path))
         if self._on_create is not None:
             controls.append(
-                ft.FilledButton(
+                ft.OutlinedButton(
                     content=afanes.ui.strings.NEW_VAULT_ACTION,
                     icon=ft.Icons.CREATE_NEW_FOLDER_OUTLINED,
                     on_click=self._on_create,

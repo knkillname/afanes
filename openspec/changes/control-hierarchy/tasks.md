@@ -8,11 +8,11 @@
 
 ## 2. Welcome and page surfaces
 
-- [ ] 2.1 Add a visible-control walker and a Welcome test that counts suggested and destructive controls in the built tree. Make Choose Vault (desktop) or Open (browser) the only suggested action and make New Vault an outlined button. Verify `tests/ui/test_inbox_view.py` passes.
-- [ ] 2.2 Add a page conflict-panel test and keep Reload from Disk as the only suggested action; make Overwrite, Recreate, and Discard regular buttons. Verify `tests/ui/test_page_view.py` passes.
-- [ ] 2.3 Add a rename and repair panel test; keep Rename and Rewrite Links suggested, and make Preview a regular button. Verify the page view tests pass.
-- [ ] 2.4 Reorder the inline confirmation panels so Cancel comes first and the affirmative action last: trash, type change, category move, rename, and repair. Add order assertions to `tests/ui/test_page_view.py` and verify they pass.
-- [ ] 2.5 Make the rename Preview and Rename actions insensitive while the new-name field is blank, with live updates on change. Verify the page view tests cover blank, valid, and cleared states.
+- [x] 2.1 Add a visible-control walker and a Welcome test that counts suggested and destructive controls in the built tree. Make Choose Vault (desktop) or Open (browser) the only suggested action and make New Vault an outlined button. Verify `tests/ui/test_inbox_view.py` passes.
+- [x] 2.2 Add a page conflict-panel test and keep Reload from Disk as the only suggested action; make Overwrite, Recreate, and Discard regular buttons. Verify `tests/ui/test_page_view.py` passes.
+- [x] 2.3 Add a rename and repair panel test; keep Rename and Rewrite Links suggested, and make Preview a regular button. Verify the page view tests pass.
+- [x] 2.4 Reorder the inline confirmation panels so Cancel comes first and the affirmative action last: trash, type change, category move, rename, and repair. Add order assertions to `tests/ui/test_page_view.py` and verify they pass.
+- [x] 2.5 Make the rename Preview and Rename actions insensitive while the new-name field is blank, with live updates on change. Verify the page view tests cover blank, valid, and cleared states.
 
 ## 3. Inbox and processing availability
 

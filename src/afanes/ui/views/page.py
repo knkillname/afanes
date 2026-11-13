@@ -425,12 +425,12 @@ class PageView:
             icon=ft.Icons.SYNC_OUTLINED,
             on_click=self.reload_page,
         )
-        self.overwrite_button = ft.FilledButton(
+        self.overwrite_button = ft.OutlinedButton(
             content=afanes.ui.strings.PAGE_CONFLICT_OVERWRITE,
             icon=ft.Icons.SAVE_OUTLINED,
             on_click=self.overwrite_page,
         )
-        self.recreate_button = ft.FilledButton(
+        self.recreate_button = ft.OutlinedButton(
             content=afanes.ui.strings.PAGE_CONFLICT_RECREATE,
             icon=ft.Icons.ADD_OUTLINED,
             on_click=self.recreate_page,
@@ -481,7 +481,7 @@ class PageView:
         self.repair_panel = Panel(
             afanes.ui.strings.PAGE_REPAIR_TITLE,
             self.repair_text,
-            [self.repair_rewrite_button, self.repair_keep_button, self.repair_cancel_button],
+            [self.repair_cancel_button, self.repair_keep_button, self.repair_rewrite_button],
         ).build()
         self.repair_panel.visible = False
 
@@ -498,7 +498,7 @@ class PageView:
         self.type_change_panel = Panel(
             afanes.ui.strings.PAGE_TYPE_CHANGE_TITLE,
             self.type_change_text,
-            [self.type_change_confirm_button, self.type_change_cancel_button],
+            [self.type_change_cancel_button, self.type_change_confirm_button],
         ).build()
         self.type_change_panel.visible = False
 
@@ -515,24 +515,27 @@ class PageView:
         self.category_move_panel = Panel(
             afanes.ui.strings.PAGE_CATEGORY_MOVE_TITLE,
             self.category_move_text,
-            [self.category_move_confirm_button, self.category_move_cancel_button],
+            [self.category_move_cancel_button, self.category_move_confirm_button],
         ).build()
         self.category_move_panel.visible = False
 
         self.rename_field = ft.TextField(
             label=afanes.ui.strings.PAGE_RENAME_LABEL,
             width=afanes.ui.theme.PAGE_RENAME_WIDTH,
+            on_change=self.change_rename_text,
         )
         self.rename_preview_text = ft.Text("", selectable=True)
-        self.rename_preview_button = ft.FilledButton(
+        self.rename_preview_button = ft.OutlinedButton(
             content=afanes.ui.strings.PAGE_RENAME,
             icon=ft.Icons.VISIBILITY_OUTLINED,
             on_click=self.preview_rename,
+            disabled=True,
         )
         self.rename_confirm_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_RENAME_CONFIRM,
             icon=ft.Icons.CHECK_OUTLINED,
             on_click=self.confirm_rename,
+            disabled=True,
         )
         self.rename_cancel_button = ft.TextButton(
             content=afanes.ui.strings.PAGE_CANCEL,
@@ -550,7 +553,7 @@ class PageView:
                     self.rename_field,
                     self.rename_preview_text,
                     ft.Row(
-                        controls=[self.rename_preview_button, self.rename_confirm_button, self.rename_cancel_button],
+                        controls=[self.rename_cancel_button, self.rename_preview_button, self.rename_confirm_button],
                         spacing=afanes.ui.theme.ITEM_GAP,
                         wrap=True,
                     ),
@@ -573,7 +576,7 @@ class PageView:
         self.trash_panel = Panel(
             afanes.ui.strings.PAGE_TRASH_TITLE,
             self.trash_text,
-            [self.trash_confirm_button, self.trash_cancel_button],
+            [self.trash_cancel_button, self.trash_confirm_button],
         ).build()
         self.trash_panel.visible = False
 
@@ -1166,6 +1169,7 @@ class PageView:
 
     def _refresh_rename(self) -> None:
         """Refresh the rename panel."""
+        self._set_rename_available()
         preview = self._state.dialogs.rename_preview
         self.rename_panel.visible = self._rename_open or preview is not None
         self.rename_field.visible = preview is None
@@ -1178,6 +1182,12 @@ class PageView:
         self.rename_preview_text.value = afanes.ui.strings.PAGE_RENAME_PREVIEW.format(
             detail=afanes.ui.strings.reference_count(count, len(preview.affected))
         )
+
+    def _set_rename_available(self) -> None:
+        """Keep the rename actions available only for a non-blank name."""
+        valid = bool((self.rename_field.value or "").strip())
+        self.rename_preview_button.disabled = not valid
+        self.rename_confirm_button.disabled = not valid
 
     def _refresh_trash(self) -> None:
         """Refresh the trash confirmation panel."""
@@ -1251,6 +1261,11 @@ class PageView:
         """Forward raw rescue text to the draft."""
         await self._state.pages.set_page_raw_text(self.raw_field.value or "")
         self.refresh()
+        self._update()
+
+    async def change_rename_text(self) -> None:
+        """Update the rename actions as the new name changes."""
+        self._set_rename_available()
         self._update()
 
     async def save_raw(self) -> None:
