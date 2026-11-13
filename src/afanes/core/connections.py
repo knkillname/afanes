@@ -114,6 +114,31 @@ class ConnectionSet:
         return any(project.has_completed_steps for project in self.owned_projects)
 
 
+@dataclasses.dataclass(slots=True)
+class ProjectIndex:
+    """Accumulate the relationship buckets built from project notes.
+
+    Attributes
+    ----------
+    owned : dict[pathlib.Path, list[OwnedProject]]
+        Open and completed steps grouped by owner target.
+    project_owned : dict[pathlib.Path, dict[pathlib.Path, VaultNote]]
+        Open projects grouped by owner target.
+    finished_project_owned : dict[pathlib.Path, dict[pathlib.Path, VaultNote]]
+        Finished projects grouped by owner target.
+    requested : dict[pathlib.Path, dict[pathlib.Path, VaultNote]]
+        Open projects grouped by requester target.
+    finished : dict[pathlib.Path, dict[pathlib.Path, VaultNote]]
+        Finished projects grouped by requester target.
+    """
+
+    owned: dict[Path, list[OwnedProject]] = dataclasses.field(default_factory=dict)
+    project_owned: dict[Path, dict[Path, VaultNote]] = dataclasses.field(default_factory=dict)
+    finished_project_owned: dict[Path, dict[Path, VaultNote]] = dataclasses.field(default_factory=dict)
+    requested: dict[Path, dict[Path, VaultNote]] = dataclasses.field(default_factory=dict)
+    finished: dict[Path, dict[Path, VaultNote]] = dataclasses.field(default_factory=dict)
+
+
 class Connections:
     """Connection indexes over one vault snapshot.
 
@@ -181,11 +206,7 @@ class Connections:
     def _build(self) -> None:
         """Build every index in one pass over the parsed notes."""
         linked: dict[Path, dict[Path, VaultNote]] = {}
-        owned: dict[Path, list[OwnedProject]] = {}
-        project_owned: dict[Path, dict[Path, VaultNote]] = {}
-        finished_project_owned: dict[Path, dict[Path, VaultNote]] = {}
-        requested: dict[Path, dict[Path, VaultNote]] = {}
-        finished: dict[Path, dict[Path, VaultNote]] = {}
+        index = ProjectIndex()
 
         for note in self._snapshot.notes:
             for reference in note.body_references:
@@ -193,7 +214,7 @@ class Connections:
                 if target is None or target == note.path:
                     continue
                 linked.setdefault(target, {})[note.path] = note
-            self._index_project(note, owned, project_owned, finished_project_owned, requested, finished)
+            self._index_project(note, index)
 
         self._linked_from = {
             target: tuple(sorted(notes.values(), key=lambda note: note.alphabetical_order))
@@ -201,47 +222,39 @@ class Connections:
         }
         self._owned = {
             target: tuple(sorted(projects, key=lambda item: item.project.alphabetical_order))
-            for target, projects in owned.items()
+            for target, projects in index.owned.items()
         }
         self._project_owned = {
             target: tuple(sorted(notes.values(), key=lambda note: note.alphabetical_order))
-            for target, notes in project_owned.items()
+            for target, notes in index.project_owned.items()
         }
         self._finished_project_owned = {
             target: tuple(sorted(notes.values(), key=lambda note: note.alphabetical_order))
-            for target, notes in finished_project_owned.items()
+            for target, notes in index.finished_project_owned.items()
         }
         self._requested = {
             target: tuple(sorted(notes.values(), key=lambda note: note.alphabetical_order))
-            for target, notes in requested.items()
+            for target, notes in index.requested.items()
         }
         self._finished = {
             target: tuple(sorted(notes.values(), key=lambda note: note.alphabetical_order))
-            for target, notes in finished.items()
+            for target, notes in index.finished.items()
         }
 
-    def _index_project(
-        self,
-        note: VaultNote,
-        owned: dict[Path, list[OwnedProject]],
-        project_owned: dict[Path, dict[Path, VaultNote]],
-        finished_project_owned: dict[Path, dict[Path, VaultNote]],
-        requested: dict[Path, dict[Path, VaultNote]],
-        finished: dict[Path, dict[Path, VaultNote]],
-    ) -> None:
+    def _index_project(self, note: VaultNote, index: ProjectIndex) -> None:
         """Index one note's owned steps, owner, and requester values."""
         if note.note_type is not NoteType.PROJECT:
             return
         if note.is_open_project:
-            self._index_owned_steps(note, owned)
+            self._index_owned_steps(note, index.owned)
         owner_target = self._resolve_name(note.owner) if note.owner is not None else None
         if owner_target is not None:
-            owner_bucket = project_owned if note.is_open_project else finished_project_owned
+            owner_bucket = index.project_owned if note.is_open_project else index.finished_project_owned
             owner_bucket.setdefault(owner_target, {})[note.path] = note
         target = self._resolve_name(note.asked_by) if note.asked_by is not None else None
         if target is None:
             return
-        bucket = requested if note.is_open_project else finished
+        bucket = index.requested if note.is_open_project else index.finished
         bucket.setdefault(target, {})[note.path] = note
 
     def _index_owned_steps(self, project: VaultNote, owned: dict[Path, list[OwnedProject]]) -> None:

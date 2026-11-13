@@ -45,6 +45,35 @@ from afanes.models.note import CategoryLabel, NoteType
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class ReferenceRewrite:
+    """Referring-note rewrite inputs shared by the planning and apply steps.
+
+    Attributes
+    ----------
+    preview : RenamePreview
+        Rename preview with affected sites and content hashes.
+    source : pathlib.Path
+        Original note path.
+    target : pathlib.Path
+        Renamed note path.
+    old_reference : NoteReference
+        Reference that currently points at the source.
+    new_reference : NoteReference
+        Reference that should point at the target.
+    skip_source : bool
+        Whether the source note itself is skipped because its heading was
+        already updated.
+    """
+
+    preview: RenamePreview
+    source: Path
+    target: Path
+    old_reference: NoteReference
+    new_reference: NoteReference
+    skip_source: bool
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class VaultNaming:
     """Plan and apply renames, category moves, repairs, moves, and trash.
 
@@ -379,12 +408,14 @@ class VaultNaming:
             failed.extend(heading_failed)
 
         site_updated, site_skipped, site_unchanged, site_failed = self._apply_reference_sites(
-            preview,
-            source,
-            target,
-            old_reference,
-            new_reference,
-            skip_source=preview.heading_update,
+            ReferenceRewrite(
+                preview=preview,
+                source=source,
+                target=target,
+                old_reference=old_reference,
+                new_reference=new_reference,
+                skip_source=preview.heading_update,
+            )
         )
         updated.extend(site_updated)
         skipped.extend(site_skipped)
@@ -465,21 +496,20 @@ class VaultNaming:
 
     def _apply_reference_sites(
         self,
-        preview: RenamePreview,
-        source: Path,
-        target: Path,
-        old_reference: NoteReference,
-        new_reference: NoteReference,
-        *,
-        skip_source: bool,
+        rewrite: ReferenceRewrite,
     ) -> tuple[list[Path], list[Path], list[Path], list[RewriteFailure]]:
         """Rewrite the preview's referring notes, optionally skipping the renamed note."""
+        preview = rewrite.preview
+        source = rewrite.source
+        target = rewrite.target
+        old_reference = rewrite.old_reference
+        new_reference = rewrite.new_reference
         updated: list[Path] = []
         skipped: list[Path] = []
         unchanged: list[Path] = []
         failed: list[RewriteFailure] = []
         for site in preview.affected:
-            if skip_source and VaultPath.same(site.path, source):
+            if rewrite.skip_source and VaultPath.same(site.path, source):
                 continue
             read_path = target if VaultPath.same(site.path, source) else site.path
             try:
