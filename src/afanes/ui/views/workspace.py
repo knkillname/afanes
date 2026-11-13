@@ -620,8 +620,8 @@ class WorkspaceView:
         self._show_detail = True
         self._render_shell()
         self._refresh_dynamic()
-        await self.page_view.scroll_to_top()
         self._update()
+        await self.page_view.scroll_to_top()
 
     async def _select_section(self, section: afanes.ui.state.browser.WorkspaceSection) -> None:
         """Switch the browser to one section."""

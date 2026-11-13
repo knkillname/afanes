@@ -672,8 +672,18 @@ class PageView:
         )
 
     async def scroll_to_top(self) -> None:
-        """Move the reusable page pane to its starting scroll position."""
-        await self.content.scroll_to(offset=0, duration=0)
+        """Move the reusable page pane to its starting scroll position.
+
+        Notes
+        -----
+        The pane may be reattached while the host rebuilds its detail region.
+        A scroll request can arrive before the client knows the control, so an
+        unattached control is left untouched instead of failing the command.
+        """
+        try:
+            await self.content.scroll_to(offset=0, duration=0)
+        except RuntimeError:
+            return
 
     async def handle_link(self, event: ft.Event[ft.Markdown]) -> None:
         """Route a tapped Markdown link.

@@ -85,6 +85,13 @@ class TestReadMode:
         assert view.edit_form.visible is False
         assert view.raw_panel.visible is False
 
+    def test_scroll_to_top_tolerates_an_unattached_pane(self) -> None:
+        view = PageView(lambda: None)
+
+        asyncio.run(view.scroll_to_top())
+
+        assert view.content.expand is True
+
     def test_link_tap_forwards_the_destination(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
