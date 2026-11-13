@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- **Feedback channels, trash undo, and overlays.** Feedback now follows the lifetime of the event:
+  transient toasts for one-time results and undo, banners owned by the workspace, session, page, or
+  processing state for persistent conditions, inline text for field and form problems, and inline
+  panels for decisions. Moving a page to trash takes effect immediately and offers **Undo**; the trash
+  confirmation and the pre-trash reference report are removed. `VaultNaming.trash` returns the
+  `TrashPreview` it used, and `VaultNaming.restore_from_trash` restores exclusively without
+  overwriting an occupied path. `UiStatus.show_message`, `message`, and `clear_message` are removed;
+  `show_notice`, `take_notice`, and `clear_notice` replace the transient channel. Dialogs now set
+  initial focus, close on Esc, and keep Cancel before an irreversible action; menus stay small and
+  need no Close or Done button. This implements the `establish-feedback-patterns` OpenSpec change.
+  README: no change required. Docs: updated.
+
 - **Owned methods and the Ruff method-shape gate.** Free functions now live on owning classes:
   `NamePolicy.normalize`, `safe_filename`, and `unique` replace `normalize_name`, `safe_filename`,
   and `unique_name`; `AtomicWriter.write_text_atomic` and `write_text_exclusive` replace the module

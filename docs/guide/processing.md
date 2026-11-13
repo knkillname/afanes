@@ -73,11 +73,14 @@ Append Step moves the capture to `trash/` after writing the project. If you are 
 
 ## 🗑️ Trash and retry
 
-Trash moves the note without rewriting any referring note. Moving it back restores it and resolves its
-inbound references again.
+The wizard's Trash outcome is applied after you confirm the plan. It moves the note without rewriting
+any referring note. The page's Move to Trash action is immediate and offers **Undo** in a toast; Undo
+restores the note and resolves its inbound references again while the original path is free.
 
 Every other outcome writes the classified frontmatter atomically and then moves the note out of
-`inbox/`. A failed move leaves the note in the Inbox so the same plan can be retried.
+`inbox/`. A failed move leaves the note in the Inbox so the same plan can be retried. A failed plan or
+apply is reported in a toast while the wizard stays open. If the apply succeeds but the scan refresh
+fails, the success state remains and the workspace banner reports the refresh failure.
 
 :::{important} Remember
 Processing never infers a status, template card, project, owner, requester, or due date from the

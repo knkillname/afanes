@@ -30,7 +30,8 @@ about the invoice
 ```
 
 The frontmatter contains only `type: note`. No status, category, project, owner, or due date is
-inferred.
+inferred. A blank capture is reported in a transient toast and the composer keeps its text; a scan
+failure that remains true stays in a banner.
 
 :::{tip}
 The first non-blank line is the identity. Make it the title you will recognize later, and put the

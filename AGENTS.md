@@ -139,7 +139,7 @@ Strict NumPy-style docstrings are mandatory for every public module, class, enum
 - Write with `afanes.core.atomic.write_text_atomic` (same-directory temp file, fsync, `os.replace`).
 - Preserve body, unknown frontmatter keys, and existing newline style. New files are UTF-8 without BOM, LF.
 - Compare content before overwriting; if another program changed the file, stop and ask.
-- Confirm rename, move, and trash. Trash moves to `trash/`; no recursive or permanent deletes, never follow symlinks, never touch paths outside the vault.
+- Confirm rename and move. Trash is immediate and undoable: it moves to `trash/` and offers Undo in a toast; an irreversible action requires a confirmation. No recursive or permanent deletes, never follow symlinks, never touch paths outside the vault.
 - Startup and scanning are read-only: opening or scanning a vault must not create files or folders. A valid read-only vault still opens for browsing.
 - A vault root contains `afanes.yaml` with `schema_version: 1`. Opening requires it and never creates it. Creating a vault writes it before the default folders and starter content; adoption of an older folder writes only that file.
 - One writer per vault; serialize writes.
@@ -156,7 +156,8 @@ Strict NumPy-style docstrings are mandatory for every public module, class, enum
 - The earlier per-section icon-hue requirement is retired. Browser section icons are monochrome, and the active section uses the neutral selected-row fill. The accent is reserved for suggested actions, focus, links, and log marks. Do not reintroduce a per-section palette or an accent selection without an approved change.
 - Copy follows the GNOME writing style: header capitalization for headings and short control labels, sentence capitalization for field labels and prose, no final period, ellipses only on actions that open further input or a confirmation, neutral tone without first- or second-person pronouns, and typographic apostrophes (`’`) and ellipsis (`…`). `tests/ui/test_copy.py` enforces these rules on both catalogs with no baseline; classify every new copy constant in its header-case or sentence-case set and run `hatch test tests/ui/test_copy.py` after a copy change. A new exception requires a standard change.
 - Read `page.web` once in the shell; views must not branch on presentation.
-- Show concise, actionable banners/dialogs, never tracebacks. Destructive actions require confirmation. Support light/dark, keyboard access, visible focus, and no color-only status.
+- Feedback follows the lifetime of the event: a transient toast for a one-time result or undo, a banner owned by the state for a condition that remains true, inline text for a field or form problem, and an inline panel or dialog for a decision. A background refresh never clears an owned banner or a waiting notice.
+- Show concise, actionable feedback, never tracebacks. A destructive action requires a confirmation or a visible undo path; trash moves immediately and offers Undo. Support light/dark, keyboard access, visible focus, and no color-only status.
 - Persist only UI preferences such as window size and last view; never persist vault data in UI state.
 - Cancel timers/tasks/subscriptions on dispose. Allow one active web session; a second must neither scan nor write.
 

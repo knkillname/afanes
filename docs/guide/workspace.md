@@ -105,10 +105,13 @@ in both modes. The window fits the 1024x600 desktop minimum.
 One blue accent marks suggested actions, links, keyboard focus, and log entries. Selection uses a
 neutral row shade, not the accent, matching the GNOME navigation sidebar. Section icons are
 monochrome; the label, icon, and neutral fill identify the active destination without relying on color.
-Actions that move a note to the trash use the red destructive style. Due-work notices use a warm
-attention surface. Typography uses the platform font family and the GNOME standard styles: title-1 for
-the rendered page heading, title-3 in the detail toolbar, title-2 for a step headline, heading for
-compact headings, body for prose, and caption for metadata.
+Move to Trash is immediate: a toast offers **Undo**, and the page returns to its original path while
+that path is free. One-time results and failures use a transient toast; a persistent condition such as
+a page conflict or refresh failure uses a banner owned by the page or session. Field and form problems
+stay inline with the control that caused them. Due-work notices use a warm attention surface.
+Typography uses the platform font family and the GNOME standard styles: title-1 for the rendered page
+heading, title-3 in the detail toolbar, title-2 for a step headline, heading for compact headings, body
+for prose, and caption for metadata.
 
 ## 🧭 See also
 

@@ -113,16 +113,20 @@ opened from there.
 
 ## 🔀 Rename and trash
 
-Rename and Move to Trash are available from the detail toolbar's secondary menu in read mode. Both show
-their affected references before confirming. A log entry has no Rename action; change its Date instead.
+Rename and Move to Trash are available from the detail toolbar's secondary menu in read mode. Rename
+previews its affected references and asks for confirmation. Move to Trash takes effect immediately and
+offers **Undo** in a toast; it no longer opens a confirmation. A log entry has no Rename action; change
+its Date instead.
 
 A rename updates the first heading only when it still matches the old identity; a custom heading is
-preserved. Trashed pages move under `trash/`, and their inbound references become unresolved until a
-page with that name appears again.
+preserved. Trashed pages move under `trash/`, and their inbound references become unresolved until the
+page returns. Undo restores the page to its original path while that path is free; an occupied path is
+reported and never overwritten. The undo opportunity lasts for the current session.
 
 :::{warning}
-Renaming or moving a page changes how other notes resolve its name. Review the affected references in
-the confirmation before you commit.
+Renaming a page changes how other notes resolve its name. Review the affected references in the
+confirmation before you commit. Trashing leaves those references unresolved until Undo or a manual
+move restores the page.
 :::
 
 ## 🧭 See also

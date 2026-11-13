@@ -38,7 +38,7 @@ detail on the following lines.
 
 Select the capture in the Inbox and choose **Process…**. The wizard asks what the capture should become:
 
-- **Trash** moves it to `trash/` without rewriting it.
+- **Trash** moves it to `trash/` without rewriting it; the wizard applies this outcome after you confirm the plan.
 - **Later** keeps it as a reference with `status: later`.
 - **Reference** keeps it as an uncategorized reference with no status.
 - **Project** turns it into a project with a status, optional due date, owner, and requester.
@@ -54,7 +54,8 @@ identity.
 
 :::{warning}
 Moving a note to `trash/` does not rewrite the notes that refer to it. Those links stay unresolved
-until a page with that name appears again. Moving the note back restores them.
+until a page with that name appears again. Undo or moving the note back restores them. The page's Move
+to Trash action is immediate and offers **Undo**; the wizard outcome is part of a confirmed plan.
 :::
 
 ## 🎯 Work the project

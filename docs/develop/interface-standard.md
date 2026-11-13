@@ -16,7 +16,7 @@ the writing style in the interface and command-line copy catalogs, with no basel
 
 ## 🪜 Conformance levels
 
-The standard has six levels, in the order a reviewer should check them:
+The standard has seven levels, in the order a reviewer should check them:
 
 1. **Palette and contrast.** Light and dark each define the Adwaita 1.8.0 tokens independently.
    Body and muted text meet 4.5:1 on every neutral surface; accent text meets 4.5:1 on the note
@@ -36,6 +36,9 @@ The standard has six levels, in the order a reviewer should check them:
 6. **Writing style.** Headings and short control labels use header capitalization; field labels and
    prose use sentence capitalization; copy ends without a period; ellipses mark only actions that
    need further input; tone stays neutral; apostrophes and ellipses are typographic.
+7. **Feedback.** The feedback surface follows the lifetime of the event: a toast for a one-time
+   result or undo, an owned banner for a condition that remains true, inline text for a field or form
+   problem, and a panel or dialog for a decision. Trash is immediate and offers Undo.
 
 ## 🎨 Palette roles
 
@@ -133,9 +136,10 @@ A selected navigation row uses a neutral 10% `ON_SURFACE` shade with no accent t
 edge, matching libadwaita's `.navigation-sidebar` treatment. The label and icon remain the identity
 of the row; the value step is the selection cue.
 
-Destructive actions use Red 3 in light mode and Red 4 in dark mode. The header trash action and the
-confirmation action both carry the destructive style. The accent is never used to distinguish one
-browser section from another; log marks use the accent.
+Destructive actions use Red 3 in light mode and Red 4 in dark mode. An irreversible confirmation
+carries the destructive style. Trash is reversible: it moves immediately and offers Undo in a toast,
+so it does not use a destructive confirmation. The accent is never used to distinguish one browser
+section from another; log marks use the accent.
 
 ## 🎚️ Control states
 
@@ -143,8 +147,38 @@ An affirmative action is insensitive until its input can succeed; the command st
 input as a guard, but the interface does not invite a click that must fail. An insensitive control
 uses the muted disabled fill and label rather than the accent, and availability updates as the field
 changes. A rendered surface shows at most one suggested or destructive control, and a dialog or
-inline panel counts on its own. Confirmation surfaces put Cancel before the affirmative action, and
-the affirmative action names the operation.
+inline panel counts on its own. A reversible action uses Undo in a toast instead of a confirmation.
+An irreversible confirmation puts Cancel before the affirmative action, and the affirmative action
+names the operation.
+
+## 💬 Feedback
+
+Feedback is chosen by the lifetime of the event, not by severity:
+
+| Surface | Owns | Examples |
+| --- | --- | --- |
+| Toast | A one-time result, failure, or undo | Capture failed, page moved to trash, undo restored a page |
+| Owned banner | A condition that remains true | Page conflict, refresh failure, unresolved leave guard |
+| Inline text | A field or form problem | Invalid category, blank rename, form write failure |
+| Panel or dialog | A decision or consequence preview | Rename preview, category move, type change, repair |
+
+A toast appears at the bottom center, stays dismissible, disappears on its own, and carries at most
+one action. The action names the operation it reverses. A success toast appears only when the result
+is not already visible in the page or list. A toast never reports a condition that remains true.
+
+A banner is rendered from the state that owns the condition: the workspace owns vault and selection
+conditions, the vault session owns scan and refresh failures, the page owns conflicts and blocking
+state, and the processing state owns a post-apply refresh failure. A background refresh never clears
+an owned banner or a waiting notice.
+
+Trash moves a page immediately and offers **Undo** in a toast. Undo restores the note to its original
+path when that path is free; an occupied path is reported and never overwritten. The undo opportunity
+belongs to the current session and ends when the toast is dismissed or replaced.
+
+Dialogs put initial focus on the first control, close on Esc, keep Cancel before an irreversible
+affirmative action, and never make a destructive action the default. Menus and popovers stay small,
+close on Esc, and need no Close or Done button. Confirmation panels stay inline with the page they
+change; they are not moved into a modal.
 
 ## 🔤 Typography
 
@@ -173,7 +207,7 @@ Copy follows the GNOME writing style. Headings, view and destination titles, dia
 menu items, tooltips, and section labels use **header capitalization**: capitalize the first and last
 word, every word of four or more letters, every verb and noun, and both parts of a hyphenated word.
 Articles, conjunctions, and prepositions of three letters or fewer stay lowercase in the middle of a
-label. Examples: **New Vault…**, **Move to Trash…**, **Search Results**, **Due Step**.
+label. Examples: **New Vault…**, **Move to Trash**, **Search Results**, **Due Step**.
 
 Field labels, hints, dialog bodies, banners, and status messages use **sentence capitalization**:
 capitalize the first word and proper nouns only. Examples: **Vault folder path**, **Due date**, **The
@@ -297,7 +331,7 @@ WAVE 2  landed: control hierarchy: one suggested or destructive action
 WAVE 3  landed: writing style: header capitalization, ellipses, final periods,
         neutral tone, typographic apostrophes and ellipsis, copy gate,
         AGENTS.md 4.6
-WAVE 4  feedback: undo over confirmation, toasts for one-time events,
+WAVE 4  landed: feedback: undo over confirmation, toasts for one-time events,
         banners only for persistent states, overlays
 WAVE 5  keyboard and accessibility: shortcut map, focus order, semantics
         labels, large-text robustness

@@ -60,8 +60,9 @@ offers to rewrite the references that still use it. If the safe name already bel
 same scheme, that page opens instead of creating a duplicate.
 
 :::{warning}
-Renaming a note or moving it to trash shows the affected references before confirming. A rename updates
-the first heading only when it still matches the old identity; a custom heading is preserved.
+Renaming a note previews its affected references and asks for confirmation. Moving it to trash takes
+effect immediately and offers **Undo** in a toast. A rename updates the first heading only when it
+still matches the old identity; a custom heading is preserved.
 :::
 
 ## 🧭 See also

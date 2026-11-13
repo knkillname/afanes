@@ -35,13 +35,13 @@
 ## 6. Overlay audit
 
 - [x] 6.1 Audit every `AppShell` dialog for initial focus, Esc dismissal, Cancel before the affirmative action, a specific affirmative label, and no destructive default; add focused tests with the fake page and verify `hatch test tests/ui/test_app.py` passes.
-- [ ] 6.2 Audit the primary and page menus for Esc dismissal and low complexity; add or update focused tests and verify `hatch test tests/ui/test_workspace_view.py` passes.
-- [ ] 6.3 Verify the toast, dialogs, menus, and inline panels follow the new overlay requirements and that no inline confirmation panel was moved into a modal.
+- [x] 6.2 Audit the primary and page menus for Esc dismissal and low complexity; add or update focused tests and verify `hatch test tests/ui/test_workspace_view.py` passes.
+- [x] 6.3 Verify the toast, dialogs, menus, and inline panels follow the new overlay requirements and that no inline confirmation panel was moved into a modal.
 
 ## 7. Documents and gates
 
-- [ ] 7.1 Update `AGENTS.md` 4.5 and 4.6 so a destructive action requires a confirmation or a visible undo path, trash is immediate and undoable, and the feedback channels are named; verify the old confirmation wording is gone.
-- [ ] 7.2 Update `docs/develop/interface-standard.md` with the feedback channels, the toast and banner rules, the overlay audit, the trash undo, and wave 4 marked landed; verify `hatch run docs:build` passes.
+- [x] 7.1 Update `AGENTS.md` 4.5 and 4.6 so a destructive action requires a confirmation or a visible undo path, trash is immediate and undoable, and the feedback channels are named; verify the old confirmation wording is gone.
+- [x] 7.2 Update `docs/develop/interface-standard.md` with the feedback channels, the toast and banner rules, the overlay audit, the trash undo, and wave 4 marked landed; verify `hatch run docs:build` passes.
 - [ ] 7.3 Update the guide pages that describe trash, editing, inbox, review, processing, and workspace behavior; verify quoted labels match the catalog and `hatch run docs:build` passes.
 - [ ] 7.4 Add one `Unreleased` changelog entry naming the change, the feedback channels, the trash undo, the `VaultNaming.trash` return change, `restore_from_trash`, the `UiStatus.show_message` removal, and `README: no change required` / `Docs: updated`; verify no version bump.
 - [ ] 7.5 Run `hatch check`, `hatch test --cover`, `hatch run docs:build`, `openspec validate --all --strict`, `openspec doctor`, both vocabulary greps, and `git diff --check`; verify coverage stays at or above 85%.

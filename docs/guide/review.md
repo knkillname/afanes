@@ -58,7 +58,8 @@ replaces the owners.
 A project card shows the project title, status, optional due date, its next step, and any other open
 steps. **Open Project** opens the page. For a project with no open step, the card offers adding a next
 step, marking the project done, deferring it to `later`, or skipping. Adding a step requires text and
-appends a task-list item to the project body. Marking done and deferring both require confirmation.
+appends a task-list item to the project body. Marking done and deferring both require confirmation. A
+failed card write is reported in a toast; the inline step and project forms keep their own error text.
 
 Step text in every review card is rendered Markdown, so links and emphasis appear the same way they do
 on the project page. Raw Markdown source appears only in edit mode. A link label inside a card is
