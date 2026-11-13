@@ -26,9 +26,9 @@
 
 ## 5. Search and null specifications
 
-- [ ] 5.1 Add or adjust a projects-view test so a step-text query lists the project without requiring a matching-step line; verify the test asserts the amended search scenario and passes.
-- [ ] 5.2 Add parser tests for null `status` and `due_date` on a log, reference, and note; verify each note parses with the value absent.
-- [ ] 5.3 Update `docs/reference/frontmatter.md` with the null-value rule and fix the `core/frontmatter.py` module docstring from “six” to “seven” recognized keys; verify `hatch run docs:build` passes and the docstring reads seven.
+- [x] 5.1 Add or adjust a projects-view test so a step-text query lists the project without requiring a matching-step line; verify the test asserts the amended search scenario and passes.
+- [x] 5.2 Add parser tests for null `status` and `due_date` on a log, reference, and note; verify each note parses with the value absent.
+- [x] 5.3 Update `docs/reference/frontmatter.md` with the null-value rule and fix the `core/frontmatter.py` module docstring from “six” to “seven” recognized keys; verify `hatch run docs:build` passes and the docstring reads seven.
 
 ## 6. Core test hardening
 

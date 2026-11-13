@@ -22,7 +22,9 @@ Only the recognized keys are `type`, `date`, `category`, `status`, `due_date`, `
 | `asked_by` | projects only | a single non-empty name, treated as a metadata reference |
 | `owner` | projects only | a single non-empty name or team, treated as a metadata reference |
 
-Unknown keys are preserved when Afanes rewrites a note. A due date is a date, not a timestamp.
+Unknown keys are preserved when Afanes rewrites a note. A null `status` or `due_date` is treated as
+absent on every note type, including notes and log entries where the key is otherwise forbidden. The
+other recognized keys do not accept null. A due date is a date, not a timestamp.
 
 ## 🏷️ Type
 

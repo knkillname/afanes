@@ -4,7 +4,7 @@
 """Frontmatter-aware note documents.
 
 The module exposes one cohesive value object, :class:`NoteDocument`, which
-owns fence parsing, safe YAML loading, serialization, and validation of the six
+owns fence parsing, safe YAML loading, serialization, and validation of the seven
 recognized frontmatter keys. Keeping those behaviors together preserves the
 document's invariants: metadata, body, newline style, declared type, category,
 status, due date, requester, and note date always travel as one unit.

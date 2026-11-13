@@ -257,3 +257,24 @@ class TestProjectRefresh:
         view.refresh()
 
         assert [tile.title for tile in _project_tiles(view, "active")] == ["Launch"]
+
+    def test_step_text_search_lists_the_project_without_the_matching_step(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _write_note(
+            vault / "projects" / "Launch.md",
+            status="active",
+            body="# Launch\n\n- [ ] Write copy\n- [ ] Call the printer\n",
+        )
+        _write_note(vault / "projects" / "Archive.md", status="active", body="# Archive\n\n- [ ] File it\n")
+        view = _open_view(tmp_path, monkeypatch)
+        asyncio.run(afanes.ui.state.app_state.browser.set_query("printer"))
+
+        view.refresh()
+
+        tiles = _project_tiles(view, "active")
+        assert [tile.title for tile in tiles] == ["Launch"]
+        details = _details(tiles[0])
+        assert any("Write copy" in detail for detail in details)
+        assert "printer" not in " ".join(details).lower()

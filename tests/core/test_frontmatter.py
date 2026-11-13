@@ -198,8 +198,9 @@ class TestStatus:
         with pytest.raises(NoteParseError):
             NoteDocument.from_text("---\ntype: project\nstatus: 3\n---\n")
 
-    def test_null_status_is_treated_as_absent(self) -> None:
-        document = NoteDocument.from_text("---\ntype: project\nstatus: null\n---\n")
+    @pytest.mark.parametrize("note_type", ["note", "reference", "project", "log"])
+    def test_null_status_is_absent_on_every_type(self, note_type: str) -> None:
+        document = NoteDocument.from_text(f"---\ntype: {note_type}\nstatus: null\n---\n")
 
         assert document.status is None
 
@@ -228,8 +229,9 @@ class TestDueDate:
 
         assert document.due_date is None
 
-    def test_null_due_date_is_none(self) -> None:
-        document = NoteDocument.from_text("---\ntype: project\ndue_date: null\n---\n")
+    @pytest.mark.parametrize("note_type", ["note", "reference", "project", "log"])
+    def test_null_due_date_is_absent_on_every_type(self, note_type: str) -> None:
+        document = NoteDocument.from_text(f"---\ntype: {note_type}\ndue_date: null\n---\n")
 
         assert document.due_date is None
 
