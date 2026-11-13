@@ -12,6 +12,7 @@ import pytest
 
 import afanes.core.settings
 import afanes.ui.state
+import afanes.ui.state.navigation
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.frontmatter import NoteDocument
@@ -55,12 +56,14 @@ def _open_project(
     *,
     due_date: str | None = None,
     chosen: datetime.date | None = None,
+    missing_roles: list[str] | None = None,
 ) -> tuple[Path, ProjectBodyView, list[str]]:
     vault = tmp_path / "vault"
     path = _write_note(vault / "projects" / "Home.md", _typed_note("project", body, status="active", due_date=due_date))
     _use_settings_file(monkeypatch, tmp_path / "settings.json")
     state = afanes.ui.state.app_state
     followed: list[str] = []
+    missing = missing_roles if missing_roles is not None else []
 
     async def follow(destination: str) -> None:
         followed.append(destination)
@@ -69,13 +72,22 @@ def _open_project(
     async def pick_date(_current: datetime.date | None) -> datetime.date | None:
         return chosen
 
+    async def follow_role(name: str) -> None:
+        outcome = await state.navigation.follow_role(name)
+        if outcome is afanes.ui.state.navigation.RoleFollowOutcome.MISSING:
+            missing.append(name)
+
     async def scenario() -> None:
         await state.workspace.choose_vault(vault)
         await state.navigation.open_page(path)
 
     asyncio.run(scenario())
-    view = ProjectBodyView(lambda: None, follow, pick_date)
+    view = ProjectBodyView(lambda: None, follow, pick_date, follow_role)
     return path, view, followed
+
+
+def _spans(control: ft.Text) -> str:
+    return "".join(str(span.text) for span in control.spans or [])
 
 
 def _walk(control: ft.Control) -> Iterator[ft.Control]:
@@ -308,3 +320,52 @@ class TestActions:
 
         step = StepDocument(NoteDocument.from_text(path.read_text(encoding="utf-8")).body).steps[0]
         assert step.owners == ("Ada Lovelace",)
+
+    def test_step_owner_chip_opens_its_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        person = _write_note(
+            tmp_path / "vault" / "reference" / "Ada.md",
+            _typed_note("reference", "# Ada\n"),
+        )
+        body = "# Home\n\n- [ ] Call <!-- {owners: [Ada]} -->\n"
+        _path, view, _followed = _open_project(tmp_path, monkeypatch, body)
+
+        _run(_button(view.root, afanes.ui.strings.PAGE_STEP_OWNER_ACTION).on_click)
+        chip = next(item for item in _walk(view.root) if isinstance(item, ft.Chip) and item.label == "Ada")
+        _run(chip.on_click)
+
+        state = afanes.ui.state.app_state
+        assert state.pages.page is not None
+        assert state.pages.page.path == person.resolve()
+
+    def test_missing_step_owner_chip_uses_the_broken_style(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        missing: list[str] = []
+        body = "# Home\n\n- [ ] Call <!-- {owners: [Nobody]} -->\n"
+        _path, view, _followed = _open_project(tmp_path, monkeypatch, body, missing_roles=missing)
+
+        _run(_button(view.root, afanes.ui.strings.PAGE_STEP_OWNER_ACTION).on_click)
+        chip = next(item for item in _walk(view.root) if isinstance(item, ft.Chip) and item.label == "Nobody")
+
+        assert chip.label_text_style is afanes.ui.theme.ROLE_BROKEN_TEXT_STYLE
+        assert chip.tooltip == afanes.ui.strings.ROLE_LINK_MISSING
+
+        _run(chip.on_click)
+
+        assert missing == ["Nobody"]
+
+    def test_step_owner_detail_name_opens_its_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        person = _write_note(
+            tmp_path / "vault" / "reference" / "Ada.md",
+            _typed_note("reference", "# Ada\n"),
+        )
+        body = "# Home\n\n- [ ] Call <!-- {owners: [Ada]} -->\n"
+        _path, view, _followed = _open_project(tmp_path, monkeypatch, body)
+        detail = next(item for item in _walk(view.root) if isinstance(item, ft.Text) and _spans(item) == "Owners: Ada")
+        name_span = (detail.spans or [])[1]
+
+        _run(name_span.on_click)
+
+        state = afanes.ui.state.app_state
+        assert state.pages.page is not None
+        assert state.pages.page.path == person.resolve()

@@ -3,6 +3,7 @@
 import asyncio
 import dataclasses
 import logging
+from enum import StrEnum
 from pathlib import Path
 
 import afanes.core.links
@@ -13,7 +14,7 @@ import afanes.ui.strings
 from afanes.core.errors import AfanesError, InvalidReferenceError, VaultError
 from afanes.core.links import DestinationKind, ReferenceParser
 from afanes.core.vault.snapshot import LinkOutcome
-from afanes.models.link import NoteReference
+from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.pages import PageEditorState
@@ -23,6 +24,24 @@ from afanes.ui.state.status import UiStatus
 logger = logging.getLogger(__name__)
 
 PAGE_HISTORY_LIMIT = 50
+
+
+class RoleFollowOutcome(StrEnum):
+    """Result of following one project role name.
+
+    Attributes
+    ----------
+    OPENED : str
+        Exactly one note matched and it is now open.
+    AMBIGUOUS : str
+        More than one note matched; the candidates wait for a choice.
+    MISSING : str
+        No note matched; the caller may create one.
+    """
+
+    OPENED = "opened"
+    AMBIGUOUS = "ambiguous"
+    MISSING = "missing"
 
 
 @dataclasses.dataclass(slots=True)
@@ -172,6 +191,75 @@ class PageNavigator:
             finally:
                 self.status.set_busy(busy=False)
 
+    async def create_role_reference(self, name: str, category: CategoryLabel | None) -> bool:
+        """Create a reference for a missing role name and open it for editing.
+
+        Parameters
+        ----------
+        name : str
+            Written owner, requester, or step owner name. It becomes the note
+            identity and its level-1 heading.
+        category : CategoryLabel | None
+            Chosen reference category, or ``None`` for an uncategorized
+            reference.
+
+        Returns
+        -------
+        bool
+            ``True`` when the note was written and opened in edit mode.
+
+        Notes
+        -----
+        The current draft is committed first. The note is written atomically,
+        the scan is refreshed, and the new page opens in edit mode. A blank
+        name or a collision writes nothing and reports the failure. If the scan
+        fails after the write, the note remains and the banner reports the
+        refresh failure. Blocking I/O runs in a worker thread.
+        """
+        display_name = name.strip()
+        if not display_name:
+            self.status.show_message(afanes.ui.strings.BROWSER_NAME_REQUIRED)
+            return False
+        async with self.command_lock:
+            vault = self.session.vault
+            if vault is None:
+                return False
+            self.status.set_busy(busy=True)
+            try:
+                if not await self.pages.commit():
+                    return False
+                previous = self.pages.page.path if self.pages.page is not None else None
+                body = self._reference_body(display_name, await self._role_scaffold(category))
+                try:
+                    path = await asyncio.to_thread(
+                        afanes.core.vault.pages.VaultPages(vault).create_page,
+                        display_name,
+                        NoteType.REFERENCE,
+                        category,
+                        body=body,
+                    )
+                except (AfanesError, OSError) as exc:
+                    logger.debug("Role reference could not be created", exc_info=True)
+                    self.status.show_message(afanes.ui.strings.BROWSER_CREATE_FAILED.format(detail=str(exc)))
+                    return False
+                refresh_error: str | None = None
+                try:
+                    snapshot = await asyncio.to_thread(vault.scan)
+                except (VaultError, OSError) as exc:
+                    logger.debug("Snapshot refresh after creating a role reference failed", exc_info=True)
+                    refresh_error = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
+                else:
+                    self.session.apply_snapshot(snapshot, focus=path)
+                if not await self.pages.load(path, editing=True):
+                    return False
+                self.ambiguous = ()
+                self._push_history(previous)
+                if refresh_error is not None:
+                    self.status.show_message(refresh_error)
+                return True
+            finally:
+                self.status.set_busy(busy=False)
+
     async def open_or_create_log_entry(
         self,
         date: NoteDate,
@@ -259,6 +347,37 @@ class PageNavigator:
             return f"{body}\n{starter}\n"
         return body
 
+    async def _role_scaffold(self, category: CategoryLabel | None) -> str | None:
+        """Return the starter body of the template card for one category.
+
+        Parameters
+        ----------
+        category : CategoryLabel | None
+            Chosen role-reference category, or ``None`` when the user chose no
+            category.
+
+        Returns
+        -------
+        str | None
+            The first valid reference card body for the category, or ``None``
+            when the category has no card or no category was chosen.
+
+        Notes
+        -----
+        Multiple cards may share a category. The first card in title order is
+        used, matching the order shown by the reference picker. Reading the
+        cards runs blocking I/O in a worker thread and never writes.
+        """
+        if category is None:
+            return None
+        listing = await self.session.template_cards()
+        if listing is None:
+            return None
+        for card in listing.for_type(NoteType.REFERENCE):
+            if card.category == category and card.body.strip():
+                return card.body
+        return None
+
     async def back(self) -> bool:
         """Return to the previous page in the shared history.
 
@@ -339,6 +458,45 @@ class PageNavigator:
             await self.pages.offer_repair(reference)
             return
         await self._open_new_draft(reference)
+
+    async def follow_role(self, name: str) -> RoleFollowOutcome:
+        """Route one project role name from read mode.
+
+        Parameters
+        ----------
+        name : str
+            Written owner or requester name, or one step owner name.
+
+        Returns
+        -------
+        RoleFollowOutcome
+            ``OPENED`` when exactly one note matched, ``AMBIGUOUS`` when the
+            candidate picker is showing, or ``MISSING`` when no note matched.
+
+        Notes
+        -----
+        Role names resolve in the ``note:`` namespace. A resolved name opens
+        its page through the normal page command. An ambiguous name exposes the
+        existing candidate list and chooses nothing. A missing name writes
+        nothing; the caller starts the category dialog.
+        """
+        reference = NoteReference(scheme=ReferenceScheme.NOTE, name=name)
+        snapshot = self.session.snapshot
+        if snapshot is None:
+            return RoleFollowOutcome.MISSING
+        target = snapshot.link_target(reference)
+        if target.outcome is LinkOutcome.RESOLVED:
+            await self.open_page(target.paths[0])
+            return RoleFollowOutcome.OPENED
+        if target.outcome is LinkOutcome.AMBIGUOUS:
+            async with self.command_lock:
+                self.ambiguous = target.paths
+                self.status.clear_message()
+            return RoleFollowOutcome.AMBIGUOUS
+        if target.outcome is LinkOutcome.BROKEN and len(target.paths) == 1:
+            await self.open_page(target.paths[0])
+            return RoleFollowOutcome.OPENED
+        return RoleFollowOutcome.MISSING
 
     async def choose_candidate(self, path: Path) -> bool:
         """Open one of the candidates offered for an ambiguous reference.

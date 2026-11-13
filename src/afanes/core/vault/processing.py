@@ -45,6 +45,8 @@ class VaultProcessing:
         *,
         status: Status | None = None,
         due_date: datetime.date | None = None,
+        owner: str | None = None,
+        asked_by: str | None = None,
         project: str | None = None,
         card: TemplateCard | None = None,
         today: datetime.date | None = None,
@@ -63,6 +65,13 @@ class VaultProcessing:
             always ``later``; Reference has no status; Done now is ``done``.
         due_date : datetime.date | None
             Optional calendar due date for a new project or a done-now project.
+        owner : str | None
+            Optional project-owner name. Only project outcomes accept it;
+            surrounding whitespace is trimmed and a blank value means no owner.
+        asked_by : str | None
+            Optional requester name. Only project outcomes accept it;
+            surrounding whitespace is trimmed and a blank value means no
+            requester.
         project : str | None
             Target project identity for Append step. Text that matches no
             project is rejected.
@@ -108,6 +117,8 @@ class VaultProcessing:
         if card is not None and card.note_type is not NoteType.REFERENCE:
             message = "Reference and Later need a reference card"
             raise ProcessingError(message)
+        self._validate_role_outcome(outcome, owner, asked_by)
+        owner_name, asked_by_name = self._role_names(owner, asked_by)
         source = self.vault.contained(note_path)
         self._require_inbox_note(source)
 
@@ -182,6 +193,8 @@ class VaultProcessing:
             affected_notes=tuple(site.path for site in affected),
             changes_scheme=source_scheme is not target_scheme,
             target_date=target_date,
+            owner=owner_name,
+            asked_by=asked_by_name,
         )
         document = NoteDocument.from_text(source.read_text(encoding="utf-8"))
         processed_text = plan.processed_text(document)
@@ -189,6 +202,56 @@ class VaultProcessing:
             plan,
             processed_hash=hashlib.sha256(processed_text.encode("utf-8")).hexdigest(),
         )
+
+    @staticmethod
+    def _validate_role_outcome(
+        outcome: ProcessingOutcome,
+        owner: str | None,
+        asked_by: str | None,
+    ) -> None:
+        """Reject role names outside the two project outcomes.
+
+        Parameters
+        ----------
+        outcome : ProcessingOutcome
+            Selected clarification outcome.
+        owner : str | None
+            Written project-owner value, or ``None``.
+        asked_by : str | None
+            Written requester value, or ``None``.
+
+        Raises
+        ------
+        ProcessingError
+            If a role name is supplied for a non-project outcome.
+        """
+        if (owner is not None or asked_by is not None) and outcome not in (
+            ProcessingOutcome.PROJECT,
+            ProcessingOutcome.DONE_NOW,
+        ):
+            message = "Only projects accept owner and requester names"
+            raise ProcessingError(message)
+
+    @staticmethod
+    def _role_names(owner: str | None, asked_by: str | None) -> tuple[str | None, str | None]:
+        """Trim optional role names and treat blank values as absent.
+
+        Parameters
+        ----------
+        owner : str | None
+            Written project-owner value, or ``None``.
+        asked_by : str | None
+            Written requester value, or ``None``.
+
+        Returns
+        -------
+        tuple[str | None, str | None]
+            Trimmed owner and requester, with blank values replaced by
+            ``None``.
+        """
+        owner_name = owner.strip() if owner is not None and owner.strip() else None
+        asked_by_name = asked_by.strip() if asked_by is not None and asked_by.strip() else None
+        return owner_name, asked_by_name
 
     def _plan_non_note(
         self,

@@ -127,6 +127,76 @@ class TestProcessingView:
         assert view.status.visible is True
         assert view.due_date.visible is True
         assert view.project.visible is False
+        assert view.owner.visible is True
+        assert view.asked_by.visible is True
+
+    def test_done_now_reveals_the_role_fields(self) -> None:
+        _open_capture()
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.DONE_NOW.value
+
+        _select_outcome(view)
+
+        assert view.owner.visible is True
+        assert view.asked_by.visible is True
+
+    def test_append_outcome_hides_the_role_fields(self) -> None:
+        _open_capture()
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.APPEND_STEP.value
+
+        _select_outcome(view)
+
+        assert view.owner.visible is False
+        assert view.asked_by.visible is False
+
+    def test_reference_outcome_hides_the_role_fields(self) -> None:
+        _open_capture()
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.REFERENCE.value
+
+        _select_outcome(view)
+
+        assert view.owner.visible is False
+        assert view.asked_by.visible is False
+
+    def test_role_fields_suggest_vault_names(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        versioned(root)
+        vault = afanes.core.vault.service.Vault(root)
+        afanes.core.vault.pages.VaultPages(vault).create_page("Sam Rivera", NoteType.REFERENCE)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
+        _open_vault_capture(root, capture, monkeypatch)
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.PROJECT.value
+        _select_outcome(view)
+        view.owner.value = "Sam"
+
+        _trigger(view.owner.on_change)
+
+        tiles = [control for control in view.role_suggestions.controls if isinstance(control, ft.ListTile)]
+        assert [tile.title for tile in tiles] == ["Sam Rivera"]
+
+        _trigger(tiles[0].on_click)
+
+        assert view.owner.value == "Sam Rivera"
+
+    def test_asked_by_field_suggests_vault_names(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        root = tmp_path / "vault"
+        versioned(root)
+        vault = afanes.core.vault.service.Vault(root)
+        afanes.core.vault.pages.VaultPages(vault).create_page("Priya Nair", NoteType.REFERENCE)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
+        _open_vault_capture(root, capture, monkeypatch)
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+        view.outcome.value = ProcessingOutcome.PROJECT.value
+        _select_outcome(view)
+        view.asked_by.value = "Pri"
+
+        _trigger(view.asked_by.on_change)
+
+        tiles = [control for control in view.role_suggestions.controls if isinstance(control, ft.ListTile)]
+        assert [tile.title for tile in tiles] == ["Priya Nair"]
 
     def test_append_outcome_reveals_the_project_field(self) -> None:
         _open_capture()
@@ -339,6 +409,26 @@ class TestProcessingView:
         assert str(plan.target_path) in view.plan_destination.value
         assert "Project" in view.plan_details.value
 
+    def test_plan_preview_names_the_owner_and_requester(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        versioned(root)
+        vault = afanes.core.vault.service.Vault(root)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            capture,
+            ProcessingOutcome.PROJECT,
+            owner="Sam Rivera",
+            asked_by="Priya Nair",
+        )
+        assert isinstance(plan, ProcessingPlan)
+        state = _open_capture()
+
+        state.processing.plan = plan
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+
+        assert afanes.ui.strings.PROCESSING_PLAN_OWNER.format(name="Sam Rivera") in view.plan_details.value
+        assert afanes.ui.strings.PROCESSING_PLAN_ASKED_BY.format(name="Priya Nair") in view.plan_details.value
+
     def test_plan_preview_names_the_category_and_starter_body(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         versioned(root)
@@ -470,6 +560,8 @@ class TestProcessingView:
         _select_outcome(view)
         view.status.value = "waiting"
         view.due_date.value = "2026-11-20"
+        view.owner.value = "Sam Rivera"
+        view.asked_by.value = "Priya Nair"
 
         assert view.preview_button.on_click is not None
         asyncio.run(_click(view.preview_button.on_click))
@@ -481,6 +573,8 @@ class TestProcessingView:
         assert outcome is ProcessingOutcome.PROJECT
         assert status is Status.WAITING
         assert kwargs["due_date"] == datetime.date(2026, 11, 20)
+        assert kwargs["owner"] == "Sam Rivera"
+        assert kwargs["asked_by"] == "Priya Nair"
         assert kwargs["project"] is None
 
     def test_append_preview_passes_the_project_identity(

@@ -123,6 +123,47 @@ def _typed[T: ft.Control](control: ft.Control | None, expected: type[T]) -> T:
     return control
 
 
+def _find_span(control: ft.Control, text: str) -> ft.TextSpan | None:
+    if isinstance(control, ft.Text):
+        for span in control.spans or []:
+            found = _find_span_in(span, text)
+            if found is not None:
+                return found
+    for child in getattr(control, "controls", []) or []:
+        found = _find_span(child, text)
+        if found is not None:
+            return found
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        return _find_span(content, text)
+    return None
+
+
+def _find_span_in(span: object, text: str) -> ft.TextSpan | None:
+    if not isinstance(span, ft.TextSpan):
+        return None
+    if span.text == text:
+        return span
+    for child in span.spans or []:
+        found = _find_span_in(child, text)
+        if found is not None:
+            return found
+    return None
+
+
+def _find_button_by_label(control: ft.Control, label: str) -> ft.FilledButton | None:
+    if isinstance(control, ft.FilledButton) and control.content == label:
+        return control
+    for child in getattr(control, "controls", []) or []:
+        found = _find_button_by_label(child, label)
+        if found is not None:
+            return found
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        return _find_button_by_label(content, label)
+    return None
+
+
 class TestAppShell:
     def test_without_settings_shows_the_welcome(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -1125,6 +1166,51 @@ def _all_texts(control: ft.Control) -> list[str]:
     if isinstance(content, ft.Control):
         values.extend(_all_texts(content))
     return values
+
+
+class TestRoleReferenceCreation:
+    def test_creating_a_role_reference_refreshes_the_existing_workspace(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = versioned(tmp_path / "vault")
+        project = vault / "projects" / "Follow.md"
+        project.parent.mkdir(parents=True)
+        project.write_text(
+            "---\ntype: project\nstatus: active\nasked_by: Ghost\n---\n# Follow\n",
+            encoding="utf-8",
+        )
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            workspace = page.controls[0]
+            projects = _typed(_find_by_key(workspace, "section-projects"), ft.ListTile)
+            await typing.cast("Handler", projects.on_click)()
+            follow = _typed(_find_by_key(page.controls[0], "project-projects/Follow.md"), ft.ListTile)
+            await typing.cast("Handler", follow.on_click)()
+            link = _find_span(page.controls[0], "Ghost")
+            assert link is not None
+            await typing.cast("Handler", link.on_click)()
+            create = _typed(_find_by_key(page.dialogs[-1], "role-reference-create"), ft.FilledButton)
+
+            await typing.cast("Handler", create.on_click)()
+
+            assert page.controls[0] is workspace
+            assert page.dialogs == []
+            assert state.pages.editing is True
+            assert (vault / "reference" / "person" / "Ghost.md").is_file()
+
+            done = _find_button_by_label(page.controls[0], afanes.ui.strings.PAGE_DONE)
+            assert done is not None
+            await typing.cast("Handler", done.on_click)()
+
+        asyncio.run(scenario())
+
+        assert state.pages.editing is False
 
 
 class TestBrowserReferenceCreation:

@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **Project roles and metadata name references.** A project may declare one optional `owner`, shown before `Asked
+  by` and backed by a real note name. The owner, requester, and step owners now resolve through the `note:` catalog:
+  renaming a note rewrites each matching value, moving it to trash leaves the value as an unresolved name, rename
+  and trash previews count them, and browser search finds projects by role name. Role names are clickable in read
+  mode; a missing name is shown as a broken link and creates a categorized reference after confirmation. The
+  project header also offers owner and requester actions that set or clear either role with vault-name
+  suggestions and write immediately. New role references always offer `person` and every template card category,
+  default to `person`, and seed the note from the matching template card. Connections add **Owned projects** and
+  show finished owned and requested projects behind the existing finished toggle. Project and Done now in the
+  Processing Wizard accept optional Owner and Asked by names with vault suggestions. Append step is unchanged and
+  does not copy the project owner. This implements the
+  `add-project-roles` OpenSpec change. README: no change required. Docs: frontmatter, vault format, names and
+  links, step metadata, projects and steps, pages and editing, workspace search, processing, and the
+  capture-clarify-review guide were updated.
 - **Versioned vaults.** Every vault root now carries `afanes.yaml` with `schema_version: 1`. Creation writes it
   before starter content, and opening a valid read-only vault remains read-only. An older writable folder with the
   five default folders can be adopted through the interface or `afanes vault adopt DIR`, which writes only that
@@ -21,6 +35,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - **Breaking:** a folder without a valid `afanes.yaml` is no longer opened as a vault. Invalid or unsupported
   settings files are refused and preserved byte for byte; a newer schema asks the user to update Afanes.
+- **Renames rewrite role names.** Renaming a note now also rewrites a project's `owner` and `asked_by` values and
+  every matching step owner, in the same atomic write as body links. A role name that matches no note remains in
+  the file as a broken link. This implements the `add-project-roles` OpenSpec change.
 - **One owner for page labels and template cards.** Editable frontmatter labels are written only by
   `PageLabels.apply_to`, and the processing, reference, and log forms share one template card picker. Vault files
   keep their unknown keys and newline style, and parsed note values are unchanged. This implements the
@@ -28,12 +45,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Removed
 
+- **Breaking:** the unused `PageEditorState.page_steps` property is removed to make room for the new
+  `set_page_owner` command within the controller's public-name budget. Read steps from `page_body_blocks` or the
+  scanned note instead. This implements the `add-project-roles` OpenSpec change.
 - **Breaking:** the unused `ui.views.inbox.InboxView` class and its exclusive helpers are removed. The live
   workspace browser replaced that screen with `ui.views.workspace.WorkspaceView`; no user-visible workflow changed.
   This implements the `refactor-single-owner` OpenSpec change.
 
 ### Fixed
 
+- Creating a role reference now refreshes the existing workspace instead of rebuilding the Flet page from
+  inside the category dialog. Before this fix the new reference opened in edit mode but Done and Back
+  stopped repainting because the client no longer applied updates. The same in-place refresh is used by
+  the new-reference and new-log-entry dialogs. This implements the `add-project-roles` OpenSpec change.
+- The read-mode owner and requester dialogs now save a typed name even when no suggestion is selected;
+  previously the typed text was ignored and the unchanged role closed the dialog. The missing-role
+  category dialog applies the same fix to a typed category. This implements the `add-project-roles`
+  OpenSpec change.
+- The page edit form gives its label controls an explicit height, puts every label in one wrapping row so
+  Date shares the wide row, and lets the body and raw editors fill the rest of the page pane through a
+  full-size mode host and parent-filling multiline fields with top-aligned text. The page pane also
+  recovers from stale toolkit freeze markers after a dialog interaction, so Back and Cancel no longer
+  raise `Frozen controls cannot be updated`. This implements the `add-project-roles` OpenSpec change.
 - The log entry picker describes Empty as a log entry with no starter body instead of offering a reference
   category. This implements the `refactor-single-owner` OpenSpec change.
 - The workspace sidebar recovers from a stale presentation freeze marker, so switching browser sections no longer

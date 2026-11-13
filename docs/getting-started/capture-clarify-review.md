@@ -41,9 +41,12 @@ Select the capture in the Inbox and choose **Process**. The wizard asks what the
 - **Trash** moves it to `trash/` without rewriting it.
 - **Later** keeps it as a reference with `status: later`.
 - **Reference** keeps it as an uncategorized reference with no status.
-- **Project** turns it into a project with a status and optional due date.
+- **Project** turns it into a project with a status, optional due date, owner, and requester.
 - **Append step** adds the capture as a step of an existing project and moves the capture to trash.
-- **Done now** writes a completed one-step project with `status: done`.
+- **Done now** writes a completed one-step project with `status: done` and optional owner and requester.
+
+Project and Done now offer optional **Owner** and **Asked by** fields that suggest names already in the
+vault. A new name is saved as written and can be created later by clicking it on the project page.
 
 The preview shows the destination and, when the outcome changes scheme, how many inbound references
 will become unresolved. Append step suggests existing projects by title or identity and stores the

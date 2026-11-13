@@ -347,6 +347,7 @@ class TestLogFrontmatter:
             "status: archived",
             "due_date: 2025-10-12",
             "asked_by: Sam Rivera",
+            "owner: Sam Rivera",
         ],
     )
     def test_workflow_labels_are_rejected(self, line: str) -> None:
@@ -444,6 +445,96 @@ class TestAskedBy:
             document.with_metadata({"type": "reference", "asked_by": "Priya Nair"})
 
 
+class TestOwner:
+    def test_project_accepts_an_owner_name(self) -> None:
+        document = NoteDocument.from_text("---\ntype: project\nowner: Sam Rivera\n---\n")
+
+        assert document.owner == "Sam Rivera"
+        assert document.raw["owner"] == "Sam Rivera"
+
+    def test_surrounding_whitespace_is_trimmed(self) -> None:
+        document = NoteDocument.from_text("---\ntype: project\nowner: '  Sam Rivera  '\n---\n")
+
+        assert document.owner == "Sam Rivera"
+        assert document.raw["owner"] == "Sam Rivera"
+
+    def test_absent_owner_is_none(self) -> None:
+        document = NoteDocument.from_text("---\ntype: project\n---\n")
+
+        assert document.owner is None
+
+    def test_reference_rejects_an_owner(self) -> None:
+        with pytest.raises(NoteParseError, match="project notes"):
+            NoteDocument.from_text("---\ntype: reference\nowner: Sam Rivera\n---\n")
+
+    def test_capture_rejects_an_owner(self) -> None:
+        with pytest.raises(NoteParseError, match="project notes"):
+            NoteDocument.from_text("---\ntype: note\nowner: Sam Rivera\n---\n")
+
+    def test_owner_without_a_type_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError):
+            NoteDocument.from_text("---\nowner: Sam Rivera\n---\n")
+
+    def test_empty_owner_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError, match="non-empty"):
+            NoteDocument.from_text("---\ntype: project\nowner: ''\n---\n")
+
+    def test_whitespace_only_owner_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError, match="non-empty"):
+            NoteDocument.from_text("---\ntype: project\nowner: '   '\n---\n")
+
+    def test_null_owner_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError, match="string"):
+            NoteDocument.from_text("---\ntype: project\nowner: null\n---\n")
+
+    def test_list_owner_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError, match="string"):
+            NoteDocument.from_text("---\ntype: project\nowner: [Sam Rivera]\n---\n")
+
+    def test_number_owner_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError, match="string"):
+            NoteDocument.from_text("---\ntype: project\nowner: 3\n---\n")
+
+    def test_owner_survives_a_round_trip(self) -> None:
+        document = NoteDocument.from_text("---\ntype: project\nowner: Sam Rivera\n---\n")
+
+        reparsed = NoteDocument.from_text(document.to_text())
+
+        assert reparsed.owner == "Sam Rivera"
+        assert "owner: Sam Rivera" in document.to_text()
+
+    def test_round_trip_preserves_unknown_keys_and_body(self) -> None:
+        source = "---\ntype: project\nowner: Sam Rivera\ncustom: 42\n---\nBody\n"
+        document = NoteDocument.from_text(source)
+
+        reparsed = NoteDocument.from_text(document.to_text())
+
+        assert reparsed.raw == document.raw
+        assert reparsed.owner == "Sam Rivera"
+        assert reparsed.body == document.body
+        assert reparsed.raw["custom"] == CUSTOM_VALUE
+
+    def test_round_trip_preserves_crlf(self) -> None:
+        source = "---\r\ntype: project\r\nowner: Sam Rivera\r\n---\r\nBody\r\n"
+        document = NoteDocument.from_text(source)
+
+        assert document.to_text() == source
+
+    def test_with_metadata_accepts_an_owner(self) -> None:
+        document = NoteDocument.from_text("---\ntype: project\n---\n")
+
+        updated = document.with_metadata({"type": "project", "owner": "Sam Rivera"})
+
+        assert updated.owner == "Sam Rivera"
+        assert updated.raw["owner"] == "Sam Rivera"
+
+    def test_with_metadata_rejects_a_misplaced_owner(self) -> None:
+        document = NoteDocument.from_text("---\ntype: reference\n---\n")
+
+        with pytest.raises(NoteParseError, match="project notes"):
+            document.with_metadata({"type": "reference", "owner": "Sam Rivera"})
+
+
 class TestSerializeDocument:
     def test_with_body_replaces_only_the_body(self) -> None:
         document = NoteDocument.from_text(SAMPLE)
@@ -492,6 +583,13 @@ class TestSerializeDocument:
             min_size=1,
         ).filter(lambda value: bool(value.strip())),
     ),
+    owner=hypothesis.strategies.one_of(
+        hypothesis.strategies.none(),
+        hypothesis.strategies.text(
+            alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-'.",
+            min_size=1,
+        ).filter(lambda value: bool(value.strip())),
+    ),
     note_date=hypothesis.strategies.one_of(
         hypothesis.strategies.none(),
         hypothesis.strategies.dates().map(NoteDate.from_date),
@@ -508,6 +606,7 @@ def test_frontmatter_round_trip_preserves_recognized_and_unknown_values(
     status: Status | None,
     due_date: datetime.date | None,
     asked_by: str | None,
+    owner: str | None,
     note_date: NoteDate | None,
     unknown: str,
 ) -> None:
@@ -521,6 +620,8 @@ def test_frontmatter_round_trip_preserves_recognized_and_unknown_values(
         raw["due_date"] = due_date
     if note_type is NoteType.PROJECT and asked_by is not None:
         raw["asked_by"] = asked_by
+    if note_type is NoteType.PROJECT and owner is not None:
+        raw["owner"] = owner
     if note_date is not None:
         raw["date"] = note_date.to_yaml_value()
     document = NoteDocument.from_text("---\ntype: note\n---\n")
@@ -532,6 +633,7 @@ def test_frontmatter_round_trip_preserves_recognized_and_unknown_values(
     assert reparsed.status is candidate.status
     assert reparsed.due_date == candidate.due_date
     assert reparsed.asked_by == candidate.asked_by
+    assert reparsed.owner == candidate.owner
     assert reparsed.date == candidate.date
     assert reparsed.date_error == candidate.date_error
 

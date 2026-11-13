@@ -22,13 +22,18 @@ out of the Inbox, so a failed move leaves the capture available for a retry.
 | **Trash** | Moves the capture to `trash/` without rewriting it |
 | **Later** | Keeps it as a reference with `status: later`, using the chosen template card or Empty |
 | **Reference** | Keeps it as a reference, using the chosen template card or Empty |
-| **Project** | Turns it into a project with a status and optional due date |
+| **Project** | Turns it into a project with a status, optional due date, owner, and requester |
 | **Log entry** | Turns it into a dated log entry under `log/`, using the capture's date |
 | **Append step** | Adds the capture as a step of an existing project and moves the capture to trash |
-| **Done now** | Writes a completed one-step project with `status: done` |
+| **Done now** | Writes a completed one-step project with `status: done` and optional owner and requester |
 
 Task list items already in the capture body become steps when the outcome is a project. A project may
 start empty.
+
+Project and Done now also offer optional **Owner** and **Asked by** fields. Both suggest names already
+in the vault and accept a new name typed as-is; the new name is saved on the project and can be created
+later by clicking it on the project page. Append step keeps its current behavior: the appended step gets
+no owner, and the project's owner is not copied to it.
 
 The preview shows the destination and, when the outcome changes scheme, how many inbound references
 will be affected. A Log entry outcome rewrites `note:` links to the new `log:<date>` destination; an
@@ -74,8 +79,8 @@ Every other outcome writes the classified frontmatter atomically and then moves 
 `inbox/`. A failed move leaves the note in the Inbox so the same plan can be retried.
 
 :::{important} Remember
-Processing never infers a status, template card, project, owner, or due date from the capture text.
-You choose every label.
+Processing never infers a status, template card, project, owner, requester, or due date from the
+capture text. You choose every label.
 :::
 
 ## 🧭 See also

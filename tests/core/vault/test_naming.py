@@ -1,5 +1,6 @@
 """Tests for reference-safe naming, moves, repairs, and trash."""
 
+import datetime
 import hashlib
 import os
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import pytest
 
 import afanes.core.atomic
+import afanes.core.steps
 import afanes.core.vault.log_conversions
 import afanes.core.vault.naming
 import afanes.core.vault.pages
@@ -28,6 +30,7 @@ from afanes.models.note import CategoryLabel, NoteDate, NoteType
 ONE = 1
 TWO = 2
 THREE_REFERENCES = 3
+FOUR_REFERENCES = 4
 YEAR_LENGTH = 4
 
 
@@ -167,6 +170,106 @@ class TestReferenceRepair:
         assert "note:Ada>" in path.read_text(encoding="utf-8")
         assert "note:Ada?>" not in path.read_text(encoding="utf-8")
 
+    def test_counts_metadata_role_references(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        project = root / "projects/Review.md"
+        project.parent.mkdir(parents=True)
+        project.write_text(
+            "---\ntype: project\nasked_by: 'Q1: Planning?'\nowner: 'Q1: Planning?'\n---\n\n"
+            "- [ ] Call <!-- {owners: ['Q1: Planning?']} -->\n",
+            encoding="utf-8",
+        )
+        old = NoteReference(ReferenceScheme.NOTE, "Q1: Planning?")
+        new = NoteReference(ReferenceScheme.NOTE, "Q1 Planning")
+        vault = afanes.core.vault.service.Vault(root)
+
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_reference_repair(old, new, snapshot=vault.scan())
+
+        assert [(site.path, site.reference_count) for site in preview.sites] == [(project, 3)]
+
+    def test_repair_rewrites_metadata_role_references(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        project = root / "projects/Review.md"
+        project.parent.mkdir(parents=True)
+        project.write_text(
+            "---\ntype: project\nasked_by: 'Q1: Planning?'\nowner: 'Q1: Planning?'\n---\n\n"
+            "- [ ] Call <!-- {owners: ['Q1: Planning?'], plan: 2026-01-02} -->\n",
+            encoding="utf-8",
+        )
+        old = NoteReference(ReferenceScheme.NOTE, "Q1: Planning?")
+        new = NoteReference(ReferenceScheme.NOTE, "Q1 Planning")
+        vault = afanes.core.vault.service.Vault(root)
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_reference_repair(old, new, snapshot=vault.scan())
+
+        afanes.core.vault.naming.VaultNaming(vault).apply_reference_repair(preview, confirm=True)
+
+        text = project.read_text(encoding="utf-8")
+        assert "asked_by: Q1 Planning\n" in text
+        assert "owner: Q1 Planning\n" in text
+        assert "owners: [Q1 Planning]" in text
+        assert "Q1: Planning?" not in text
+        assert "plan: 2026-01-02" in text
+
+    def test_skips_a_metadata_referrer_changed_after_planning(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        project = root / "projects/Review.md"
+        project.parent.mkdir(parents=True)
+        project.write_text(
+            "---\ntype: project\nasked_by: 'Q1: Planning?'\nowner: 'Q1: Planning?'\n---\n\n"
+            "- [ ] Call <!-- {owners: ['Q1: Planning?']} -->\n",
+            encoding="utf-8",
+        )
+        old = NoteReference(ReferenceScheme.NOTE, "Q1: Planning?")
+        new = NoteReference(ReferenceScheme.NOTE, "Q1 Planning")
+        vault = afanes.core.vault.service.Vault(root)
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_reference_repair(old, new, snapshot=vault.scan())
+        changed = project.read_text(encoding="utf-8") + "\nExternal edit.\n"
+        project.write_text(changed, encoding="utf-8", newline="\n")
+
+        report = afanes.core.vault.naming.VaultNaming(vault).apply_reference_repair(preview, confirm=True)
+
+        assert report.updated == ()
+        assert report.skipped == (project.resolve(),)
+        assert project.read_text(encoding="utf-8") == changed
+
+    def test_reports_a_metadata_partial_failure_and_recovers_on_rerun(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        root = tmp_path / "vault"
+        first = root / "projects/One.md"
+        second = root / "projects/Two.md"
+        for path in (first, second):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                "---\ntype: project\nasked_by: 'Q1: Planning?'\nowner: 'Q1: Planning?'\n---\n\n"
+                "- [ ] Call <!-- {owners: ['Q1: Planning?']} -->\n",
+                encoding="utf-8",
+            )
+        old = NoteReference(ReferenceScheme.NOTE, "Q1: Planning?")
+        new = NoteReference(ReferenceScheme.NOTE, "Q1 Planning")
+        vault = afanes.core.vault.service.Vault(root)
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_reference_repair(old, new, snapshot=vault.scan())
+
+        original_write = afanes.core.atomic.write_text_atomic
+        state = {"failed": False}
+
+        def flaky_write(path: Path, text: str) -> None:
+            if path == first.resolve() and not state["failed"]:
+                state["failed"] = True
+                message = "disk full"
+                raise OSError(message)
+            original_write(path, text)
+
+        monkeypatch.setattr(afanes.core.atomic, "write_text_atomic", flaky_write)
+        first_report = afanes.core.vault.naming.VaultNaming(vault).apply_reference_repair(preview, confirm=True)
+        assert [failure.path for failure in first_report.failed] == [first.resolve()]
+        assert first_report.updated == (second.resolve(),)
+
+        second_report = afanes.core.vault.naming.VaultNaming(vault).apply_reference_repair(preview, confirm=True)
+        assert second_report.failed == ()
+        assert first.resolve() in second_report.updated
+        assert "owner: Q1 Planning" in first.read_text(encoding="utf-8")
+
 
 class TestMoveNote:
     def test_requires_confirmation(self, tmp_path: Path) -> None:
@@ -215,6 +318,127 @@ class TestMoveNote:
         text.write_text("body", encoding="utf-8")
         with pytest.raises(VaultPathError):
             afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).move(text, root, confirm=True)
+
+
+class TestMetadataReferenceCharacterization:
+    """Check how rename and trash count role names as metadata references."""
+
+    def test_plan_counts_body_and_metadata_references(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        project = root / "projects/Review.md"
+        project.parent.mkdir(parents=True)
+        project.write_text(
+            "---\ntype: project\nasked_by: Ada\nowner: Ada\n---\n\n"
+            "[Ada](<note:Ada>)\n\n- [ ] Call Ada <!-- {owners: [Ada], plan: 2026-01-02} -->\n",
+            encoding="utf-8",
+        )
+
+        preview = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).plan_rename(
+            note, "Ada King"
+        )
+
+        assert preview.reference_count == FOUR_REFERENCES
+        assert preview.affected == (ReferenceSite(path=project, reference_count=FOUR_REFERENCES),)
+
+    def test_plan_counts_metadata_only_references(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        project = root / "projects/Review.md"
+        project.parent.mkdir(parents=True)
+        project.write_text(
+            "---\ntype: project\nasked_by: Ada\nowner: Ada\n---\n\n"
+            "- [ ] Call Ada <!-- {owners: [Ada], plan: 2026-01-02} -->\n",
+            encoding="utf-8",
+        )
+
+        preview = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).plan_rename(
+            note, "Ada King"
+        )
+
+        assert preview.reference_count == THREE_REFERENCES
+        assert preview.affected == (ReferenceSite(path=project, reference_count=THREE_REFERENCES),)
+
+    def test_apply_rewrites_metadata_role_names(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        project = root / "projects/Review.md"
+        project.parent.mkdir(parents=True)
+        project.write_text(
+            "---\ntype: project\nasked_by: Ada\nowner: Ada\n---\n\n"
+            "[Ada](<note:Ada>)\n\n- [ ] Call Ada <!-- {owners: [Ada], plan: 2026-01-02} -->\n",
+            encoding="utf-8",
+        )
+        vault = afanes.core.vault.service.Vault(root)
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_rename(note, "Ada King")
+
+        afanes.core.vault.naming.VaultNaming(vault).apply_rename(preview, confirm=True)
+
+        text = project.read_text(encoding="utf-8")
+        assert "asked_by: Ada King\n" in text
+        assert "owner: Ada King\n" in text
+        assert "owners: [Ada King]" in text
+        assert "note:Ada King" in text
+        assert "asked_by: Ada\n" not in text
+
+    def test_apply_updates_step_metadata_and_crlf(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        project = root / "projects/Review.md"
+        project.parent.mkdir(parents=True)
+        project.write_bytes(
+            b"---\r\ntype: project\r\n---\r\n\r\n"
+            b"[Ada](<note:Ada>)\r\n\r\n"
+            b"- [ ] Call Ada <!-- {owners: [Ada], plan: 2026-01-02, "
+            b"actual: 2026-01-03, tags: [review], custom: keep} -->\r\n"
+        )
+        vault = afanes.core.vault.service.Vault(root)
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_rename(note, "Ada King")
+
+        afanes.core.vault.naming.VaultNaming(vault).apply_rename(preview, confirm=True)
+
+        rewritten = project.read_bytes().decode("utf-8")
+        assert "note:Ada King" in rewritten
+        steps = afanes.core.steps.StepDocument(NoteDocument.from_text(rewritten).body).steps
+        assert len(steps) == ONE
+        assert steps[0].owners == ("Ada King",)
+        assert steps[0].plan == datetime.date(2026, 1, 2)
+        assert steps[0].actual == datetime.date(2026, 1, 3)
+        assert steps[0].tags == ("review",)
+        assert steps[0].metadata.raw["custom"] == "keep"
+        assert "\n" not in rewritten.replace("\r\n", "")
+
+    def test_trash_counts_body_and_metadata_references(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        _write_note(root / "projects/Review.md", "project", body="[Ada](<note:Ada>)\n")
+        project = root / "projects/Review.md"
+        project.write_text(
+            "---\ntype: project\nasked_by: Ada\nowner: Ada\n---\n\n"
+            "[Ada](<note:Ada>)\n\n- [ ] Call Ada <!-- {owners: [Ada], plan: 2026-01-02} -->\n",
+            encoding="utf-8",
+        )
+
+        preview = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).plan_trash(note)
+
+        assert preview.reference_count == FOUR_REFERENCES
+        assert len(preview.affected_notes) == ONE
+
+    def test_trash_counts_metadata_only_references(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        note = _write_note(root / "people/Ada.md", "person")
+        project = root / "projects/Review.md"
+        project.parent.mkdir(parents=True)
+        project.write_text(
+            "---\ntype: project\nasked_by: Ada\nowner: Ada\n---\n\n"
+            "- [ ] Call Ada <!-- {owners: [Ada], plan: 2026-01-02} -->\n",
+            encoding="utf-8",
+        )
+
+        preview = afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).plan_trash(note)
+
+        assert preview.reference_count == THREE_REFERENCES
+        assert len(preview.affected_notes) == ONE
 
 
 class TestPlanRename:
@@ -419,6 +643,24 @@ class TestApplyRename:
         afanes.core.vault.naming.VaultNaming(afanes.core.vault.service.Vault(root)).apply_rename(preview, confirm=True)
         target = root / "people/Ada King.md"
         assert "[Ada King](<note:Ada King>)" in target.read_text(encoding="utf-8")
+
+    def test_project_rename_leaves_note_scheme_role_names(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        project = root / "projects/Ada.md"
+        project.parent.mkdir(parents=True)
+        project.write_text(
+            "---\ntype: project\nowner: Ada\nasked_by: Ada\n---\n\n- [ ] Call Ada <!-- {owners: [Ada]} -->\n",
+            encoding="utf-8",
+        )
+        vault = afanes.core.vault.service.Vault(root)
+        preview = afanes.core.vault.naming.VaultNaming(vault).plan_rename(project, "Ada King")
+
+        afanes.core.vault.naming.VaultNaming(vault).apply_rename(preview, confirm=True)
+
+        text = (root / "projects/Ada King.md").read_text(encoding="utf-8")
+        assert "owner: Ada\n" in text
+        assert "asked_by: Ada\n" in text
+        assert "owners: [Ada]" in text
 
     def test_skips_a_file_changed_after_planning(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

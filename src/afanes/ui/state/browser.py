@@ -23,6 +23,7 @@ from afanes.core.search import (
     BrowserSection,
     ProjectGroup,
 )
+from afanes.models.note import CategoryLabel, NoteType
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.session import VaultSession
 
@@ -146,6 +147,53 @@ class BrowserState:
         if snapshot is None:
             return None
         return afanes.core.search.Browser(snapshot).filter(self.query)
+
+    def reference_categories(self) -> tuple[CategoryLabel, ...]:
+        """Return every category label used by a reference note.
+
+        Returns
+        -------
+        tuple[CategoryLabel, ...]
+            Distinct labels sorted case-insensitively, or an empty tuple when
+            no vault is open.
+
+        Notes
+        -----
+        The result ignores the browser query and the active section, so a
+        category is still known when a search filters its notes out of the
+        sidebar.
+        """
+        snapshot = self.session.snapshot
+        if snapshot is None:
+            return ()
+        listing = afanes.core.search.Browser(snapshot).groups()
+        labels = {group.label for group in listing.groups_for(BrowserSection.REFERENCES) if group.label is not None}
+        return tuple(sorted(labels, key=lambda label: label.value.casefold()))
+
+    async def role_categories(self) -> tuple[CategoryLabel, ...]:
+        """Return category suggestions for a missing role name.
+
+        Returns
+        -------
+        tuple[CategoryLabel, ...]
+            `person`, every category used by a reference note, and every
+            category declared by a valid reference template card, sorted
+            case-insensitively.
+
+        Notes
+        -----
+        The suggestions ignore the browser query and the active section. A
+        missing ``templates/`` folder still yields `person` and the categories
+        already in use. Reading the cards runs blocking I/O in a worker thread
+        and never writes.
+        """
+        categories = {CategoryLabel("person"), *self.reference_categories()}
+        listing = await self.session.template_cards()
+        if listing is not None:
+            categories.update(
+                card.category for card in listing.for_type(NoteType.REFERENCE) if card.category is not None
+            )
+        return tuple(sorted(categories, key=lambda label: label.value.casefold()))
 
     def project_groups(self) -> tuple[ProjectGroup, ...]:
         """Return project summaries grouped by presentation stage.

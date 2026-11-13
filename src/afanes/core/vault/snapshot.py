@@ -268,6 +268,9 @@ class VaultNote:
     asked_by : str | None
         Requester name declared by a project, or ``None`` when the key is
         absent or the note is not a project.
+    owner : str | None
+        Accountable person or team declared by a project, or ``None`` when the
+        key is absent or the note is not a project.
     """
 
     path: Path
@@ -285,6 +288,7 @@ class VaultNote:
     steps: tuple[ProjectStep, ...]
     search_text: str
     asked_by: str | None = None
+    owner: str | None = None
 
     @property
     def references(self) -> tuple[NoteReference, ...]:
@@ -296,6 +300,33 @@ class VaultNote:
             References extracted from the Markdown body.
         """
         return self.body_references
+
+    @property
+    def metadata_references(self) -> tuple[NoteReference, ...]:
+        """Return the role-name references declared by this note.
+
+        Returns
+        -------
+        tuple[NoteReference, ...]
+            One ``note:`` reference for the project owner, one for the
+            requester, and one for each step owner, in that order. Repeated
+            names are preserved so a rename preview can count each written
+            occurrence.
+
+        Notes
+        -----
+        These references come from frontmatter and step metadata, not from the
+        body. They resolve through the same catalog as body references but are
+        never listed as inbound body links.
+        """
+        names: list[str] = []
+        if self.owner is not None:
+            names.append(self.owner)
+        if self.asked_by is not None:
+            names.append(self.asked_by)
+        for step in self.steps:
+            names.extend(step.owners)
+        return tuple(NoteReference(scheme=ReferenceScheme.NOTE, name=name) for name in names)
 
     @property
     def order(self) -> NoteOrder:
@@ -775,10 +806,17 @@ class VaultSnapshot:
         -------
         tuple[ReferenceSite, ...]
             Referring notes with per-note reference counts, in scan order.
+
+        Notes
+        -----
+        Counts body references and metadata role references (project owner,
+        requester, and step owners). An ambiguous reference is not attributed
+        to any candidate.
         """
         sites: list[ReferenceSite] = []
         for note in self.notes:
-            count = sum(1 for reference in note.references if self.resolves_to(reference, source))
+            references = (*note.references, *note.metadata_references)
+            count = sum(1 for reference in references if self.resolves_to(reference, source))
             if count:
                 sites.append(ReferenceSite(path=note.path, reference_count=count))
         return tuple(sites)
@@ -841,8 +879,9 @@ class VaultSnapshot:
         Notes
         -----
         Only unique resolution counts; an ambiguous reference is not attributed
-        to any candidate. The result is computed from the snapshot and performs
-        no file I/O.
+        to any candidate. Body references and metadata role references both
+        count. The result is computed from the snapshot and performs no file
+        I/O.
         """
         return self.affected_sites(note_path)
 

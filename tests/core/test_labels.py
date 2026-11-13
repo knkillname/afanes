@@ -18,6 +18,7 @@ custom: keep
 status: waiting
 due_date: 2026-01-02
 asked_by: Priya Nair
+owner: Sam Rivera
 ---
 
 # Call Ada
@@ -43,6 +44,7 @@ class TestApplyTo:
         assert "status" not in applied.raw
         assert "due_date" not in applied.raw
         assert "asked_by" not in applied.raw
+        assert "owner" not in applied.raw
 
     def test_writes_a_reference_category_and_status(self) -> None:
         labels = PageLabels(
@@ -58,6 +60,7 @@ class TestApplyTo:
         assert applied.status is Status.LATER
         assert "due_date" not in applied.raw
         assert "asked_by" not in applied.raw
+        assert "owner" not in applied.raw
 
     def test_writes_project_status_due_date_and_requester(self) -> None:
         labels = PageLabels(
@@ -65,6 +68,7 @@ class TestApplyTo:
             status=Status.ACTIVE,
             due_date_text="2027-03-04",
             asked_by_text="  Ada Lovelace  ",
+            owner_text="  Grace Hopper  ",
         )
 
         applied = labels.apply_to(NoteDocument.from_text(PROJECT_SOURCE))
@@ -73,6 +77,7 @@ class TestApplyTo:
         assert applied.status is Status.ACTIVE
         assert applied.due_date == datetime.date(2027, 3, 4)
         assert applied.asked_by == "Ada Lovelace"
+        assert applied.owner == "Grace Hopper"
         assert "category" not in applied.raw
 
     def test_writes_a_log_type_and_removes_reference_labels(self) -> None:
@@ -87,6 +92,7 @@ class TestApplyTo:
         assert "status" not in applied.raw
         assert "due_date" not in applied.raw
         assert "asked_by" not in applied.raw
+        assert "owner" not in applied.raw
 
     def test_keeps_the_date_when_the_type_changes(self) -> None:
         document = NoteDocument.from_text(_note_text(NoteType.NOTE))
@@ -116,12 +122,13 @@ class TestApplyTo:
             status=Status.ACTIVE,
             due_date_text="2026-01-02",
             asked_by_text="Priya Nair",
+            owner_text="Sam Rivera",
             date_text="2025-10-12",
         )
 
         applied = labels.apply_to(document)
 
-        assert list(applied.raw) == ["type", "custom", "date", "status", "due_date", "asked_by"]
+        assert list(applied.raw) == ["type", "custom", "date", "status", "due_date", "asked_by", "owner"]
 
     def test_appends_a_category_before_a_new_status(self) -> None:
         document = NoteDocument.from_text("---\ntype: note\ncustom: keep\n---\n\n# Example\n")
@@ -152,6 +159,7 @@ class TestApplyTo:
             status=Status.ACTIVE,
             due_date_text="2026-01-02",
             asked_by_text="Priya Nair",
+            owner_text="Sam Rivera",
         ).apply_to(document)
         written = applied.to_text()
 
@@ -173,6 +181,32 @@ class TestApplyTo:
 
         assert "category" not in applied.raw
 
+    def test_removes_a_blank_owner(self) -> None:
+        applied = PageLabels(note_type=NoteType.PROJECT, owner_text="   ").apply_to(
+            NoteDocument.from_text(PROJECT_SOURCE)
+        )
+
+        assert "owner" not in applied.raw
+
+    def test_a_type_change_clears_the_owner(self) -> None:
+        labels = PageLabels(note_type=NoteType.PROJECT, owner_text="Sam Rivera")
+
+        changed = labels.with_type(NoteType.REFERENCE)
+
+        assert changed.owner_text == ""
+
+    def test_with_owner_text_ignores_non_project_labels(self) -> None:
+        labels = PageLabels(note_type=NoteType.REFERENCE)
+
+        changed = labels.with_owner_text("Sam Rivera")
+
+        assert changed.owner_text == ""
+
+    def test_from_document_reads_the_owner(self) -> None:
+        labels = PageLabels.from_document(NoteDocument.from_text(PROJECT_SOURCE))
+
+        assert labels.owner_text == "Sam Rivera"
+
 
 @st.composite
 def _label_sets(draw: st.DrawFn) -> PageLabels:
@@ -182,6 +216,11 @@ def _label_sets(draw: st.DrawFn) -> PageLabels:
     category = draw(st.none() | st.text(alphabet="abcxyz", min_size=1)) if note_type is NoteType.REFERENCE else None
     due_date_text = draw(st.none() | st.dates().map(str)) if note_type is NoteType.PROJECT else ""
     asked_by_text = (
+        draw(st.text(alphabet="abc XYZ", min_size=1).map(str.strip).filter(bool))
+        if note_type is NoteType.PROJECT
+        else ""
+    )
+    owner_text = (
         draw(st.text(alphabet="abc XYZ", min_size=1).map(str.strip).filter(bool))
         if note_type is NoteType.PROJECT
         else ""
@@ -200,6 +239,7 @@ def _label_sets(draw: st.DrawFn) -> PageLabels:
         status=status,
         due_date_text=due_date_text or "",
         asked_by_text=asked_by_text or "",
+        owner_text=owner_text or "",
         date_text=date_text or "",
     )
 

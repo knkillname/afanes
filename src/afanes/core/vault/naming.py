@@ -16,6 +16,7 @@ from pathlib import Path
 import afanes.core.atomic
 import afanes.core.links
 import afanes.core.names
+import afanes.core.steps
 import afanes.core.vault.snapshot
 from afanes.core.errors import (
     AfanesError,
@@ -538,7 +539,8 @@ class VaultNaming:
         -----
         Matching compares reference keys (scheme and normalized name) rather
         than resolution. It therefore finds references to a name that has no
-        page yet, which is exactly the unsafe-link repair case. This method
+        page yet, which is exactly the unsafe-link repair case. Body
+        references and metadata role references are both matched. This method
         performs blocking file I/O when it scans, and never writes.
         """
         if old.scheme is not new.scheme and not allow_scheme_change:
@@ -550,7 +552,8 @@ class VaultNaming:
         sites: list[ReferenceSite] = []
         hashes: dict[Path, str] = {}
         for note in vault.notes:
-            count = sum(1 for reference in note.references if ReferenceKey.from_reference(reference) == old_key)
+            references = (*note.references, *note.metadata_references)
+            count = sum(1 for reference in references if ReferenceKey.from_reference(reference) == old_key)
             if count:
                 sites.append(ReferenceSite(path=note.path, reference_count=count))
                 hashes[note.path] = note.content_hash
@@ -725,13 +728,14 @@ class VaultNaming:
         old: NoteReference,
         new: NoteReference,
     ) -> bool:
-        """Rewrite body references in one note atomically."""
+        """Rewrite body and metadata role references in one note atomically."""
         document = NoteDocument.from_text(data.decode("utf-8"))
         rewrite = afanes.core.links.MarkdownBody(document.body).rewrite_references(old, new)
-        if rewrite.count == 0:
+        final = document.with_body(rewrite.text) if rewrite.count else document
+        final = VaultNaming._rewrite_metadata(final, old, new)
+        if final == document:
             return False
 
-        final = document.with_body(rewrite.text)
         text = final.to_text()
         reader = afanes.core.links.ReferenceReader()
         VaultNaming._verify_rewrite(text, old, reader)
@@ -746,11 +750,12 @@ class VaultNaming:
         new: NoteReference,
         new_title: str,
     ) -> bool:
-        """Rewrite a renamed note's heading and body references atomically."""
+        """Rewrite a renamed note's heading, body, and role names atomically."""
         current = data.decode("utf-8")
         document = NoteDocument.from_text(current)
         rewrite = afanes.core.links.MarkdownBody(document.body).rewrite_references(old, new)
-        final = document.with_body(rewrite.text).with_heading(new_title)
+        final = VaultNaming._rewrite_metadata(document.with_body(rewrite.text), old, new)
+        final = final.with_heading(new_title)
         text = final.to_text()
         if text == current:
             return False
@@ -758,6 +763,66 @@ class VaultNaming:
         VaultNaming._verify_rewrite(text, old, reader)
         afanes.core.atomic.write_text_atomic(path, text)
         return True
+
+    @staticmethod
+    def _rewrite_metadata(
+        document: NoteDocument,
+        old: NoteReference,
+        new: NoteReference,
+    ) -> NoteDocument:
+        """Return a project with matching owner, requester, and step owners rewritten.
+
+        Parameters
+        ----------
+        document : NoteDocument
+            Parsed note to rewrite.
+        old : NoteReference
+            Reference being renamed.
+        new : NoteReference
+            Replacement reference.
+
+        Returns
+        -------
+        NoteDocument
+            The original document when it is not a project or nothing matches;
+            otherwise a copy with only the matching role names replaced.
+
+        Notes
+        -----
+        Role names are metadata references in the ``note`` namespace, so a
+        project, log, or date rename never rewrites them. Step rewrites go
+        through :meth:`afanes.core.steps.StepDocument.with_owners`, which keeps
+        ``plan``, ``actual``, ``tags``, unknown keys, and line endings intact.
+        """
+        if document.note_type is not NoteType.PROJECT or old.scheme is not ReferenceScheme.NOTE:
+            return document
+        old_key = ReferenceKey.from_reference(old)
+        raw = dict(document.raw)
+        changed = False
+        for key in ("owner", "asked_by"):
+            value = raw.get(key)
+            if isinstance(value, str) and VaultNaming._metadata_name_matches(value, old_key):
+                raw[key] = new.name
+                changed = True
+        body = document.body
+        step_document = afanes.core.steps.StepDocument(body)
+        for step in step_document.steps:
+            owners = tuple(
+                new.name if VaultNaming._metadata_name_matches(owner, old_key) else owner for owner in step.owners
+            )
+            if owners == step.owners:
+                continue
+            body = afanes.core.steps.StepDocument(body).with_owners(step, owners)
+            changed = True
+        if not changed:
+            return document
+        return document.with_metadata(raw).with_body(body)
+
+    @staticmethod
+    def _metadata_name_matches(name: str, old_key: ReferenceKey) -> bool:
+        """Return whether a written role name matches the renamed reference."""
+        key = ReferenceKey.from_reference(NoteReference(scheme=ReferenceScheme.NOTE, name=name))
+        return key == old_key
 
     @staticmethod
     def _verify_rewrite(
@@ -768,7 +833,15 @@ class VaultNaming:
         """Confirm that a rewritten note no longer names the old reference."""
         document = NoteDocument.from_text(text)
         old_key = ReferenceKey.from_reference(old)
-        remaining = reader.extract(document.body)
+        remaining = list(reader.extract(document.body))
+        if document.note_type is NoteType.PROJECT:
+            remaining.extend(
+                NoteReference(scheme=ReferenceScheme.NOTE, name=value)
+                for value in (document.owner, document.asked_by)
+                if value is not None
+            )
+            for step in afanes.core.steps.StepDocument(document.body).steps:
+                remaining.extend(NoteReference(scheme=ReferenceScheme.NOTE, name=owner) for owner in step.owners)
         if any(ReferenceKey.from_reference(reference) == old_key for reference in remaining):
             message = "Rewritten note still contains the old reference"
             raise ReferenceRewriteError(message)

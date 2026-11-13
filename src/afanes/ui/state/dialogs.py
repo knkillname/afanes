@@ -231,7 +231,7 @@ class PageDialogState:
         async with self.command_lock:
             await self._mutate_labels(lambda labels: labels.with_due_date_text(text))
 
-    async def set_page_asked_by(self, text: str) -> None:
+    async def set_page_asked_by(self, text: str, *, save: bool = False) -> bool:
         """Change the draft requester field text.
 
         Parameters
@@ -239,9 +239,27 @@ class PageDialogState:
         text : str
             Text exactly as typed. It is trimmed and written when the draft is
             saved.
+        save : bool
+            Write the draft immediately and refresh the scan. Read-mode actions
+            use this; edit-mode typing keeps the draft unsaved.
+
+        Returns
+        -------
+        bool
+            ``True`` when the label was applied and, when requested, written.
         """
         async with self.command_lock:
-            await self._mutate_labels(lambda labels: labels.with_asked_by_text(text))
+            previous = self.pages.page
+            changed = await self._mutate_labels(lambda labels: labels.with_asked_by_text(text))
+            if not changed or not save:
+                return changed
+            if self.pages.page is None or not self.pages.page.is_dirty:
+                return True
+        if not await self.pages.autosave(force=True):
+            self.pages.page = previous
+            return False
+        await self.session.refresh_snapshot()
+        return True
 
     async def save_page_date(self, text: str) -> bool:
         """Set or clear the note date from the page.

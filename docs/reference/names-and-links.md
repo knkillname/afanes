@@ -44,15 +44,23 @@ The draft starts with the reference name as its level-1 heading and is written o
 text or change a label. The filename is the sanitized reference name, used exactly. A collision stops
 the first save instead of adding a suffix.
 
+A project's `owner` and `asked_by` names and every step owner name behave as links too, even though
+they are plain text in the file. A resolved name opens its page and an ambiguous name shows the
+candidate picker. A missing name is styled as a broken link; selecting it asks for a category, which
+defaults to `person` and offers existing and template card categories, then creates the note from the
+matching template card and opens it in edit mode. Cancelling writes nothing.
+
 ## 🧹 Renames, trash, and unresolved links
 
 A rename updates the first heading only when it still matches the old identity; a custom heading is
-preserved. Moving a note to `trash/` makes its inbound references unresolved without rewriting the
-referring notes. Moving the note back restores them.
+preserved. Renaming a note also rewrites every resolving body reference and every metadata role name
+that uses it: a project's `owner` and `asked_by` values and a step's `owners`. Moving a note to
+`trash/` makes its inbound references unresolved without rewriting the referring notes, including role
+names. Moving the note back restores them.
 
 If a reference name was unsafe as a filename, the first save offers to rewrite the references that still
-use it. If the safe name already belongs to a page in the same scheme, that page opens instead of
-creating a duplicate.
+use it, including role names. If the safe name already belongs to a page in the same scheme, that page
+opens instead of creating a duplicate.
 
 ## ↩️ Connections use the same resolution
 
@@ -60,11 +68,12 @@ The **Connections** section of a page is the inbound direction of the same name 
 under **Linked from** only when its body reference resolves to exactly one page. A missing or ambiguous
 reference is attributed to no page, and notes under `trash/` never contribute.
 
-Step owners and a project's `asked_by` value resolve in the `note:` namespace, so any note with a
-matching name can own steps or request work; the note does not need a person category. An `asked_by`
-value that matches no note stays plain text on the project and appears in no Connections section. A
-project appears under **Requested projects** once, and an owner can own several steps in the same
-project.
+Step owners and a project's `owner` and `asked_by` values resolve in the `note:` namespace, so any note
+with a matching name can own steps, own a project, or request work; the note does not need a person
+category. A role name that matches no note stays in the file and appears in no Connections section; in
+the page it is shown as a broken link that can create the missing note. A project appears under
+**Owned projects** once, under **Requested projects** once, and an owner can own several steps in the
+same project.
 
 Connections are derived from the scan and are not stored. Nothing in the vault records a backlink,
 and reading or toggling the section writes no file. See [Pages and editing](../guide/pages-and-editing.md)

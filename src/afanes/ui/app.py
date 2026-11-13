@@ -17,8 +17,11 @@ import afanes.ui.theme
 import afanes.ui.views.inbox
 import afanes.ui.views.workspace
 from afanes.core.template_cards import TemplateCardListing
+from afanes.models.link import ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType
 from afanes.ui.components.panel import Panel
+from afanes.ui.components.role_name import RoleNameDialog
+from afanes.ui.components.role_reference import RoleReferenceDialog
 from afanes.ui.components.template_cards import TemplateCardContext, TemplateCardPicker
 
 # Public task name so the shell can be observed without exposing its fields.
@@ -146,6 +149,11 @@ class _Shell:
             if await self.state.workspace.refresh_workspace() and self.workspace is not None:
                 self.workspace.refresh()
 
+    def _refresh_current_workspace(self) -> None:
+        """Refresh the retained workspace after a dialog command."""
+        if self.workspace is not None:
+            self.workspace.refresh()
+
     async def render(self) -> None:
         """Render the welcome state or the workspace for the current session."""
         await self._stop_refresh_loop()
@@ -177,6 +185,8 @@ class _Shell:
                 on_new_reference=self.show_new_reference_dialog,
                 pick_date=self.pick_date,
                 on_log_entry=self.show_log_entry_dialog,
+                on_missing_role=self.show_role_reference_dialog,
+                pick_role=self.pick_role,
             )
             self.workspace = workspace
             digest = self._due_digest()
@@ -573,7 +583,8 @@ class _Shell:
                 self._show_create_error(error, self.state.status.message or afanes.ui.strings.BROWSER_NAME_REQUIRED)
                 return
             self.page.pop_dialog()
-            await self.render()
+            self.page.update()
+            self._refresh_current_workspace()
 
         async def cancel() -> None:
             self.page.pop_dialog()
@@ -609,6 +620,90 @@ class _Shell:
             ),
         )
         self.page.update()
+
+    async def show_role_reference_dialog(self, name: str) -> None:
+        """Ask where to file a reference created from a missing role name.
+
+        Parameters
+        ----------
+        name : str
+            Written owner, requester, or step owner name.
+
+        Notes
+        -----
+        Existing reference categories are offered as suggestions, and a free
+        typed label or no category is accepted. Confirming creates the note
+        atomically through the navigation command and opens it in edit mode.
+        Cancelling writes nothing.
+        """
+
+        async def confirm(category: CategoryLabel | None) -> None:
+            if not await self.state.navigation.create_role_reference(name, category):
+                return
+            self.page.pop_dialog()
+            self.page.update()
+            self._refresh_current_workspace()
+
+        async def cancel() -> None:
+            self.page.pop_dialog()
+            self.page.update()
+
+        ordered = await self.state.browser.role_categories()
+        dialog = RoleReferenceDialog(name, ordered, confirm, cancel)
+        self.page.show_dialog(dialog.dialog)
+        self.page.update()
+
+    async def pick_role(self, role: str, current: str | None) -> str | None:
+        """Ask for an owner or requester name from read mode.
+
+        Parameters
+        ----------
+        role : str
+            ``owner`` or ``asked_by``; selects the dialog title.
+        current : str | None
+            Current written name, or ``None`` when the role is empty.
+
+        Returns
+        -------
+        str | None
+            Selected or typed name, an empty string when the role is cleared,
+            or ``None`` when the dialog was cancelled.
+
+        Notes
+        -----
+        The dialog offers every note name in the ``note:`` namespace as a
+        suggestion and accepts a new name. It writes nothing itself; the page
+        view saves the returned value.
+        """
+        loop = asyncio.get_running_loop()
+        result: asyncio.Future[str | None] = loop.create_future()
+
+        def settle(value: str | None) -> None:
+            if not result.done():
+                result.set_result(value)
+
+        async def save(text: str) -> None:
+            settle(text)
+
+        async def cancel() -> None:
+            settle(None)
+
+        async def dismiss(_event: object = None) -> None:
+            settle(None)
+
+        names = [note.name for note in self.state.session.assignment_candidates(ReferenceScheme.NOTE, "")]
+        title = (
+            afanes.ui.strings.ROLE_NAME_OWNER_TITLE if role == "owner" else afanes.ui.strings.ROLE_NAME_ASKED_BY_TITLE
+        )
+        dialog = RoleNameDialog(title, current, names, save, cancel)
+        dialog.dialog.on_dismiss = dismiss
+        self.page.show_dialog(dialog.dialog)
+        self.page.update()
+        try:
+            return await result
+        finally:
+            self.page.pop_dialog()
+            self.page.update()
 
     async def show_log_entry_dialog(self, date: NoteDate) -> None:
         """Open or create the log entry for one date.
@@ -663,7 +758,8 @@ class _Shell:
                 )
                 return
             self.page.pop_dialog()
-            await self.render()
+            self.page.update()
+            self._refresh_current_workspace()
 
         async def cancel() -> None:
             self.page.pop_dialog()

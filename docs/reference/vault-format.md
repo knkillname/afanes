@@ -46,12 +46,14 @@ The recognized keys are:
 | `category` | references only | any non-empty single folder label; case is preserved |
 | `status` | projects and references | projects: `active`, `waiting`, `done`, `cancelled`, `archived`, `later`; references: `later`, `archived`, or absent |
 | `due_date` | projects only | a calendar date written as `YYYY-MM-DD` |
-| `asked_by` | projects only | a single non-empty name; plain text, not a reference |
+| `asked_by` | projects only | a single non-empty name; a metadata reference |
+| `owner` | projects only | a single non-empty name or team; a metadata reference |
 
 Unknown keys are preserved. A capture has no status; `status: inbox` is not valid because the folder is
-the queue. A due date is a date, not a timestamp. `asked_by` records who requested the project and is
-shown in the project meta row; it does not resolve or navigate. See [Frontmatter](frontmatter.md) for
-the full key reference.
+the queue. A due date is a date, not a timestamp. `asked_by` records who requested the project and
+`owner` records who is accountable for it. Both are shown in the project meta row and resolve through
+the `note:` catalog, so their pages list the project and rename rewrites the value. See
+[Frontmatter](frontmatter.md) for the full key reference.
 
 A note's `date` is an ISO calendar value: `YYYY`, `YYYY-MM`, or `YYYY-MM-DD`. It places the note in
 the archive and the Log section and is independent of a project's `due_date`. A malformed date keeps
@@ -64,6 +66,7 @@ status: active
 date: 2025-10-12
 due_date: 2026-11-30
 asked_by: Priya Nair
+owner: Sam Rivera
 ---
 
 # Release migration checklist
@@ -153,7 +156,7 @@ log/2025/10/2025-10-12.md           # one day
 
 Only one log entry may exist for each exact date. The entry's first level-1 heading is its display
 title and is not part of its identity. Link to it with `[Tuesday](<log:2025-10-12>)`. A log entry has
-no `category`, `status`, `due_date`, or `asked_by`.
+no `category`, `status`, `due_date`, `asked_by`, or `owner`.
 
 Changing a log entry's date renames and moves it and rewrites inbound `log:` links automatically. A
 note that changes type into or out of `log` is moved and renamed the same way; a note without a date

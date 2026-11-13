@@ -23,7 +23,7 @@ from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.models.link import NoteReference
 from afanes.models.note import NoteType
-from afanes.models.step import ProjectStep, StepEdit, StepEditKind
+from afanes.models.step import StepEdit, StepEditKind
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.session import VaultSession
 from afanes.ui.state.status import UiStatus
@@ -176,23 +176,6 @@ class PageEditorState:
             page is in raw rescue mode.
         """
         return None if self.page is None else self.page.labels
-
-    @property
-    def page_steps(self) -> tuple[ProjectStep, ...]:
-        """Return the current page's project steps.
-
-        Returns
-        -------
-        tuple[ProjectStep, ...]
-            Steps from the latest scan for the open project, or an empty tuple
-            for a non-project or unopened page.
-        """
-        page = self.page
-        snapshot = self.session.snapshot
-        if page is None or page.path is None or snapshot is None:
-            return ()
-        note = next((value for value in snapshot.notes if value.path == page.path), None)
-        return () if note is None else note.steps
 
     @property
     def page_body_blocks(self) -> tuple[afanes.core.project_body.BodyBlock, ...]:
@@ -359,6 +342,44 @@ class PageEditorState:
             page = self.page
             if isinstance(page, NormalDraft):
                 self.page = page.with_body(body)
+
+    async def set_page_owner(self, text: str, *, save: bool = False) -> bool:
+        """Change the draft project-owner field text.
+
+        Parameters
+        ----------
+        text : str
+            Text exactly as typed. It is trimmed and written when the draft is
+            saved.
+        save : bool
+            Write the draft immediately and refresh the scan. Read-mode actions
+            use this; edit-mode typing keeps the draft unsaved.
+
+        Returns
+        -------
+        bool
+            ``True`` when the label was applied and, when requested, written.
+
+        Notes
+        -----
+        The owner is a project-only label. Calling this for another note type
+        leaves the labels blank, and ``PageLabels.apply_to`` owns the actual
+        frontmatter write.
+        """
+        async with self.command_lock:
+            page = self.page
+            if not isinstance(page, NormalDraft):
+                return False
+            previous = page
+            self.page = page.with_labels(page.labels.with_owner_text(text))
+            self.status.clear_message()
+            if not save or not self.page.is_dirty:
+                return True
+        if not await self.autosave(force=True):
+            self.page = previous
+            return False
+        await self.session.refresh_snapshot()
+        return True
 
     async def toggle_page_step(self, line_index: int, *, checked: bool) -> bool:
         """Check or reopen one step of the open project page.

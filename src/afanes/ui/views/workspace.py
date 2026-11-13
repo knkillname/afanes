@@ -10,7 +10,6 @@ the Processing Wizard, or a guided review.
 """
 
 import asyncio
-import dataclasses
 import datetime
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -20,6 +19,7 @@ import flet as ft
 import afanes.core.log
 import afanes.core.search
 import afanes.ui.components.calendar
+import afanes.ui.components.frozen
 import afanes.ui.components.log_tree
 import afanes.ui.state
 import afanes.ui.strings
@@ -31,6 +31,7 @@ import afanes.ui.views.review
 from afanes.core.vault.snapshot import VaultFailure, VaultNote
 from afanes.models.note import DatePrecision, NoteDate
 from afanes.ui.components.banner import Banner
+from afanes.ui.components.frozen import FrozenControlRecovery
 
 _MONTHS_IN_YEAR = 12
 
@@ -81,6 +82,8 @@ class WorkspaceView:
         on_new_reference: Callable[[], Awaitable[None]] | None = None,
         pick_date: afanes.ui.views.page.PickDate | None = None,
         on_log_entry: Callable[[NoteDate], Awaitable[None]] | None = None,
+        on_missing_role: Callable[[str], Awaitable[None]] | None = None,
+        pick_role: afanes.ui.views.page.PickRole | None = None,
     ) -> None:
         """Build the workspace controls against the shared application state.
 
@@ -101,6 +104,11 @@ class WorkspaceView:
             Command that opens the date picker for step and project dates.
         on_log_entry : Callable[[NoteDate], Awaitable[None]] | None
             Command that opens or creates a log entry for a date.
+        on_missing_role : Callable[[str], Awaitable[None]] | None
+            Command that asks for a category before creating a missing role
+            reference.
+        pick_role : afanes.ui.views.page.PickRole | None
+            Command that asks for an owner or requester name in read mode.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
@@ -110,6 +118,8 @@ class WorkspaceView:
         self._on_new_reference = on_new_reference
         self._on_log_entry = on_log_entry
         self._pick_date = pick_date
+        self._on_missing_role = on_missing_role
+        self._pick_role = pick_role
         self.log_calendar: afanes.ui.components.calendar.LogCalendar | None = None
         self.log_tree: afanes.ui.components.log_tree.LogTree | None = None
         self.log_today_button: ft.FilledButton | None = None
@@ -254,6 +264,8 @@ class WorkspaceView:
             self._on_page_update,
             self._process_note,
             self._pick_date,
+            self._on_missing_role,
+            self._pick_role,
         )
         self.main_host = ft.Container(expand=True)
         self.status_bar = ft.Container(
@@ -455,40 +467,10 @@ class WorkspaceView:
         Flet 1.1.x can mark an imperative control as immutable while reconciling
         a keyed update. Every control under :attr:`root` belongs to this view, so
         a marker on one of them is stale and makes the next assignment raise.
-        The walk reads control metadata only and never reads or writes the vault.
+        The shared recovery helper reads control metadata only and never reads or
+        writes the vault.
         """
-        self._clear_frozen(self.root, set())
-
-    def _clear_frozen(self, control: ft.Control, visited: set[int]) -> None:
-        """Clear freeze markers on one control and its descendants."""
-        if id(control) in visited:
-            return
-        visited.add(id(control))
-        if hasattr(control, "_frozen"):
-            object.__delattr__(control, "_frozen")
-        for child in self._control_children(control):
-            self._clear_frozen(child, visited)
-
-    @staticmethod
-    def _control_children(control: ft.Control) -> list[ft.Control]:
-        """Return the direct controls held by one control's fields."""
-        if not dataclasses.is_dataclass(control):
-            return []
-        children: list[ft.Control] = []
-        for field in dataclasses.fields(control):
-            children.extend(WorkspaceView._controls_in(getattr(control, field.name, None)))
-        return children
-
-    @staticmethod
-    def _controls_in(value: object) -> list[ft.Control]:
-        """Return the controls held directly in one field value."""
-        if isinstance(value, ft.Control):
-            return [value]
-        if isinstance(value, (list, tuple)):
-            return [item for item in value if isinstance(item, ft.Control)]
-        if isinstance(value, dict):
-            return [item for item in value.values() if isinstance(item, ft.Control)]
-        return []
+        FrozenControlRecovery.clear(self.root)
 
     def _set_section_tiles_disabled(self, *, disabled: bool) -> None:
         """Enable or disable the section entries during a command."""

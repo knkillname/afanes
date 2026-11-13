@@ -493,6 +493,11 @@ class Vault:
             step_document = afanes.core.steps.StepDocument(document.body)
             steps = step_document.steps
             search_text = step_document.search_text
+        role_names = [name for name in (document.owner, document.asked_by) if name is not None]
+        for step in steps:
+            role_names.extend(step.owners)
+        if role_names:
+            search_text = "\n".join((search_text, *role_names))
         return VaultNote(
             path=note_path.path,
             relative_path=note_path.relative_path,
@@ -509,6 +514,7 @@ class Vault:
             steps=steps,
             search_text=search_text,
             asked_by=document.asked_by,
+            owner=document.owner,
         )
 
     def directory_for(self, note_type: NoteType, category: CategoryLabel | None = None) -> Path:

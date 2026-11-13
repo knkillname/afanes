@@ -141,6 +141,22 @@ class ProcessingView:
             width=260,
             visible=False,
         )
+        self.owner = ft.TextField(
+            label=afanes.ui.strings.PAGE_OWNER_LABEL,
+            hint_text=afanes.ui.strings.PAGE_OWNER_HINT,
+            on_change=self._change_owner_query,
+            width=260,
+            visible=False,
+        )
+        self.asked_by = ft.TextField(
+            label=afanes.ui.strings.PAGE_ASKED_BY_LABEL,
+            hint_text=afanes.ui.strings.PAGE_ASKED_BY_HINT,
+            on_change=self._change_asked_by_query,
+            width=260,
+            visible=False,
+        )
+        self.role_suggestions = ft.Column(controls=[], spacing=0, visible=False)
+        self._role_suggestion_field: str | None = None
         self.project = ft.TextField(
             label=afanes.ui.strings.PROCESSING_PROJECT_LABEL,
             hint_text="Launch",
@@ -188,6 +204,12 @@ class ProcessingView:
                     spacing=afanes.ui.theme.ITEM_GAP,
                     wrap=True,
                 ),
+                ft.Row(
+                    controls=[self.owner, self.asked_by],
+                    spacing=afanes.ui.theme.ITEM_GAP,
+                    wrap=True,
+                ),
+                self.role_suggestions,
                 self.project_suggestions,
                 self.form_error,
                 self.preview_button,
@@ -306,6 +328,57 @@ class ProcessingView:
         self._refresh_dynamic()
         self._update()
 
+    def _change_owner_query(self, _event: object = None) -> None:
+        """Refresh owner suggestions from the typed query."""
+        self._role_suggestion_field = "owner"
+        self._invalidate_plan()
+
+    def _change_asked_by_query(self, _event: object = None) -> None:
+        """Refresh requester suggestions from the typed query."""
+        self._role_suggestion_field = "asked_by"
+        self._invalidate_plan()
+
+    def _refresh_role_suggestions(self, *, visible: bool) -> None:
+        """Fill the role-name suggestion list from the active field."""
+        field = self._role_suggestion_field
+        if not visible or field is None:
+            self.role_suggestions.controls = []
+            self.role_suggestions.visible = False
+            return
+        source = self.owner if field == "owner" else self.asked_by
+        query = (source.value or "").strip()
+        if not query:
+            self.role_suggestions.controls = []
+            self.role_suggestions.visible = False
+            return
+        candidates = self._state.session.assignment_candidates(ReferenceScheme.NOTE, query)
+        self.role_suggestions.controls = [
+            ft.ListTile(
+                title=note.title,
+                subtitle=note.name if note.name != note.title else None,
+                dense=True,
+                on_click=self._role_suggestion_handler(note.name),
+            )
+            for note in candidates
+        ]
+        self.role_suggestions.visible = bool(self.role_suggestions.controls)
+
+    def _role_suggestion_handler(self, name: str) -> Callable[[], None]:
+        """Bind a suggestion tile to the active role field."""
+
+        def handle() -> None:
+            field = self._role_suggestion_field
+            self._role_suggestion_field = None
+            if field == "owner":
+                self.owner.value = name
+            elif field == "asked_by":
+                self.asked_by.value = name
+            self.role_suggestions.controls = []
+            self.role_suggestions.visible = False
+            self._invalidate_plan()
+
+        return handle
+
     def _show_form_error(self, message: str) -> None:
         """Show a local form error without calling the controller."""
         self.form_error.value = message
@@ -321,6 +394,8 @@ class ProcessingView:
 
         status: Status | None = None
         due_date: datetime.date | None = None
+        owner: str | None = None
+        asked_by: str | None = None
         project: str | None = None
         card = (
             self._template_picker.selected_card
@@ -338,6 +413,8 @@ class ProcessingView:
                 except ValueError:
                     self._show_form_error(afanes.ui.strings.PROCESSING_INVALID_DATE)
                     return
+            owner = (self.owner.value or "").strip() or None
+            asked_by = (self.asked_by.value or "").strip() or None
         if outcome is ProcessingOutcome.APPEND_STEP:
             project = (self.project.value or "").strip() or None
 
@@ -348,6 +425,8 @@ class ProcessingView:
                 outcome,
                 status=status,
                 due_date=due_date,
+                owner=owner,
+                asked_by=asked_by,
                 project=project,
                 card=card,
             )
@@ -383,9 +462,14 @@ class ProcessingView:
         self.outcome.disabled = working
         self.status.disabled = working
         self.due_date.disabled = working
+        self.owner.disabled = working
+        self.asked_by.disabled = working
         self.project.disabled = working
         self.template.disabled = working
         for control in self.project_suggestions.controls:
+            if isinstance(control, ft.ListTile):
+                control.disabled = working
+        for control in self.role_suggestions.controls:
             if isinstance(control, ft.ListTile):
                 control.disabled = working
         self.preview_button.disabled = working
@@ -405,14 +489,18 @@ class ProcessingView:
         self.capture_body.value = state.processing.body or ""
 
         outcome = self._selected_outcome()
+        project_outcome = outcome in (ProcessingOutcome.PROJECT, ProcessingOutcome.DONE_NOW)
         self.status.visible = outcome is ProcessingOutcome.PROJECT
         self.due_date.visible = outcome is ProcessingOutcome.PROJECT
         self.project.visible = outcome is ProcessingOutcome.APPEND_STEP
+        self.owner.visible = project_outcome
+        self.asked_by.visible = project_outcome
         reference_outcome = outcome in (ProcessingOutcome.REFERENCE, ProcessingOutcome.LATER)
         self.template.visible = reference_outcome
         self.template_description.visible = reference_outcome
         self.template_warning.visible = reference_outcome and bool(state.processing.card_issues)
         self._refresh_suggestions()
+        self._refresh_role_suggestions(visible=project_outcome)
 
         success = state.processing.result is not None
         self.form.visible = not success
@@ -454,6 +542,10 @@ class ProcessingView:
             details.append(f"Status: {plan.target_status.value}")
         if plan.due_date is not None:
             details.append(f"Due: {plan.due_date.isoformat()}")
+        if plan.owner is not None:
+            details.append(afanes.ui.strings.PROCESSING_PLAN_OWNER.format(name=plan.owner))
+        if plan.asked_by is not None:
+            details.append(afanes.ui.strings.PROCESSING_PLAN_ASKED_BY.format(name=plan.asked_by))
         if plan.category is not None:
             details.append(afanes.ui.strings.PROCESSING_PLAN_CATEGORY.format(category=plan.category.value))
         if plan.scaffold is not None:

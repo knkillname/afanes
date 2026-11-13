@@ -114,6 +114,8 @@ class PageLabels:
         Due-date field text exactly as shown in the editor.
     asked_by_text : str
         Requester field text exactly as shown in the editor.
+    owner_text : str
+        Project-owner field text exactly as shown in the editor.
     date_text : str
         Note-date field text exactly as shown in the editor.
     """
@@ -123,6 +125,7 @@ class PageLabels:
     status: Status | None = None
     due_date_text: str = ""
     asked_by_text: str = ""
+    owner_text: str = ""
     date_text: str = ""
 
     @classmethod
@@ -138,7 +141,7 @@ class PageLabels:
         -------
         PageLabels
             Labels populated from the document's type, category, status, due
-            date, and requester.
+            date, requester, and owner.
 
         Raises
         ------
@@ -155,6 +158,7 @@ class PageLabels:
             status=document.status,
             due_date_text=DueDateText.from_raw(due_date).text,
             asked_by_text=document.asked_by or "",
+            owner_text=document.owner or "",
             date_text=PageLabels._date_text(document.raw.get("date")),
         )
 
@@ -263,7 +267,8 @@ class PageLabels:
         NoteDocument
             New document with the editable labels applied and revalidated.
             Existing keys keep their positions and new keys append in the
-            documented order: type, date, category, status, due_date, asked_by.
+            documented order: type, date, category, status, due_date, asked_by,
+            owner.
 
         Raises
         ------
@@ -277,8 +282,8 @@ class PageLabels:
         Validation and serialization stay in ``NoteDocument``. A malformed
         non-blank note date already present in the document is left untouched
         so it can be corrected later; a blank date removes the key. Category,
-        status, due date, and requester are removed when the note type does not
-        allow them.
+        status, due date, requester, and owner are removed when the note type
+        does not allow them.
         """
         raw = dict(document.raw)
         raw["type"] = self.note_type.value
@@ -301,6 +306,11 @@ class PageLabels:
             raw["asked_by"] = asked_by
         else:
             raw.pop("asked_by", None)
+        owner = self.owner_text.strip()
+        if self.note_type is NoteType.PROJECT and owner:
+            raw["owner"] = owner
+        else:
+            raw.pop("owner", None)
         return document.with_metadata(raw)
 
     def _apply_date(self, raw: dict[str, object]) -> None:
@@ -329,13 +339,14 @@ class PageLabels:
         Returns
         -------
         PageLabels
-            New labels. Category is kept only for references, due-date and
-            requester text are kept only for projects, and a status the new
-            type does not allow is cleared.
+            New labels. Category is kept only for references, due-date,
+            requester, and owner text are kept only for projects, and a status
+            the new type does not allow is cleared.
         """
         category = self.category if note_type is NoteType.REFERENCE else None
         due_date_text = self.due_date_text if note_type is NoteType.PROJECT else ""
         asked_by_text = self.asked_by_text if note_type is NoteType.PROJECT else ""
+        owner_text = self.owner_text if note_type is NoteType.PROJECT else ""
         status = self.status if self.status in note_type.allowed_statuses else None
         return dataclasses.replace(
             self,
@@ -344,6 +355,7 @@ class PageLabels:
             status=status,
             due_date_text=due_date_text,
             asked_by_text=asked_by_text,
+            owner_text=owner_text,
         )
 
     def with_category(self, category: CategoryLabel | None) -> Self:
@@ -421,6 +433,24 @@ class PageLabels:
         if self.note_type is not NoteType.PROJECT:
             return dataclasses.replace(self, asked_by_text="")
         return dataclasses.replace(self, asked_by_text=text)
+
+    def with_owner_text(self, text: str) -> Self:
+        """Return labels with new project-owner field text.
+
+        Parameters
+        ----------
+        text : str
+            Text exactly as typed. It is trimmed when the draft is saved.
+
+        Returns
+        -------
+        PageLabels
+            New labels carrying the text, or blank labels for a non-project
+            note.
+        """
+        if self.note_type is not NoteType.PROJECT:
+            return dataclasses.replace(self, owner_text="")
+        return dataclasses.replace(self, owner_text=text)
 
     def with_date_text(self, text: str) -> Self:
         """Return labels with new note-date field text.

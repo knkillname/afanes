@@ -146,6 +146,8 @@ class ProcessingState:
         *,
         status: Status | None = None,
         due_date: datetime.date | None = None,
+        owner: str | None = None,
+        asked_by: str | None = None,
         project: str | None = None,
         card: TemplateCard | None = None,
     ) -> ProcessingPlan | AppendStepPlan | None:
@@ -159,6 +161,10 @@ class ProcessingState:
             Requested target status, when the outcome accepts one.
         due_date : datetime.date | None
             Optional calendar due date for a new project.
+        owner : str | None
+            Optional project-owner name for Project or Done now.
+        asked_by : str | None
+            Optional requester name for Project or Done now.
         project : str | None
             Target project identity for Append step.
         card : TemplateCard | None
@@ -190,6 +196,8 @@ class ProcessingState:
                         outcome,
                         status=status,
                         due_date=due_date,
+                        owner=owner,
+                        asked_by=asked_by,
                         project=project,
                         card=card,
                     )

@@ -15,6 +15,7 @@ def _write_note(
     category: str | None = None,
     status: str | None = None,
     asked_by: str | None = None,
+    owner: str | None = None,
 ) -> Path:
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -25,6 +26,8 @@ def _write_note(
         lines.append(f"status: {status}")
     if asked_by is not None:
         lines.append(f"asked_by: {asked_by}")
+    if owner is not None:
+        lines.append(f"owner: {owner}")
     lines.extend(["---", "", body])
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
@@ -44,6 +47,8 @@ class TestConnectionsService:
         assert connections.has_connections is False
         assert connections.linked_from == ()
         assert connections.owned_projects == ()
+        assert connections.project_owner_projects == ()
+        assert connections.finished_project_owner_projects == ()
         assert connections.requested_projects == ()
         assert connections.finished_projects == ()
 
@@ -281,6 +286,89 @@ class TestOwnedSteps:
         connections = _connections(root).for_note(team)
 
         assert connections.owned_projects[0].project.title == "Home"
+
+
+class TestOwnedProjects:
+    def test_lists_a_project_whose_owner_matches(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        _write_note(root, "projects/Home.md", "project", "# Home\n", owner="Ada")
+
+        connections = _connections(root).for_note(ada)
+
+        assert [note.title for note in connections.project_owner_projects] == ["Home"]
+        assert connections.finished_project_owner_projects == ()
+
+    def test_splits_finished_projects_from_open_ones(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        _write_note(root, "projects/Open.md", "project", "# Open\n", owner="Ada")
+        _write_note(root, "projects/Done.md", "project", "# Done\n", owner="Ada", status="done")
+
+        connections = _connections(root).for_note(ada)
+
+        assert [note.title for note in connections.project_owner_projects] == ["Open"]
+        assert [note.title for note in connections.finished_project_owner_projects] == ["Done"]
+
+    def test_a_missing_owner_contributes_nothing(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        _write_note(root, "projects/Home.md", "project", "# Home\n", owner="Finance team")
+
+        connections = _connections(root).for_note(ada)
+
+        assert connections.project_owner_projects == ()
+        assert connections.finished_project_owner_projects == ()
+
+    def test_an_ambiguous_owner_contributes_nothing(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        _write_note(root, "reference/Archive/Ada.md", "reference", "# Ada\n")
+        _write_note(root, "projects/Home.md", "project", "# Home\n", owner="Ada")
+
+        connections = _connections(root).for_note(ada)
+
+        assert connections.project_owner_projects == ()
+        assert connections.finished_project_owner_projects == ()
+
+    def test_owned_projects_are_ordered_by_title(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        _write_note(root, "projects/Zeta.md", "project", "# Zeta\n", owner="Ada")
+        _write_note(root, "projects/Alpha.md", "project", "# Alpha\n", owner="Ada")
+
+        connections = _connections(root).for_note(ada)
+
+        assert [note.title for note in connections.project_owner_projects] == ["Alpha", "Zeta"]
+
+    def test_an_owned_project_shows_the_section(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        _write_note(root, "projects/Home.md", "project", "# Home\n", owner="Ada")
+
+        connections = _connections(root).for_note(ada)
+
+        assert connections.has_connections is True
+
+    def test_project_ownership_and_step_ownership_are_distinct(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        ada = _write_note(root, "reference/Ada.md", "reference", "# Ada\n")
+        grace = _write_note(root, "reference/Grace.md", "reference", "# Grace\n")
+        _write_note(
+            root,
+            "projects/Home.md",
+            "project",
+            "# Home\n\n- [ ] Call <!-- {owners: [Grace]} -->\n",
+            owner="Ada",
+        )
+
+        owner_connections = _connections(root).for_note(ada)
+        step_connections = _connections(root).for_note(grace)
+
+        assert [note.title for note in owner_connections.project_owner_projects] == ["Home"]
+        assert owner_connections.owned_projects == ()
+        assert [project.project.title for project in step_connections.owned_projects] == ["Home"]
+        assert step_connections.project_owner_projects == ()
 
 
 class TestRequestedProjects:

@@ -66,6 +66,7 @@ class TestNoteOrder:
             steps=(),
             search_text="",
             asked_by=None,
+            owner=None,
         )
 
     def test_dated_notes_sort_before_undated_notes(self) -> None:
@@ -211,6 +212,43 @@ class TestReferrers:
         snapshot = afanes.core.vault.service.Vault(root).scan()
 
         assert snapshot.referrers(first) == ()
+
+
+class TestMetadataReferences:
+    def test_orders_owner_requester_and_step_owners(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        path = root / "projects/Home.md"
+        path.parent.mkdir(parents=True)
+        path.write_text(
+            "---\ntype: project\nowner: Sam Rivera\nasked_by: Priya Nair\n---\n\n"
+            "# Home\n\n"
+            "- [ ] Call <!-- {owners: [Ada, Grace]} -->\n"
+            "- [ ] Write <!-- {owners: [Ada]} -->\n",
+            encoding="utf-8",
+        )
+        note = afanes.core.vault.service.Vault(root).scan().notes[0]
+
+        assert note.metadata_references == (
+            NoteReference(ReferenceScheme.NOTE, "Sam Rivera"),
+            NoteReference(ReferenceScheme.NOTE, "Priya Nair"),
+            NoteReference(ReferenceScheme.NOTE, "Ada"),
+            NoteReference(ReferenceScheme.NOTE, "Grace"),
+            NoteReference(ReferenceScheme.NOTE, "Ada"),
+        )
+
+    def test_project_without_roles_has_no_metadata_references(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "projects/Home.md", note_type="project", body="# Home\n")
+        note = afanes.core.vault.service.Vault(root).scan().notes[0]
+
+        assert note.metadata_references == ()
+
+    def test_non_project_has_no_metadata_references(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "notes/Home.md", body="# Home\n")
+        note = afanes.core.vault.service.Vault(root).scan().notes[0]
+
+        assert note.metadata_references == ()
 
 
 class TestInboxNotes:

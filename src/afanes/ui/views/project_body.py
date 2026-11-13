@@ -14,12 +14,13 @@ from collections.abc import Awaitable, Callable
 
 import flet as ft
 
+import afanes.core.vault.snapshot
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.editing import DraftMode
 from afanes.core.project_body import ProseBlock, StepEntry, StepListBlock
-from afanes.models.link import ReferenceScheme
+from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteType
 from afanes.models.step import ProjectStep, StepEdit, StepEditKind
 from afanes.ui.components.step_text import StepText
@@ -46,6 +47,7 @@ class ProjectBodyView:
         update: Callable[[], None],
         on_follow_link: Callable[[str], Awaitable[None]],
         pick_date: PickDate | None = None,
+        on_follow_role: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         """Build the project body controls against the shared application state.
 
@@ -57,10 +59,14 @@ class ProjectBodyView:
             Command that resolves one link destination.
         pick_date : PickDate | None
             Command that opens the date picker.
+        on_follow_role : Callable[[str], Awaitable[None]] | None
+            Command that opens or creates the page for a role name, or ``None``
+            when role navigation is unavailable.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
         self._on_follow_link = on_follow_link
+        self._on_follow_role = on_follow_role
         self._pick_date = pick_date
         self._owner_panel: int | None = None
         self._owner_query = ""
@@ -242,7 +248,7 @@ class ProjectBodyView:
         """Build the structured metadata labels for one step."""
         details: list[ft.Control] = []
         if step.owners:
-            details.append(self._detail(afanes.ui.strings.PAGE_STEP_OWNERS.format(owners=", ".join(step.owners))))
+            details.append(self._owner_detail(step))
         if step.plan is not None:
             details.append(self._detail(afanes.ui.strings.PAGE_STEP_PLAN.format(date=step.plan.isoformat())))
         if step.actual is not None:
@@ -250,6 +256,57 @@ class ProjectBodyView:
         if step.tags:
             details.append(self._detail(afanes.ui.strings.PAGE_STEP_TAGS.format(tags=", ".join(step.tags))))
         return details
+
+    def _owner_detail(self, step: ProjectStep) -> ft.Control:
+        """Render the step owners as individually clickable names."""
+        spans: list[ft.TextSpan] = [ft.TextSpan(afanes.ui.strings.PAGE_STEP_OWNERS_LABEL)]
+        for index, owner in enumerate(step.owners):
+            if index:
+                spans.append(ft.TextSpan(", "))
+            spans.append(self._role_span(owner))
+        return ft.Text(spans=spans, size=12, color=afanes.ui.theme.STEP_TEXT_COLOR)
+
+    def _role_span(self, name: str) -> ft.TextSpan:
+        """Build one link-styled span for a step owner name."""
+        return ft.TextSpan(
+            name,
+            style=self._role_label_style(name),
+            tooltip=self._role_tooltip(name),
+            on_click=self._role_handler(name),
+        )
+
+    def _role_outcome(self, name: str) -> afanes.core.vault.snapshot.LinkOutcome:
+        """Return how a written role name resolves in the current scan."""
+        snapshot = self._state.session.snapshot
+        if snapshot is None:
+            return afanes.core.vault.snapshot.LinkOutcome.MISSING
+        reference = NoteReference(scheme=ReferenceScheme.NOTE, name=name)
+        return snapshot.link_target(reference).outcome
+
+    def _role_handler(self, name: str) -> Callable[[], Awaitable[None]]:
+        """Bind a role name to its navigation command."""
+
+        async def handle() -> None:
+            if self._on_follow_role is not None:
+                await self._on_follow_role(name)
+
+        return handle
+
+    def _role_label_style(self, name: str) -> ft.TextStyle:
+        """Return the link or broken-link style for one role name."""
+        outcome = self._role_outcome(name)
+        if outcome in (afanes.core.vault.snapshot.LinkOutcome.MISSING, afanes.core.vault.snapshot.LinkOutcome.BROKEN):
+            return afanes.ui.theme.ROLE_BROKEN_TEXT_STYLE
+        return afanes.ui.theme.ROLE_LINK_TEXT_STYLE
+
+    def _role_tooltip(self, name: str) -> str | None:
+        """Return the hover explanation for one role name."""
+        outcome = self._role_outcome(name)
+        if outcome in (afanes.core.vault.snapshot.LinkOutcome.MISSING, afanes.core.vault.snapshot.LinkOutcome.BROKEN):
+            return afanes.ui.strings.ROLE_LINK_MISSING
+        if outcome is afanes.core.vault.snapshot.LinkOutcome.AMBIGUOUS:
+            return afanes.ui.strings.ROLE_LINK_AMBIGUOUS
+        return None
 
     @staticmethod
     def _detail(text: str) -> ft.Control:
@@ -334,6 +391,9 @@ class ProjectBodyView:
         chips: list[ft.Control] = [
             ft.Chip(
                 label=owner,
+                label_text_style=self._role_label_style(owner),
+                tooltip=self._role_tooltip(owner),
+                on_click=self._role_handler(owner),
                 delete_icon_tooltip=afanes.ui.strings.PAGE_STEP_OWNER_REMOVE.format(owner=owner),
                 on_delete=self._remove_owner_handler(step, owner),
             )

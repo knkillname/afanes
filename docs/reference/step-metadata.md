@@ -28,8 +28,9 @@ comment makes it prose. Every key is optional, and a comment without a mapping i
 | `actual` | Day it was completed, as `YYYY-MM-DD`; written by ticking |
 | `tags` | Free-form labels used only to filter steps |
 
-Step owners resolve through the same catalog as `note:` references. Owners are step-level; a project
-does not gain an owners field.
+Step owners resolve through the same catalog as `note:` references. They are metadata references:
+renaming the named note rewrites the step, and trashing it leaves the name in place as unresolved.
+Owners are step-level. A project has its own single `owner` key, not an `owners` field.
 
 ## ✅ Ticking a step
 

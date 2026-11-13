@@ -6,8 +6,8 @@ Afanes uses to classify the note; the rest of the file is ordinary Markdown.
 :::{admonition} tl;dr
 :class: note
 
-Only the recognized keys are `type`, `date`, `category`, `status`, `due_date`, and `asked_by`.
-Unknown keys are preserved, and a missing status means the default for that note type.
+Only the recognized keys are `type`, `date`, `category`, `status`, `due_date`, `asked_by`, and
+`owner`. Unknown keys are preserved, and a missing status means the default for that note type.
 :::
 
 ## 🧾 Keys
@@ -19,7 +19,8 @@ Unknown keys are preserved, and a missing status means the default for that note
 | `category` | references only | any non-empty single folder label; case is preserved |
 | `status` | projects and references | projects: `active`, `waiting`, `done`, `cancelled`, `archived`, `later`; references: `later`, `archived`, or absent |
 | `due_date` | projects only | a calendar date written as `YYYY-MM-DD` |
-| `asked_by` | projects only | a single non-empty name, shown as plain text |
+| `asked_by` | projects only | a single non-empty name, treated as a metadata reference |
+| `owner` | projects only | a single non-empty name or team, treated as a metadata reference |
 
 Unknown keys are preserved when Afanes rewrites a note. A due date is a date, not a timestamp.
 
@@ -37,7 +38,7 @@ A capture has no status; `status: inbox` is not valid because the folder is the 
 
 A log entry is a dated page. Its `date` is also its identity: `2025.md`, `2025-10.md`, or
 `2025-10-12.md`, filed under `log/<year>/` or `log/<year>/<month>/`. Only one log entry may exist for
-each exact date. A log entry has no category, status, due date, or requester. Link to it with
+each exact date. A log entry has no category, status, due date, requester, or owner. Link to it with
 `<log:2025-10-12>`. Changing its date renames and moves it and rewrites inbound `log:` links; the
 heading stays as written.
 
@@ -77,9 +78,20 @@ the project having a due date.
 ## 🙋 Asked by
 
 `asked_by` is valid only on projects. It records the person or group that requested the project and is
-shown in the project meta row. The value is one plain name; it is not a reference, does not become a
-link, and does not resolve through the vault. Renaming the named note does not rewrite the value, so
-correct a stale name by editing the project.
+shown in the project meta row. The value is one plain name in the file. The application treats it as a
+metadata reference: the name resolves to the note with that name, so its page lists the project under
+**Requested projects**, the name is searchable and clickable, and renaming the named note rewrites the
+value. A name that matches no note stays in the file and appears as a broken link until you create the
+note.
+
+## 🧑‍💻 Owner
+
+`owner` is valid only on projects. It records the person or team accountable for delivering the project
+and is shown before **Asked by** in the project meta row. The value is one plain name in the file. Like
+`asked_by`, it is a metadata reference: the name resolves to the note with that name, its page lists the
+project under **Owned projects**, the name is searchable and clickable, and renaming the named note
+rewrites the value. The owner is display-only; it does not change the project's status, group, next
+step, or review state.
 
 ## 🚫 Retired values
 

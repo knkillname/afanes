@@ -26,10 +26,9 @@ BANNER_PADDING = 12
 CARD_RADIUS = 6
 PAGE_FIELD_WIDTH = 200
 PAGE_DUE_WIDTH = 240
+PAGE_FORM_FIELD_HEIGHT = 56
 PAGE_NAME_WIDTH = 420
 PAGE_RENAME_WIDTH = 360
-PAGE_BODY_MIN_LINES = 8
-PAGE_RAW_MIN_LINES = 10
 STEP_INDENT = 16
 CONNECTIONS_GAP = 12
 
@@ -84,3 +83,13 @@ STEP_HEADLINE_TEXT_STYLE = ft.TextStyle(size=24, color=TEXT_COLOR)
 PAGE_TITLE_TEXT_STYLE = ft.TextStyle(size=28, weight=ft.FontWeight.W_600, color=TEXT_COLOR)
 SECTION_LABEL_TEXT_STYLE = ft.TextStyle(size=12, weight=ft.FontWeight.W_600, color=MUTED_TEXT_COLOR)
 METADATA_TEXT_STYLE = ft.TextStyle(size=12, color=MUTED_TEXT_COLOR)
+ROLE_LINK_TEXT_STYLE = ft.TextStyle(
+    size=12,
+    color=ACCENT_COLOR,
+    decoration=ft.TextDecoration.UNDERLINE,
+)
+ROLE_BROKEN_TEXT_STYLE = ft.TextStyle(
+    size=12,
+    color=ERROR_COLOR,
+    decoration=ft.TextDecoration.UNDERLINE,
+)

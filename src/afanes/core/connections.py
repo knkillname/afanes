@@ -62,6 +62,12 @@ class ConnectionSet:
     owned_projects : tuple[OwnedProject, ...]
         Open projects with steps that name the note as an owner, ordered by
         display title.
+    project_owner_projects : tuple[VaultNote, ...]
+        Open projects whose ``owner`` value uniquely resolves to the note,
+        ordered by display title.
+    finished_project_owner_projects : tuple[VaultNote, ...]
+        Finished projects whose ``owner`` value uniquely resolves to the note,
+        ordered by display title.
     requested_projects : tuple[VaultNote, ...]
         Open projects whose ``asked_by`` value uniquely resolves to the note,
         ordered by display title.
@@ -72,6 +78,8 @@ class ConnectionSet:
 
     linked_from: tuple[VaultNote, ...] = ()
     owned_projects: tuple[OwnedProject, ...] = ()
+    project_owner_projects: tuple[VaultNote, ...] = ()
+    finished_project_owner_projects: tuple[VaultNote, ...] = ()
     requested_projects: tuple[VaultNote, ...] = ()
     finished_projects: tuple[VaultNote, ...] = ()
 
@@ -82,10 +90,17 @@ class ConnectionSet:
         Returns
         -------
         bool
-            ``True`` when at least one linked note, owned project, requested
-            project, or finished project is present.
+            ``True`` when at least one linked note, owned step project, owned
+            project, requested project, or finished project is present.
         """
-        return bool(self.linked_from or self.owned_projects or self.requested_projects or self.finished_projects)
+        return bool(
+            self.linked_from
+            or self.owned_projects
+            or self.project_owner_projects
+            or self.finished_project_owner_projects
+            or self.requested_projects
+            or self.finished_projects
+        )
 
     @property
     def has_completed_steps(self) -> bool:
@@ -109,10 +124,11 @@ class Connections:
 
     Notes
     -----
-    Construction walks every parsed note once and builds three indexes:
-    inbound references, owned steps, and requested projects. Only a unique
-    name resolution attributes a relationship; missing and ambiguous names
-    contribute nothing. The service never reads or writes a file.
+    Construction walks every parsed note once and builds the relationship
+    indexes: inbound references, owned steps, project ownership, and requested
+    projects. Only a unique name resolution attributes a relationship; missing
+    and ambiguous names contribute nothing. The service never reads or writes a
+    file.
     """
 
     def __init__(self, snapshot: VaultSnapshot) -> None:
@@ -126,6 +142,8 @@ class Connections:
         self._snapshot = snapshot
         self._linked_from: dict[Path, tuple[VaultNote, ...]] = {}
         self._owned: dict[Path, tuple[OwnedProject, ...]] = {}
+        self._project_owned: dict[Path, tuple[VaultNote, ...]] = {}
+        self._finished_project_owned: dict[Path, tuple[VaultNote, ...]] = {}
         self._requested: dict[Path, tuple[VaultNote, ...]] = {}
         self._finished: dict[Path, tuple[VaultNote, ...]] = {}
         self._build()
@@ -142,8 +160,8 @@ class Connections:
         Returns
         -------
         ConnectionSet
-            Inbound references, owned projects, requested projects, and
-            finished projects for the note.
+            Inbound references, owned step projects, owned projects, requested
+            projects, and finished projects for the note.
 
         Notes
         -----
@@ -154,6 +172,8 @@ class Connections:
         return ConnectionSet(
             linked_from=self._linked_from.get(target, ()),
             owned_projects=self._owned.get(target, ()),
+            project_owner_projects=self._project_owned.get(target, ()),
+            finished_project_owner_projects=self._finished_project_owned.get(target, ()),
             requested_projects=self._requested.get(target, ()),
             finished_projects=self._finished.get(target, ()),
         )
@@ -162,6 +182,8 @@ class Connections:
         """Build every index in one pass over the parsed notes."""
         linked: dict[Path, dict[Path, VaultNote]] = {}
         owned: dict[Path, list[OwnedProject]] = {}
+        project_owned: dict[Path, dict[Path, VaultNote]] = {}
+        finished_project_owned: dict[Path, dict[Path, VaultNote]] = {}
         requested: dict[Path, dict[Path, VaultNote]] = {}
         finished: dict[Path, dict[Path, VaultNote]] = {}
 
@@ -171,7 +193,7 @@ class Connections:
                 if target is None or target == note.path:
                     continue
                 linked.setdefault(target, {})[note.path] = note
-            self._index_project(note, owned, requested, finished)
+            self._index_project(note, owned, project_owned, finished_project_owned, requested, finished)
 
         self._linked_from = {
             target: tuple(sorted(notes.values(), key=lambda note: note.alphabetical_order))
@@ -180,6 +202,14 @@ class Connections:
         self._owned = {
             target: tuple(sorted(projects, key=lambda item: item.project.alphabetical_order))
             for target, projects in owned.items()
+        }
+        self._project_owned = {
+            target: tuple(sorted(notes.values(), key=lambda note: note.alphabetical_order))
+            for target, notes in project_owned.items()
+        }
+        self._finished_project_owned = {
+            target: tuple(sorted(notes.values(), key=lambda note: note.alphabetical_order))
+            for target, notes in finished_project_owned.items()
         }
         self._requested = {
             target: tuple(sorted(notes.values(), key=lambda note: note.alphabetical_order))
@@ -194,14 +224,20 @@ class Connections:
         self,
         note: VaultNote,
         owned: dict[Path, list[OwnedProject]],
+        project_owned: dict[Path, dict[Path, VaultNote]],
+        finished_project_owned: dict[Path, dict[Path, VaultNote]],
         requested: dict[Path, dict[Path, VaultNote]],
         finished: dict[Path, dict[Path, VaultNote]],
     ) -> None:
-        """Index one note's owned steps and requested-project value."""
+        """Index one note's owned steps, owner, and requester values."""
         if note.note_type is not NoteType.PROJECT:
             return
         if note.is_open_project:
             self._index_owned_steps(note, owned)
+        owner_target = self._resolve_name(note.owner) if note.owner is not None else None
+        if owner_target is not None:
+            owner_bucket = project_owned if note.is_open_project else finished_project_owned
+            owner_bucket.setdefault(owner_target, {})[note.path] = note
         target = self._resolve_name(note.asked_by) if note.asked_by is not None else None
         if target is None:
             return

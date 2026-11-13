@@ -47,9 +47,10 @@ raw rescue mode so the text is never lost.
 
 ## 🔍 Search
 
-The search field filters the active section by display title, identity, prose body text, and step text.
-Matching ignores case, Unicode form, and repeated whitespace. Step metadata comments are excluded, so
-an owner name or date inside a comment is not a search result. In the **Log**, the same query filters
+The search field filters the active section by display title, identity, prose body text, step text, and
+role names: a project's `owner`, its `asked_by`, and the owners of its steps. Matching ignores case,
+Unicode form, and repeated whitespace. Other step metadata and unknown frontmatter keys are excluded,
+so a plan date or tag inside a comment is not a search result. In the **Log**, the same query filters
 both the date tree and the calendar accents.
 
 ## ✍️ Capture field

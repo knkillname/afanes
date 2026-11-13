@@ -166,6 +166,13 @@ class TestLoadDraft:
         assert draft.labels is not None
         assert draft.labels.asked_by_text == "Priya Nair"
 
+    def test_loads_a_project_owner(self) -> None:
+        draft = _normal("---\ntype: project\nowner: Sam Rivera\n---\n\nBody\n")
+
+        assert isinstance(draft, NormalDraft)
+        assert draft.labels is not None
+        assert draft.labels.owner_text == "Sam Rivera"
+
     def test_loads_a_note_date(self) -> None:
         draft = _normal("---\ntype: project\ndate: 2025-10-12\n---\n\nBody\n")
 
@@ -206,6 +213,7 @@ class TestLabelRules:
         assert labels.status is None
         assert labels.due_date_text == ""
         assert labels.asked_by_text == ""
+        assert labels.owner_text == ""
 
     def test_switching_to_reference_clears_an_invalid_status_and_due_date(self) -> None:
         draft = _normal(PROJECT_NOTE)
@@ -214,6 +222,7 @@ class TestLabelRules:
         assert labels.status is None
         assert labels.due_date_text == ""
         assert labels.asked_by_text == ""
+        assert labels.owner_text == ""
 
     def test_switching_between_project_and_reference_keeps_a_valid_status(self) -> None:
         draft = _normal(REFERENCE_NOTE)
@@ -259,6 +268,18 @@ class TestLabelRules:
 
         assert labels.asked_by_text == ""
 
+    def test_owner_text_is_kept_for_projects(self) -> None:
+        draft = _normal(PROJECT_NOTE)
+        labels = draft.labels.with_owner_text("Sam Rivera")
+
+        assert labels.owner_text == "Sam Rivera"
+
+    def test_owner_is_ignored_for_a_non_project(self) -> None:
+        draft = _normal(REFERENCE_NOTE)
+        labels = draft.labels.with_owner_text("Sam Rivera")
+
+        assert labels.owner_text == ""
+
     def test_date_is_kept_when_the_type_changes(self) -> None:
         draft = _normal("---\ntype: project\ndate: 2025-10\n---\n\nBody\n")
         labels = draft.labels.with_type(NoteType.NOTE)
@@ -280,7 +301,9 @@ class TestLabelRules:
         assert labels.date_error is not None
 
     def test_switching_to_log_clears_workflow_labels(self) -> None:
-        draft = _normal("---\ntype: project\ndate: 2025-10-12\nstatus: active\nasked_by: Priya Nair\n---\n\nBody\n")
+        draft = _normal(
+            "---\ntype: project\ndate: 2025-10-12\nstatus: active\nasked_by: Priya Nair\nowner: Sam Rivera\n---\n\nBody\n"
+        )
         labels = draft.labels.with_type(NoteType.LOG)
 
         assert labels.note_type is NoteType.LOG
@@ -288,6 +311,7 @@ class TestLabelRules:
         assert labels.status is None
         assert labels.due_date_text == ""
         assert labels.asked_by_text == ""
+        assert labels.owner_text == ""
         assert labels.date_text == "2025-10-12"
 
     def test_switching_from_log_keeps_the_date(self) -> None:
@@ -352,6 +376,42 @@ class TestSerialize:
         written = draft.with_labels(labels).to_text()
 
         assert "asked_by: Priya Nair\r\n" in written
+        assert "\n" not in written.replace("\r\n", "")
+
+    def test_writes_and_trims_a_project_owner(self) -> None:
+        draft = _normal(PROJECT_NOTE)
+        labels = draft.labels.with_owner_text("  Sam Rivera  ")
+        document = NoteDocument.from_text(draft.with_labels(labels).to_text())
+
+        assert document.owner == "Sam Rivera"
+        assert document.raw["owner"] == "Sam Rivera"
+        assert document.raw["custom"] == "keep"
+        assert document.body == draft.body
+
+    def test_clearing_the_owner_removes_the_key(self) -> None:
+        draft = _normal("---\ntype: project\nowner: Sam Rivera\ncustom: keep\n---\n\nBody\n")
+        labels = draft.labels.with_owner_text("")
+        document = NoteDocument.from_text(draft.with_labels(labels).to_text())
+
+        assert "owner" not in document.raw
+        assert document.raw["custom"] == "keep"
+
+    def test_type_change_removes_the_owner(self) -> None:
+        draft = _normal("---\ntype: project\nowner: Sam Rivera\n---\n\nBody\n")
+        labels = draft.labels.with_type(NoteType.REFERENCE)
+        document = NoteDocument.from_text(draft.with_labels(labels).to_text())
+
+        assert "owner" not in document.raw
+
+    def test_owner_write_preserves_crlf(self) -> None:
+        text = "---\r\ntype: project\r\n---\r\n\r\n# Call\r\n"
+        draft = PageDraftFactory.from_page(_page(text))
+
+        assert isinstance(draft, NormalDraft)
+        labels = draft.labels.with_owner_text("Sam Rivera")
+        written = draft.with_labels(labels).to_text()
+
+        assert "owner: Sam Rivera\r\n" in written
         assert "\n" not in written.replace("\r\n", "")
 
     def test_invalid_due_date_blocks_serialization(self) -> None:

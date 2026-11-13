@@ -16,7 +16,7 @@ import afanes.core.vault.snapshot
 import afanes.core.vault.steps
 from afanes.core.errors import NameCollisionError, ProcessingError
 from afanes.core.frontmatter import NoteDocument
-from afanes.core.processing import AppendStepPlan, ProcessingOutcome
+from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
 from afanes.models.note import NoteDate, NoteType, Status
 
 ONE = 1
@@ -122,6 +122,75 @@ class TestProcessingEdgeCases:
 
 
 class TestProcessingGuards:
+    def test_project_plan_writes_role_names(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.service.Vault(root)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Call")
+        service = afanes.core.vault.processing.VaultProcessing(vault)
+
+        plan = service.plan_processing(
+            capture,
+            ProcessingOutcome.PROJECT,
+            owner="  Sam Rivera  ",
+            asked_by="  Priya Nair  ",
+        )
+
+        assert isinstance(plan, ProcessingPlan)
+        assert plan.owner == "Sam Rivera"
+        assert plan.asked_by == "Priya Nair"
+        target = service.apply_processing(plan, confirm=True)
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert document.owner == "Sam Rivera"
+        assert document.asked_by == "Priya Nair"
+
+    def test_done_now_plan_writes_role_names(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.service.Vault(root)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Call")
+        service = afanes.core.vault.processing.VaultProcessing(vault)
+
+        plan = service.plan_processing(
+            capture,
+            ProcessingOutcome.DONE_NOW,
+            today=datetime.date(2026, 11, 14),
+            owner="Sam Rivera",
+            asked_by="Priya Nair",
+        )
+
+        assert isinstance(plan, ProcessingPlan)
+        target = service.apply_processing(plan, confirm=True)
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert document.owner == "Sam Rivera"
+        assert document.asked_by == "Priya Nair"
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [ProcessingOutcome.REFERENCE, ProcessingOutcome.LATER, ProcessingOutcome.LOG, ProcessingOutcome.TRASH],
+    )
+    def test_non_project_outcomes_reject_role_names(self, tmp_path: Path, outcome: ProcessingOutcome) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.service.Vault(root)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
+        service = afanes.core.vault.processing.VaultProcessing(vault)
+
+        with pytest.raises(ProcessingError, match="Only projects"):
+            service.plan_processing(capture, outcome, owner="Sam Rivera")
+
+    def test_append_step_rejects_role_names(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        vault = afanes.core.vault.service.Vault(root)
+        project = vault.create("Home", NoteType.PROJECT, body="# Home\n")
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
+        service = afanes.core.vault.processing.VaultProcessing(vault)
+
+        with pytest.raises(ProcessingError, match="Only projects"):
+            service.plan_processing(capture, ProcessingOutcome.APPEND_STEP, project="Home", asked_by="Sam Rivera")
+        assert project.is_file()
+
     def test_plan_rejects_a_capture_missing_from_the_snapshot(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()

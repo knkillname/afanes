@@ -38,15 +38,19 @@ body link to a project does not create a step, and a project may have no steps a
 Steps have no filename, identity, or reference namespace. They live only inside the project body.
 :::
 
-## 🙋 Who asked
+## 🙋 Owner and requester
 
-A project can record the person or group that requested it. The value lives in the project frontmatter
-as `asked_by` and appears in the header beside the status and due date. Set or clear it in edit mode
-with the **Asked by** field; the field is offered only for projects.
+A project can record two roles. The **owner** is the person or team accountable for delivering the
+project; the **requester** is the person or group that asked for it. They live in the project
+frontmatter as `owner` and `asked_by` and appear in the header in that order, after the status and
+before the due date. Set or clear each one in edit mode with the **Owner** and **Asked by** fields, or
+from read mode with the owner and requester actions beside the names. Both fields are offered only for
+projects and suggest names from the vault while still accepting free text.
 
-The name is plain text. It is not a reference, so it does not become a link and renaming the named note
-does not rewrite it. If the name changes, edit the project and correct the field. The requester does
-not change the project's status, group, or next step.
+Both values are metadata references in the `note:` namespace. They resolve to the note with that name,
+so it appears under **Owned projects** or **Requested projects** on that page, the name is searchable
+and clickable, and renaming the named note rewrites the value. A value that matches no note stays in
+the file and is shown as a broken link. Neither role changes the project's status, group, or next step.
 
 ## ✅ Completing steps
 

@@ -15,14 +15,21 @@ import flet as ft
 
 import afanes.core.connections
 import afanes.core.search
+import afanes.core.vault.snapshot
 import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.editing import DraftMode, PageDraft
+from afanes.core.vault.snapshot import LinkOutcome
+from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType, Status
 from afanes.ui.components.banner import Banner
+from afanes.ui.components.frozen import FrozenControlRecovery
 from afanes.ui.components.panel import Panel
+from afanes.ui.state.navigation import RoleFollowOutcome
 from afanes.ui.views.project_body import PickDate, ProjectBodyView
+
+type PickRole = Callable[[str, str | None], Awaitable[str | None]]
 
 
 class PageView:
@@ -42,6 +49,8 @@ class PageView:
         update: Callable[[], None],
         on_process: Callable[[Path], Awaitable[None]] | None = None,
         pick_date: PickDate | None = None,
+        on_missing_role: Callable[[str], Awaitable[None]] | None = None,
+        pick_role: PickRole | None = None,
     ) -> None:
         """Build the page controls against the shared application state.
 
@@ -53,12 +62,21 @@ class PageView:
             Command that opens the Processing Wizard for an Inbox capture.
         pick_date : PickDate | None
             Command that opens the date picker for step and project dates.
+        on_missing_role : Callable[[str], Awaitable[None]] | None
+            Command that asks for a category before creating a missing role
+            reference, or ``None`` when creation is unavailable.
+        pick_role : PickRole | None
+            Command that asks for an owner or requester name, or ``None`` when
+            the read-mode action is unavailable.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
         self._on_process = on_process
         self._pick_date = pick_date
+        self._on_missing_role = on_missing_role
+        self._pick_role = pick_role
         self._rename_open = False
+        self._role_suggestion_field: str | None = None
 
         self.back_button = ft.IconButton(
             icon=ft.Icons.ARROW_BACK,
@@ -72,7 +90,34 @@ class PageView:
             selectable=True,
         )
         self.meta_status = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
+        self.meta_owner = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
+        self.meta_owner_button = ft.IconButton(
+            icon=ft.Icons.PERSON_ADD,
+            tooltip=afanes.ui.strings.PAGE_OWNER_SET,
+            icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
+            on_click=self.choose_owner,
+            style=ft.ButtonStyle(
+                icon_color={
+                    ft.ControlState.HOVERED: afanes.ui.theme.TEXT_COLOR,
+                    ft.ControlState.FOCUSED: afanes.ui.theme.TEXT_COLOR,
+                },
+            ),
+            key="page-owner-set",
+        )
         self.meta_asked = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
+        self.meta_asked_button = ft.IconButton(
+            icon=ft.Icons.PERSON_SEARCH,
+            tooltip=afanes.ui.strings.PAGE_ASKED_BY_SET,
+            icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
+            on_click=self.choose_asked_by,
+            style=ft.ButtonStyle(
+                icon_color={
+                    ft.ControlState.HOVERED: afanes.ui.theme.TEXT_COLOR,
+                    ft.ControlState.FOCUSED: afanes.ui.theme.TEXT_COLOR,
+                },
+            ),
+            key="page-asked-by-set",
+        )
         self.meta_due = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
         self.meta_date = ft.Text("", style=afanes.ui.theme.METADATA_TEXT_STYLE)
         self.meta_due_button = ft.IconButton(
@@ -103,7 +148,10 @@ class PageView:
             controls=[
                 self.meta_date,
                 self.meta_status,
+                self.meta_owner,
+                self.meta_owner_button,
                 self.meta_asked,
+                self.meta_asked_button,
                 self.meta_due,
                 self.meta_due_button,
                 self.meta_due_clear,
@@ -179,7 +227,7 @@ class PageView:
             auto_follow_links=False,
             on_tap_link=self.handle_link,
         )
-        self.project_body = ProjectBodyView(self._update, self.follow, self._pick_date)
+        self.project_body = ProjectBodyView(self._update, self.follow, self._pick_date, self.follow_role)
         self._show_completed_steps = False
         self._show_finished_projects = False
         self._connections_page: Path | None = None
@@ -211,8 +259,8 @@ class PageView:
         self.body_field = ft.TextField(
             label=afanes.ui.strings.PAGE_BODY_LABEL,
             multiline=True,
-            min_lines=afanes.ui.theme.PAGE_BODY_MIN_LINES,
-            max_lines=None,
+            fit_parent_size=True,
+            text_vertical_align=ft.VerticalAlignment.START,
             expand=True,
             on_change=self.change_body,
         )
@@ -224,6 +272,7 @@ class PageView:
             ],
             on_select=self.change_type,
             width=afanes.ui.theme.PAGE_FIELD_WIDTH,
+            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.category_field = ft.Dropdown(
             label=afanes.ui.strings.PAGE_CATEGORY_LABEL,
@@ -234,18 +283,21 @@ class PageView:
             on_select=self.change_category,
             on_blur=self._commit_category_on_blur,
             width=afanes.ui.theme.PAGE_FIELD_WIDTH,
+            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.status_dropdown = ft.Dropdown(
             label=afanes.ui.strings.PAGE_STATUS_LABEL,
             options=[],
             on_select=self.change_status,
             width=afanes.ui.theme.PAGE_FIELD_WIDTH,
+            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.due_field = ft.TextField(
             label=afanes.ui.strings.PAGE_DUE_DATE_LABEL,
             hint_text="2026-11-20",
             on_change=self.change_due_date,
             width=afanes.ui.theme.PAGE_DUE_WIDTH,
+            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.date_field = ft.TextField(
             label=afanes.ui.strings.PAGE_DATE_LABEL,
@@ -253,6 +305,7 @@ class PageView:
             on_blur=self.commit_date,
             on_submit=self.commit_date,
             width=afanes.ui.theme.PAGE_DUE_WIDTH,
+            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.date_error = ft.Text(
             "",
@@ -266,7 +319,16 @@ class PageView:
             hint_text=afanes.ui.strings.PAGE_ASKED_BY_HINT,
             on_change=self.change_asked_by,
             width=afanes.ui.theme.PAGE_FIELD_WIDTH,
+            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
+        self.owner_field = ft.TextField(
+            label=afanes.ui.strings.PAGE_OWNER_LABEL,
+            hint_text=afanes.ui.strings.PAGE_OWNER_HINT,
+            on_change=self.change_owner,
+            width=afanes.ui.theme.PAGE_FIELD_WIDTH,
+            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
+        )
+        self.name_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.due_error = ft.Text(
             "",
             size=12,
@@ -274,29 +336,30 @@ class PageView:
             visible=False,
             selectable=True,
         )
+        self.form_fields = ft.Row(
+            controls=[
+                self.type_dropdown,
+                self.category_field,
+                self.status_dropdown,
+                self.date_field,
+                self.due_field,
+                self.owner_field,
+                self.asked_by_field,
+            ],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            run_spacing=afanes.ui.theme.ITEM_GAP,
+            wrap=True,
+        )
         self.edit_form = ft.Column(
             controls=[
                 self.identity_text,
-                ft.Row(
-                    controls=[self.type_dropdown, self.category_field, self.status_dropdown],
-                    spacing=afanes.ui.theme.ITEM_GAP,
-                    wrap=True,
-                ),
-                ft.Row(
-                    controls=[self.date_field],
-                    spacing=afanes.ui.theme.ITEM_GAP,
-                    wrap=True,
-                ),
-                ft.Row(
-                    controls=[self.due_field, self.asked_by_field],
-                    spacing=afanes.ui.theme.ITEM_GAP,
-                    wrap=True,
-                ),
+                self.form_fields,
+                self.name_suggestions,
                 self.date_error,
                 self.due_error,
                 self.body_field,
             ],
-            spacing=afanes.ui.theme.ITEM_GAP,
+            spacing=afanes.ui.theme.SECTION_GAP,
             expand=True,
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             visible=False,
@@ -310,8 +373,8 @@ class PageView:
         self.raw_field = ft.TextField(
             label=afanes.ui.strings.PAGE_BODY_LABEL,
             multiline=True,
-            min_lines=afanes.ui.theme.PAGE_RAW_MIN_LINES,
-            max_lines=None,
+            fit_parent_size=True,
+            text_vertical_align=ft.VerticalAlignment.START,
             expand=True,
             on_change=self.change_raw_text,
         )
@@ -503,6 +566,12 @@ class PageView:
             scroll=ft.ScrollMode.AUTO,
             expand=True,
         )
+        self.mode_host = ft.Stack(
+            controls=[self.content, self.edit_form, self.raw_panel],
+            expand=True,
+            fit=ft.StackFit.EXPAND,
+            key="page-mode-host",
+        )
         self.root = ft.Container(
             expand=True,
             padding=afanes.ui.theme.ITEM_GAP,
@@ -515,9 +584,7 @@ class PageView:
                     ft.Divider(),
                     self.banners,
                     self.dialogs,
-                    self.content,
-                    self.edit_form,
-                    self.raw_panel,
+                    self.mode_host,
                 ],
                 spacing=afanes.ui.theme.ITEM_GAP,
                 expand=True,
@@ -559,8 +626,65 @@ class PageView:
         self.refresh()
         self._update()
 
+    async def follow_role(self, name: str) -> None:
+        """Open a project role name or start creating its missing note.
+
+        Parameters
+        ----------
+        name : str
+            Written owner, requester, or step owner name.
+
+        Notes
+        -----
+        A resolved or ambiguous name follows the shared page navigation rules.
+        A missing name delegates to the category dialog callback; this view
+        writes nothing by itself.
+        """
+        outcome = await self._state.navigation.follow_role(name)
+        if outcome is RoleFollowOutcome.MISSING:
+            if self._on_missing_role is not None:
+                await self._on_missing_role(name)
+            return
+        self.refresh()
+        self._update()
+
+    def _role_outcome(self, name: str) -> LinkOutcome:
+        """Return how a written role name resolves in the current scan."""
+        snapshot = self._state.session.snapshot
+        if snapshot is None:
+            return LinkOutcome.MISSING
+        reference = NoteReference(scheme=ReferenceScheme.NOTE, name=name)
+        return snapshot.link_target(reference).outcome
+
+    def _role_span(self, name: str) -> ft.TextSpan:
+        """Build one link-styled text span for a role name."""
+        outcome = self._role_outcome(name)
+        broken = outcome in (LinkOutcome.MISSING, LinkOutcome.BROKEN)
+        style = afanes.ui.theme.ROLE_BROKEN_TEXT_STYLE if broken else afanes.ui.theme.ROLE_LINK_TEXT_STYLE
+        if broken:
+            tooltip = afanes.ui.strings.ROLE_LINK_MISSING
+        elif outcome is LinkOutcome.AMBIGUOUS:
+            tooltip = afanes.ui.strings.ROLE_LINK_AMBIGUOUS
+        else:
+            tooltip = None
+        return ft.TextSpan(
+            name,
+            style=style,
+            tooltip=tooltip,
+            on_click=self._role_handler(name),
+        )
+
+    def _role_handler(self, name: str) -> Callable[[], Awaitable[None]]:
+        """Bind a role-name span to its navigation command."""
+
+        async def handle() -> None:
+            await self.follow_role(name)
+
+        return handle
+
     def refresh(self) -> None:
         """Refresh every control from the shared application state."""
+        FrozenControlRecovery.clear(self.root)
         page = self._state.pages.page
         editing = self._state.pages.editing or self._state.pages.page_mode is DraftMode.RAW
         self.content.visible = not editing
@@ -639,11 +763,17 @@ class PageView:
         self.connections_steps_toggle.value = self._show_completed_steps
         self.connections_steps_toggle.visible = result.has_completed_steps
         self.connections_projects_toggle.value = self._show_finished_projects
-        self.connections_projects_toggle.visible = bool(result.finished_projects)
+        self.connections_projects_toggle.visible = bool(
+            result.finished_projects or result.finished_project_owner_projects
+        )
         self.connections_body.controls = [
             self._connection_subsection(
                 afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM,
                 self._linked_from_controls(result),
+            ),
+            self._connection_subsection(
+                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS,
+                self._owned_project_controls(result),
             ),
             self._connection_subsection(
                 afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS,
@@ -685,6 +815,23 @@ class PageView:
                 on_click=self._connection_handler(note.path),
             )
             for note in result.linked_from
+        ]
+
+    def _owned_project_controls(self, result: afanes.core.connections.ConnectionSet) -> list[ft.Control]:
+        """Build owned-project rows, with finished projects behind the toggle."""
+        projects = list(result.project_owner_projects)
+        if self._show_finished_projects:
+            projects.extend(result.finished_project_owner_projects)
+        if not projects:
+            return [
+                ft.Text(afanes.ui.strings.PAGE_CONNECTIONS_EMPTY_PROJECTS, style=afanes.ui.theme.METADATA_TEXT_STYLE)
+            ]
+        return [
+            ft.TextButton(
+                content=project.title,
+                on_click=self._connection_handler(project.path),
+            )
+            for project in projects
         ]
 
     def _owned_step_controls(self, result: afanes.core.connections.ConnectionSet) -> list[ft.Control]:
@@ -742,7 +889,10 @@ class PageView:
         visible = page is not None and not editing and labels is not None
         self.meta_row.visible = visible
         if not visible or labels is None:
+            self.meta_owner.visible = False
+            self.meta_owner_button.visible = False
             self.meta_asked.visible = False
+            self.meta_asked_button.visible = False
             return
         self.meta_date.value = (
             afanes.ui.strings.PAGE_DATE.format(date=labels.date_text)
@@ -754,7 +904,10 @@ class PageView:
         self.meta_due.visible = is_project
         self.meta_due_button.visible = is_project
         self.meta_due_clear.visible = is_project and labels.due_date is not None
+        self.meta_owner_button.visible = is_project
+        self.meta_asked_button.visible = is_project
         if not is_project:
+            self.meta_owner.visible = False
             self.meta_asked.visible = False
             return
         status_label = (
@@ -763,8 +916,25 @@ class PageView:
             else afanes.ui.strings.PAGE_PROJECT_NO_STATUS
         )
         self.meta_status.value = afanes.ui.strings.PROJECT_STATUS.format(status=status_label)
+        owner = labels.owner_text.strip()
+        self.meta_owner.spans = (
+            [
+                ft.TextSpan(f"{afanes.ui.strings.PAGE_OWNER_LABEL} "),
+                self._role_span(owner),
+            ]
+            if owner
+            else []
+        )
+        self.meta_owner.visible = bool(owner)
         asked_by = labels.asked_by_text.strip()
-        self.meta_asked.value = afanes.ui.strings.PROJECT_ASKED_BY.format(name=asked_by) if asked_by else ""
+        self.meta_asked.spans = (
+            [
+                ft.TextSpan(f"{afanes.ui.strings.PAGE_ASKED_BY_LABEL} "),
+                self._role_span(asked_by),
+            ]
+            if asked_by
+            else []
+        )
         self.meta_asked.visible = bool(asked_by)
         due_date = labels.due_date
         self.meta_due.value = (
@@ -780,6 +950,7 @@ class PageView:
         visible = page is not None and editing and state.pages.page_mode is DraftMode.NORMAL and labels is not None
         self.edit_form.visible = visible
         if not visible or page is None or labels is None:
+            self._clear_role_suggestions()
             return
 
         body = state.pages.page_body
@@ -817,8 +988,12 @@ class PageView:
         self.asked_by_field.visible = labels.note_type is NoteType.PROJECT
         if self.asked_by_field.value != labels.asked_by_text:
             self.asked_by_field.value = labels.asked_by_text
+        self.owner_field.visible = labels.note_type is NoteType.PROJECT
+        if self.owner_field.value != labels.owner_text:
+            self.owner_field.value = labels.owner_text
         self.due_error.value = labels.due_date_error or ""
         self.due_error.visible = labels.due_date_error is not None
+        self._refresh_role_suggestions()
 
     def _refresh_raw(self, page: PageDraft | None) -> None:
         """Refresh raw rescue mode."""
@@ -937,12 +1112,14 @@ class PageView:
 
     async def start_edit(self) -> None:
         """Switch to edit mode."""
+        self._role_suggestion_field = None
         self._state.pages.edit_page()
         self.refresh()
         self._update()
 
     async def finish_edit(self) -> None:
         """Commit the draft and return to read mode."""
+        self._role_suggestion_field = None
         previous = self._state.pages.page.path if self._state.pages.page is not None else None
         await self.commit_date()
         current = self._state.pages.page.path if self._state.pages.page is not None else None
@@ -1058,7 +1235,85 @@ class PageView:
 
     async def change_asked_by(self) -> None:
         """Forward the requester text."""
+        self._role_suggestion_field = "asked_by"
         await self._state.dialogs.set_page_asked_by(self.asked_by_field.value or "")
+        self.refresh()
+        self._update()
+
+    async def change_owner(self) -> None:
+        """Forward the project-owner text."""
+        self._role_suggestion_field = "owner"
+        await self._state.pages.set_page_owner(self.owner_field.value or "")
+        self.refresh()
+        self._update()
+
+    def _refresh_role_suggestions(self) -> None:
+        """Fill the role-name suggestions from the active field."""
+        field = self._role_suggestion_field
+        if field is None or not self.edit_form.visible:
+            self._clear_role_suggestions()
+            return
+        source = self.owner_field if field == "owner" else self.asked_by_field
+        query = (source.value or "").strip()
+        if not query:
+            self._clear_role_suggestions()
+            return
+        candidates = self._state.session.assignment_candidates(ReferenceScheme.NOTE, query)
+        self.name_suggestions.controls = [
+            ft.ListTile(
+                title=note.title,
+                subtitle=note.name if note.name != note.title else None,
+                dense=True,
+                on_click=self._role_suggestion_handler(note.name),
+            )
+            for note in candidates
+        ]
+        self.name_suggestions.visible = bool(self.name_suggestions.controls)
+
+    def _clear_role_suggestions(self) -> None:
+        """Empty and hide the role-name suggestion list."""
+        self.name_suggestions.controls = []
+        self.name_suggestions.visible = False
+
+    def _role_suggestion_handler(self, name: str) -> Callable[[], Awaitable[None]]:
+        """Bind a suggestion tile to the role field being edited."""
+
+        async def handle() -> None:
+            field = self._role_suggestion_field
+            self._role_suggestion_field = None
+            if field == "owner":
+                self.owner_field.value = name
+                await self._state.pages.set_page_owner(name)
+            elif field == "asked_by":
+                self.asked_by_field.value = name
+                await self._state.dialogs.set_page_asked_by(name)
+            self._clear_role_suggestions()
+            self.refresh()
+            self._update()
+
+        return handle
+
+    async def choose_owner(self) -> None:
+        """Ask for a project owner and write it from read mode."""
+        labels = self._state.pages.page_labels
+        if labels is None or labels.note_type is not NoteType.PROJECT or self._pick_role is None:
+            return
+        chosen = await self._pick_role("owner", labels.owner_text.strip() or None)
+        if chosen is None:
+            return
+        await self._state.pages.set_page_owner(chosen, save=True)
+        self.refresh()
+        self._update()
+
+    async def choose_asked_by(self) -> None:
+        """Ask for a project requester and write it from read mode."""
+        labels = self._state.pages.page_labels
+        if labels is None or labels.note_type is not NoteType.PROJECT or self._pick_role is None:
+            return
+        chosen = await self._pick_role("asked_by", labels.asked_by_text.strip() or None)
+        if chosen is None:
+            return
+        await self._state.dialogs.set_page_asked_by(chosen, save=True)
         self.refresh()
         self._update()
 

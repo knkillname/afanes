@@ -488,7 +488,8 @@ class TestDocumentedExamples:
         page = Path(__file__).resolve().parents[2] / "docs" / "reference" / "vault-format.md"
         text = page.read_text(encoding="utf-8")
         marker = (
-            "---\ntype: project\nstatus: active\ndate: 2025-10-12\ndue_date: 2026-11-30\nasked_by: Priya Nair\n---\n"
+            "---\ntype: project\nstatus: active\ndate: 2025-10-12\ndue_date: 2026-11-30\n"
+            "asked_by: Priya Nair\nowner: Sam Rivera\n---\n"
         )
         start = text.index(marker)
         end = text.index("```", start)
@@ -498,6 +499,7 @@ class TestDocumentedExamples:
         assert document.note_type is NoteType.PROJECT
         assert document.due_date == datetime.date(2026, 11, 30)
         assert document.asked_by == "Priya Nair"
+        assert document.owner == "Sam Rivera"
         assert [step.text for step in steps] == [
             "Draft the checklist",
             "Ask [Ada Lovelace](<note:Ada Lovelace>) to review it",

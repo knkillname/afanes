@@ -38,6 +38,8 @@ def _plan(
     scaffold: str | None = None,
     source_hash: str = HASH_A,
     processed_hash: str = HASH_B,
+    owner: str | None = None,
+    asked_by: str | None = None,
 ) -> ProcessingPlan:
     if target_type is NoteType.REFERENCE and category is None:
         category = CategoryLabel("general")
@@ -56,6 +58,8 @@ def _plan(
         reference_count=0,
         affected_notes=(),
         changes_scheme=False,
+        owner=owner,
+        asked_by=asked_by,
     )
 
 
@@ -250,6 +254,39 @@ class TestProcessingPlan:
                 due_date=PLAN_DATE,
             )
 
+    @pytest.mark.parametrize(
+        ("outcome", "target_type", "target_status"),
+        [
+            (ProcessingOutcome.REFERENCE, NoteType.REFERENCE, None),
+            (ProcessingOutcome.LATER, NoteType.REFERENCE, Status.LATER),
+            (ProcessingOutcome.LOG, NoteType.LOG, None),
+            (ProcessingOutcome.TRASH, NoteType.NOTE, None),
+        ],
+    )
+    def test_rejects_role_names_outside_project_outcomes(
+        self,
+        tmp_path: Path,
+        outcome: ProcessingOutcome,
+        target_type: NoteType,
+        target_status: Status | None,
+    ) -> None:
+        with pytest.raises(ProcessingError, match="Only projects"):
+            _plan(
+                tmp_path,
+                outcome=outcome,
+                target_type=target_type,
+                target_status=target_status,
+                owner="Sam Rivera",
+            )
+
+    def test_rejects_a_blank_owner(self, tmp_path: Path) -> None:
+        with pytest.raises(ProcessingError):
+            _plan(tmp_path, owner="   ")
+
+    def test_rejects_a_blank_requester(self, tmp_path: Path) -> None:
+        with pytest.raises(ProcessingError):
+            _plan(tmp_path, asked_by="   ")
+
     def test_rejects_an_append_outcome(self, tmp_path: Path) -> None:
         with pytest.raises(ProcessingError):
             _plan(tmp_path, outcome=ProcessingOutcome.APPEND_STEP)
@@ -375,6 +412,22 @@ class TestProcessedText:
 
         assert NoteDocument.from_text(text).due_date == PLAN_DATE
 
+    def test_writes_the_owner_and_requester(self, tmp_path: Path) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n# Call\n")
+        text = _plan(tmp_path, owner="Sam Rivera", asked_by="Priya Nair").processed_text(document)
+        reparsed = NoteDocument.from_text(text)
+
+        assert reparsed.owner == "Sam Rivera"
+        assert reparsed.asked_by == "Priya Nair"
+
+    def test_trims_owner_and_requester_text(self, tmp_path: Path) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n# Call\n")
+        text = _plan(tmp_path, owner="  Sam Rivera  ", asked_by="  Priya Nair  ").processed_text(document)
+        reparsed = NoteDocument.from_text(text)
+
+        assert reparsed.raw["owner"] == "Sam Rivera"
+        assert reparsed.raw["asked_by"] == "Priya Nair"
+
     def test_uses_a_body_override_for_done_now(self, tmp_path: Path) -> None:
         document = NoteDocument.from_text("---\ntype: note\n---\n# Call\n")
         plan = _plan(
@@ -488,6 +541,40 @@ class TestPlanProcessing:
 
         assert isinstance(plan, ProcessingPlan)
         assert plan.due_date == PLAN_DATE
+
+    def test_plans_a_project_with_role_names(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        source = _capture(root)
+
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source,
+            ProcessingOutcome.PROJECT,
+            owner="  Sam Rivera ",
+            asked_by=" Priya Nair  ",
+        )
+
+        assert isinstance(plan, ProcessingPlan)
+        assert plan.owner == "Sam Rivera"
+        assert plan.asked_by == "Priya Nair"
+
+    def test_plans_a_done_now_project_with_role_names(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        source = _capture(root)
+
+        plan = afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+            source,
+            ProcessingOutcome.DONE_NOW,
+            today=TODAY,
+            owner="Sam Rivera",
+            asked_by="Priya Nair",
+        )
+
+        assert isinstance(plan, ProcessingPlan)
+        assert plan.owner == "Sam Rivera"
+        assert plan.asked_by == "Priya Nair"
+        assert plan.target_status is Status.DONE
 
     def test_plans_a_reference(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -668,6 +755,18 @@ class TestPlanProcessing:
                 source,
                 ProcessingOutcome.REFERENCE,
                 due_date=PLAN_DATE,
+            )
+
+    def test_rejects_role_names_on_a_reference_plan(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        source = _capture(root)
+
+        with pytest.raises(ProcessingError, match="Only projects"):
+            afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
+                source,
+                ProcessingOutcome.REFERENCE,
+                owner="Sam Rivera",
             )
 
     def test_plan_source_hash_matches_the_capture(self, tmp_path: Path) -> None:

@@ -25,6 +25,8 @@ def _write_note(
     category: str | None = None,
     status: str | None = None,
     due_date: str | None = None,
+    asked_by: str | None = None,
+    owner: str | None = None,
 ) -> Path:
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -35,6 +37,10 @@ def _write_note(
         lines.append(f"status: {status}")
     if due_date is not None:
         lines.append(f"due_date: {due_date}")
+    if asked_by is not None:
+        lines.append(f"asked_by: {asked_by}")
+    if owner is not None:
+        lines.append(f"owner: {owner}")
     lines.extend(["---", "", body])
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
@@ -165,10 +171,52 @@ class TestBrowserFilter:
             root,
             "projects/Home.md",
             "project",
-            "# Home\n\n- [ ] Call <!-- {owners: [Plumber], plan: 2026-11-20} -->\n",
+            "# Home\n\n- [ ] Call <!-- {owners: [Plumber], plan: 2026-11-20, tags: [plumbing]} -->\n",
         )
 
-        listing = Browser(_snapshot(root)).filter("plumber")
+        listing = Browser(_snapshot(root)).filter("2026-11-20")
+
+        assert listing.group(BrowserSection.PROJECTS).notes == ()
+
+    def test_owner_match_names_the_project(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root, "projects/Home.md", "project", "# Home\n", owner="Sam Rivera")
+
+        listing = Browser(_snapshot(root)).filter("Sam Rivera")
+
+        assert len(listing.group(BrowserSection.PROJECTS).notes) == 1
+
+    def test_requester_match_names_the_project(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root, "projects/Home.md", "project", "# Home\n", asked_by="Priya Nair")
+
+        listing = Browser(_snapshot(root)).filter("Priya Nair")
+
+        assert len(listing.group(BrowserSection.PROJECTS).notes) == 1
+
+    def test_step_owner_match_names_the_project(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(
+            root,
+            "projects/Home.md",
+            "project",
+            "# Home\n\n- [ ] Call <!-- {owners: [Ada Lovelace]} -->\n",
+        )
+
+        listing = Browser(_snapshot(root)).filter("Ada Lovelace")
+
+        assert len(listing.group(BrowserSection.PROJECTS).notes) == 1
+
+    def test_step_tags_are_not_searched(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(
+            root,
+            "projects/Home.md",
+            "project",
+            "# Home\n\n- [ ] Call <!-- {tags: [plumbing]} -->\n",
+        )
+
+        listing = Browser(_snapshot(root)).filter("plumbing")
 
         assert listing.group(BrowserSection.PROJECTS).notes == ()
 

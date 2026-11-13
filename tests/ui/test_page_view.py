@@ -19,7 +19,7 @@ from afanes.ui.views.page import PageView
 from tests.support import ensure_vault, versioned
 
 TWO_CANDIDATES = 2
-THREE_SUBSECTIONS = 3
+FOUR_SUBSECTIONS = 4
 
 
 @pytest.fixture(autouse=True)
@@ -128,6 +128,10 @@ class TestReadMode:
         assert view.content.visible is False
         assert view.edit_form.expand is True
         assert view.body_field.expand is True
+        assert view.body_field.fit_parent_size is True
+        assert view.body_field.min_lines is None
+        assert view.body_field.max_lines is None
+        assert view.body_field.text_vertical_align == ft.VerticalAlignment.START
 
     def test_category_combobox_suggests_existing_labels(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -233,6 +237,22 @@ class TestEditMode:
         assert view.due_field.visible is True
         assert view.due_field.value == "2026-01-02"
         assert "Call" in view.identity_text.value
+        assert view.type_dropdown.height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
+        assert view.date_field.height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
+        assert view.owner_field.height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
+        assert view.edit_form.spacing == afanes.ui.theme.SECTION_GAP
+        assert view.form_fields.wrap is True
+        assert view.form_fields.controls == [
+            view.type_dropdown,
+            view.category_field,
+            view.status_dropdown,
+            view.date_field,
+            view.due_field,
+            view.owner_field,
+            view.asked_by_field,
+        ]
+        assert view.mode_host.fit == ft.StackFit.EXPAND
+        assert view.mode_host.controls == [view.content, view.edit_form, view.raw_panel]
 
     def test_asked_by_field_renders_for_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -302,6 +322,159 @@ class TestEditMode:
         assert page is not None
         assert page.labels is not None
         assert page.labels.asked_by_text == "Priya Nair"
+
+    def test_owner_field_renders_for_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = _write_note(
+            vault / "projects" / "Call.md",
+            _typed_note("project", "# Call Ada\nBody.\n", extra="owner: Sam Rivera"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+
+        asyncio.run(scenario())
+
+        assert view.owner_field.visible is True
+        assert view.owner_field.value == "Sam Rivera"
+
+    @pytest.mark.parametrize("note_type", ["reference", "note"])
+    def test_owner_field_is_hidden_for_non_projects(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        note_type: str,
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = _write_note(vault / "notes" / "Ada.md", _typed_note(note_type, "# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+
+        asyncio.run(scenario())
+
+        assert view.owner_field.visible is False
+
+    def test_owner_change_forwards_to_the_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+            view.owner_field.value = "Sam Rivera"
+            await view.change_owner()
+
+        asyncio.run(scenario())
+
+        page = state.pages.page
+        assert page is not None
+        assert page.labels is not None
+        assert page.labels.owner_text == "Sam Rivera"
+
+    def test_owner_field_suggests_vault_names(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _write_note(
+            vault / "reference" / "person" / "Sam Rivera.md",
+            _typed_note("reference", "# Sam Rivera\n", category="person"),
+        )
+        path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+            view.owner_field.value = "Sam"
+            await view.change_owner()
+
+        asyncio.run(scenario())
+
+        assert view.name_suggestions.visible is True
+        tiles = [control for control in view.name_suggestions.controls if isinstance(control, ft.ListTile)]
+        assert [tile.title for tile in tiles] == ["Sam Rivera"]
+
+        asyncio.run(typing.cast("typing.Any", tiles[0].on_click)())
+
+        assert view.owner_field.value == "Sam Rivera"
+        page = state.pages.page
+        assert page is not None
+        assert page.labels is not None
+        assert page.labels.owner_text == "Sam Rivera"
+
+    def test_asked_by_field_suggests_vault_names(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        _write_note(
+            vault / "reference" / "person" / "Priya Nair.md",
+            _typed_note("reference", "# Priya Nair\n", category="person"),
+        )
+        path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+            view.asked_by_field.value = "Pri"
+            await view.change_asked_by()
+
+        asyncio.run(scenario())
+
+        assert view.name_suggestions.visible is True
+        tiles = [control for control in view.name_suggestions.controls if isinstance(control, ft.ListTile)]
+        assert [tile.title for tile in tiles] == ["Priya Nair"]
+
+    def test_owner_field_accepts_free_text(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(lambda: None)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+            view.owner_field.value = "New Person"
+            await view.change_owner()
+
+        asyncio.run(scenario())
+
+        assert view.name_suggestions.visible is False
+        page = state.pages.page
+        assert page is not None
+        assert page.labels is not None
+        assert page.labels.owner_text == "New Person"
 
     def test_status_options_follow_the_type(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -484,6 +657,10 @@ class TestRawMode:
         assert view.content.visible is False
         assert view.raw_panel.expand is True
         assert view.raw_field.expand is True
+        assert view.raw_field.fit_parent_size is True
+        assert view.raw_field.min_lines is None
+        assert view.raw_field.max_lines is None
+        assert view.raw_field.text_vertical_align == ft.VerticalAlignment.START
 
     def test_raw_save_upgrades_the_view(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -725,7 +902,8 @@ class TestSteps:
         assert view.project_body.root.visible is True
         assert view.read_body.visible is False
         assert "Call" in texts
-        assert afanes.ui.strings.PAGE_STEP_OWNERS.format(owners="Ada") in texts
+        assert afanes.ui.strings.PAGE_STEP_OWNERS_LABEL in texts
+        assert "Ada" in texts
         assert afanes.ui.strings.PAGE_STEP_PLAN.format(date="2026-11-20") in texts
         assert afanes.ui.strings.PAGE_STEP_ACTUAL.format(date="2026-11-14") in texts
         assert afanes.ui.strings.PAGE_STEP_TAGS.format(tags="phone") in texts
@@ -781,11 +959,14 @@ class TestProjectMeta:
         *,
         due_date: str | None = "2026-12-01",
         asked_by: str | None = None,
+        owner: str | None = None,
     ) -> tuple[Path, afanes.ui.state.controller.AppState]:
         vault = tmp_path / "vault"
         extra = "status: waiting" + (f"\ndue_date: {due_date}" if due_date else "")
         if asked_by is not None:
             extra += f"\nasked_by: {asked_by}"
+        if owner is not None:
+            extra += f"\nowner: {owner}"
         path = _write_note(
             vault / "projects" / "Home.md",
             _typed_note("project", "# Home\n\n- [ ] Call\n", extra=extra),
@@ -826,7 +1007,155 @@ class TestProjectMeta:
         view = PageView(lambda: None)
 
         assert view.meta_asked.visible is True
-        assert view.meta_asked.value == afanes.ui.strings.PROJECT_ASKED_BY.format(name="Priya Nair")
+        assert _spans_text(view.meta_asked) == "Asked by Priya Nair"
+
+    def test_project_meta_row_shows_the_owner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._project(tmp_path, monkeypatch, owner="Sam Rivera")
+
+        view = PageView(lambda: None)
+
+        assert view.meta_owner.visible is True
+        assert _spans_text(view.meta_owner) == "Owner Sam Rivera"
+
+    def test_owner_is_shown_before_the_requester(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._project(tmp_path, monkeypatch, owner="Sam Rivera", asked_by="Priya Nair")
+
+        view = PageView(lambda: None)
+
+        controls = list(view.meta_row.controls)
+        assert controls.index(view.meta_owner) < controls.index(view.meta_asked)
+
+    def test_project_without_an_owner_omits_the_label(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._project(tmp_path, monkeypatch)
+
+        view = PageView(lambda: None)
+
+        assert view.meta_owner.visible is False
+        assert view.meta_owner.spans == []
+
+    def test_owner_action_icon_sets_the_owner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        path, state = self._project(tmp_path, monkeypatch)
+        calls: list[tuple[str, str | None]] = []
+
+        async def pick(role: str, current: str | None) -> str | None:
+            calls.append((role, current))
+            return "Grace Hopper"
+
+        view = PageView(lambda: None, pick_role=pick)
+
+        asyncio.run(view.choose_owner())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.owner == "Grace Hopper"
+        assert calls == [("owner", None)]
+        assert state.pages.editing is False
+
+    def test_owner_action_icon_clears_the_owner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        path, _state = self._project(tmp_path, monkeypatch, owner="Sam Rivera")
+
+        async def pick(_role: str, _current: str | None) -> str | None:
+            return ""
+
+        view = PageView(lambda: None, pick_role=pick)
+
+        asyncio.run(view.choose_owner())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.owner is None
+
+    def test_asked_by_action_icon_sets_the_requester(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        path, _state = self._project(tmp_path, monkeypatch)
+        calls: list[tuple[str, str | None]] = []
+
+        async def pick(role: str, current: str | None) -> str | None:
+            calls.append((role, current))
+            return "Priya Nair"
+
+        view = PageView(lambda: None, pick_role=pick)
+
+        asyncio.run(view.choose_asked_by())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.asked_by == "Priya Nair"
+        assert calls == [("asked_by", None)]
+
+    def test_role_action_icons_are_visible_only_for_projects(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        note = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
+        self._project(tmp_path, monkeypatch)
+        project_view = PageView(lambda: None)
+        assert project_view.meta_owner_button.visible is True
+        assert project_view.meta_asked_button.visible is True
+
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.navigation.open_page(note)
+
+        asyncio.run(scenario())
+        note_view = PageView(lambda: None)
+
+        assert note_view.meta_owner_button.visible is False
+        assert note_view.meta_asked_button.visible is False
+
+    def test_owner_name_opens_its_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        person = _write_note(
+            vault / "reference" / "people" / "Sam Rivera.md",
+            _typed_note("reference", "# Sam Rivera\n", category="person"),
+        )
+        project = _write_note(
+            vault / "projects" / "Home.md",
+            _typed_note("project", "# Home\n", extra="owner: Sam Rivera"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(project)
+
+        asyncio.run(scenario())
+        view = PageView(lambda: None)
+        name_span = (view.meta_owner.spans or [])[1]
+
+        asyncio.run(typing.cast("typing.Any", name_span.on_click)())
+
+        assert state.pages.page is not None
+        assert state.pages.page.path == person.resolve()
+
+    def test_missing_owner_uses_the_broken_style_and_asks_to_create(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        project = _write_note(
+            vault / "projects" / "Home.md",
+            _typed_note("project", "# Home\n", extra="owner: Nobody"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        requested: list[str] = []
+
+        async def missing(name: str) -> None:
+            requested.append(name)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(project)
+
+        asyncio.run(scenario())
+        view = PageView(lambda: None, on_missing_role=missing)
+        name_span = (view.meta_owner.spans or [])[1]
+
+        assert name_span.style is afanes.ui.theme.ROLE_BROKEN_TEXT_STYLE
+        assert name_span.tooltip == afanes.ui.strings.ROLE_LINK_MISSING
+
+        asyncio.run(typing.cast("typing.Any", name_span.on_click)())
+
+        assert requested == ["Nobody"]
+        assert not (vault / "reference" / "Nobody.md").exists()
 
     def test_project_without_a_requester_omits_the_label(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._project(tmp_path, monkeypatch)
@@ -834,7 +1163,7 @@ class TestProjectMeta:
         view = PageView(lambda: None)
 
         assert view.meta_asked.visible is False
-        assert view.meta_asked.value == ""
+        assert view.meta_asked.spans == []
 
     def test_note_page_shows_only_the_date(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -854,6 +1183,7 @@ class TestProjectMeta:
         assert view.meta_status.visible is False
         assert view.meta_due.visible is False
         assert view.meta_due_button.visible is False
+        assert view.meta_owner.visible is False
         assert view.meta_asked.visible is False
 
     def test_due_date_is_set_from_read_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -907,6 +1237,14 @@ class TestProjectMeta:
         assert view.read_body.extension_set is ft.MarkdownExtensionSet.GITHUB_FLAVORED
 
 
+def _spans_text(control: ft.Text) -> str:
+    return "".join(str(span.text) for span in control.spans or [])
+
+
+def _freeze(control: ft.Control) -> None:
+    object.__setattr__(control, "_frozen", True)
+
+
 def _texts(control: ft.Control) -> list[str]:
     values: list[str] = []
     if isinstance(control, ft.Text):
@@ -915,6 +1253,7 @@ def _texts(control: ft.Control) -> list[str]:
         values.append(str(control.label))
     if isinstance(control, ft.Markdown):
         values.append(str(control.value))
+    values.extend(str(span.text) for span in getattr(control, "spans", []) or [] if isinstance(span, ft.TextSpan))
     for child in getattr(control, "controls", []) or []:
         values.extend(_texts(child))
     content = getattr(control, "content", None)
@@ -972,12 +1311,16 @@ class TestConnections:
             _typed_note(
                 "project",
                 "# Home\n\n- [ ] Review <!-- {owners: [Ada]} -->\n- [x] Done <!-- {owners: [Ada]} -->\n",
-                extra="asked_by: Ada",
+                extra="owner: Ada\nasked_by: Ada",
             ),
         )
         _write_note(
             vault / "projects" / "Finished.md",
             _typed_note("project", "# Finished\n", extra="status: done\nasked_by: Ada"),
+        )
+        _write_note(
+            vault / "projects" / "Old.md",
+            _typed_note("project", "# Old\n", extra="status: done\nowner: Ada"),
         )
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
@@ -988,16 +1331,17 @@ class TestConnections:
 
         asyncio.run(scenario())
 
-    def test_section_lists_all_three_subsections(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_section_lists_all_four_subsections(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
         view = PageView(lambda: None)
         subsections = view.connections_body.controls
 
         assert view.connections_panel.visible is True
-        assert len(subsections) == THREE_SUBSECTIONS
+        assert len(subsections) == FOUR_SUBSECTIONS
         assert afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM in _texts(subsections[0])
-        assert afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS in _texts(subsections[1])
-        assert afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS in _texts(subsections[2])
+        assert afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS in _texts(subsections[1])
+        assert afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS in _texts(subsections[2])
+        assert afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS in _texts(subsections[3])
 
     def test_linked_from_rows_use_display_titles(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
@@ -1005,10 +1349,18 @@ class TestConnections:
 
         assert "Call" in _texts(view.connections_body.controls[0])
 
-    def test_owned_steps_group_under_project_headings(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_owned_projects_list_open_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
         view = PageView(lambda: None)
         texts = _texts(view.connections_body.controls[1])
+
+        assert "Home" in texts
+        assert "Old" not in texts
+
+    def test_owned_steps_group_under_project_headings(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._open_person(tmp_path, monkeypatch)
+        view = PageView(lambda: None)
+        texts = _texts(view.connections_body.controls[2])
 
         assert "Home" in texts
         assert "Review" in texts
@@ -1017,10 +1369,11 @@ class TestConnections:
     def test_requested_projects_list_open_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
         view = PageView(lambda: None)
-        texts = _texts(view.connections_body.controls[2])
+        texts = _texts(view.connections_body.controls[3])
 
         assert "Home" in texts
         assert "Finished" not in texts
+        assert "Old" not in texts
 
     def test_selecting_a_linked_note_opens_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
@@ -1035,7 +1388,7 @@ class TestConnections:
     def test_selecting_an_owned_step_opens_its_project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
         view = PageView(lambda: None)
-        button = _find_text_button(view.connections_body.controls[1], "Review")
+        button = _find_text_button(view.connections_body.controls[2], "Review")
         assert button is not None
 
         asyncio.run(typing.cast("typing.Any", button.on_click)())
@@ -1045,6 +1398,16 @@ class TestConnections:
     def test_selecting_a_project_heading_opens_its_project(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        self._open_person(tmp_path, monkeypatch)
+        view = PageView(lambda: None)
+        button = _find_text_button(view.connections_body.controls[2], "Home")
+        assert button is not None
+
+        asyncio.run(typing.cast("typing.Any", button.on_click)())
+
+        assert view.title.value == "Home"
+
+    def test_selecting_an_owned_project_opens_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
         view = PageView(lambda: None)
         button = _find_text_button(view.connections_body.controls[1], "Home")
@@ -1059,25 +1422,29 @@ class TestConnections:
         view = PageView(lambda: None)
         assert view.connections_steps_toggle.visible is True
         assert view.connections_steps_toggle.value is False
-        assert "Done" not in _texts(view.connections_body.controls[1])
+        assert "Done" not in _texts(view.connections_body.controls[2])
 
         view.connections_steps_toggle.value = True
         asyncio.run(view.toggle_completed_steps(ft.Event(name="change", control=view.connections_steps_toggle)))
 
-        assert "Done" in _texts(view.connections_body.controls[1])
+        assert "Done" in _texts(view.connections_body.controls[2])
         assert view.connections_steps_toggle.value is True
 
-    def test_enabling_finished_projects_reveals_them(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_enabling_finished_projects_reveals_both_roles(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         self._open_person(tmp_path, monkeypatch)
         view = PageView(lambda: None)
         assert view.connections_projects_toggle.visible is True
         assert view.connections_projects_toggle.value is False
-        assert "Finished" not in _texts(view.connections_body.controls[2])
+        assert "Old" not in _texts(view.connections_body.controls[1])
+        assert "Finished" not in _texts(view.connections_body.controls[3])
 
         view.connections_projects_toggle.value = True
         asyncio.run(view.toggle_finished_projects(ft.Event(name="change", control=view.connections_projects_toggle)))
 
-        assert "Finished" in _texts(view.connections_body.controls[2])
+        assert "Old" in _texts(view.connections_body.controls[1])
+        assert "Finished" in _texts(view.connections_body.controls[3])
         assert view.connections_projects_toggle.value is True
 
     def test_changing_the_page_resets_both_toggles(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1099,8 +1466,9 @@ class TestConnections:
 
         assert view.connections_steps_toggle.value is False
         assert view.connections_projects_toggle.value is False
-        assert "Done" not in _texts(view.connections_body.controls[1])
-        assert "Finished" not in _texts(view.connections_body.controls[2])
+        assert "Done" not in _texts(view.connections_body.controls[2])
+        assert "Old" not in _texts(view.connections_body.controls[1])
+        assert "Finished" not in _texts(view.connections_body.controls[3])
 
     def test_page_without_connections_hides_the_section(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -1171,7 +1539,7 @@ class TestConnections:
 
         asyncio.run(scenario())
         view = PageView(lambda: None)
-        texts = _texts(view.connections_body.controls[1])
+        texts = _texts(view.connections_body.controls[2])
 
         assert (
             texts.index("Alpha")
@@ -1190,9 +1558,9 @@ class TestConnections:
         view.connections_steps_toggle.value = True
         asyncio.run(view.toggle_completed_steps(ft.Event(name="change", control=view.connections_steps_toggle)))
 
-        assert "Done" in _texts(view.connections_body.controls[1])
+        assert "Done" in _texts(view.connections_body.controls[2])
         assert view.connections_projects_toggle.value is False
-        assert "Finished" not in _texts(view.connections_body.controls[2])
+        assert "Finished" not in _texts(view.connections_body.controls[3])
 
     def test_finished_projects_toggle_does_not_reveal_completed_steps(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1203,9 +1571,29 @@ class TestConnections:
         view.connections_projects_toggle.value = True
         asyncio.run(view.toggle_finished_projects(ft.Event(name="change", control=view.connections_projects_toggle)))
 
-        assert "Finished" in _texts(view.connections_body.controls[2])
+        assert "Finished" in _texts(view.connections_body.controls[3])
         assert view.connections_steps_toggle.value is False
-        assert "Done" not in _texts(view.connections_body.controls[1])
+        assert "Done" not in _texts(view.connections_body.controls[2])
+
+
+class TestFrozenPageRecovery:
+    def test_refresh_recovers_a_frozen_content_control(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
+        view = PageView(lambda: None)
+        _freeze(view.content)
+
+        view.refresh()
+
+        assert not hasattr(view.content, "_frozen")
 
 
 class TestPageDates:

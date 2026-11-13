@@ -139,6 +139,31 @@ class TestProcessingState:
         assert state.processing.body == "# Buy milk"
         assert state.session.selected == capture
 
+    def test_build_plan_passes_role_names(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> ProcessingPlan | None:
+            await state.workspace.choose_vault(vault)
+            capture = await state.session.capture("Buy milk")
+            assert capture is not None
+            assert await state.processing.begin(capture) is True
+            plan = await state.processing.build_plan(
+                ProcessingOutcome.PROJECT,
+                owner="Sam Rivera",
+                asked_by="Priya Nair",
+            )
+            assert isinstance(plan, ProcessingPlan)
+            return plan
+
+        plan = asyncio.run(scenario())
+
+        assert plan is not None
+        assert plan.owner == "Sam Rivera"
+        assert plan.asked_by == "Priya Nair"
+
     def test_begin_processing_rejects_a_missing_capture(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _versioned(vault)
@@ -2264,6 +2289,31 @@ class TestPageLabels:
 
         asyncio.run(scenario())
 
+    def test_owner_updates_the_labels(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        project = _write_note(vault / "projects" / "Call.md", _typed_note("project", "# Call\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(project)
+            await state.pages.set_page_owner("Sam Rivera")
+            page = state.pages.page
+            assert page is not None
+            assert page.labels is not None
+            assert page.labels.owner_text == "Sam Rivera"
+            assert page.is_dirty
+            await state.pages.set_page_owner("")
+            page = state.pages.page
+            assert page is not None
+            assert page.labels is not None
+            assert page.labels.owner_text == ""
+            assert not page.is_dirty
+
+        asyncio.run(scenario())
+
     def test_assignment_suggestions_come_from_the_scan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _versioned(vault)
@@ -2650,6 +2700,65 @@ class TestPageLinks:
         assert state.pages.page is not None
         assert state.pages.page.path == first.resolve()
 
+    def test_resolved_role_name_opens_its_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        person = _write_note(
+            vault / "reference" / "people" / "Sam Rivera.md",
+            _typed_note("reference", "# Sam Rivera\n", category="person"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.ui.state.navigation.RoleFollowOutcome:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.follow_role("Sam Rivera")
+
+        outcome = asyncio.run(scenario())
+
+        assert outcome is afanes.ui.state.navigation.RoleFollowOutcome.OPENED
+        assert state.pages.page is not None
+        assert state.pages.page.path == person.resolve()
+
+    def test_ambiguous_role_name_exposes_the_candidates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        first = _write_note(
+            vault / "reference" / "people" / "Sam Rivera.md",
+            _typed_note("reference", "# Sam Rivera\n", category="person"),
+        )
+        second = _write_note(vault / "notes" / "Sam Rivera.md", _typed_note("reference", "# Sam Rivera\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.ui.state.navigation.RoleFollowOutcome:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.follow_role("Sam Rivera")
+
+        outcome = asyncio.run(scenario())
+
+        assert outcome is afanes.ui.state.navigation.RoleFollowOutcome.AMBIGUOUS
+        assert set(state.navigation.ambiguous) == {first.resolve(), second.resolve()}
+        assert state.pages.page is None
+
+    def test_missing_role_name_reports_missing_without_writing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.ui.state.navigation.RoleFollowOutcome:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.follow_role("Sam Rivera")
+
+        outcome = asyncio.run(scenario())
+
+        assert outcome is afanes.ui.state.navigation.RoleFollowOutcome.MISSING
+        assert state.pages.page is None
+        assert not (vault / "reference" / "Sam Rivera.md").exists()
+
     def test_missing_references_create_the_right_drafts(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _versioned(vault)
@@ -2821,6 +2930,157 @@ class TestPageLinks:
         assert state.pages.page is not None
         assert state.pages.page.path == existing.resolve()
         assert state.pages.repair_preview is not None
+
+
+class TestRoleCategories:
+    def test_offers_person_existing_and_template_categories(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _write_note(
+            vault / "reference" / "process" / "Release.md",
+            _typed_note("reference", "# Release\n", category="process"),
+        )
+        _write_note(
+            vault / "reference" / "team" / "Platform.md",
+            _typed_note("reference", "# Platform\n", category="team"),
+        )
+        card = vault / "templates" / "place.md"
+        card.parent.mkdir(parents=True)
+        card.write_text(
+            "---\ntype: reference\ncategory: place\ntitle: Place\n---\n\n## Notes\n",
+            encoding="utf-8",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[CategoryLabel, ...]:
+            await state.workspace.choose_vault(vault)
+            state.browser.query = "release"
+            return await state.browser.role_categories()
+
+        categories = asyncio.run(scenario())
+
+        assert [category.value for category in categories] == ["person", "place", "process", "team"]
+
+    def test_offers_person_without_templates_or_references(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[CategoryLabel, ...]:
+            await state.workspace.choose_vault(vault)
+            return await state.browser.role_categories()
+
+        categories = asyncio.run(scenario())
+
+        assert [category.value for category in categories] == ["person"]
+
+
+class TestCreateRoleReference:
+    def test_creates_a_categorized_reference_and_opens_it(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.create_role_reference("Sam Rivera", CategoryLabel("person"))
+
+        created = asyncio.run(scenario())
+
+        path = vault / "reference" / "person" / "Sam Rivera.md"
+        assert created is True
+        assert path.is_file()
+        assert "# Sam Rivera" in path.read_text(encoding="utf-8")
+        assert state.pages.editing is True
+        assert state.pages.page is not None
+        assert state.pages.page.path == path.resolve()
+        assert state.pages.page.labels is not None
+        assert state.pages.page.labels.category == CategoryLabel("person")
+
+    def test_creates_an_uncategorized_reference(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.create_role_reference("Sam Rivera", None)
+
+        created = asyncio.run(scenario())
+
+        path = vault / "reference" / "Sam Rivera.md"
+        assert created is True
+        assert path.is_file()
+        assert state.pages.page is not None
+        assert state.pages.page.path == path.resolve()
+
+    def test_uses_the_matching_template_card(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        card = vault / "templates" / "person.md"
+        card.parent.mkdir(parents=True)
+        card.write_text(
+            "---\ntype: reference\ncategory: person\ntitle: Person\n---\n\n## Contact\n\n- Email:\n",
+            encoding="utf-8",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.create_role_reference("Sam Rivera", CategoryLabel("person"))
+
+        created = asyncio.run(scenario())
+
+        path = vault / "reference" / "person" / "Sam Rivera.md"
+        assert created is True
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.body.startswith("# Sam Rivera\n")
+        assert "## Contact" in document.body
+        assert "- Email:" in document.body
+
+    def test_a_collision_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        existing = _write_note(vault / "reference" / "Sam Rivera.md", _note_text("# Existing\n"))
+        before = existing.read_bytes()
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.create_role_reference("Sam Rivera", None)
+
+        created = asyncio.run(scenario())
+
+        assert created is False
+        assert existing.read_bytes() == before
+        assert state.status.message is not None
+
+    def test_a_blank_name_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.create_role_reference("   ", None)
+
+        created = asyncio.run(scenario())
+
+        assert created is False
+        assert state.status.message == afanes.ui.strings.BROWSER_NAME_REQUIRED
 
 
 class TestPageRenameTrash:

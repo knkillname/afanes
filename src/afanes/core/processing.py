@@ -188,6 +188,11 @@ class ProcessingPlan:
         Whether the outcome moves the note to a different reference scheme.
     target_date : NoteDate | None
         Date written by a log outcome, or ``None`` for every other outcome.
+    owner : str | None
+        Project-owner name written by a project outcome, or ``None`` when
+        absent.
+    asked_by : str | None
+        Requester name written by a project outcome, or ``None`` when absent.
 
     Notes
     -----
@@ -211,6 +216,8 @@ class ProcessingPlan:
     affected_notes: tuple[Path, ...]
     changes_scheme: bool
     target_date: NoteDate | None = None
+    owner: str | None = None
+    asked_by: str | None = None
 
     def __post_init__(self) -> None:
         """Validate the plan's local invariants.
@@ -246,6 +253,8 @@ class ProcessingPlan:
         labels = labels.with_status(self.target_status)
         labels = labels.with_category(self.category)
         labels = labels.with_due_date_text("" if self.due_date is None else self.due_date.isoformat())
+        labels = labels.with_owner_text(self.owner or "")
+        labels = labels.with_asked_by_text(self.asked_by or "")
         if self.target_date is not None:
             labels = labels.with_date_text(self.target_date.text)
         body = document.body if self.body_override is None else self.body_override
@@ -298,6 +307,11 @@ class ProcessingPlan:
         """Validate metadata against the selected outcome."""
         if self.outcome is ProcessingOutcome.APPEND_STEP:
             message = "Append step uses an append plan"
+            raise ProcessingError(message)
+        if self.outcome not in (ProcessingOutcome.PROJECT, ProcessingOutcome.DONE_NOW) and (
+            self.owner is not None or self.asked_by is not None
+        ):
+            message = "Only projects accept owner and requester names"
             raise ProcessingError(message)
         if self.outcome is ProcessingOutcome.TRASH:
             if self.due_date is not None:
@@ -362,6 +376,12 @@ class ProcessingPlan:
             raise ProcessingError(message)
         if self.category is not None or self.scaffold is not None:
             message = "Project outcomes do not accept a category or starter body"
+            raise ProcessingError(message)
+        if self.owner is not None and not self.owner.strip():
+            message = "Project owner must be a non-empty name"
+            raise ProcessingError(message)
+        if self.asked_by is not None and not self.asked_by.strip():
+            message = "Project requester must be a non-empty name"
             raise ProcessingError(message)
 
 

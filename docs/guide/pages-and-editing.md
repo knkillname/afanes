@@ -27,18 +27,32 @@ is derived from the current vault scan and is never written to a note.
 
 - **Linked from** lists the notes whose body references resolve to this page, once per note and by
   display title.
+- **Owned projects** lists the open projects whose `owner` value resolves to this page.
 - **Owned steps** lists the open steps of open projects that name this page as an owner. Steps are
   grouped by project and keep their order in the project body.
 - **Requested projects** lists the open projects whose `asked_by` value resolves to this page.
 
-Completed owned steps stay behind **Show completed steps**, and finished requested projects stay
-behind **Show finished projects**. The two toggles are independent and both start hidden; opening
-another page hides them again. Selecting a linked note opens it, while selecting an owned step or a
-project heading opens the project at the top.
+The sections always appear in that order and a section is omitted when it has no item. Completed owned
+steps stay behind **Show completed steps**, and finished owned and requested projects stay behind
+**Show finished projects**. The two toggles are independent and both start hidden; opening another page
+hides them again. Selecting a linked note or a project opens it, while selecting an owned step opens its
+project at the top.
 
 Only a name that resolves to exactly one note creates a connection. Missing and ambiguous names
 contribute nothing, and notes under `trash/` never contribute. Edit mode and raw rescue mode hide the
 section. See [Names and links](../reference/names-and-links.md) for the resolution rules.
+
+A project's **Owner** and **Asked by** names and every step owner name are links in read mode. A name
+that resolves opens its page; an ambiguous name lists the candidates and waits for a choice. A missing
+name is shown as a broken link; selecting it asks for a reference category, then creates the note and
+opens it in edit mode. The category field defaults to **person** and suggests every existing category
+and every template card category; the matching template card supplies the starter body. Cancelling that
+dialog writes nothing. Step owner chips keep their separate
+delete action.
+
+The same header has an owner action and a requester action. Each opens a name dialog with the vault's
+note names as suggestions, accepts a new name, and offers **Clear**. Confirming writes the value
+immediately without entering edit mode; cancelling writes nothing.
 
 ## ✏️ Editing labels
 
@@ -51,11 +65,16 @@ Choose **Edit** to change the raw Markdown body and the labels:
   one.
 - **Status**: choices follow the selected type.
 - **Due date**: offered only for projects.
+- **Owner** and **Asked by**: offered only for projects. Both accept free text and suggest matching
+  note names from the vault.
 
-A log entry shows only the Date field and the body. It has no category, status, due date, or requester.
+A log entry shows only the Date field and the body. It has no category, status, due date, requester, or
+owner.
 
 The body includes its level-1 heading, which is the display title, and project steps with their
-metadata. There are no `people` or `project` fields. The body editor fills the page pane, so the
+metadata. There are no `people` or `project` fields. The label fields sit in one wrapping row: Date
+stays beside Type, Category, and Status when the pane is wide, and the fields wrap onto more rows when
+it narrows. The body editor fills the page pane, with its text starting at the top-left, so the
 Markdown area grows with the window while the label fields stay above it.
 
 Changing a reference's category previews its new folder and moves the file only after confirmation.

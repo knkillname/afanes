@@ -825,8 +825,51 @@ class TestScanVault:
 
         assert [step.text for step in note.steps] == ["Call the plumber"]
         assert note.next_step is not None
-        assert "Ada" not in note.search_text
+        assert "Ada" in note.search_text
         assert "Call the plumber" in note.search_text
+
+    def test_project_search_text_excludes_non_role_metadata(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(
+            root / "projects/Home.md",
+            "project",
+            body=(
+                "# Home\n\n- [ ] Call <!-- {owners: [Ada], plan: 2026-11-20, tags: [plumbing], custom: hidden} -->\n"
+            ),
+        )
+
+        note = afanes.core.vault.service.Vault(root).scan().notes[0]
+
+        assert "Ada" in note.search_text
+        assert "Call" in note.search_text
+        assert "2026-11-20" not in note.search_text
+        assert "plumbing" not in note.search_text
+        assert "hidden" not in note.search_text
+
+    def test_project_note_reads_role_metadata_references(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        path = root / "projects/Home.md"
+        path.parent.mkdir(parents=True)
+        path.write_text(
+            "---\ntype: project\nowner: Sam Rivera\nasked_by: Priya Nair\n---\n\n"
+            "# Home\n\n"
+            "- [ ] Call <!-- {owners: [Ada, Grace]} -->\n"
+            "- [ ] Write <!-- {owners: [Ada]} -->\n",
+            encoding="utf-8",
+        )
+
+        note = afanes.core.vault.service.Vault(root).scan().notes[0]
+
+        assert note.owner == "Sam Rivera"
+        assert note.asked_by == "Priya Nair"
+        assert note.metadata_references == (
+            NoteReference(ReferenceScheme.NOTE, "Sam Rivera"),
+            NoteReference(ReferenceScheme.NOTE, "Priya Nair"),
+            NoteReference(ReferenceScheme.NOTE, "Ada"),
+            NoteReference(ReferenceScheme.NOTE, "Grace"),
+            NoteReference(ReferenceScheme.NOTE, "Ada"),
+        )
+        assert note.body_references == ()
 
     def test_reference_note_has_no_steps(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

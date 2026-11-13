@@ -77,6 +77,9 @@ class NoteDocument:
     asked_by : str | None
         Plain name of the person or group that requested the project, or
         ``None`` when absent.
+    owner : str | None
+        Plain name of the person or team accountable for the project, or
+        ``None`` when absent.
     date : NoteDate | None
         ISO partial date, or ``None`` when absent or malformed.
     date_error : str | None
@@ -101,6 +104,7 @@ class NoteDocument:
     status: Status | None = None
     due_date: datetime.date | None = None
     asked_by: str | None = None
+    owner: str | None = None
     date: NoteDate | None = None
     date_error: str | None = None
 
@@ -118,7 +122,7 @@ class NoteDocument:
         -------
         NoteDocument
             Raw metadata, body, newline style, declared type, category, status,
-            due date, requester, and note date.
+            due date, requester, owner, and note date.
 
         Raises
         ------
@@ -126,8 +130,8 @@ class NoteDocument:
             If the opening fence is never closed, the YAML is malformed or is
             not a mapping, a key is not a string, the declared type or status
             is unknown, the category is invalid or misplaced, the due date is
-            invalid or misplaced, the asked-by name is invalid or misplaced, or
-            the status is not valid for the type.
+            invalid or misplaced, the asked-by or owner name is invalid or
+            misplaced, or the status is not valid for the type.
         RetiredValueError
             If the note declares ``type: action``, ``type: person``, or a
             ``people`` or ``project`` key.
@@ -147,6 +151,7 @@ class NoteDocument:
         status = cls._declared_status(split.raw, note_type)
         due_date = cls._declared_due_date(split.raw, note_type)
         asked_by = cls._declared_asked_by(split.raw, note_type)
+        owner = cls._declared_owner(split.raw, note_type)
         note_date, date_error = cls._declared_date(split.raw)
         return cls(
             raw=split.raw,
@@ -158,6 +163,7 @@ class NoteDocument:
             status=status,
             due_date=due_date,
             asked_by=asked_by,
+            owner=owner,
             date=note_date,
             date_error=date_error,
         )
@@ -312,6 +318,7 @@ class NoteDocument:
         status = self._declared_status(new_raw, note_type)
         due_date = self._declared_due_date(new_raw, note_type)
         asked_by = self._declared_asked_by(new_raw, note_type)
+        owner = self._declared_owner(new_raw, note_type)
         note_date, date_error = self._declared_date(new_raw)
         return dataclasses.replace(
             self,
@@ -321,6 +328,7 @@ class NoteDocument:
             status=status,
             due_date=due_date,
             asked_by=asked_by,
+            owner=owner,
             date=note_date,
             date_error=date_error,
         )
@@ -496,6 +504,28 @@ class NoteDocument:
             message = "Frontmatter asked_by is only valid on project notes"
             raise NoteParseError(message)
         raw["asked_by"] = name
+        return name
+
+    @staticmethod
+    def _declared_owner(
+        raw: dict[str, object],
+        note_type: NoteType | None,
+    ) -> str | None:
+        """Return the validated project owner name, or ``None`` when absent."""
+        if "owner" not in raw:
+            return None
+        value = raw["owner"]
+        if not isinstance(value, str):
+            message = "Frontmatter owner must be a string"
+            raise NoteParseError(message)
+        name = value.strip()
+        if not name:
+            message = "Frontmatter owner must be a non-empty string"
+            raise NoteParseError(message)
+        if note_type is not NoteType.PROJECT:
+            message = "Frontmatter owner is only valid on project notes"
+            raise NoteParseError(message)
+        raw["owner"] = name
         return name
 
     @staticmethod
