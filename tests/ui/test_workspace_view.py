@@ -26,6 +26,7 @@ from tests.support import ensure_vault, versioned
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
 SECTION_COUNT = 5
+PRIMARY_MENU_ITEM_COUNT = 4
 OWNED_BANNER_COUNT = 3
 TWO_ENTRIES = 2
 FIRST_DAY = 1
@@ -144,6 +145,14 @@ def _find_control(control: ft.Control, key: str) -> ft.Control | None:
 
 
 class TestWorkspaceShell:
+    def test_the_primary_menu_stays_small_and_has_no_close_action(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        assert len(view.change_button.items) == PRIMARY_MENU_ITEM_COUNT
+        assert all(item.content not in (afanes.ui.strings.CLOSE_ACTION, "Done") for item in view.change_button.items)
+
     def test_shell_renders_the_owned_banners(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
         state = afanes.ui.state.app_state

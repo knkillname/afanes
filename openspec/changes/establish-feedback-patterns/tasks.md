@@ -34,7 +34,7 @@
 
 ## 6. Overlay audit
 
-- [ ] 6.1 Audit every `AppShell` dialog for initial focus, Esc dismissal, Cancel before the affirmative action, a specific affirmative label, and no destructive default; add focused tests with the fake page and verify `hatch test tests/ui/test_app.py` passes.
+- [x] 6.1 Audit every `AppShell` dialog for initial focus, Esc dismissal, Cancel before the affirmative action, a specific affirmative label, and no destructive default; add focused tests with the fake page and verify `hatch test tests/ui/test_app.py` passes.
 - [ ] 6.2 Audit the primary and page menus for Esc dismissal and low complexity; add or update focused tests and verify `hatch test tests/ui/test_workspace_view.py` passes.
 - [ ] 6.3 Verify the toast, dialogs, menus, and inline panels follow the new overlay requirements and that no inline confirmation panel was moved into a modal.
 

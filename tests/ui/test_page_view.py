@@ -24,6 +24,7 @@ from tests.ui.test_conformance import HEADER_ACTION_KEYS
 
 TWO_CANDIDATES = 2
 FOUR_SUBSECTIONS = 4
+PAGE_MENU_ITEM_COUNT = 3
 
 
 @pytest.fixture(autouse=True)
@@ -775,6 +776,18 @@ class TestRawMode:
 
 
 class TestPanels:
+    def test_the_page_menu_stays_small_and_has_no_close_action(self) -> None:
+        view = PageView(PageActions(update=lambda: None))
+
+        assert len(view.menu_button.items) == PAGE_MENU_ITEM_COUNT
+        assert all(item.content not in (afanes.ui.strings.CLOSE_ACTION, "Done") for item in view.menu_button.items)
+
+    def test_inline_confirmation_panels_remain_inline(self) -> None:
+        view = PageView(PageActions(update=lambda: None))
+
+        assert isinstance(view.dialogs, ft.Column)
+        assert all(isinstance(panel, ft.Container) for panel in view.dialogs.controls)
+
     def test_page_banner_renders_the_page_conflict(self) -> None:
         afanes.ui.state.app_state.pages.conflict = "changed"
 

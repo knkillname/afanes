@@ -253,9 +253,11 @@ class AppShell:
                     ft.TextButton(
                         content=afanes.ui.strings.CLOSE_ACTION,
                         on_click=close,
+                        autofocus=True,
                         key="about-close",
                     ),
                 ],
+                on_dismiss=self._dialog_dismissed,
             ),
         )
         self.page.update()
@@ -660,8 +662,13 @@ class AppShell:
                     ),
                     submit_button,
                 ],
+                on_dismiss=self._dialog_dismissed,
             ),
         )
+        self.page.update()
+
+    def _dialog_dismissed(self, _event: object = None) -> None:
+        """Repaint after Esc or a barrier dismiss closes a dialog."""
         self.page.update()
 
     def _show_create_error(self, error: ft.Text, message: str) -> None:
@@ -766,6 +773,7 @@ class AppShell:
                     ),
                     submit_button,
                 ],
+                on_dismiss=self._dialog_dismissed,
             ),
         )
         self.page.update()
@@ -799,6 +807,7 @@ class AppShell:
 
         ordered = await self.state.browser.role_categories()
         dialog = RoleReferenceDialog(name, ordered, confirm, cancel)
+        dialog.dialog.on_dismiss = self._dialog_dismissed
         self.page.show_dialog(dialog.dialog)
         self.page.update()
 
@@ -941,6 +950,7 @@ class AppShell:
                         key="new-log-submit",
                     ),
                 ],
+                on_dismiss=self._dialog_dismissed,
             ),
         )
         self.page.update()
@@ -986,6 +996,7 @@ class AppShell:
                         key="change-vault-open",
                     ),
                 ],
+                on_dismiss=self._dialog_dismissed,
             ),
         )
         self.page.update()

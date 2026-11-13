@@ -25,7 +25,7 @@ import afanes.ui.views.workspace
 from afanes.core.errors import TemplateContentError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.settings import Settings
-from afanes.models.note import CategoryLabel
+from afanes.models.note import CategoryLabel, NoteDate
 from tests.support import versioned
 
 Handler = Callable[[], Awaitable[None]]
@@ -1578,3 +1578,51 @@ class TestAboutDialog:
         assert title.value == afanes.ui.strings.ABOUT_TITLE
         assert afanes.__about__.__version__ in (version.value or "")
         assert license_text.value == afanes.ui.strings.ABOUT_LICENSE
+
+
+class TestDialogAudit:
+    def test_dialogs_follow_the_overlay_rules(self) -> None:
+        page = FakePage()
+        shell = afanes.ui.app.AppShell(typing.cast("ft.Page", page), None)
+
+        async def scenario() -> tuple[
+            ft.AlertDialog,
+            ft.AlertDialog,
+            ft.AlertDialog,
+            ft.AlertDialog,
+            ft.AlertDialog,
+        ]:
+            await shell.show_about_dialog()
+            about = typing.cast("ft.AlertDialog", page.dialogs.pop())
+            await shell.show_create_dialog()
+            create = typing.cast("ft.AlertDialog", page.dialogs.pop())
+            await shell.show_new_reference_dialog()
+            reference = typing.cast("ft.AlertDialog", page.dialogs.pop())
+            await shell.show_log_entry_dialog(NoteDate.from_text("2025-10-12"))
+            log = typing.cast("ft.AlertDialog", page.dialogs.pop())
+            shell.show_vault_dialog()
+            vault = typing.cast("ft.AlertDialog", page.dialogs.pop())
+            return about, create, reference, log, vault
+
+        about, create, reference, log, vault = asyncio.run(scenario())
+
+        for dialog in (about, create, reference, log, vault):
+            assert dialog.on_dismiss is not None
+            assert all(
+                getattr(action, "style", None) != afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE for action in dialog.actions
+            )
+
+        about_close = _typed(_find_by_key(about, "about-close"), ft.TextButton)
+        assert about_close.autofocus is True
+        assert about.actions[0] is about_close
+
+        for dialog, key in (
+            (create, "create-vault-path"),
+            (reference, "new-reference-name"),
+            (log, "new-log-title"),
+            (vault, "change-vault-path"),
+        ):
+            field = _typed(_find_by_key(dialog, key), ft.TextField)
+            assert field.autofocus is True
+            assert getattr(dialog.actions[0], "content", None) == afanes.ui.strings.CANCEL_ACTION
+            assert getattr(dialog.actions[-1], "content", None) != afanes.ui.strings.CANCEL_ACTION
