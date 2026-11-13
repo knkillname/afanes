@@ -205,6 +205,7 @@ PROCESSING_REFRESH_FAILED = "The capture was processed, but the Inbox could not 
 PROCESSING_MISSING = "This capture is no longer in the Inbox."
 NOTE_COUNT_ONE = "1 note"
 NOTE_COUNT_MANY = "{count} notes"
+COMPOSER_LABEL = "Capture a thought"
 COMPOSER_HINT = "The first line becomes the title."
 CAPTURE_ACTION = "Capture"
 REFRESH_ACTION = "Refresh"

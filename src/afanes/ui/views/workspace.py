@@ -225,6 +225,15 @@ class WorkspaceView:
             vertical_alignment=ft.CrossAxisAlignment.END,
             key="workspace-capture-row",
         )
+        self.capture_label = ft.Text(
+            afanes.ui.strings.COMPOSER_LABEL,
+            style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
+        )
+        self.capture_section = ft.Column(
+            controls=[self.capture_label, self.capture_row],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            key="workspace-capture-section",
+        )
 
         self.review_count = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.review_icon = ft.Icon(ft.Icons.PLAY_ARROW_OUTLINED, color=afanes.ui.theme.SECTION_ICON_COLOR)
@@ -298,19 +307,20 @@ class WorkspaceView:
         )
         self.browser_body = ft.Column(
             controls=[
-                self.capture_row,
+                self.capture_section,
                 ft.Container(content=self.browser_list, expand=True),
                 self.failures_column,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
             expand=True,
         )
+        self.browser_divider = ft.Divider(height=afanes.ui.theme.BORDER_WIDTH, key="browser-divider")
         self.browser_region = ft.Container(
             width=afanes.ui.theme.BROWSER_MAX_WIDTH,
             bgcolor=afanes.ui.theme.PAGE_SURFACE_COLOR,
             content=ft.Column(
-                controls=[self.browser_header, self.browser_body],
-                spacing=afanes.ui.theme.ITEM_GAP,
+                controls=[self.browser_header, self.browser_divider, self.browser_body],
+                spacing=afanes.ui.theme.SECTION_GAP,
                 expand=True,
             ),
             key="workspace-browser",
@@ -773,7 +783,7 @@ class WorkspaceView:
         self.review_icon.color = afanes.ui.theme.SECTION_ICON_COLOR
         self.search_field.value = state.browser.query
         self._refresh_browser_header()
-        self.capture_row.visible = state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
+        self.capture_section.visible = state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
         self.browser_list.controls = self._browser_controls(listing)
         self._refresh_failures()
         self._refresh_banners()

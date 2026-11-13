@@ -754,10 +754,20 @@ class TestCapturePlacement:
         _write_note(tmp_path / "vault" / "inbox" / "One.md")
         view = _open_workspace(tmp_path, monkeypatch)
 
-        assert view.capture_row.visible is True
+        assert view.capture_section.visible is True
         asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.PROJECTS])())
 
-        assert view.capture_row.visible is False
+        assert view.capture_section.visible is False
+
+    def test_the_composer_is_labeled_and_separated_from_search(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_note(tmp_path / "vault" / "inbox" / "One.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        assert view.capture_label.value == afanes.ui.strings.COMPOSER_LABEL
+        assert _find_control(view.browser_region, "browser-divider") is not None
+        assert view.search_field not in view.capture_section.controls
 
     def test_new_capture_switches_to_inbox_and_focuses(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -774,7 +784,7 @@ class TestCapturePlacement:
         asyncio.run(_handler(view.new_capture_button)())
 
         assert afanes.ui.state.app_state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
-        assert view.capture_row.visible is True
+        assert view.capture_section.visible is True
         assert focused == ["workspace-capture-field"]
 
     def test_capture_is_the_only_suggested_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
