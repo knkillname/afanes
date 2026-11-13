@@ -303,8 +303,6 @@ def log_day_tooltip(day: int, count: int) -> str:
 
 
 VAULT_PATH_REQUIRED = "Enter the folder path for the vault."
-SCAN_WARNING_ONE = "1 note could not be read: {paths}"
-SCAN_WARNING_MANY = "{count} notes could not be read: {paths}"
 
 PAGE_BACK = "Back"
 PAGE_EDIT = "Edit"
@@ -499,37 +497,3 @@ def review_pending(count: int) -> str:
     """
     return REVIEW_PENDING_ONE if count == 1 else REVIEW_PENDING_MANY.format(count=count)
 
-
-def scan_warning_title(count: int) -> str:
-    """Return the unreadable-note banner heading.
-
-    Parameters
-    ----------
-    count : int
-        Number of notes that could not be parsed.
-
-    Returns
-    -------
-    str
-        Singular or plural heading for the failure list.
-    """
-    return "1 note could not be read." if count == 1 else f"{count} notes could not be read."
-
-
-def scan_warning(count: int, paths: str) -> str:
-    """Return the unreadable-note banner text.
-
-    Parameters
-    ----------
-    count : int
-        Number of notes that could not be parsed.
-    paths : str
-        Comma-separated vault-relative paths.
-
-    Returns
-    -------
-    str
-        Singular or plural warning with the affected paths.
-    """
-    template = SCAN_WARNING_ONE if count == 1 else SCAN_WARNING_MANY
-    return template.format(count=count, paths=paths)

@@ -51,23 +51,23 @@
 
 ## 3. Retired InboxView removal
 
-- [ ] 3.1 Re-run the D8 reference proof before deleting anything: the AST count must show zero
+- [x] 3.1 Re-run the D8 reference proof before deleting anything: the AST count must show zero
   production references to `InboxView` outside `ui/views/inbox.py`, `WelcomeView` and `SessionNotice`
   must still have `ui/app.py` callers, and no entry point, packaging file, docs page, README, or main
   spec may reference `InboxView`; record the command output in the task commit.
-- [ ] 3.2 Remove `TestInboxView` and its exclusive helpers, constants, and imports from
+- [x] 3.2 Remove `TestInboxView` and its exclusive helpers, constants, and imports from
   `tests/ui/test_inbox_view.py`, keeping the `WelcomeView` tests; verify
   `hatch test tests/ui/test_inbox_view.py` passes.
-- [ ] 3.3 Remove the `InboxView` class and its exclusive private methods and imports from
+- [x] 3.3 Remove the `InboxView` class and its exclusive private methods and imports from
   `ui/views/inbox.py`, keeping `WelcomeView`, `SessionNotice`, and shared helpers such as `Banner`;
   verify `grep -rn "InboxView" src` returns nothing and
   `hatch test tests/ui/test_app.py tests/ui/test_inbox_view.py` passes.
-- [ ] 3.4 Remove `scan_warning_title` and `scan_warning` from `ui/strings.py`; verify
+- [x] 3.4 Remove `scan_warning_title` and `scan_warning` from `ui/strings.py`; verify
   `grep -rn "scan_warning" src tests docs` returns nothing and the targeted UI tests pass.
-- [ ] 3.5 Add the `Removed` entry to `CHANGELOG.md` with the `InboxView` migration note and the live
+- [x] 3.5 Add the `Removed` entry to `CHANGELOG.md` with the `InboxView` migration note and the live
   `WorkspaceView` replacement; verify the entry names this change and records that no user-visible
   workflow changed.
-- [ ] 3.6 Re-run the reference proof and verify the module still exports only the live views; run
+- [x] 3.6 Re-run the reference proof and verify the module still exports only the live views; run
   `hatch test tests/ui/test_app.py tests/ui/test_inbox_view.py` and verify both pass.
 
 ## 4. Integration verification

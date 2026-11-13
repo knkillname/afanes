@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   keep their unknown keys and newline style, and parsed note values are unchanged. This implements the
   `refactor-single-owner` OpenSpec change.
 
+### Removed
+
+- **Breaking:** the unused `ui.views.inbox.InboxView` class and its exclusive helpers are removed. The live
+  workspace browser replaced that screen with `ui.views.workspace.WorkspaceView`; no user-visible workflow changed.
+  This implements the `refactor-single-owner` OpenSpec change.
+
 ### Fixed
 
 - The log entry picker describes Empty as a log entry with no starter body instead of offering a reference
