@@ -21,8 +21,8 @@
 
 ## 4. Dialogs and review forms
 
-- [ ] 4.1 Make the New Vault Create action insensitive while the path field is blank, with live updates. Verify the dialog tests in `tests/ui/test_app.py` cover disabled, enabled, and direct-command rejection.
-- [ ] 4.2 Make the New Reference Create action insensitive while the name field is blank, with live updates. Verify `tests/ui/test_app.py` covers the dialog and the direct-command rejection.
+- [x] 4.1 Make the New Vault Create action insensitive while the path field is blank, with live updates. Verify the dialog tests in `tests/ui/test_app.py` cover disabled, enabled, and direct-command rejection.
+- [x] 4.2 Make the New Reference Create action insensitive while the name field is blank, with live updates. Verify `tests/ui/test_app.py` covers the dialog and the direct-command rejection.
 - [x] 4.3 Make the Review form Confirm action insensitive until the typed value is non-blank and, for postpone, a valid date. Verify `tests/ui/test_review_view.py` covers add-step, postpone, delegate, and reassign.
 - [x] 4.4 Hide a review card's normal action rows while its inline form or confirmation is open, so only the form's Confirm is suggested; restore the rows on cancel. Verify the review view tests count one suggested action in each open state.
 
