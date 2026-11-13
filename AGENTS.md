@@ -10,6 +10,8 @@
 
 **Tie-breaker:** Zen of Python (PEP 20). Prefer explicit, flat, readable, obvious designs.
 
+**Design principles:** SOLID, DRY, KISS, and YAGNI, read through the Zen of Python (PEP 20). The Zen is necessary but not sufficient. Structure is object-oriented with immutable value objects and small public methods that return values; no free functions. Use functional style inside methods — explicit inputs, returned outputs, no hidden mutation. Prefer the simplest design that satisfies the spec and keep one source of truth for each behavior.
+
 > This file contains prohibited vocabulary only in sections 4.1 and 6.1, as an enforcement target. Never copy those strings into code, UI, tests, specs, commits, or user docs.
 
 ## 1. Project snapshot
@@ -78,7 +80,7 @@ hatch run python scripts/scan_benchmark.py --notes 1000 5000 10000 --repeat 5
 - Allowed stdlib patterns include `from pathlib import Path`, `from collections.abc import Sequence`, and `from typing import Self`. Access other `typing` members through `import typing`.
 - No relative imports, wildcard imports, `from __future__ import annotations`, or `typing.TYPE_CHECKING`. Quote an unavoidable forward reference.
 - Keep `__init__.py` thin; do not re-export implementation symbols.
-- No dependency injection, service containers, or injected clocks/collaborators. Pass plain values; patch module behavior in tests.
+- No dependency-injection containers, service locators, or injected clocks/collaborators. Pass plain values; dependency inversion is expressed through explicit parameters, and tests patch module behavior.
 
 ## 4. Code standards
 
@@ -97,9 +99,9 @@ Use neutral vocabulary: Inbox, Processing Wizard / Clarification Pipeline, Step,
 
 ### 4.2 Object ownership and the architecture gate
 
-Classify every new unit as one of: **value object** (immutable data + invariants), **service object** (owns one resource, validates it at construction), or **controller/view** (UI state + presentation). Split mixed roles. A stateless transformation is a method on the value object or service that owns the data, not a free function. No Java-style getters, anemic data bags, or dependency injection.
+Classify every new unit as one of: **value object** (immutable data + invariants), **service object** (owns one resource, validates it at construction), or **controller/view** (UI state + presentation). Split mixed roles. A stateless transformation is a method on the value object or service that owns the data, not a free function. No Java-style getters, anemic data bags, dependency-injection containers, service locators, or injected clocks; dependency inversion is expressed through explicit parameters and plain values.
 
-Code is object-oriented: every behavior is a method on an owning class. Module-level functions are prohibited. The only exception is a function object passed to a class or library by contract — a Flet `main` target, an `argparse` type, or a console-script entry point — and it must delegate to an owned method in one line.
+Code is object-oriented: every behavior is a method on an owning class. Module-level functions are prohibited. The only exception is a function object passed to a class or library by contract — a Flet `main` target, an `argparse` type, or a console-script entry point — and it must delegate to an owned method in one line. Apply SOLID, DRY, KISS, and YAGNI to the object graph: one responsibility per unit, composition over inheritance, narrow interfaces, and no speculative abstraction.
 
 Prefer small, public, fruitful methods that return a value and can be tested directly. Keep a private method to an internal step of a public command; do not hide testable behavior in a large private helper.
 
