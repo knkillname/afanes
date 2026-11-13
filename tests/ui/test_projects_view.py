@@ -78,6 +78,10 @@ def _project_tiles(view: afanes.ui.views.projects.ProjectsView, stage: str) -> l
     return [control for control in _group(view, stage).controls or [] if isinstance(control, ft.ListTile)]
 
 
+def _titles(view: afanes.ui.views.projects.ProjectsView, stage: str) -> list[str]:
+    return [control.title.value for control in _project_tiles(view, stage) if isinstance(control.title, ft.Text)]
+
+
 def _details(tile: ft.ListTile) -> list[str]:
     subtitle = tile.subtitle
     assert isinstance(subtitle, ft.Column)
@@ -98,10 +102,10 @@ class TestProjectGrouping:
         _write_note(vault / "projects" / "Finished.md", status="done")
         view = _open_view(tmp_path, monkeypatch)
 
-        assert [tile.title for tile in _project_tiles(view, "active")] == ["Now", "Plain"]
-        assert [tile.title for tile in _project_tiles(view, "waiting")] == ["Blocked"]
-        assert [tile.title for tile in _project_tiles(view, "later")] == ["Someday"]
-        assert [tile.title for tile in _project_tiles(view, "closed")] == ["Finished"]
+        assert _titles(view, "active") == ["Now", "Plain"]
+        assert _titles(view, "waiting") == ["Blocked"]
+        assert _titles(view, "later") == ["Someday"]
+        assert _titles(view, "closed") == ["Finished"]
 
     def test_closed_group_starts_collapsed(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -113,17 +117,18 @@ class TestProjectGrouping:
         assert _group(view, "later").expanded is True
         assert _group(view, "closed").expanded is False
 
-    def test_status_labels_are_shown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_status_is_shown_in_the_metadata_line(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _write_note(vault / "projects" / "Now.md", status="active")
         _write_note(vault / "projects" / "Plain.md")
         view = _open_view(tmp_path, monkeypatch)
+        expected = afanes.ui.strings.PROJECT_META_SEPARATOR.join(["Active", afanes.ui.strings.open_step_count(0)])
 
         active_details = _details(_project_tiles(view, "active")[0])
         plain_details = _details(_project_tiles(view, "active")[1])
 
-        assert "Status: Active" in active_details
-        assert "Status: Active" in plain_details
+        assert active_details[-1] == expected
+        assert plain_details[-1] == expected
 
 
 class TestProjectRows:
@@ -139,9 +144,36 @@ class TestProjectRows:
 
         details = _details(_project_tiles(view, "active")[0])
 
-        assert "Due 2026-11-20" in details
-        assert "1 open step" in details
+        assert "Due 2026-11-20" in details[-1]
+        assert "1 open step" in details[-1]
         assert "Next: Write copy" in details
+
+    def test_row_leads_with_the_next_step_and_keeps_metadata_quiet(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _write_note(
+            vault / "projects" / "Launch.md",
+            status="active",
+            due_date="2026-11-20",
+            body="# Launch\n\n- [ ] Write copy\n",
+        )
+        view = _open_view(tmp_path, monkeypatch)
+        tile = _project_tiles(view, "active")[0]
+        subtitle = tile.subtitle
+
+        assert isinstance(tile.title, ft.Text)
+        assert tile.title.style == afanes.ui.theme.TEXT_ROLES["heading"]
+        assert isinstance(subtitle, ft.Column)
+        next_step, metadata = subtitle.controls
+        assert isinstance(next_step, ft.Markdown)
+        style_sheet = next_step.md_style_sheet
+        assert style_sheet is not None
+        assert style_sheet.p_text_style == afanes.ui.theme.TEXT_ROLES["body"]
+        assert isinstance(metadata, ft.Text)
+        assert metadata.style == afanes.ui.theme.TEXT_ROLES["caption"]
+        assert not tile.dense
+        assert not _group(view, "active").dense
 
     def test_row_without_due_date_omits_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -164,11 +196,11 @@ class TestProjectRows:
         view = _open_view(tmp_path, monkeypatch)
 
         tiles = _project_tiles(view, "waiting")
-        assert [tile.title for tile in tiles] == ["Launch"]
+        assert [tile.title.value for tile in tiles if isinstance(tile.title, ft.Text)] == ["Launch"]
         details = _details(tiles[0])
-        assert "Status: Waiting" in details
-        assert afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01") in details
-        assert "2 open steps" in details
+        assert "Waiting" in details[-1]
+        assert afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01") in details[-1]
+        assert "2 open steps" in details[-1]
         assert any("Write copy" in detail for detail in details)
         assert "Sam Rivera" not in " ".join(details)
         assert all("Owner" not in detail for detail in details)
@@ -193,11 +225,11 @@ class TestProjectRows:
         view.refresh()
 
         tiles = _project_tiles(view, "waiting")
-        assert [tile.title for tile in tiles] == ["Launch"]
+        assert [tile.title.value for tile in tiles if isinstance(tile.title, ft.Text)] == ["Launch"]
         details = _details(tiles[0])
-        assert "Status: Waiting" in details
-        assert afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01") in details
-        assert "2 open steps" in details
+        assert "Waiting" in details[-1]
+        assert afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01") in details[-1]
+        assert "2 open steps" in details[-1]
         assert any("Write copy" in detail for detail in details)
         assert "Sam Rivera" not in " ".join(details)
 
@@ -208,7 +240,7 @@ class TestProjectRows:
 
         details = _details(_project_tiles(view, "active")[0])
 
-        assert "0 open steps" in details
+        assert "0 open steps" in details[-1]
         assert "No next step" in details
 
     def test_next_step_renders_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -241,7 +273,7 @@ class TestProjectRows:
 
         details = _details(_project_tiles(view, "active")[0])
 
-        assert "2 open steps" in details
+        assert "2 open steps" in details[-1]
 
 
 class TestProjectSelection:
@@ -285,7 +317,7 @@ class TestProjectRefresh:
             body="# Launch\n\n- [ ] Write copy\n",
         )
         view = _open_view(tmp_path, monkeypatch)
-        assert "1 open step" in _details(_project_tiles(view, "active")[0])
+        assert "1 open step" in _details(_project_tiles(view, "active")[0])[-1]
 
         _write_note(
             vault / "projects" / "Launch.md",
@@ -296,7 +328,7 @@ class TestProjectRefresh:
         view.refresh()
 
         details = _details(_project_tiles(view, "active")[0])
-        assert "0 open steps" in details
+        assert "0 open steps" in details[-1]
         assert "No next step" in details
 
     def test_search_filters_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -308,7 +340,7 @@ class TestProjectRefresh:
 
         view.refresh()
 
-        assert [tile.title for tile in _project_tiles(view, "active")] == ["Launch"]
+        assert _titles(view, "active") == ["Launch"]
 
     def test_step_text_search_lists_the_project_without_the_matching_step(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -326,7 +358,7 @@ class TestProjectRefresh:
         view.refresh()
 
         tiles = _project_tiles(view, "active")
-        assert [tile.title for tile in tiles] == ["Launch"]
+        assert _titles(view, "active") == ["Launch"]
         details = _details(tiles[0])
         assert any("Write copy" in detail for detail in details)
         assert "printer" not in " ".join(details).lower()

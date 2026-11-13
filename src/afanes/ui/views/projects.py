@@ -101,53 +101,43 @@ class ProjectsView:
             title=ft.Text(f"{label} ({len(projects)})", style=afanes.ui.theme.TEXT_ROLES["heading"]),
             controls=[self._project_tile(summary) for summary in projects],
             expanded=group.stage is not ProjectStage.CLOSED,
-            dense=True,
             maintain_state=True,
             key=f"project-group-{group.stage.value}",
         )
 
     def _project_tile(self, summary: ProjectSummary) -> ft.Control:
-        """Build one clickable project row with its next step."""
+        """Build one clickable project row with its next step and metadata."""
         note = summary.note
-        details: list[ft.Control] = [
-            ft.Text(
-                afanes.ui.strings.PROJECT_STATUS.format(status=StatusLabel(note.status).text),
-                style=afanes.ui.theme.TEXT_ROLES["caption"],
-            )
-        ]
-        if note.due_date is not None:
-            details.append(
-                ft.Text(
-                    afanes.ui.strings.PROJECT_DUE.format(date=note.due_date.isoformat()),
-                    style=afanes.ui.theme.TEXT_ROLES["caption"],
-                )
-            )
-        details.append(
-            ft.Text(
-                afanes.ui.strings.open_step_count(summary.open_count),
-                style=afanes.ui.theme.TEXT_ROLES["caption"],
-            )
-        )
         if summary.next_step is None:
-            details.append(
-                ft.Text(
-                    afanes.ui.strings.PROJECT_NO_NEXT_STEP, style=afanes.ui.theme.TEXT_ROLES["caption"], selectable=True
-                )
+            next_step: ft.Control = ft.Text(
+                afanes.ui.strings.PROJECT_NO_NEXT_STEP,
+                style=afanes.ui.theme.TEXT_ROLES["caption"],
+                selectable=True,
             )
         else:
-            details.append(
-                StepText(
-                    afanes.ui.strings.PROJECT_NEXT_STEP.format(title=summary.next_step.text),
-                    afanes.ui.theme.TEXT_ROLES["caption"],
-                    selectable=True,
-                ).build()
-            )
+            next_step = StepText(
+                afanes.ui.strings.PROJECT_NEXT_STEP.format(title=summary.next_step.text),
+                afanes.ui.theme.TEXT_ROLES["body"],
+                selectable=True,
+            ).build()
+        meta: list[str] = [StatusLabel(note.status).text]
+        if note.due_date is not None:
+            meta.append(afanes.ui.strings.PROJECT_DUE.format(date=note.due_date.isoformat()))
+        meta.append(afanes.ui.strings.open_step_count(summary.open_count))
         page = self._state.pages.page
         return ft.ListTile(
-            title=note.title,
-            subtitle=ft.Column(controls=details, spacing=0),
+            title=ft.Text(note.title, style=afanes.ui.theme.TEXT_ROLES["heading"]),
+            subtitle=ft.Column(
+                controls=[
+                    next_step,
+                    ft.Text(
+                        afanes.ui.strings.PROJECT_META_SEPARATOR.join(meta),
+                        style=afanes.ui.theme.TEXT_ROLES["caption"],
+                    ),
+                ],
+                spacing=0,
+            ),
             selected=page is not None and page.path == note.path,
-            dense=True,
             on_click=self._select_handler(note.path),
             key=f"project-{note.relative_path.as_posix()}",
         )

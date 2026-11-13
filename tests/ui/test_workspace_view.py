@@ -322,7 +322,11 @@ class TestWorkspaceShell:
             for control in projects_root.controls
             if isinstance(control, ft.ExpansionTile) and control.key == "project-group-active"
         )
-        titles = [control.title for control in active_group.controls or [] if isinstance(control, ft.ListTile)]
+        titles = [
+            control.title.value
+            for control in active_group.controls or []
+            if isinstance(control, ft.ListTile) and isinstance(control.title, ft.Text)
+        ]
         assert titles == ["Launch"]
 
     def test_section_counts_follow_the_scan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -95,7 +95,6 @@ BASELINE: dict[str, dict[str, int]] = {
         "views/page.py": 2,
         "views/processing.py": 2,
         "views/project_body.py": 2,
-        "views/projects.py": 2,
         "views/workspace.py": 5,
     },
 }

@@ -144,6 +144,13 @@ part of the standard; the gate rejects them. The application does not bundle a f
 theme leaves the family unset so Flutter resolves the platform font, and the resolved family is
 checked per platform at release.
 
+## 📋 Lists and rows
+
+Browser lists follow the reference list view rather than a card grid: a row keeps a heading title,
+at most one body-weight supporting line, and one muted caption line for metadata. Rows do not use
+the toolkit's dense mode. The standard row height and the type roles carry the hierarchy, so a list
+does not become a wall of equally muted text. A selected row keeps the neutral selected-row fill.
+
 ## 🖼️ Icons
 
 Interface icons use monochrome symbolic or outlined glyphs at `ICON_SIZE` (16) or

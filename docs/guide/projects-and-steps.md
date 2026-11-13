@@ -21,10 +21,11 @@ The Projects group lists every parsed project under **Active**, **Waiting**, **L
 A project without a status is active. `done`, `cancelled`, and `archived` projects are closed, and the
 Closed group starts collapsed.
 
-Each project row shows its status, optional due date, count of open steps, and next step. An open step
-is an unchecked task-list item in the project body; checked steps are not counted. The next step is
-rendered Markdown, so links and emphasis appear as labels rather than raw source; raw Markdown appears
-only in edit mode.
+Each project row shows its status, optional due date, count of open steps, and next step. The next
+step leads the row in body text; status, due date, and open-step count share one muted metadata line
+under it. An open step is an unchecked task-list item in the project body; checked steps are not
+counted. The next step is rendered Markdown, so links and emphasis appear as labels rather than raw
+source; raw Markdown appears only in edit mode.
 
 ## ➡️ The next step
 
