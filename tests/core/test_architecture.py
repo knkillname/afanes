@@ -1,13 +1,12 @@
 """Architecture tests for layering, imports, and object ownership.
 
 The ownership gate enforces the end state described in ``AGENTS.md`` section
-4.2: every behavior is a method on an owning class. The remaining module-level
-functions are migration debt and are listed by name; the list may only shrink.
-The callback exception covers the ``main`` entry points and the ``argparse``
-type ``_port_number``.
+4.2: every behavior is a method on an owning class. The only allowed
+module-level function is ``entrypoint`` in ``__main__.py``, the installed script
+target. Callback functions that an external library receives as objects live on
+an owning class or as the local Flet entry closure.
 
-Do not add a free function. Delete an allowlist entry when its module gains an
-owning class.
+Do not add a free function.
 """
 
 import ast
@@ -23,14 +22,13 @@ CLI_ROOT = SOURCE_ROOT / "cli"
 UI_ROOT = SOURCE_ROOT / "ui"
 VIEW_ROOT = UI_ROOT / "views"
 
-# Migration debt: each entry is an existing free function, not a permission for
-# new ones. The list may only shrink as modules gain an owning class.
-FINAL_FUNCTION_ALLOWLIST: dict[str, frozenset[str] | None] = {
+# The single callback exception: the installed script resolves this name.
+FINAL_FUNCTION_ALLOWLIST: dict[str, frozenset[str]] = {
     "__main__.py": frozenset({"entrypoint"}),
 }
 
 # Temporary entries removed phase by phase. The final state is empty.
-TEMPORARY_FUNCTION_ALLOWLIST: dict[str, frozenset[str] | None] = {}
+TEMPORARY_FUNCTION_ALLOWLIST: dict[str, frozenset[str]] = {}
 
 # Temporary exemptions for the duplicate view-helper and field-budget rules.
 TEMPORARY_DUPLICATE_HELPER_ALLOWLIST: frozenset[str] = frozenset()
@@ -393,26 +391,17 @@ class TestObjectOwnership:
         assert frozenset() == TEMPORARY_FIELD_BUDGET_ALLOWLIST
 
     def test_final_allowlist_is_exact(self) -> None:
-        assert set(FINAL_FUNCTION_ALLOWLIST) == {
-            "__main__.py",
+        assert FINAL_FUNCTION_ALLOWLIST == {
+            "__main__.py": frozenset({"entrypoint"}),
         }
-        assert all(value is not None for value in FINAL_FUNCTION_ALLOWLIST.values())
 
     def test_module_functions_are_owned(self) -> None:
         offenders: list[str] = []
         for path in _python_files(SOURCE_ROOT):
             relative = _relative_source_path(path)
-            allowed = FINAL_FUNCTION_ALLOWLIST.get(relative)
-            temporary = TEMPORARY_FUNCTION_ALLOWLIST.get(relative)
-            functions = _module_functions(path)
-            if allowed is None and relative in FINAL_FUNCTION_ALLOWLIST:
-                continue
-            if temporary is None and relative in TEMPORARY_FUNCTION_ALLOWLIST:
-                continue
-            permitted = set() if allowed is None else set(allowed)
-            if temporary is not None:
-                permitted.update(temporary)
-            offenders.extend(f"{relative}: {name}" for name in sorted(functions - permitted))
+            permitted = set(FINAL_FUNCTION_ALLOWLIST.get(relative, frozenset()))
+            permitted.update(TEMPORARY_FUNCTION_ALLOWLIST.get(relative, frozenset()))
+            offenders.extend(f"{relative}: {name}" for name in sorted(_module_functions(path) - permitted))
         assert offenders == []
 
     def test_views_do_not_define_duplicate_helpers(self) -> None:

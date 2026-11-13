@@ -39,9 +39,9 @@
 
 ## 6. Enable the gates
 
-- [ ] 6.1 Add `PLR` to `[tool.ruff.lint].extend-select`, make `C901` explicit, set `[tool.ruff.lint.pylint].max-statements = 50`, and add `PLR0913` to the `tests/**/*.py` per-file ignores; verify `hatch run ruff check src tests` and `hatch check` pass.
-- [ ] 6.2 Reduce `FINAL_FUNCTION_ALLOWLIST` in `tests/core/test_architecture.py` to `{"__main__.py": frozenset({"entrypoint"})}`, simplify the type to `dict[str, frozenset[str]]`, remove the `None` branches from the module-function check, and update the docstring and exact-allowlist test; verify a temporary module-level function fails the gate and the real tree passes.
-- [ ] 6.3 Verify `grep -rn "^def \|^async def " src/afanes` lists only `entrypoint`; confirm no leading-underscore helper was promoted solely to satisfy the gate.
+- [x] 6.1 Add `PLR` to `[tool.ruff.lint].extend-select`, make `C901` explicit, set `[tool.ruff.lint.pylint].max-statements = 50`, and add `PLR0913` to the `tests/**/*.py` per-file ignores; verify `hatch run ruff check src tests` and `hatch check` pass.
+- [x] 6.2 Reduce `FINAL_FUNCTION_ALLOWLIST` in `tests/core/test_architecture.py` to `{"__main__.py": frozenset({"entrypoint"})}`, simplify the type to `dict[str, frozenset[str]]`, remove the `None` branches from the module-function check, and update the docstring and exact-allowlist test; verify a temporary module-level function fails the gate and the real tree passes.
+- [x] 6.3 Verify `grep -rn "^def \|^async def " src/afanes` lists only `entrypoint`; confirm no leading-underscore helper was promoted solely to satisfy the gate.
 
 ## 7. Update the durable documents
 

@@ -117,16 +117,19 @@ line-length = 120
 target-version = "py313"
 
 [tool.ruff.lint]
-extend-select = ["ANN", "C90", "D", "S"]
+extend-select = ["ANN", "C901", "D", "PLR", "S"]
 # The interface writing style requires the typographic apostrophe.
 allowed-confusables = ["’"]
+
+[tool.ruff.lint.pylint]
+max-statements = 50
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "docs/conf.py" = ["A001", "INP001"]
-"tests/**/*.py" = ["D100", "D101", "D102", "D103", "D104", "S101"]
+"tests/**/*.py" = ["D100", "D101", "D102", "D103", "D104", "PLR0913", "S101"]
 
 [tool.pyrefly]
 project-includes = ["src/afanes", "tests"]
