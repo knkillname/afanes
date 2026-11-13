@@ -113,7 +113,7 @@ class ReviewView:
         body = ft.Column(
             controls=[
                 ft.Text(afanes.ui.strings.REVIEW_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-2"]),
-                ft.Text(afanes.ui.strings.review_pending(count), selectable=True),
+                ft.Text(afanes.ui.strings.CopyFormatter.review_pending(count), selectable=True),
                 ft.FilledButton(
                     content=afanes.ui.strings.REVIEW_START_ACTION,
                     on_click=self._start,

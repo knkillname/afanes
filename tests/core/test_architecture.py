@@ -26,16 +26,6 @@ VIEW_ROOT = UI_ROOT / "views"
 # Migration debt: each entry is an existing free function, not a permission for
 # new ones. The list may only shrink as modules gain an owning class.
 FINAL_FUNCTION_ALLOWLIST: dict[str, frozenset[str] | None] = {
-    "ui/strings.py": frozenset(
-        {
-            "log_entry_count",
-            "log_day_tooltip",
-            "reference_count",
-            "note_count",
-            "open_step_count",
-            "review_pending",
-        }
-    ),
     "ui/app.py": frozenset({"main"}),
     "cli/main.py": frozenset({"main"}),
     "__main__.py": frozenset({"main", "_port_number"}),
@@ -406,7 +396,6 @@ class TestObjectOwnership:
 
     def test_final_allowlist_is_exact(self) -> None:
         assert set(FINAL_FUNCTION_ALLOWLIST) == {
-            "ui/strings.py",
             "ui/app.py",
             "cli/main.py",
             "__main__.py",

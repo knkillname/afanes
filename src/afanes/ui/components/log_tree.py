@@ -113,7 +113,7 @@ class LogTree:
                 controls=[
                     ft.Text(str(year.year)),
                     ft.Text(
-                        afanes.ui.strings.log_entry_count(year.count),
+                        afanes.ui.strings.CopyFormatter.log_entry_count(year.count),
                         style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                     control,
@@ -149,7 +149,7 @@ class LogTree:
                 controls=[
                     ft.Text(name),
                     ft.Text(
-                        afanes.ui.strings.log_entry_count(month.count),
+                        afanes.ui.strings.CopyFormatter.log_entry_count(month.count),
                         style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                     control,
@@ -182,7 +182,7 @@ class LogTree:
                 controls=[
                     ft.Text(str(day.day)),
                     ft.Text(
-                        afanes.ui.strings.log_entry_count(day.count),
+                        afanes.ui.strings.CopyFormatter.log_entry_count(day.count),
                         style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                 ],
@@ -216,7 +216,7 @@ class LogTree:
                 controls=[
                     ft.Text(afanes.ui.strings.LOG_UNDATED),
                     ft.Text(
-                        afanes.ui.strings.log_entry_count(len(notes)),
+                        afanes.ui.strings.CopyFormatter.log_entry_count(len(notes)),
                         style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                 ]

@@ -153,7 +153,7 @@ class ProjectsView:
         meta: list[str] = [StatusLabel(note.status).text]
         if note.due_date is not None:
             meta.append(afanes.ui.strings.PROJECT_DUE.format(date=note.due_date.isoformat()))
-        meta.append(afanes.ui.strings.open_step_count(summary.open_count))
+        meta.append(afanes.ui.strings.CopyFormatter.open_step_count(summary.open_count))
         page = self._state.pages.page
         selected = page is not None and page.path == note.path
         row = ft.Container(

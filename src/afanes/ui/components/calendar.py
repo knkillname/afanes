@@ -145,7 +145,7 @@ class LogCalendar:
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             data={"day": cell.day, "count": cell.count},
-            tooltip=afanes.ui.strings.log_day_tooltip(cell.day, cell.count),
+            tooltip=afanes.ui.strings.CopyFormatter.log_day_tooltip(cell.day, cell.count),
             style=ft.ButtonStyle(
                 bgcolor=afanes.ui.theme.LOG_ENTRY_TINT if cell.count else None,
                 padding=0,

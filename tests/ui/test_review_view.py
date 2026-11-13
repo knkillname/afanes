@@ -149,7 +149,7 @@ class TestReviewEntry:
 
         view = afanes.ui.views.review.ReviewView(_noop)
 
-        assert afanes.ui.strings.review_pending(1) in _texts(view.root)
+        assert afanes.ui.strings.CopyFormatter.review_pending(1) in _texts(view.root)
         assert _find_by_key(view.root, "review-start") is not None
 
     def test_capture_card_processes_and_skips(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

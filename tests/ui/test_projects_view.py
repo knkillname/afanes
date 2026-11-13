@@ -183,7 +183,9 @@ class TestProjectGrouping:
         _write_note(vault / "projects" / "Now.md", status="active")
         _write_note(vault / "projects" / "Plain.md")
         view = _open_view(tmp_path, monkeypatch)
-        expected = afanes.ui.strings.PROJECT_META_SEPARATOR.join(["Active", afanes.ui.strings.open_step_count(0)])
+        expected = afanes.ui.strings.PROJECT_META_SEPARATOR.join(
+            ["Active", afanes.ui.strings.CopyFormatter.open_step_count(0)]
+        )
 
         active_details = _details(_project_buttons(view, "active")[0])
         plain_details = _details(_project_buttons(view, "active")[1])

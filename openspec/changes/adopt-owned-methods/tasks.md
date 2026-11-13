@@ -12,8 +12,8 @@
 
 ## 3. Give copy formatting an owner
 
-- [ ] 3.1 Add `CopyFormatter` to `src/afanes/ui/strings.py` with public classmethods `log_entry_count`, `log_day_tooltip`, `reference_count`, `note_count`, `open_step_count`, and `review_pending`; keep the copy constants module-level; verify the formatting tests call the classmethods and pass.
-- [ ] 3.2 Update every call site in `ui/` and `tests/` from `afanes.ui.strings.<helper>(` to `CopyFormatter`; verify `grep -rn "ui\.strings\.\(log_entry_count\|log_day_tooltip\|reference_count\|note_count\|open_step_count\|review_pending\)" src tests` returns no output and the full suite passes.
+- [x] 3.1 Add `CopyFormatter` to `src/afanes/ui/strings.py` with public classmethods `log_entry_count`, `log_day_tooltip`, `reference_count`, `note_count`, `open_step_count`, and `review_pending`; keep the copy constants module-level; verify the formatting tests call the classmethods and pass.
+- [x] 3.2 Update every call site in `ui/` and `tests/` from `afanes.ui.strings.<helper>(` to `CopyFormatter`; verify `grep -rn "ui\.strings\.\(log_entry_count\|log_day_tooltip\|reference_count\|note_count\|open_step_count\|review_pending\)" src tests` returns no output and the full suite passes.
 
 ## 4. Reduce entry points to one free function
 

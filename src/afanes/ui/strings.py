@@ -288,44 +288,6 @@ LOG_MODE_ENTRIES = "Entries"
 LOG_MODE_EVERYTHING = "Everything"
 
 
-def log_entry_count(count: int) -> str:
-    """Return a compact entry count for a tree row.
-
-    Parameters
-    ----------
-    count : int
-        Number of notes at or below the row.
-
-    Returns
-    -------
-    str
-        Parenthesized count.
-    """
-    return f"({count})"
-
-
-def log_day_tooltip(day: int, count: int) -> str:
-    """Return the calendar day tooltip for an entry count.
-
-    Parameters
-    ----------
-    day : int
-        Calendar day.
-    count : int
-        Number of entries on that day.
-
-    Returns
-    -------
-    str
-        Tooltip naming the date and entry count.
-    """
-    if count == 0:
-        return f"{day}: no entries"
-    if count == 1:
-        return f"{day}: 1 entry"
-    return f"{day}: {count} entries"
-
-
 VAULT_PATH_REQUIRED = "Enter the folder path for the vault"
 
 PAGE_BACK = "Back"
@@ -483,69 +445,117 @@ PAGE_TYPE_LABELS = MappingProxyType(
 )
 
 
-def reference_count(count: int, notes: int) -> str:
-    """Return a short reference-count phrase for a page dialog.
+class CopyFormatter:
+    """Format user-facing counts and labels for the interface.
 
-    Parameters
-    ----------
-    count : int
-        Number of references affected.
-    notes : int
-        Number of notes containing those references.
-
-    Returns
-    -------
-    str
-        Phrase such as ``2 references in 1 note``.
+    Notes
+    -----
+    The copy constants remain the single catalog; this class owns the
+    formatting rules. Call the classmethods directly.
     """
-    reference_label = "reference" if count == 1 else "references"
-    note_label = "note" if notes == 1 else "notes"
-    return f"{count} {reference_label} in {notes} {note_label}"
 
+    @classmethod
+    def log_entry_count(cls, count: int) -> str:
+        """Return a compact entry count for a tree row.
 
-def note_count(count: int) -> str:
-    """Return the note-count label for the Inbox heading.
+        Parameters
+        ----------
+        count : int
+            Number of notes at or below the row.
 
-    Parameters
-    ----------
-    count : int
-        Number of notes currently shown.
+        Returns
+        -------
+        str
+            Parenthesized count.
+        """
+        return f"({count})"
 
-    Returns
-    -------
-    str
-        Singular or plural count label.
-    """
-    return NOTE_COUNT_ONE if count == 1 else NOTE_COUNT_MANY.format(count=count)
+    @classmethod
+    def log_day_tooltip(cls, day: int, count: int) -> str:
+        """Return the calendar day tooltip for an entry count.
 
+        Parameters
+        ----------
+        day : int
+            Calendar day.
+        count : int
+            Number of entries on that day.
 
-def open_step_count(count: int) -> str:
-    """Return the open-step count label for a project row.
+        Returns
+        -------
+        str
+            Tooltip naming the date and entry count.
+        """
+        if count == 0:
+            return f"{day}: no entries"
+        if count == 1:
+            return f"{day}: 1 entry"
+        return f"{day}: {count} entries"
 
-    Parameters
-    ----------
-    count : int
-        Number of open steps.
+    @classmethod
+    def reference_count(cls, count: int, notes: int) -> str:
+        """Return a short reference-count phrase for a page dialog.
 
-    Returns
-    -------
-    str
-        Singular or plural label.
-    """
-    return PROJECT_OPEN_STEPS_ONE if count == 1 else PROJECT_OPEN_STEPS_MANY.format(count=count)
+        Parameters
+        ----------
+        count : int
+            Number of references affected.
+        notes : int
+            Number of notes containing those references.
 
+        Returns
+        -------
+        str
+            Phrase such as ``2 references in 1 note``.
+        """
+        reference_label = "reference" if count == 1 else "references"
+        note_label = "note" if notes == 1 else "notes"
+        return f"{count} {reference_label} in {notes} {note_label}"
 
-def review_pending(count: int) -> str:
-    """Return the review badge label.
+    @classmethod
+    def note_count(cls, count: int) -> str:
+        """Return the note-count label for the Inbox heading.
 
-    Parameters
-    ----------
-    count : int
-        Number of captures and stalled projects awaiting review.
+        Parameters
+        ----------
+        count : int
+            Number of notes currently shown.
 
-    Returns
-    -------
-    str
-        Singular or plural pending label, including zero.
-    """
-    return REVIEW_PENDING_ONE if count == 1 else REVIEW_PENDING_MANY.format(count=count)
+        Returns
+        -------
+        str
+            Singular or plural count label.
+        """
+        return NOTE_COUNT_ONE if count == 1 else NOTE_COUNT_MANY.format(count=count)
+
+    @classmethod
+    def open_step_count(cls, count: int) -> str:
+        """Return the open-step count label for a project row.
+
+        Parameters
+        ----------
+        count : int
+            Number of open steps.
+
+        Returns
+        -------
+        str
+            Singular or plural label.
+        """
+        return PROJECT_OPEN_STEPS_ONE if count == 1 else PROJECT_OPEN_STEPS_MANY.format(count=count)
+
+    @classmethod
+    def review_pending(cls, count: int) -> str:
+        """Return the review badge label.
+
+        Parameters
+        ----------
+        count : int
+            Number of captures and stalled projects awaiting review.
+
+        Returns
+        -------
+        str
+            Singular or plural pending label, including zero.
+        """
+        return REVIEW_PENDING_ONE if count == 1 else REVIEW_PENDING_MANY.format(count=count)

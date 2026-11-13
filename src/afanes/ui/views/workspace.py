@@ -842,7 +842,7 @@ class WorkspaceView:
             tile.selected = active
             self.section_icons[section].color = afanes.ui.theme.SECTION_ICON_COLOR
         review_active = state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW
-        self.review_count.value = afanes.ui.strings.review_pending(state.browser.pending_count())
+        self.review_count.value = afanes.ui.strings.CopyFormatter.review_pending(state.browser.pending_count())
         self.review_tile.selected = review_active
         self.review_icon.color = afanes.ui.theme.SECTION_ICON_COLOR
         self.search_field.value = state.browser.query
@@ -1001,7 +1001,7 @@ class WorkspaceView:
                 ft.Container(
                     padding=afanes.ui.theme.ITEM_GAP,
                     content=ft.Text(
-                        afanes.ui.strings.review_pending(state.browser.pending_count()),
+                        afanes.ui.strings.CopyFormatter.review_pending(state.browser.pending_count()),
                         color=afanes.ui.theme.MUTED_TEXT_COLOR,
                     ),
                 )

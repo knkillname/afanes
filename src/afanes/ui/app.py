@@ -568,7 +568,7 @@ class _Shell:
             else:
                 preview.value = afanes.ui.strings.NEW_VAULT_PREVIEW_TEMPLATE.format(
                     folders=folders,
-                    notes=afanes.ui.strings.note_count(summary.note_count),
+                    notes=afanes.ui.strings.CopyFormatter.note_count(summary.note_count),
                 )
             self.page.update()
 

@@ -1141,7 +1141,9 @@ class PageView:
         self.repair_text.value = (
             afanes.ui.strings.PAGE_REPAIR_BODY.format(old=preview.old.name, new=preview.new.name)
             + " "
-            + afanes.ui.strings.PAGE_REPAIR_COUNT.format(detail=afanes.ui.strings.reference_count(count, notes))
+            + afanes.ui.strings.PAGE_REPAIR_COUNT.format(
+                detail=afanes.ui.strings.CopyFormatter.reference_count(count, notes)
+            )
         )
 
     def _refresh_type_change(self) -> None:
@@ -1153,7 +1155,7 @@ class PageView:
             return
         count = sum(site.reference_count for site in sites)
         self.type_change_text.value = afanes.ui.strings.PAGE_TYPE_CHANGE_BODY.format(
-            detail=afanes.ui.strings.reference_count(count, len(sites))
+            detail=afanes.ui.strings.CopyFormatter.reference_count(count, len(sites))
         )
 
     def _refresh_rename(self) -> None:
@@ -1169,7 +1171,7 @@ class PageView:
             return
         count = preview.reference_count
         self.rename_preview_text.value = afanes.ui.strings.PAGE_RENAME_PREVIEW.format(
-            detail=afanes.ui.strings.reference_count(count, len(preview.affected))
+            detail=afanes.ui.strings.CopyFormatter.reference_count(count, len(preview.affected))
         )
 
     def _set_rename_available(self) -> None:
@@ -1186,7 +1188,9 @@ class PageView:
             return
         self.trash_text.value = afanes.ui.strings.PAGE_TRASH_BODY.format(
             path=preview.trash_path,
-            detail=afanes.ui.strings.reference_count(preview.reference_count, len(preview.affected_notes)),
+            detail=afanes.ui.strings.CopyFormatter.reference_count(
+                preview.reference_count, len(preview.affected_notes)
+            ),
         )
 
     def _refresh_category_move(self) -> None:
