@@ -99,13 +99,19 @@ The workspace has three regions with one owner each:
 | Region | Owns | Surface |
 | --- | --- | --- |
 | Navigation | Destinations, counts, the Review entry, the vault identity, and the primary menu | Sidebar |
-| Browser | The active destination's title, search, actions, list, calendar, or review queue | Window |
+| Browser | The active destination's title, actions, list, calendar, or review queue, plus the permanent global search row | Window |
 | Detail | The page or focused flow with its toolbar | Note view |
 
 The three headers share `HEADER_HEIGHT` and align horizontally. The navigation header holds the
-vault name and the primary menu. The browser header holds the destination title, the permanent
-search entry, refresh, and the destination's actions. The detail toolbar holds Back, the page or
+vault name and the primary menu. The browser header holds the destination title, refresh, and the
+destination's actions. A dedicated full-width search row directly beneath the browser header holds
+the permanent global search entry and its clear action. The detail toolbar holds Back, the page or
 flow title, at most one suggested action, and a secondary menu.
+
+Search is a browser filter, never a navigation location: the navigation keeps its destinations and
+counts without a Search row. While a query is active, the browser title reads **Search results** and
+the destination-specific controls (Inbox composer, References action, Log date controls, Review
+queue) are hidden so one origin-independent result list fills the browser.
 
 The primary menu sits above the navigation list, as required when a window has a sidebar. The
 navigation is a bordered panel with the reference surface radius: structural in the wide layout, and

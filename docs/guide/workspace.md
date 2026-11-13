@@ -1,9 +1,10 @@
 # 🗂️ Workspace and browser
 
 The workspace has three regions. The **navigation** region lists destinations, counts, the vault
-name, and the primary menu. The **browser** region holds the active destination's title, the global
-search field, its actions, and the list, calendar, or review queue. The **detail** region holds the
-open page or focused flow and its toolbar. The browser stays visible while a page is open.
+name, and the primary menu. The **browser** region holds the active destination's title and actions
+in its header, a permanent search row beneath that header, and the list, calendar, or review queue.
+The **detail** region holds the open page or focused flow and its toolbar. The browser stays visible
+while a page is open.
 
 :::{admonition} tl;dr
 :class: note
@@ -58,15 +59,24 @@ from a note to the browser. The window cannot shrink below 1024x600.
 
 ## 🔍 Search
 
-The search field filters the whole vault by display title, identity, prose body text, step text, and
-role names: a project's `owner`, its `asked_by`, and the owners of its steps. Results are grouped by
-destination, and the active destination does not limit them. The navigation counts stay at each
-destination's total. Matching ignores case, Unicode form, and repeated whitespace. Other step metadata
-and unknown frontmatter keys are excluded, so a plan date or tag inside a comment is not a search result.
-In the **Log**, the same query filters both the date tree and the calendar accents.
+The search field sits in its own full-width row beneath the browser header, so it is available from
+every destination without becoming a destination itself. It filters the whole vault by display title,
+identity, prose body text, step text, and role names: a project's `owner`, its `asked_by`, and the
+owners of its steps. Results are grouped by destination, and the active destination does not limit
+them. The navigation counts stay at each destination's total. Matching ignores case, Unicode form, and
+repeated whitespace. Other step metadata and unknown frontmatter keys are excluded, so a plan date or
+tag inside a comment is not a search result.
 
-Switching destinations clears the query and returns to that destination's normal browser. Press
-**Ctrl+F** to focus the search field.
+While a query is active, the browser title reads **Search results** and the destination's own controls
+step aside: the Inbox composer, the References **New reference** action, the Log calendar and date
+tree, and the Review queue are hidden. A search started in the Log returns the same grouped results as
+the same search started in any other destination. Clearing the query restores the active destination's
+title, controls, and normal list or calendar.
+
+The navigation lists no Search entry: search is a global browser filter, not a location. Switching
+destinations clears the query and returns to that destination's normal browser. Press **Ctrl+F** to
+focus the search field, **Esc** to clear a non-empty query, or use the clear action at the end of the
+search row. When the query is already empty, **Esc** closes the navigation drawer instead.
 
 ## ✍️ Capture field
 

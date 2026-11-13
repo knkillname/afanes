@@ -195,6 +195,8 @@ class _Shell:
         key = (event.key or "").upper()
         if key == "ESCAPE":
             if self.workspace is not None:
+                if await self.workspace.clear_search():
+                    return
                 self.workspace.close_drawer()
             return
         if not event.ctrl or self.workspace is None:

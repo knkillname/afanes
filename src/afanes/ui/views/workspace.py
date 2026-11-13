@@ -275,6 +275,22 @@ class WorkspaceView:
             on_change=self._search,
             key="browser-search",
         )
+        self.browser_search_clear = ft.IconButton(
+            icon=ft.Icons.CLOSE_OUTLINED,
+            tooltip=afanes.ui.strings.BROWSER_SEARCH_CLEAR,
+            on_click=self._clear_search,
+            visible=False,
+            key="browser-search-clear",
+        )
+        self.browser_search_bar = ft.Container(
+            height=afanes.ui.theme.HEADER_HEIGHT,
+            content=ft.Row(
+                controls=[self.search_field, self.browser_search_clear],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            key="browser-search-bar",
+        )
         self.browser_list = ft.ListView(
             controls=[],
             expand=True,
@@ -287,6 +303,7 @@ class WorkspaceView:
             "",
             style=afanes.ui.theme.TEXT_ROLES["title-4"],
             overflow=ft.TextOverflow.ELLIPSIS,
+            expand=True,
         )
         self.browser_actions = ft.Row(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
         self.browser_header = ft.Container(
@@ -295,7 +312,6 @@ class WorkspaceView:
                 controls=[
                     self.nav_toggle,
                     self.browser_title,
-                    self.search_field,
                     self.refresh_button,
                     self.browser_actions,
                 ],
@@ -314,11 +330,16 @@ class WorkspaceView:
             expand=True,
         )
         self.browser_divider = ft.Divider(height=afanes.ui.theme.BORDER_WIDTH, key="browser-divider")
+        self.browser_top = ft.Column(
+            controls=[self.browser_header, self.browser_search_bar, self.browser_divider],
+            spacing=afanes.ui.theme.NO_GAP,
+            key="browser-top",
+        )
         self.browser_region = ft.Container(
             width=afanes.ui.theme.BROWSER_MAX_WIDTH,
             bgcolor=afanes.ui.theme.PAGE_SURFACE_COLOR,
             content=ft.Column(
-                controls=[self.browser_header, self.browser_divider, self.browser_body],
+                controls=[self.browser_top, self.browser_body],
                 spacing=afanes.ui.theme.SECTION_GAP,
                 expand=True,
             ),
@@ -655,6 +676,28 @@ class WorkspaceView:
         """Focus the permanent browser search entry."""
         await self._focus(self.search_field)
 
+    async def clear_search(self) -> bool:
+        """Clear the browser search query.
+
+        Returns
+        -------
+        bool
+            ``True`` when a non-empty query was cleared, ``False`` when the
+            browser was already showing the active destination.
+        """
+        if not self._searching():
+            return False
+        await self._state.browser.set_query("")
+        self.search_field.value = ""
+        self._refresh_dynamic()
+        self._update()
+        await self._focus(self.search_field)
+        return True
+
+    async def _clear_search(self) -> None:
+        """Clear the browser search from the row action."""
+        await self.clear_search()
+
     async def _focus_capture(self) -> None:
         """Focus the capture composer when the control is attached."""
         await self._focus(self.capture_field)
@@ -803,24 +846,35 @@ class WorkspaceView:
         self.review_tile.selected = review_active
         self.review_icon.color = afanes.ui.theme.SECTION_ICON_COLOR
         self.search_field.value = state.browser.query
+        searching = self._searching()
+        self.browser_search_clear.visible = searching
         self._refresh_browser_header()
-        self.capture_section.visible = state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
+        self.capture_section.visible = (
+            not searching and state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
+        )
         self.browser_list.controls = self._browser_controls(listing)
         self._refresh_failures()
         self._refresh_banners()
         self._refresh_main()
         self.progress.visible = state.status.busy
 
+    def _searching(self) -> bool:
+        """Return whether a non-empty query is showing global results."""
+        return bool(self._state.browser.query.strip())
+
     def _refresh_browser_header(self) -> None:
         """Refresh the browser title and the destination actions."""
         state = self._state
         section = state.browser.active_section
-        if section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
+        searching = self._searching()
+        if searching:
+            title = afanes.ui.strings.BROWSER_SEARCH_TITLE
+        elif section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
             title = afanes.ui.strings.REVIEW_TITLE
         else:
             title = afanes.ui.strings.WORKSPACE_SECTION_LABELS[section.value]
         self.browser_title.value = title
-        references = section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
+        references = section is afanes.ui.state.browser.WorkspaceSection.REFERENCES and not searching
         self.new_reference_button.visible = references
         self.browser_actions.controls = [self.new_reference_button] if references else []
 
@@ -830,7 +884,7 @@ class WorkspaceView:
     ) -> list[ft.Control]:
         """Build the browser entries for the active destination or search."""
         state = self._state
-        if state.browser.query.strip():
+        if self._searching():
             return self._search_controls(listing)
         if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
             return self._review_queue_controls()
@@ -907,10 +961,7 @@ class WorkspaceView:
         if log_entries:
             matched = True
             controls.append(self._heading(afanes.ui.strings.WORKSPACE_SECTION_LABELS["log"], len(log_entries)))
-        if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.LOG:
-            controls.extend(self._log_controls())
-        else:
-            controls.extend(self._note_row(note) for note in log_entries)
+        controls.extend(self._note_row(note) for note in log_entries)
         if listing is not None:
             misplaced = listing.group(afanes.core.search.BrowserSection.NEEDS_ATTENTION).notes
             if misplaced:

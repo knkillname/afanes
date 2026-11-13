@@ -155,6 +155,19 @@ class TestWorkspaceShell:
         assert _find_control(view.browser_region, "browser-list") is not None
         assert _find_control(view.browser_region, "browser-search") is not None
 
+    def test_the_search_entry_has_its_own_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        header = typing.cast("ft.Row", view.browser_header.content)
+        search_bar = typing.cast("ft.Row", view.browser_search_bar.content)
+
+        assert view.search_field in search_bar.controls
+        assert view.browser_search_clear in search_bar.controls
+        assert view.search_field not in header.controls
+        assert view.browser_title in header.controls
+        assert view.browser_title.expand is True
+        assert view.browser_top.controls == [view.browser_header, view.browser_search_bar, view.browser_divider]
+        assert view.browser_top.spacing == afanes.ui.theme.NO_GAP
+
     def test_change_menu_offers_open_create_and_close(
         self,
         tmp_path: Path,
@@ -733,6 +746,73 @@ class TestGlobalSearch:
 
         assert view.section_counts[afanes.ui.state.browser.WorkspaceSection.INBOX].value == "2"
 
+    def test_search_names_the_mode_and_restores_the_title(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_note(tmp_path / "vault" / "inbox" / "One.md", body="# One\n\nterm")
+        view = _open_workspace(tmp_path, monkeypatch)
+        assert view.browser_title.value == afanes.ui.strings.WORKSPACE_SECTION_LABELS["inbox"]
+        assert view.browser_search_clear.visible is False
+
+        view.search_field.value = "term"
+        asyncio.run(_change_handler(view.search_field)())
+
+        assert view.browser_title.value == afanes.ui.strings.BROWSER_SEARCH_TITLE
+        assert view.browser_search_clear.visible is True
+
+        asyncio.run(view.clear_search())
+
+        assert view.browser_title.value == afanes.ui.strings.WORKSPACE_SECTION_LABELS["inbox"]
+        assert view.browser_search_clear.visible is False
+        assert afanes.ui.state.app_state.browser.query == ""
+
+    def test_the_clear_action_clears_the_query(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _write_note(tmp_path / "vault" / "inbox" / "One.md", body="# One\n\nterm")
+        view = _open_workspace(tmp_path, monkeypatch)
+        view.search_field.value = "term"
+        asyncio.run(_change_handler(view.search_field)())
+
+        asyncio.run(_handler(view.browser_search_clear)())
+
+        assert afanes.ui.state.app_state.browser.query == ""
+        assert view.search_field.value == ""
+        assert view.browser_title.value == afanes.ui.strings.WORKSPACE_SECTION_LABELS["inbox"]
+        assert [_row_for(view.browser_list, "One")] != []
+
+    def test_clear_search_reports_when_the_query_is_already_empty(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        assert asyncio.run(view.clear_search()) is False
+
+    def test_search_hides_the_inbox_composer(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _write_note(tmp_path / "vault" / "inbox" / "One.md", body="# One\n\nterm")
+        view = _open_workspace(tmp_path, monkeypatch)
+        assert view.capture_section.visible is True
+
+        view.search_field.value = "term"
+        asyncio.run(_change_handler(view.search_field)())
+
+        assert view.capture_section.visible is False
+
+        asyncio.run(view.clear_search())
+
+        assert view.capture_section.visible is True
+
+    def test_search_hides_the_reference_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "reference" / "Ada.md", note_type="reference", body="# Ada\n\nterm")
+        view = _open_workspace(tmp_path, monkeypatch)
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.REFERENCES])())
+        assert view.new_reference_button.visible is True
+
+        view.search_field.value = "ada"
+        asyncio.run(_change_handler(view.search_field)())
+
+        assert view.new_reference_button.visible is False
+        assert view.browser_actions.controls == []
+
     def test_clearing_restores_the_active_destination(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _write_note(vault / "inbox" / "One.md", body="# One\n\nterm")
@@ -887,6 +967,16 @@ class TestReviewQueue:
         assert session is not None
         assert self._queue_titles(view) == [self._review_title(item) for item in session.items]
         assert self._queue_titles(view)[0] == "Two"
+
+    def test_search_hides_the_review_queue(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = self._open_review(tmp_path, monkeypatch)
+        assert self._queue_cards(view)
+
+        view.search_field.value = "two"
+        asyncio.run(_change_handler(view.search_field)())
+
+        assert not self._queue_cards(view)
+        assert view.browser_title.value == afanes.ui.strings.BROWSER_SEARCH_TITLE
 
     def test_the_current_item_is_marked(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = self._open_review(tmp_path, monkeypatch)
@@ -1222,7 +1312,9 @@ class TestLogSection:
 
         assert afanes.ui.state.app_state.browser.log_mode is LogMode.EVERYTHING
 
-    def test_search_filters_the_calendar_and_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_search_shows_grouped_results_without_the_calendar(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         vault = tmp_path / "vault"
         today = _today()
         self._log_path(vault, today, "Dentist")
@@ -1233,13 +1325,32 @@ class TestLogSection:
         asyncio.run(afanes.ui.state.app_state.browser.set_query("dentist"))
         view.refresh()
 
-        tree = view.log_tree
-        calendar = view.log_calendar
-        assert tree is not None
-        assert calendar is not None
-        assert [note.title for note in tree.note_rows.values()] == ["Dentist"]
-        assert calendar.day_buttons[today.day].data["count"] == 1
-        assert calendar.day_buttons[other.day].data["count"] == 0
+        headings = _texts(view.browser_list)
+        assert "Log (1)" in headings
+        assert _row_for(view.browser_list, "Dentist") is not None
+        assert _find_control(view.browser_region, "log-mode-entries") is None
+        assert _find_control(view.browser_region, "log-today-entry") is None
+        assert view.browser_title.value == afanes.ui.strings.BROWSER_SEARCH_TITLE
+
+    def test_log_search_matches_the_same_results_from_inbox(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        today = _today()
+        self._log_path(vault, today, "Dentist")
+        _write_note(vault / "inbox" / "Buy milk.md", body="# Buy milk\n\ndentist")
+        view = self._open_log(tmp_path, monkeypatch)
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.browser.set_query("dentist"))
+        view.refresh()
+        from_log = _texts(view.browser_list)
+
+        asyncio.run(state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.INBOX))
+        asyncio.run(state.browser.set_query("dentist"))
+        view.refresh()
+
+        assert _texts(view.browser_list) == from_log
 
     def test_clearing_the_query_restores_the_tree_and_calendar(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

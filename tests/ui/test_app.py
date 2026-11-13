@@ -1484,6 +1484,66 @@ class TestAdaptiveShell:
 
         assert _find_by_key(page.controls[0], "workspace-drawer") is None
 
+    def test_escape_clears_search_before_closing_the_navigation_drawer(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        page = FakePage()
+        page.width = afanes.ui.theme.SHELL_MEDIUM_MIN
+        calls: list[str] = []
+
+        async def clear_search(_self: afanes.ui.views.workspace.WorkspaceView) -> bool:
+            calls.append("clear")
+            return True
+
+        def close_drawer(_self: afanes.ui.views.workspace.WorkspaceView) -> None:
+            calls.append("drawer")
+
+        monkeypatch.setattr(afanes.ui.views.workspace.WorkspaceView, "clear_search", clear_search)
+        monkeypatch.setattr(afanes.ui.views.workspace.WorkspaceView, "close_drawer", close_drawer)
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            assert page.on_keyboard_event is not None
+            await page.on_keyboard_event(_keyboard("Escape", ctrl=False))
+
+        asyncio.run(scenario())
+
+        assert calls == ["clear"]
+
+    def test_escape_closes_the_drawer_when_no_search_is_active(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        page = FakePage()
+        page.width = afanes.ui.theme.SHELL_MEDIUM_MIN
+        calls: list[str] = []
+
+        async def clear_search(_self: afanes.ui.views.workspace.WorkspaceView) -> bool:
+            calls.append("clear")
+            return False
+
+        def close_drawer(_self: afanes.ui.views.workspace.WorkspaceView) -> None:
+            calls.append("drawer")
+
+        monkeypatch.setattr(afanes.ui.views.workspace.WorkspaceView, "clear_search", clear_search)
+        monkeypatch.setattr(afanes.ui.views.workspace.WorkspaceView, "close_drawer", close_drawer)
+
+        async def scenario() -> None:
+            await afanes.ui.app.main(typing.cast("ft.Page", page))
+            assert page.on_keyboard_event is not None
+            await page.on_keyboard_event(_keyboard("Escape", ctrl=False))
+
+        asyncio.run(scenario())
+
+        assert calls == ["clear", "drawer"]
+
 
 class TestAboutDialog:
     def test_the_primary_menu_names_the_version(

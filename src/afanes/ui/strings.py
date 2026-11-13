@@ -138,7 +138,9 @@ WORKSPACE_SECTION_LABELS = MappingProxyType(
         "needs_attention": "Needs attention",
     }
 )
-BROWSER_SEARCH_HINT = "Title, identity, or text"
+BROWSER_SEARCH_HINT = "Search all notes…"
+BROWSER_SEARCH_TITLE = "Search results"
+BROWSER_SEARCH_CLEAR = "Clear search"
 BROWSER_EMPTY = "No notes in this section."
 BROWSER_NO_MATCH = "No notes match this search."
 BROWSER_NO_MATCH_QUERY = 'No notes match "{query}".'
