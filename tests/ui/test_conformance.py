@@ -84,20 +84,8 @@ BASELINE: dict[str, dict[str, int]] = {
         "views/review.py::ReviewView": 7,
         "views/workspace.py::WorkspaceView": 1,
     },
-    "icon_and_label_buttons": {
-        "app.py::_Shell": 2,
-        "views/inbox.py::WelcomeView": 3,
-        "views/page.py::PageView": 12,
-        "views/processing.py::ProcessingView": 2,
-        "views/review.py::ReviewView": 11,
-    },
-    "dense_rows": {
-        "components/log_tree.py": 1,
-        "views/page.py": 2,
-        "views/processing.py": 2,
-        "views/project_body.py": 2,
-        "views/workspace.py": 5,
-    },
+    "icon_and_label_buttons": {},
+    "dense_rows": {},
 }
 
 
@@ -196,6 +184,8 @@ def _is_suggested_or_destructive(node: ast.AST) -> bool:
 
 def _has_icon_and_label(node: ast.AST) -> bool:
     if not isinstance(node, ast.Call) or not _is_flet_call(node):
+        return False
+    if not isinstance(node.func, ast.Attribute) or node.func.attr not in BUTTON_NAMES:
         return False
     keywords = {keyword.arg for keyword in node.keywords}
     return "icon" in keywords and bool(keywords & LABEL_KEYWORDS)

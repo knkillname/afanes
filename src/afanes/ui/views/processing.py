@@ -178,7 +178,6 @@ class ProcessingView:
         self.project_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.preview_button = ft.FilledButton(
             content=afanes.ui.strings.PROCESSING_PREVIEW_ACTION,
-            icon=ft.Icons.VISIBILITY_OUTLINED,
             on_click=self._preview,
             disabled=True,
         )
@@ -224,7 +223,6 @@ class ProcessingView:
         self.plan_warnings = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
         self.confirm_button = ft.FilledButton(
             content=afanes.ui.strings.PROCESSING_CONFIRM_ACTION,
-            icon=ft.Icons.CHECK_OUTLINED,
             on_click=self._confirm,
         )
         self.plan_panel = ft.Container(
@@ -358,7 +356,6 @@ class ProcessingView:
             ft.ListTile(
                 title=note.title,
                 subtitle=note.name if note.name != note.title else None,
-                dense=True,
                 on_click=self._role_suggestion_handler(note.name),
             )
             for note in candidates
@@ -634,7 +631,6 @@ class ProcessingView:
         return ft.ListTile(
             title=note.title,
             subtitle=subtitle,
-            dense=True,
             on_click=self._suggestion_handler(note.name, apply),
         )
 

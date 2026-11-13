@@ -203,7 +203,6 @@ class LogTree:
             title=note.title,
             subtitle=note.relative_path.as_posix(),
             leading=ft.Icons.DESCRIPTION_OUTLINED,
-            dense=True,
             on_click=self._select_handler(note.path),
             key=f"log-entry-{note.relative_path.as_posix()}",
         )

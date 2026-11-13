@@ -77,7 +77,6 @@ class WelcomeView:
             controls.append(
                 ft.FilledButton(
                     content=afanes.ui.strings.WELCOME_CHOOSE,
-                    icon=ft.Icons.FOLDER_OPEN_OUTLINED,
                     on_click=self._on_choose,
                     autofocus=True,
                     key="welcome-choose",
@@ -89,7 +88,6 @@ class WelcomeView:
             controls.append(
                 ft.OutlinedButton(
                     content=afanes.ui.strings.NEW_VAULT_ACTION,
-                    icon=ft.Icons.CREATE_NEW_FOLDER_OUTLINED,
                     on_click=self._on_create,
                     key="welcome-create",
                 ),
@@ -132,7 +130,6 @@ class WelcomeView:
         field.on_submit = open_typed_path
         button = ft.FilledButton(
             content=afanes.ui.strings.WELCOME_OPEN,
-            icon=ft.Icons.FOLDER_OPEN_OUTLINED,
             on_click=open_typed_path,
             key="welcome-open",
         )

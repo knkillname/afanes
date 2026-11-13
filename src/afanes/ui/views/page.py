@@ -408,7 +408,6 @@ class PageView:
         )
         self.raw_save_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_RAW_SAVE,
-            icon=ft.Icons.SAVE_OUTLINED,
             on_click=self.save_raw,
         )
         self.raw_panel = ft.Column(
@@ -422,17 +421,14 @@ class PageView:
         self.conflict_text = ft.Text("", selectable=True)
         self.reload_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_CONFLICT_RELOAD,
-            icon=ft.Icons.SYNC_OUTLINED,
             on_click=self.reload_page,
         )
         self.overwrite_button = ft.OutlinedButton(
             content=afanes.ui.strings.PAGE_CONFLICT_OVERWRITE,
-            icon=ft.Icons.SAVE_OUTLINED,
             on_click=self.overwrite_page,
         )
         self.recreate_button = ft.OutlinedButton(
             content=afanes.ui.strings.PAGE_CONFLICT_RECREATE,
-            icon=ft.Icons.ADD_OUTLINED,
             on_click=self.recreate_page,
         )
         self.discard_button = ft.TextButton(
@@ -467,7 +463,6 @@ class PageView:
         self.repair_text = ft.Text("", selectable=True)
         self.repair_rewrite_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_REPAIR_REWRITE,
-            icon=ft.Icons.LINK_OUTLINED,
             on_click=self.rewrite_links,
         )
         self.repair_keep_button = ft.TextButton(
@@ -488,7 +483,6 @@ class PageView:
         self.type_change_text = ft.Text("", selectable=True)
         self.type_change_confirm_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_TYPE_CHANGE_CONFIRM,
-            icon=ft.Icons.CHECK_OUTLINED,
             on_click=self.confirm_type_change,
         )
         self.type_change_cancel_button = ft.TextButton(
@@ -505,7 +499,6 @@ class PageView:
         self.category_move_text = ft.Text("", selectable=True)
         self.category_move_confirm_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_CATEGORY_MOVE_CONFIRM,
-            icon=ft.Icons.DRIVE_FILE_MOVE_OUTLINE,
             on_click=self.confirm_category_move,
         )
         self.category_move_cancel_button = ft.TextButton(
@@ -527,13 +520,11 @@ class PageView:
         self.rename_preview_text = ft.Text("", selectable=True)
         self.rename_preview_button = ft.OutlinedButton(
             content=afanes.ui.strings.PAGE_RENAME,
-            icon=ft.Icons.VISIBILITY_OUTLINED,
             on_click=self.preview_rename,
             disabled=True,
         )
         self.rename_confirm_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_RENAME_CONFIRM,
-            icon=ft.Icons.CHECK_OUTLINED,
             on_click=self.confirm_rename,
             disabled=True,
         )
@@ -565,7 +556,6 @@ class PageView:
         self.trash_text = ft.Text("", selectable=True)
         self.trash_confirm_button = ft.FilledButton(
             content=afanes.ui.strings.PAGE_TRASH_CONFIRM,
-            icon=ft.Icons.DELETE_OUTLINE,
             on_click=self.confirm_trash,
             style=afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE,
         )
@@ -1135,7 +1125,6 @@ class PageView:
             ft.ListTile(
                 title=state.session.note_title(path),
                 subtitle=path.as_posix(),
-                dense=True,
                 on_click=self._candidate_handler(path),
             )
             for path in state.navigation.ambiguous
@@ -1382,7 +1371,6 @@ class PageView:
             ft.ListTile(
                 title=note.title,
                 subtitle=note.name if note.name != note.title else None,
-                dense=True,
                 on_click=self._role_suggestion_handler(note.name),
             )
             for note in candidates

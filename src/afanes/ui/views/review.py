@@ -116,7 +116,6 @@ class ReviewView:
                 ft.Text(afanes.ui.strings.review_pending(count), selectable=True),
                 ft.FilledButton(
                     content=afanes.ui.strings.REVIEW_START_ACTION,
-                    icon=ft.Icons.PLAY_ARROW_OUTLINED,
                     on_click=self._start,
                     key="review-start",
                 ),
@@ -136,7 +135,6 @@ class ReviewView:
                 ),
                 ft.FilledButton(
                     content=afanes.ui.strings.REVIEW_BACK_TO_BROWSER,
-                    icon=ft.Icons.ARROW_BACK_OUTLINED,
                     on_click=self._finish,
                     key="review-finish",
                 ),
@@ -156,7 +154,6 @@ class ReviewView:
                     controls=[
                         ft.FilledButton(
                             content=afanes.ui.strings.REVIEW_PROCESS_ACTION,
-                            icon=ft.Icons.PLAY_ARROW_OUTLINED,
                             on_click=self._process_handler(item.path),
                             key="review-process-capture",
                         ),
@@ -215,7 +212,6 @@ class ReviewView:
                 [
                     ft.FilledButton(
                         content=afanes.ui.strings.REVIEW_DO_NOW,
-                        icon=ft.Icons.CHECK_OUTLINED,
                         on_click=self._do_now,
                         key="review-do-now",
                     ),
@@ -243,7 +239,6 @@ class ReviewView:
             [
                 ft.TextButton(
                     content=afanes.ui.strings.REVIEW_OPEN_PROJECT,
-                    icon=ft.Icons.OPEN_IN_NEW_OUTLINED,
                     on_click=self._open_project,
                     key="review-open-project",
                 ),
@@ -285,19 +280,16 @@ class ReviewView:
                 controls=[
                     ft.OutlinedButton(
                         content=afanes.ui.strings.REVIEW_CREATE_STEP,
-                        icon=ft.Icons.ADD_OUTLINED,
                         on_click=self._open_add_step,
                         key="review-create",
                     ),
                     ft.OutlinedButton(
                         content=afanes.ui.strings.REVIEW_MARK_DONE,
-                        icon=ft.Icons.CHECK_OUTLINED,
                         on_click=self._confirm_done,
                         key="review-mark-done",
                     ),
                     ft.OutlinedButton(
                         content=afanes.ui.strings.REVIEW_DEFER,
-                        icon=ft.Icons.SCHEDULE_OUTLINED,
                         on_click=self._confirm_defer,
                         key="review-defer",
                     ),
@@ -311,13 +303,11 @@ class ReviewView:
             controls=[
                 ft.TextButton(
                     content=afanes.ui.strings.REVIEW_OPEN_PROJECT,
-                    icon=ft.Icons.OPEN_IN_NEW_OUTLINED,
                     on_click=self._open_project,
                     key="review-open-project",
                 ),
                 ft.FilledButton(
                     content=afanes.ui.strings.REVIEW_NEXT,
-                    icon=ft.Icons.ARROW_FORWARD_OUTLINED,
                     on_click=self._next,
                     key="review-next",
                 ),
@@ -394,7 +384,6 @@ class ReviewView:
         )
         self._form_submit = ft.FilledButton(
             content=afanes.ui.strings.REVIEW_CONFIRM,
-            icon=ft.Icons.CHECK_OUTLINED,
             on_click=self._submit_form,
             disabled=not self._form_value_valid(),
             key="review-form-submit",

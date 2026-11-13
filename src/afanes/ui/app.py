@@ -375,7 +375,6 @@ class _Shell:
                     ft.Text(message, expand=True, selectable=True),
                     ft.FilledButton(
                         content=afanes.ui.strings.REVIEW_LAUNCH_DIGEST_ACTION,
-                        icon=ft.Icons.PLAY_ARROW_OUTLINED,
                         on_click=self.start_launch_review,
                         key="launch-digest-start",
                     ),
@@ -518,7 +517,6 @@ class _Shell:
 
         browse_button = ft.TextButton(
             content=afanes.ui.strings.NEW_VAULT_BROWSE,
-            icon=ft.Icons.FOLDER_OPEN_OUTLINED,
             on_click=browse,
             visible=self.is_desktop,
             key="create-vault-browse",

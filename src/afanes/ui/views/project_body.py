@@ -80,7 +80,6 @@ class ProjectBodyView:
         self._owner_field = ft.TextField(
             label=afanes.ui.strings.PAGE_STEP_OWNER_ADD,
             hint_text=afanes.ui.strings.PAGE_STEP_OWNER_HINT,
-            dense=True,
             expand=True,
             on_submit=self._add_owner_from_field,
             on_change=self._change_owner_query,
@@ -445,7 +444,6 @@ class ProjectBodyView:
             ft.ListTile(
                 title=note.title,
                 subtitle=note.name if note.name != note.title else None,
-                dense=True,
                 on_click=self._suggestion_handler(note.name),
             )
             for note in candidates

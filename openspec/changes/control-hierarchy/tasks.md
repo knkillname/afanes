@@ -28,8 +28,8 @@
 
 ## 5. Icon/label and row density
 
-- [ ] 5.1 Migrate every non-header icon-plus-label button to either an icon or a label, keeping the page toolbar keys exempt. Delete the cleared entries from the `icon_and_label_buttons` baseline and verify the conformance tests pass.
-- [ ] 5.2 Remove every remaining `dense=True` row and delete the `dense_rows` baseline entries. Verify the conformance tests pass and the 1024x600 minimum-window test still renders without clipping.
+- [x] 5.1 Migrate every non-header icon-plus-label button to either an icon or a label, keeping the page toolbar keys exempt. Delete the cleared entries from the `icon_and_label_buttons` baseline and verify the conformance tests pass.
+- [x] 5.2 Remove every remaining `dense=True` row and delete the `dense_rows` baseline entries. Verify the conformance tests pass and the 1024x600 minimum-window test still renders without clipping.
 
 ## 6. Integration and documentation
 

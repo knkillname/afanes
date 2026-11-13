@@ -244,7 +244,6 @@ class WorkspaceView:
             leading=self.review_icon,
             trailing=self.review_count,
             selected=False,
-            dense=True,
             on_click=self._select_review,
             key="review-entry",
         )
@@ -263,7 +262,6 @@ class WorkspaceView:
                 leading=self.section_icons[section],
                 trailing=self.section_counts[section],
                 selected=False,
-                dense=True,
                 on_click=self._section_handler(section),
                 key=f"section-{section.value}",
             )
@@ -273,7 +271,6 @@ class WorkspaceView:
         self.search_field = ft.TextField(
             hint_text=afanes.ui.strings.BROWSER_SEARCH_HINT,
             prefix_icon=ft.Icons.SEARCH_OUTLINED,
-            dense=True,
             expand=True,
             on_change=self._search,
             key="browser-search",
@@ -1272,7 +1269,6 @@ class WorkspaceView:
             subtitle=note.relative_path.as_posix(),
             leading=ft.Icons.DESCRIPTION_OUTLINED,
             selected=selected,
-            dense=True,
             on_click=self._select_handler(note.path),
         )
 
@@ -1319,7 +1315,6 @@ class WorkspaceView:
         return ft.ListTile(
             title=failure.path.as_posix(),
             leading=ft.Icons.ERROR_OUTLINE,
-            dense=True,
             on_click=self._failure_handler(failure.path),
         )
 
