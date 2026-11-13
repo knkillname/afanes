@@ -173,6 +173,52 @@ class TestReadMode:
         assert view.body_field.max_lines is None
         assert view.body_field.text_vertical_align == ft.VerticalAlignment.START
 
+    def test_invalid_category_shows_inline_without_a_notice(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(PageActions(update=lambda: None))
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
+            view.category_field.value = "people/uk"
+            await view.change_category()
+
+        asyncio.run(scenario())
+
+        assert view.category_error.visible is True
+        assert view.category_error.value == afanes.ui.strings.PAGE_CATEGORY_INVALID
+        assert state.status.notice is None
+
+    def test_blank_rename_shows_inline_without_a_notice(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(PageActions(update=lambda: None))
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.begin_rename()
+            view.rename_field.value = "   "
+            await view.preview_rename()
+
+        asyncio.run(scenario())
+
+        assert view.rename_error.visible is True
+        assert view.rename_error.value == afanes.ui.strings.PAGE_RENAME_LABEL
+        assert state.status.notice is None
+
     def test_category_combobox_suggests_existing_labels(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
@@ -729,6 +775,14 @@ class TestRawMode:
 
 
 class TestPanels:
+    def test_page_banner_renders_the_page_conflict(self) -> None:
+        afanes.ui.state.app_state.pages.conflict = "changed"
+
+        view = PageView(PageActions(update=lambda: None))
+
+        assert view.banners.visible is True
+        assert len(view.banners.controls) == 1
+
     def test_panels_use_the_container_surface(self) -> None:
         view = PageView(PageActions(update=lambda: None))
 

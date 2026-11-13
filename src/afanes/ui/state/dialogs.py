@@ -127,11 +127,10 @@ class PageDialogState:
         if page.labels.note_type is note_type:
             return True
         if note_type is NoteType.LOG and page.labels.date is None:
-            self.status.show_message(afanes.ui.strings.PAGE_LOG_DATE_REQUIRED)
+            self.status.show_notice(afanes.ui.strings.PAGE_LOG_DATE_REQUIRED)
             return False
         if page.path is None:
             self.pages.page = page.with_labels(page.labels.with_type(note_type))
-            self.status.clear_message()
             return True
         return await self._move_log_type(note_type)
 
@@ -156,7 +155,7 @@ class PageDialogState:
             report = await asyncio.to_thread(naming.apply, preview)
         except (AfanesError, OSError) as exc:
             logger.debug("Log type change failed", exc_info=True)
-            self.status.show_message(afanes.ui.strings.PAGE_TYPE_CHANGE_FAILED.format(detail=str(exc)))
+            self.status.show_notice(afanes.ui.strings.PAGE_TYPE_CHANGE_FAILED.format(detail=str(exc)))
             return False
         self.navigation.history = tuple(
             preview.target_path if path == current.path else path for path in self.navigation.history
@@ -166,7 +165,7 @@ class PageDialogState:
             return False
         report_text = self._rewrite_report(report)
         if report_text is not None:
-            self.status.show_message(afanes.ui.strings.PAGE_TYPE_CHANGE_PARTIAL.format(report=report_text))
+            self.pages.report = afanes.ui.strings.PAGE_TYPE_CHANGE_PARTIAL.format(report=report_text)
         return True
 
     async def set_page_category(self, category: CategoryLabel | None) -> bool:
@@ -192,7 +191,6 @@ class PageDialogState:
                 return True
             if page.path is None:
                 self.pages.page = page.with_labels(proposed)
-                self.status.clear_message()
                 return True
             return await self._preview_category_move(page, proposed)
 
@@ -213,16 +211,14 @@ class PageDialogState:
             )
         except (AfanesError, OSError) as exc:
             logger.debug("Category move planning failed", exc_info=True)
-            self.status.show_message(afanes.ui.strings.PAGE_CATEGORY_MOVE_FAILED.format(detail=str(exc)))
+            self.status.show_notice(afanes.ui.strings.PAGE_CATEGORY_MOVE_FAILED.format(detail=str(exc)))
             return False
         if VaultPath.same(preview.target_path, preview.note_path):
             self.pages.page = page.with_labels(proposed)
-            self.status.clear_message()
             return True
         self.category_move = preview
         self.pending_labels = proposed
         self.pages.blocking_message = afanes.ui.strings.PAGE_TYPE_CHANGE_LEAVE
-        self.status.clear_message()
         return False
 
     async def set_page_status(self, status: Status | None) -> None:
@@ -304,12 +300,12 @@ class PageDialogState:
         if self.pages.conflict is not None:
             return False
         if not text.strip() and page.labels.note_type is NoteType.LOG:
-            self.status.show_message(afanes.ui.strings.PAGE_LOG_DATE_REQUIRED)
+            self.status.show_notice(afanes.ui.strings.PAGE_LOG_DATE_REQUIRED)
             return False
         try:
             note_date = NoteDate.from_text(text) if text.strip() else None
         except ValueError as exc:
-            self.status.show_message(str(exc))
+            self.status.show_notice(str(exc))
             return False
         if (
             page.labels.note_type is NoteType.LOG
@@ -349,7 +345,7 @@ class PageDialogState:
             report = await asyncio.to_thread(naming.apply, preview)
         except (AfanesError, OSError) as exc:
             logger.debug("Log date change failed", exc_info=True)
-            self.status.show_message(afanes.ui.strings.PAGE_DATE_CHANGE_FAILED.format(detail=str(exc)))
+            self.status.show_notice(afanes.ui.strings.PAGE_DATE_CHANGE_FAILED.format(detail=str(exc)))
             return False
         self.navigation.history = tuple(
             preview.target_path if path == page.path else path for path in self.navigation.history
@@ -359,7 +355,7 @@ class PageDialogState:
             return False
         report_text = self._rewrite_report(report)
         if report_text is not None:
-            self.status.show_message(afanes.ui.strings.PAGE_DATE_CHANGE_PARTIAL.format(report=report_text))
+            self.pages.report = afanes.ui.strings.PAGE_DATE_CHANGE_PARTIAL.format(report=report_text)
         return True
 
     async def _save_in_place_date(self, page: NormalDraft, text: str) -> bool:
@@ -379,7 +375,7 @@ class PageDialogState:
         """
         labels = page.labels.with_date_text(text)
         if labels.date_error is not None:
-            self.status.show_message(labels.date_error)
+            self.status.show_notice(labels.date_error)
             return False
         previous = self.pages.page
         self.pages.page = page.with_labels(labels)
@@ -416,10 +412,10 @@ class PageDialogState:
         try:
             labels = page.labels.with_due_date_text(text)
         except NoteParseError as exc:
-            self.status.show_message(str(exc))
+            self.status.show_notice(str(exc))
             return False
         if labels.due_date_error is not None:
-            self.status.show_message(labels.due_date_error)
+            self.status.show_notice(labels.due_date_error)
             return False
         previous = self.pages.page
         self.pages.page = page.with_labels(labels)
@@ -451,7 +447,7 @@ class PageDialogState:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Category move failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_CATEGORY_MOVE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PAGE_CATEGORY_MOVE_FAILED.format(detail=str(exc)))
                     return False
                 self.category_move = None
                 self.pending_labels = None
@@ -478,7 +474,6 @@ class PageDialogState:
             self.category_move = None
             self.pending_labels = None
             self.pages.blocking_message = None
-            self.status.clear_message()
 
     async def apply_type_change(self) -> bool:
         """Apply a type or category change that was waiting for confirmation.
@@ -497,7 +492,6 @@ class PageDialogState:
             self.pending_labels = None
             self.type_change_sites = ()
             self.pages.blocking_message = None
-            self.status.clear_message()
             return True
 
     async def cancel_type_change(self) -> None:
@@ -506,7 +500,6 @@ class PageDialogState:
             self.pending_labels = None
             self.type_change_sites = ()
             self.pages.blocking_message = None
-            self.status.clear_message()
 
     async def apply_repair(self) -> bool:
         """Rewrite references that still use an unsafe link name.
@@ -529,13 +522,13 @@ class PageDialogState:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Reference repair failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_REPAIR_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PAGE_REPAIR_FAILED.format(detail=str(exc)))
                     return False
                 self.pages.repair_preview = None
                 await self.session.refresh_snapshot()
                 report_text = self._rewrite_report(report)
                 if report_text is not None:
-                    self.status.show_message(afanes.ui.strings.PAGE_REPAIR_PARTIAL.format(report=report_text))
+                    self.pages.report = afanes.ui.strings.PAGE_REPAIR_PARTIAL.format(report=report_text)
                 return True
             finally:
                 self.status.set_busy(busy=False)
@@ -544,7 +537,6 @@ class PageDialogState:
         """Leave unsafe link names unchanged and close the repair prompt."""
         async with self.command_lock:
             self.pages.repair_preview = None
-            self.status.clear_message()
 
     async def cancel_repair(self) -> bool:
         """Remove the just-created page and restore the draft.
@@ -565,7 +557,7 @@ class PageDialogState:
                     await asyncio.to_thread(afanes.core.vault.naming.VaultNaming(vault).trash, page.path, confirm=True)
                 except (AfanesError, OSError) as exc:
                     logger.debug("Created page could not be removed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
                     return False
                 self.pages.page = page.as_new()
                 self.pages.editing = True
@@ -610,11 +602,10 @@ class PageDialogState:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Rename planning failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_RENAME_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PAGE_RENAME_FAILED.format(detail=str(exc)))
                     return None
                 self.rename_preview = preview
                 self.pages.blocking_message = afanes.ui.strings.PAGE_PENDING_DIALOG
-                self.status.clear_message()
                 return preview
             finally:
                 self.status.set_busy(busy=False)
@@ -640,7 +631,7 @@ class PageDialogState:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Rename failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_RENAME_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PAGE_RENAME_FAILED.format(detail=str(exc)))
                     return False
                 self.rename_preview = None
                 self.pages.blocking_message = None
@@ -653,7 +644,7 @@ class PageDialogState:
                 await self.session.refresh_snapshot()
                 report_text = self._rewrite_report(report)
                 if report_text is not None:
-                    self.status.show_message(afanes.ui.strings.PAGE_RENAME_PARTIAL.format(report=report_text))
+                    self.pages.report = afanes.ui.strings.PAGE_RENAME_PARTIAL.format(report=report_text)
                 return True
             finally:
                 self.status.set_busy(busy=False)
@@ -663,7 +654,6 @@ class PageDialogState:
         async with self.command_lock:
             self.rename_preview = None
             self.pages.blocking_message = None
-            self.status.clear_message()
 
     def _rewrite_report(self, report: RenameReport | RewriteReport) -> str | None:
         """Format a partial reference rewrite, or return ``None`` when complete.
@@ -819,10 +809,9 @@ class PageDialogState:
         try:
             labels = transform(page.labels)
         except NoteParseError as exc:
-            self.status.show_message(str(exc))
+            self.status.show_notice(str(exc))
             return False
         self.pages.page = page.with_labels(labels)
-        self.status.clear_message()
         return True
 
     async def _apply_label_change(self, transform: Callable[[PageLabels], PageLabels]) -> bool:
@@ -834,23 +823,20 @@ class PageDialogState:
         try:
             proposed = transform(current)
         except NoteParseError as exc:
-            self.status.show_message(str(exc))
+            self.status.show_notice(str(exc))
             return False
         if proposed.scheme is current.scheme or page.path is None:
             self.pages.page = page.with_labels(proposed)
-            self.status.clear_message()
             return True
         sites = await self._scheme_change_sites(page.path)
         if sites is None:
             return False
         if not sites:
             self.pages.page = page.with_labels(proposed)
-            self.status.clear_message()
             return True
         self.pending_labels = proposed
         self.type_change_sites = sites
         self.pages.blocking_message = afanes.ui.strings.PAGE_TYPE_CHANGE_LEAVE
-        self.status.clear_message()
         return False
 
     async def _scheme_change_sites(self, path: Path) -> tuple[ReferenceSite, ...] | None:
@@ -862,7 +848,7 @@ class PageDialogState:
             snapshot = await asyncio.to_thread(vault.scan)
         except (VaultError, OSError) as exc:
             logger.debug("Snapshot refresh before a type change failed", exc_info=True)
-            self.status.show_message(afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc)))
+            self.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
             return None
         self.session.apply_snapshot(snapshot)
         return snapshot.referrers(path)
@@ -897,12 +883,12 @@ class PageDialogState:
                     draft = PageDraftFactory.from_page(content, page.reference)
                 except (AfanesError, OSError, UnicodeError) as exc:
                     logger.debug("Page reload failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc)))
                     return False
                 self.pages.page = draft
                 self.pages.conflict = None
+                self.pages.report = None
                 self.pages.editing = False
-                self.status.clear_message()
                 return True
             finally:
                 self.status.set_busy(busy=False)
@@ -923,7 +909,7 @@ class PageDialogState:
             try:
                 text = page.to_text()
             except NoteParseError as exc:
-                self.status.show_message(str(exc))
+                self.status.show_notice(str(exc))
                 return False
             self.status.set_busy(busy=True)
             try:
@@ -934,11 +920,11 @@ class PageDialogState:
                     )
                 except (AfanesError, OSError, UnicodeError) as exc:
                     logger.debug("Page overwrite failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
                     return False
                 self.pages.page = page.after_write(text, content_hash=new_hash)
                 self.pages.conflict = None
-                self.status.clear_message()
+                self.pages.report = None
                 return True
             finally:
                 self.status.set_busy(busy=False)
@@ -959,7 +945,7 @@ class PageDialogState:
             try:
                 text = page.to_text()
             except NoteParseError as exc:
-                self.status.show_message(str(exc))
+                self.status.show_notice(str(exc))
                 return False
             self.status.set_busy(busy=True)
             try:
@@ -969,15 +955,14 @@ class PageDialogState:
                     )
                 except ContentChangedError:
                     self.pages.conflict = "changed"
-                    self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_CHANGED)
                     return False
                 except (AfanesError, OSError) as exc:
                     logger.debug("Page recreation failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
                     return False
                 self.pages.page = page.after_write(text, content_hash=new_hash)
                 self.pages.conflict = None
-                self.status.clear_message()
+                self.pages.report = None
                 return True
             finally:
                 self.status.set_busy(busy=False)

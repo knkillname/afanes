@@ -511,7 +511,8 @@ class ProjectBodyView:
             self.refresh()
             self._update()
         else:
-            message = self._state.status.message or afanes.ui.strings.PAGE_STEP_FAILED.format(detail="")
+            notice = self._state.status.take_notice()
+            message = afanes.ui.strings.PAGE_STEP_FAILED.format(detail="") if notice is None else notice.message
             self._show_error(message)
         return written
 

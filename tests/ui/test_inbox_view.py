@@ -38,7 +38,7 @@ class TestWelcomeView:
         assert buttons[0].content == afanes.ui.strings.WELCOME_CHOOSE
 
     def test_welcome_shows_the_startup_message(self) -> None:
-        afanes.ui.state.app_state.status.message = afanes.ui.strings.SETTINGS_UNREADABLE
+        afanes.ui.state.app_state.workspace.banner = afanes.ui.strings.SETTINGS_UNREADABLE
 
         control = afanes.ui.views.inbox.WelcomeView(_change_vault).build()
         assert isinstance(control, ft.Container)

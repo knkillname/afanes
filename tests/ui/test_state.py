@@ -23,6 +23,7 @@ import afanes.core.vault.schema
 import afanes.core.vault.service
 import afanes.core.vault.snapshot
 import afanes.ui.state
+import afanes.ui.state.controller
 import afanes.ui.state.lock
 import afanes.ui.state.navigation
 import afanes.ui.state.session
@@ -50,6 +51,11 @@ from tests.support import versioned as _versioned
 OLD_NS = 1_700_000_000_000_000_000
 NEW_NS = 1_700_000_001_000_000_000
 TWO_PENDING = 2
+
+
+def _notice_message(state: afanes.ui.state.controller.AppState) -> str | None:
+    notice = state.status.notice
+    return None if notice is None else notice.message
 
 
 @pytest.fixture(autouse=True)
@@ -205,7 +211,7 @@ class TestProcessingState:
         opened = asyncio.run(scenario())
 
         assert opened is False
-        assert state.status.message == afanes.ui.strings.PROCESSING_MISSING
+        assert _notice_message(state) == afanes.ui.strings.PROCESSING_MISSING
 
     def test_begin_processing_performs_no_writes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -373,8 +379,9 @@ class TestProcessingState:
         asyncio.run(scenario())
 
         assert state.processing.plan is None
-        assert state.status.message is not None
-        assert state.status.message.startswith("Could not prepare")
+        message = _notice_message(state)
+        assert message is not None
+        assert message.startswith("Could not prepare")
 
     def test_apply_processing_moves_the_capture(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -452,9 +459,36 @@ class TestProcessingState:
 
         assert result is None
         assert state.processing.plan is not None
-        assert state.status.message is not None
+        assert _notice_message(state) is not None
         assert capture_path is not None
         assert capture_path.exists()
+
+    def test_post_apply_refresh_failure_uses_the_processing_banner(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            capture = await state.session.capture("Buy milk")
+            assert capture is not None
+            await state.processing.begin(capture)
+            await state.processing.build_plan(_processing_request(ProcessingOutcome.PROJECT))
+
+        asyncio.run(scenario())
+
+        def fail_scan(_self: afanes.core.vault.service.Vault) -> None:
+            message = "disk full"
+            raise VaultError(message)
+
+        monkeypatch.setattr(afanes.core.vault.service.Vault, "scan", fail_scan)
+        result = asyncio.run(state.processing.apply())
+
+        assert result is not None
+        assert state.processing.banner == afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail="disk full")
 
     def test_cancel_processing_clears_the_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -476,7 +510,7 @@ class TestProcessingState:
         assert state.processing.body is None
         assert state.processing.plan is None
         assert state.processing.result is None
-        assert state.status.message is None
+        assert _notice_message(state) is None
 
     def test_finish_processing_clears_the_success_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -616,7 +650,7 @@ class TestCreateReference:
 
         assert created is False
         assert not (vault / "reference" / "general").exists()
-        assert state.status.message == afanes.ui.strings.BROWSER_NAME_REQUIRED
+        assert _notice_message(state) == afanes.ui.strings.BROWSER_NAME_REQUIRED
 
     def test_a_collision_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -678,8 +712,8 @@ class TestCreateReference:
 
         assert created is True
         assert (vault / "reference" / "person" / "Priya.md").is_file()
-        assert state.status.message is not None
-        assert state.status.message.startswith("Could not refresh")
+        assert state.session.banner is not None
+        assert state.session.banner.startswith("Could not refresh")
 
 
 class TestAssignmentCandidates:
@@ -732,7 +766,7 @@ class TestStartup:
 
         assert state.session.vault_root is None
         assert state.session.notes == ()
-        assert state.status.message is None
+        assert state.workspace.banner is None
 
     def test_malformed_settings_show_a_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         settings = tmp_path / "settings.json"
@@ -743,7 +777,7 @@ class TestStartup:
         asyncio.run(state.workspace.start())
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.SETTINGS_UNREADABLE
+        assert state.workspace.banner == afanes.ui.strings.SETTINGS_UNREADABLE
         assert settings.read_text(encoding="utf-8") == "{not json"
 
     def test_missing_vault_shows_a_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -756,7 +790,7 @@ class TestStartup:
         asyncio.run(state.workspace.start())
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
         assert not missing.exists()
 
     def test_file_vault_shows_a_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -770,7 +804,7 @@ class TestStartup:
         asyncio.run(state.workspace.start())
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_NOT_DIRECTORY
+        assert state.workspace.banner == afanes.ui.strings.VAULT_NOT_DIRECTORY
 
     def test_valid_settings_opens_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -788,7 +822,7 @@ class TestStartup:
 
         assert state.session.vault_root == vault.resolve()
         assert [note.name for note in state.session.notes] == ["Second", "First"]
-        assert state.status.message is None
+        assert state.workspace.banner is None
 
     def test_starting_does_not_create_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -845,7 +879,7 @@ class TestChooseVault:
         asyncio.run(state.workspace.choose_vault(missing))
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
         assert not settings.exists()
 
     def test_choose_vault_rejects_a_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -857,7 +891,7 @@ class TestChooseVault:
         asyncio.run(state.workspace.choose_vault(vault))
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_NOT_DIRECTORY
+        assert state.workspace.banner == afanes.ui.strings.VAULT_NOT_DIRECTORY
 
     def test_choose_vault_reports_a_save_failure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -874,7 +908,7 @@ class TestChooseVault:
         asyncio.run(state.workspace.choose_vault(vault))
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail="simulated")
+        assert state.workspace.banner == afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail="simulated")
 
     def test_choose_vault_does_not_write_to_the_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -931,7 +965,7 @@ class TestChangeVault:
         asyncio.run(scenario())
 
         assert state.session.vault_root == first.resolve()
-        assert state.status.message == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(first.resolve())
 
 
@@ -951,7 +985,7 @@ class TestAdoption:
 
         assert state.session.vault_root is None
         assert state.session.adoption_target == vault.resolve()
-        assert state.status.message == afanes.ui.strings.VAULT_SCHEMA_ADOPT_MESSAGE
+        assert state.workspace.banner == afanes.ui.strings.VAULT_SCHEMA_ADOPT_MESSAGE
         assert not (vault / "afanes.yaml").exists()
 
     def test_welcome_refuses_a_folder_without_the_defaults(
@@ -970,7 +1004,7 @@ class TestAdoption:
 
         assert state.session.vault_root is None
         assert state.session.adoption_target is None
-        assert state.status.message == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
+        assert state.workspace.banner == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
         assert list(vault.iterdir()) == []
 
     def test_change_vault_offers_adoption_and_keeps_the_current_vault(
@@ -1070,7 +1104,7 @@ class TestAdoption:
 
         assert state.session.vault_root == first.resolve()
         assert state.session.adoption_target == second.resolve()
-        assert state.status.message == "disk full"
+        assert state.workspace.banner == "disk full"
         assert not (second / "afanes.yaml").exists()
 
     def test_adoption_remember_failure_still_opens_the_vault(
@@ -1098,7 +1132,7 @@ class TestAdoption:
 
         assert state.session.vault_root == second.resolve()
         assert state.session.adoption_target is None
-        assert state.status.message == afanes.ui.strings.VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED.format(
+        assert state.workspace.banner == afanes.ui.strings.VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED.format(
             detail="settings are read-only",
         )
 
@@ -1121,7 +1155,7 @@ class TestAdoption:
 
         assert state.session.vault_root is None
         assert state.session.adoption_target is None
-        assert "exactly schema_version" in (state.status.message or "")
+        assert "exactly schema_version" in (state.workspace.banner or "")
         assert path.read_bytes() == before
 
     def test_newer_schema_is_refused_with_an_update_message(
@@ -1141,7 +1175,7 @@ class TestAdoption:
 
         assert state.session.vault_root is None
         assert state.session.adoption_target is None
-        assert "update Afanes" in (state.status.message or "")
+        assert "update Afanes" in (state.workspace.banner or "")
 
     def test_a_read_only_unversioned_folder_is_refused_without_an_offer(
         self,
@@ -1161,7 +1195,7 @@ class TestAdoption:
 
         assert state.session.vault_root is None
         assert state.session.adoption_target is None
-        assert state.status.message == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
+        assert state.workspace.banner == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
         assert not (vault / "afanes.yaml").exists()
 
     def test_an_unversioned_supplied_folder_is_not_offered_adoption(
@@ -1177,7 +1211,7 @@ class TestAdoption:
 
         assert state.session.vault_root is None
         assert state.session.adoption_target is None
-        assert state.status.message == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
+        assert state.workspace.banner == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
         assert not (vault / "afanes.yaml").exists()
 
     def test_adoption_requires_a_pending_offer(self) -> None:
@@ -1302,7 +1336,7 @@ class TestLogEntryCreation:
             )
 
         assert asyncio.run(scenario()) is False
-        assert state.status.message is not None
+        assert _notice_message(state) is not None
         assert not (vault / "log" / "2025" / "10" / "2025-10-12.md").exists()
 
 
@@ -1325,7 +1359,7 @@ class TestCapture:
         document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
         assert document.note_type is NoteType.NOTE
         assert document.date is not None
-        assert state.status.message is None
+        assert _notice_message(state) is None
 
     def test_empty_capture_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -1340,10 +1374,10 @@ class TestCapture:
         path = asyncio.run(scenario())
 
         assert path is None
-        assert state.status.message == afanes.ui.strings.CAPTURE_EMPTY
+        assert _notice_message(state) == afanes.ui.strings.CAPTURE_EMPTY
         assert state.session.notes == ()
 
-    def test_successful_capture_clears_the_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_successful_capture_adds_no_notice(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -1352,11 +1386,12 @@ class TestCapture:
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
             await state.session.capture("")
+            state.status.take_notice()
             await state.session.capture("Buy milk")
 
         asyncio.run(scenario())
 
-        assert state.status.message is None
+        assert _notice_message(state) is None
         assert len(state.session.notes) == 1
 
     def test_capture_failure_reports_and_keeps_the_list(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1378,7 +1413,7 @@ class TestCapture:
         path = asyncio.run(scenario())
 
         assert path is None
-        assert state.status.message == afanes.ui.strings.CAPTURE_FAILED.format(detail="disk full")
+        assert _notice_message(state) == afanes.ui.strings.CAPTURE_FAILED.format(detail="disk full")
         assert state.session.notes == ()
 
     def test_repeated_captures_get_distinct_names(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1500,8 +1535,9 @@ class TestPreview:
 
         assert state.session.selected is None
         assert state.session.preview_body is None
-        assert state.status.message is not None
-        assert state.status.message.startswith("Could not read this note:")
+        message = _notice_message(state)
+        assert message is not None
+        assert message.startswith("Could not read this note:")
 
 
 class TestSessionConnections:
@@ -1639,7 +1675,7 @@ class TestRefresh:
         asyncio.run(state.workspace.refresh())
 
         assert state.session.notes == ()
-        assert state.status.message is None
+        assert _notice_message(state) is None
 
 
 class TestRefreshIfChanged:
@@ -1846,7 +1882,7 @@ class TestRefreshWorkspace:
 
         assert state.pages.page_body == "Mine\n"
         assert state.pages.conflict == "changed"
-        assert state.status.message == afanes.ui.strings.PAGE_CONFLICT_CHANGED
+        assert state.pages.banner == afanes.ui.strings.PAGE_CONFLICT_CHANGED
 
     def test_missing_file_raises_missing_and_keeps_the_draft(
         self,
@@ -1872,7 +1908,7 @@ class TestRefreshWorkspace:
 
         assert state.pages.page_body == "Mine\n"
         assert state.pages.conflict == "missing"
-        assert state.status.message == afanes.ui.strings.PAGE_CONFLICT_MISSING
+        assert state.pages.banner == afanes.ui.strings.PAGE_CONFLICT_MISSING
 
     def test_conflict_resolves_with_the_existing_actions(
         self,
@@ -1899,7 +1935,7 @@ class TestRefreshWorkspace:
 
         assert state.pages.conflict is None
         assert state.pages.page_body == "Mine\n"
-        assert state.status.message is None
+        assert state.pages.banner is None
 
     def test_a_command_message_survives_the_background_apply(
         self,
@@ -1911,29 +1947,30 @@ class TestRefreshWorkspace:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
-        async def scenario() -> str | None:
+        async def scenario() -> tuple[str | None, str | None]:
             await state.workspace.choose_vault(vault)
-            state.status.message = "Saved by a command"
+            state.workspace.banner = "Saved by a command"
+            state.status.show_notice("Saved notice")
             _write_note(vault / "inbox" / "External.md", _note_text("# External"))
             assert await state.workspace.refresh_workspace() is True
-            return state.status.message
+            return state.workspace.banner, _notice_message(state)
 
-        assert asyncio.run(scenario()) == "Saved by a command"
+        assert asyncio.run(scenario()) == ("Saved by a command", "Saved notice")
 
-    def test_a_capture_still_clears_the_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_a_capture_clears_only_the_session_banner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
-        async def scenario() -> None:
+        async def scenario() -> tuple[str | None, str | None]:
             await state.workspace.choose_vault(vault)
-            state.status.message = "Old message"
+            state.session.banner = "Old refresh failure"
+            state.workspace.banner = "Vault condition"
             assert await state.session.capture("Buy milk") is not None
+            return state.session.banner, state.workspace.banner
 
-        asyncio.run(scenario())
-
-        assert state.status.message is None
+        assert asyncio.run(scenario()) == (None, "Vault condition")
 
     def test_background_refresh_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -2105,7 +2142,6 @@ class TestPageSession:
         asyncio.run(scenario())
 
         assert state.pages.page is None
-        assert state.status.message is not None
 
     def test_done_editing_commits_the_body(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -2267,7 +2303,7 @@ class TestPageLabels:
             assert page is not None
             assert page.labels is not None
             assert page.labels.status is None
-            assert state.status.message is not None
+            assert _notice_message(state) is not None
 
         asyncio.run(scenario())
 
@@ -2664,7 +2700,7 @@ class TestPageSaving:
         assert saved is False
         assert state.pages.page is not None
         assert state.pages.page.is_dirty is True
-        assert state.status.message is not None
+        assert _notice_message(state) is not None
 
 
 class TestPageLinks:
@@ -2896,7 +2932,7 @@ class TestPageLinks:
         asyncio.run(scenario())
 
         assert state.pages.page is None
-        assert state.status.message is None
+        assert _notice_message(state) is None
         assert state.navigation.ambiguous == ()
 
     def test_unsafe_name_is_created_and_repaired(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3124,7 +3160,7 @@ class TestCreateRoleReference:
 
         assert created is False
         assert existing.read_bytes() == before
-        assert state.status.message is not None
+        assert _notice_message(state) is not None
 
     def test_a_blank_name_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -3139,7 +3175,7 @@ class TestCreateRoleReference:
         created = asyncio.run(scenario())
 
         assert created is False
-        assert state.status.message == afanes.ui.strings.BROWSER_NAME_REQUIRED
+        assert _notice_message(state) == afanes.ui.strings.BROWSER_NAME_REQUIRED
 
 
 class TestPageRenameTrash:
@@ -3393,7 +3429,7 @@ class TestPageRescue:
         assert state.pages.page.labels is not None
         assert state.pages.page.labels.note_type is NoteType.NOTE
         assert state.pages.page.is_dirty is False
-        assert state.status.message == afanes.ui.strings.PAGE_RAW_UPGRADED
+        assert state.status.notice is None
         assert state.pages.editing is True
 
         async def finish() -> None:
@@ -3837,7 +3873,7 @@ class TestReset:
         assert state.session.selected is None
         assert state.session.preview_body is None
         assert state.status.busy is False
-        assert state.status.message is None
+        assert _notice_message(state) is None
 
     def test_reset_allows_a_second_event_loop(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -3875,7 +3911,7 @@ class TestOpenVaultPath:
         asyncio.run(state.workspace.open_vault_path("   "))
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_PATH_REQUIRED
+        assert state.workspace.banner == afanes.ui.strings.VAULT_PATH_REQUIRED
         assert not settings.exists()
 
     def test_missing_path_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3885,7 +3921,7 @@ class TestOpenVaultPath:
         asyncio.run(state.workspace.open_vault_path(str(tmp_path / "missing")))
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
 
     def test_file_path_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         target = tmp_path / "note.md"
@@ -3896,7 +3932,7 @@ class TestOpenVaultPath:
         asyncio.run(state.workspace.open_vault_path(str(target)))
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_NOT_DIRECTORY
+        assert state.workspace.banner == afanes.ui.strings.VAULT_NOT_DIRECTORY
 
     def test_unreadable_path_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -3912,7 +3948,7 @@ class TestOpenVaultPath:
         asyncio.run(state.workspace.open_vault_path(str(vault)))
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_UNREADABLE
+        assert state.workspace.banner == afanes.ui.strings.VAULT_UNREADABLE
 
 
 class TestCreateVault:
@@ -3966,8 +4002,8 @@ class TestCreateVault:
 
         assert opened is False
         assert state.session.vault_root is None
-        assert state.status.message is not None
-        assert "bundled content is broken" in state.status.message
+        assert state.workspace.banner is not None
+        assert "bundled content is broken" in state.workspace.banner
         assert not target.exists()
 
     def test_template_summaries_report_the_catalog(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4006,7 +4042,7 @@ class TestCreateVault:
 
         assert opened is False
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_NOT_EMPTY
+        assert state.workspace.banner == afanes.ui.strings.VAULT_NOT_EMPTY
         assert sorted(path.name for path in target.iterdir()) == ["photo.jpg"]
 
     def test_refuses_a_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4018,7 +4054,7 @@ class TestCreateVault:
         opened = asyncio.run(state.workspace.create_vault(target))
 
         assert opened is False
-        assert state.status.message == afanes.ui.strings.VAULT_NOT_DIRECTORY
+        assert state.workspace.banner == afanes.ui.strings.VAULT_NOT_DIRECTORY
 
     def test_opens_when_preferences_cannot_be_saved(
         self,
@@ -4039,7 +4075,7 @@ class TestCreateVault:
 
         assert opened is True
         assert state.session.vault_root == target.resolve()
-        assert state.status.message == afanes.ui.strings.VAULT_CREATED_NOT_REMEMBERED.format(detail="read only")
+        assert state.workspace.banner == afanes.ui.strings.VAULT_CREATED_NOT_REMEMBERED.format(detail="read only")
 
 
 class TestCloseVault:
@@ -4064,7 +4100,7 @@ class TestCloseVault:
         assert closed is True
         assert state.session.vault_root is None
         assert state.status.session_active is True
-        assert state.status.message is None
+        assert _notice_message(state) is None
         assert not settings.exists()
 
     def test_close_saves_a_dirty_page(
@@ -4141,7 +4177,7 @@ class TestCloseVault:
 
         assert closed is True
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_CLOSE_NOT_FORGOTTEN.format(detail="read only")
+        assert state.workspace.banner == afanes.ui.strings.VAULT_CLOSE_NOT_FORGOTTEN.format(detail="read only")
         assert settings.exists()
 
     @pytest.mark.parametrize(
@@ -4182,7 +4218,7 @@ class TestCloseVault:
 
         assert closed is False
         assert state.session.vault_root == vault.resolve()
-        assert state.status.message == message
+        assert state.pages.banner == message
         assert settings.exists()
 
     def test_close_succeeds_when_the_settings_file_is_already_gone(
@@ -4260,7 +4296,7 @@ class TestOpenVaultForRun:
         asyncio.run(state.workspace.open_vault_for_run(tmp_path / "missing"))
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
 
 
 class TestSessionGuard:
@@ -4538,7 +4574,7 @@ class TestStepAwareProjectPage:
         assert asyncio.run(state.dialogs.save_page_due_date("January")) is False
 
         assert path.read_bytes() == before
-        assert state.status.message is not None
+        assert _notice_message(state) is not None
 
     def test_due_date_conflict_keeps_the_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         path, state = self._project(tmp_path, monkeypatch)
@@ -4606,7 +4642,7 @@ class TestLogTypeChange:
             return await state.dialogs.set_page_type(NoteType.LOG)
 
         assert asyncio.run(scenario()) is False
-        assert state.status.message is not None
+        assert _notice_message(state) is not None
         assert path.is_file()
 
 
@@ -4656,7 +4692,7 @@ class TestRewriteReports:
             return await state.dialogs.apply_rename()
 
         assert asyncio.run(scenario()) is True
-        message = state.status.message
+        message = state.pages.report
         assert message is not None
         assert "Updated: " in message
         assert "reference/people/Ada King.md" in message
@@ -4712,7 +4748,7 @@ class TestRewriteReports:
             return await state.dialogs.set_page_type(NoteType.LOG)
 
         assert asyncio.run(scenario()) is True
-        message = state.status.message
+        message = state.pages.report
         assert message is not None
         assert "Updated: " in message
         assert "notes/Ref.md" in message
@@ -4770,7 +4806,7 @@ class TestRewriteReports:
             return await state.dialogs.save_page_date("2025-10-13")
 
         assert asyncio.run(scenario()) is True
-        message = state.status.message
+        message = state.pages.report
         assert message is not None
         assert "Updated: " in message
         assert "notes/Ref.md" in message
@@ -4821,7 +4857,7 @@ class TestRewriteReports:
             return await state.dialogs.apply_repair()
 
         assert asyncio.run(scenario()) is True
-        message = state.status.message
+        message = state.pages.report
         assert message is not None
         assert "Updated: " in message
         assert "notes/Source.md" in message

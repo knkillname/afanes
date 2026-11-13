@@ -93,16 +93,16 @@ class ProcessingState:
             if vault is None:
                 return False
             if all(note.path != path for note in self.session.notes):
-                self.status.show_message(afanes.ui.strings.PROCESSING_MISSING)
+                self.status.show_notice(afanes.ui.strings.PROCESSING_MISSING)
                 return False
+            self.banner = None
             self.status.set_busy(busy=True)
-            self.status.clear_message()
             try:
                 try:
                     await self.load(path)
                 except (AfanesError, OSError, UnicodeError) as exc:
                     logger.debug("Capture could not be read for processing", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PROCESSING_READ_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PROCESSING_READ_FAILED.format(detail=str(exc)))
                     return False
                 return True
             finally:
@@ -173,7 +173,6 @@ class ProcessingState:
                 return None
             request = dataclasses.replace(request, note_path=note)
             self.status.set_busy(busy=True)
-            self.status.clear_message()
             try:
                 try:
                     plan = await asyncio.to_thread(
@@ -183,7 +182,7 @@ class ProcessingState:
                 except (AfanesError, OSError) as exc:
                     logger.debug("Processing plan failed", exc_info=True)
                     self.plan = None
-                    self.status.show_message(afanes.ui.strings.PROCESSING_PLAN_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PROCESSING_PLAN_FAILED.format(detail=str(exc)))
                     return None
                 self.plan = plan
                 return plan
@@ -211,7 +210,6 @@ class ProcessingState:
             if vault is None or plan is None:
                 return None
             self.status.set_busy(busy=True)
-            self.status.clear_message()
             try:
                 try:
                     target = await asyncio.to_thread(
@@ -219,16 +217,18 @@ class ProcessingState:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Processing apply failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PROCESSING_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PROCESSING_FAILED.format(detail=str(exc)))
                     return None
+                refresh_failure: str | None = None
                 try:
                     snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Inbox refresh after processing failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail=str(exc)))
+                    refresh_failure = afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail=str(exc))
                 else:
                     self.session.apply_snapshot(snapshot)
                 self.clear()
+                self.banner = refresh_failure
                 self.session.selected = None
                 self.session.preview_body = None
                 self.result = target
@@ -239,12 +239,10 @@ class ProcessingState:
     def cancel(self) -> None:
         """Close the wizard and discard its unsaved plan."""
         self.clear()
-        self.status.clear_message()
 
     def finish(self) -> None:
         """Close the success state and return to the Inbox."""
         self.clear()
-        self.status.clear_message()
 
     def clear(self) -> None:
         """Clear the Processing Wizard session fields."""

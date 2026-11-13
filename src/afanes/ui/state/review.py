@@ -213,7 +213,6 @@ class ReviewState:
             queue = afanes.core.search.ReviewPlanner(snapshot).queue()
             self.review_session = ReviewSession(items=queue) if queue else None
             self.browser.active_section = WorkspaceSection.REVIEW
-            self.status.clear_message()
             self.processing.clear()
             if not queue:
                 return False
@@ -234,7 +233,6 @@ class ReviewState:
             if session is None or session.current is None or session.current.kind is not ReviewItemKind.PROJECT:
                 return False
             self.review_session = session.record_reviewed()
-            self.status.clear_message()
             await self._enter_current_review_item()
             return True
 
@@ -251,7 +249,6 @@ class ReviewState:
             if session is None or session.current is None:
                 return False
             self.review_session = session.record_skipped()
-            self.status.clear_message()
             await self._enter_current_review_item()
             return True
 
@@ -280,7 +277,6 @@ class ReviewState:
             if index == session.index:
                 return True
             self.review_session = dataclasses.replace(session, index=index)
-            self.status.clear_message()
             await self._enter_current_review_item()
             return True
 
@@ -311,7 +307,6 @@ class ReviewState:
             if item is None or vault is None or not text.strip():
                 return None
             self.status.set_busy(busy=True)
-            self.status.clear_message()
             try:
                 try:
                     await asyncio.to_thread(
@@ -319,7 +314,7 @@ class ReviewState:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Review step creation failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.REVIEW_STEP_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.REVIEW_STEP_FAILED.format(detail=str(exc)))
                     return None
                 await self.session.refresh_snapshot()
                 self._replace_review_project(item.path)
@@ -459,7 +454,6 @@ class ReviewState:
             self.review_session = None
             self.browser.active_section = WorkspaceSection.INBOX
             self.processing.clear()
-            self.status.clear_message()
 
     def _current_review_project(self) -> ReviewItem | None:
         """Return the current project review item, or ``None``."""
@@ -493,13 +487,12 @@ class ReviewState:
             if vault is None:
                 return False
             self.status.set_busy(busy=True)
-            self.status.clear_message()
             try:
                 try:
                     await asyncio.to_thread(action, vault)
                 except (AfanesError, OSError) as exc:
                     logger.debug("Review step write failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.REVIEW_STEP_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.REVIEW_STEP_FAILED.format(detail=str(exc)))
                     return False
                 await self.session.refresh_snapshot()
                 session = self.review_session
@@ -532,7 +525,7 @@ class ReviewState:
                 await self.processing.load(item.path)
             except (AfanesError, OSError, UnicodeError) as exc:
                 logger.debug("Review capture could not be read", exc_info=True)
-                self.status.show_message(afanes.ui.strings.REVIEW_CAPTURE_READ_FAILED.format(detail=str(exc)))
+                self.status.show_notice(afanes.ui.strings.REVIEW_CAPTURE_READ_FAILED.format(detail=str(exc)))
                 self.review_session = session.record_skipped()
                 continue
             return
@@ -545,7 +538,6 @@ class ReviewState:
             if item is None or vault is None:
                 return False
             self.status.set_busy(busy=True)
-            self.status.clear_message()
             try:
                 try:
                     await asyncio.to_thread(
@@ -557,7 +549,7 @@ class ReviewState:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Review project status change failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.REVIEW_PROJECT_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.REVIEW_PROJECT_FAILED.format(detail=str(exc)))
                     return False
                 await self.session.refresh_snapshot()
                 session = self.review_session

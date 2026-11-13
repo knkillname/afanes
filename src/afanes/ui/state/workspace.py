@@ -147,11 +147,11 @@ class WorkspaceController:
         Delegates to :meth:`choose_vault`, so resolution, validation, and
         settings persistence are shared with the folder picker. A rejected
         path leaves the controller in its previous state and sets
-        :attr:`message`.
+        :attr:`banner`.
         """
         trimmed = text.strip()
         if not trimmed:
-            self.status.show_message(afanes.ui.strings.VAULT_PATH_REQUIRED)
+            self.banner = afanes.ui.strings.VAULT_PATH_REQUIRED
             return
         await self.choose_vault(Path(trimmed))
 
@@ -203,17 +203,17 @@ class WorkspaceController:
             self._show_welcome(None)
         if adoptable and target is not None:
             self.session.adoption_target = target
-            self.status.show_message(afanes.ui.strings.VAULT_SCHEMA_ADOPT_MESSAGE)
+            self.banner = afanes.ui.strings.VAULT_SCHEMA_ADOPT_MESSAGE
             return
         self.session.adoption_target = None
-        self.status.show_message(afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE)
+        self.banner = afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
 
     async def _open_vault_state(self, path: Path, *, remember: bool) -> None:
         """Open a vault while the command lock is held."""
         if not await self.pages.commit():
             return
         self.status.set_busy(busy=True)
-        self.status.clear_message()
+        self.banner = None
         try:
             existing = await self._load_settings()
             try:
@@ -224,15 +224,15 @@ class WorkspaceController:
                 if remember:
                     await self._offer_adoption(path, welcome=False)
                 else:
-                    self.status.show_message(afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE)
+                    self.banner = afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
                 return
             except VaultSchemaError as exc:
                 logger.debug("Selected folder settings cannot be used", exc_info=True)
-                self.status.show_message(str(exc))
+                self.banner = str(exc)
                 return
             except (VaultError, OSError) as exc:
                 logger.debug("Selected vault could not be opened", exc_info=True)
-                self.status.show_message(str(exc))
+                self.banner = str(exc)
                 return
             if remember:
                 try:
@@ -242,7 +242,7 @@ class WorkspaceController:
                     )
                 except ConfigurationError as exc:
                     logger.debug("Vault selection could not be saved", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail=str(exc)))
+                    self.banner = afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail=str(exc))
                     return
             self._enter_vault(
                 vault,
@@ -341,14 +341,31 @@ class WorkspaceController:
     def cancel_adoption(self) -> None:
         """Dismiss the pending adoption offer without writing anything."""
         self.session.adoption_target = None
-        self.status.clear_message()
+        self.banner = None
+
+    def take_banner(self, fallback: str) -> str:
+        """Return the workspace banner and clear it.
+
+        Parameters
+        ----------
+        fallback : str
+            Text returned when no banner is active.
+
+        Returns
+        -------
+        str
+            The active banner text, or ``fallback`` when none is set.
+        """
+        message = self.banner if self.banner is not None else fallback
+        self.banner = None
+        return message
 
     async def _adopt_vault_state(self, target: Path) -> bool:
         """Adopt and open one folder while the command lock is held."""
         if not await self.pages.commit():
             return False
         self.status.set_busy(busy=True)
-        self.status.clear_message()
+        self.banner = None
         try:
             try:
                 await asyncio.to_thread(VaultSchemaStore(target).adopt)
@@ -356,13 +373,11 @@ class WorkspaceController:
                 snapshot = await asyncio.to_thread(vault.scan)
             except VaultSchemaNotAdoptableError as exc:
                 logger.debug("Adoption target is no longer eligible", exc_info=True)
-                self.status.show_message(
-                    afanes.ui.strings.VAULT_SCHEMA_NOT_ADOPTABLE.format(detail=str(exc)),
-                )
+                self.banner = afanes.ui.strings.VAULT_SCHEMA_NOT_ADOPTABLE.format(detail=str(exc))
                 return False
             except (VaultError, OSError) as exc:
                 logger.debug("Adoption target could not be opened", exc_info=True)
-                self.status.show_message(str(exc))
+                self.banner = str(exc)
                 return False
             existing = await self._load_settings()
             remember_failure: str | None = None
@@ -380,7 +395,7 @@ class WorkspaceController:
                 existing.log_mode_for(vault.root) if existing is not None else "entries",
             )
             if remember_failure is not None:
-                self.status.show_message(remember_failure)
+                self.banner = remember_failure
             return True
         finally:
             self.status.set_busy(busy=False)
@@ -390,7 +405,7 @@ class WorkspaceController:
         if not await self.pages.commit():
             return False
         self.status.set_busy(busy=True)
-        self.status.clear_message()
+        self.banner = None
         try:
             existing = await self._load_settings()
             try:
@@ -398,7 +413,7 @@ class WorkspaceController:
                 snapshot = await asyncio.to_thread(creation.vault.scan)
             except (VaultError, OSError) as exc:
                 logger.debug("New vault could not be created", exc_info=True)
-                self.status.show_message(str(exc))
+                self.banner = str(exc)
                 return False
             remember_failure: str | None = None
             try:
@@ -415,7 +430,7 @@ class WorkspaceController:
                 existing.log_mode_for(creation.vault.root) if existing is not None else "entries",
             )
             if remember_failure is not None:
-                self.status.show_message(remember_failure)
+                self.banner = remember_failure
             return True
         finally:
             self.status.set_busy(busy=False)
@@ -451,7 +466,7 @@ class WorkspaceController:
                 )
             except ConfigurationError as exc:
                 logger.debug("Log mode could not be saved", exc_info=True)
-                self.status.show_message(afanes.ui.strings.LOG_MODE_NOT_REMEMBERED.format(detail=str(exc)))
+                self.status.show_notice(afanes.ui.strings.LOG_MODE_NOT_REMEMBERED.format(detail=str(exc)))
 
     async def _load_settings(self) -> Settings | None:
         """Load settings without failing the active command.
@@ -489,6 +504,7 @@ class WorkspaceController:
 
     def _enter_vault(self, vault: Vault, snapshot: VaultSnapshot, log_mode: str = "entries") -> None:
         """Reset per-vault state and apply a freshly scanned snapshot."""
+        self.banner = None
         self.session.vault = vault
         self.session.adoption_target = None
         self.session.selected = None
@@ -539,7 +555,7 @@ class WorkspaceController:
                     snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Vault scan failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc)))
+                    self.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
                     return
                 self.session.apply_snapshot(snapshot)
                 page = self.pages.page
@@ -550,7 +566,7 @@ class WorkspaceController:
                     except (AfanesError, OSError, UnicodeError) as exc:
                         logger.debug("Page could not be refreshed", exc_info=True)
                         self.pages.clear()
-                        self.status.show_message(afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc)))
+                        self.status.show_notice(afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc)))
                 selected = self.session.selected
                 if selected is None:
                     return
@@ -560,7 +576,7 @@ class WorkspaceController:
                     logger.debug("Preview could not be refreshed", exc_info=True)
                     self.session.selected = None
                     self.session.preview_body = None
-                    self.status.show_message(afanes.ui.strings.PREVIEW_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PREVIEW_FAILED.format(detail=str(exc)))
             finally:
                 self.status.set_busy(busy=False)
 
@@ -577,17 +593,17 @@ class WorkspaceController:
         -----
         This command is the background counterpart of :meth:`refresh`. It
         skips the tick instead of waiting when another command holds the
-        command lock, never sets the busy indicator, and preserves a message
-        raised by a user command. A processing or review flow stays on its
-        note. An open page follows the change: a clean draft reloads, a dirty
-        draft raises the existing conflict state, and a vanished file is
+        command lock, never sets the busy indicator, and never replaces an
+        owned banner or a transient notice. A processing or review flow stays
+        on its note. An open page follows the change: a clean draft reloads, a
+        dirty draft raises the existing conflict state, and a vanished file is
         reported as missing. Blocking reads run in a worker thread and no note
         file is created, changed, or removed.
         """
         if self.session.vault is None or self.command_lock.locked():
             return False
         async with self.command_lock:
-            snapshot = await self.session.refresh_if_changed(preserve_message=True)
+            snapshot = await self.session.refresh_if_changed()
             if snapshot is None:
                 return False
             if self.processing.note is None and self.processing.result is None and self.review.review_session is None:
@@ -603,4 +619,4 @@ class WorkspaceController:
         self.dialogs.clear()
         self.processing.clear()
         self.pages.clear()
-        self.status.show_message(message)
+        self.banner = message

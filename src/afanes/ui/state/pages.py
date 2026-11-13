@@ -136,6 +136,7 @@ class PageEditorState:
         self.page = draft
         self.editing = self.editing or draft.mode is DraftMode.RAW
         self.conflict = None
+        self.report = None
 
     def _raise_page_conflict(self, conflict: str) -> None:
         """Set one disk conflict without replacing an existing one.
@@ -149,10 +150,7 @@ class PageEditorState:
         if self.conflict is not None:
             return
         self.conflict = conflict
-        if conflict == "missing":
-            self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_MISSING)
-        else:
-            self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_CHANGED)
+        self.report = None
 
     @property
     def page_title(self) -> str:
@@ -295,7 +293,7 @@ class PageEditorState:
         if self.page is None:
             return False
         self.editing = True
-        self.status.clear_message()
+        self.report = None
         return True
 
     async def done_editing(self) -> bool:
@@ -397,7 +395,6 @@ class PageEditorState:
                 return False
             previous = page
             self.page = page.with_labels(page.labels.with_owner_text(text))
-            self.status.clear_message()
             if not save or not self.page.is_dirty:
                 return True
         if not await self.autosave(force=True):
@@ -432,7 +429,6 @@ class PageEditorState:
             if page is None or page.path is None or vault is None:
                 return False
             self.status.set_busy(busy=True)
-            self.status.clear_message()
             try:
                 try:
                     if checked:
@@ -449,7 +445,7 @@ class PageEditorState:
                         )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Step toggle failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_STEP_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PAGE_STEP_FAILED.format(detail=str(exc)))
                     return False
                 if not await self.load(page.path):
                     return False
@@ -483,7 +479,6 @@ class PageEditorState:
             if page is None or page.path is None or vault is None:
                 return False
             self.status.set_busy(busy=True)
-            self.status.clear_message()
             try:
                 try:
                     if edit.kind is StepEditKind.PLAN:
@@ -504,7 +499,7 @@ class PageEditorState:
                         )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Step metadata edit failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.PAGE_STEP_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PAGE_STEP_FAILED.format(detail=str(exc)))
                     return False
                 if not await self.load(page.path):
                     return False
@@ -542,22 +537,16 @@ class PageEditorState:
             return True
         saved = await self._save_page()
         if saved and self.repair_preview is not None:
-            self.status.show_message(afanes.ui.strings.PAGE_REPAIR_PENDING)
             saved = False
         return saved
 
     def _commit_allowed(self, *, check_conflict: bool) -> bool:
-        """Show the first blocking page message and report whether saving may proceed."""
+        """Report whether the open page may be committed or left."""
         if self.repair_preview is not None:
-            self.status.show_message(afanes.ui.strings.PAGE_REPAIR_PENDING)
             return False
         if self.blocking_message is not None:
-            self.status.show_message(self.blocking_message)
             return False
-        if check_conflict and self.conflict is not None:
-            self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_LEAVE)
-            return False
-        return True
+        return not (check_conflict and self.conflict is not None)
 
     async def _save_page(self) -> bool:
         """Write the current draft, creating a new page when needed."""
@@ -572,7 +561,7 @@ class PageEditorState:
         try:
             text = page.to_text()
         except NoteParseError as exc:
-            self.status.show_message(str(exc))
+            self.status.show_notice(str(exc))
             return False
 
         self.saving = True
@@ -587,7 +576,7 @@ class PageEditorState:
         """Write an existing page with the conflict guard."""
         path = page.path
         if path is None:
-            self.status.show_message(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail="The page has no path"))
+            self.status.show_notice(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail="The page has no path"))
             return False
         try:
             new_hash = await asyncio.to_thread(
@@ -595,18 +584,15 @@ class PageEditorState:
             )
         except ContentChangedError:
             self.conflict = "changed"
-            self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_CHANGED)
             return False
         except VaultPathError:
             self.conflict = "missing"
-            self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_MISSING)
             return False
         except (AfanesError, OSError) as exc:
             logger.debug("Page save failed", exc_info=True)
-            self.status.show_message(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
+            self.status.show_notice(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
             return False
         self.page = page.after_write(text, content_hash=new_hash)
-        self.status.clear_message()
         return True
 
     async def _create_new_page(
@@ -629,7 +615,7 @@ class PageEditorState:
             )
         except (AfanesError, OSError) as exc:
             logger.debug("New page could not be created", exc_info=True)
-            self.status.show_message(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
+            self.status.show_notice(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
             return False
         new_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
         updated = page.after_write(text, content_hash=new_hash, path=path)
@@ -650,22 +636,16 @@ class PageEditorState:
                 )
             except ContentChangedError:
                 self.conflict = "changed"
-                self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_CHANGED)
                 return False
             except VaultPathError:
                 self.conflict = "missing"
-                self.status.show_message(afanes.ui.strings.PAGE_CONFLICT_MISSING)
                 return False
             except (AfanesError, OSError) as exc:
                 logger.debug("Raw page save failed", exc_info=True)
-                self.status.show_message(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
+                self.status.show_notice(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
                 return False
             updated = page.after_write(page.raw_text, content_hash=new_hash)
             self.page = updated
-            if updated.mode is DraftMode.NORMAL:
-                self.status.show_message(afanes.ui.strings.PAGE_RAW_UPGRADED)
-            else:
-                self.status.clear_message()
             return True
         finally:
             self.saving = False
@@ -682,7 +662,7 @@ class PageEditorState:
             snapshot = await asyncio.to_thread(vault.scan)
         except (VaultError, OSError) as exc:
             logger.debug("Snapshot refresh after creating a page failed", exc_info=True)
-            self.status.show_message(afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc)))
+            self.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
             return
         self.session.apply_snapshot(snapshot)
         await self._plan_repair(reference, snapshot, vault)
@@ -696,7 +676,7 @@ class PageEditorState:
             snapshot = await asyncio.to_thread(vault.scan)
         except (VaultError, OSError) as exc:
             logger.debug("Snapshot refresh before a reference repair failed", exc_info=True)
-            self.status.show_message(afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc)))
+            self.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
             return
         self.session.apply_snapshot(snapshot)
         await self._plan_repair(reference, snapshot, vault)
@@ -718,7 +698,7 @@ class PageEditorState:
             )
         except (AfanesError, OSError) as exc:
             logger.debug("Reference repair could not be planned", exc_info=True)
-            self.status.show_message(afanes.ui.strings.PAGE_REPAIR_FAILED.format(detail=str(exc)))
+            self.status.show_notice(afanes.ui.strings.PAGE_REPAIR_FAILED.format(detail=str(exc)))
             return
         if preview.sites:
             self.repair_preview = preview
@@ -752,12 +732,13 @@ class PageEditorState:
             draft = PageDraftFactory.from_page(content)
         except (AfanesError, OSError, UnicodeError) as exc:
             logger.debug("Page could not be read", exc_info=True)
-            self.status.show_message(afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc)))
+            self.status.show_notice(afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc)))
             return False
         self.page = draft
         self.editing = editing or draft.mode is DraftMode.RAW
         self.conflict = None
-        self.status.clear_message()
+        self.blocking_message = None
+        self.report = None
         return True
 
     def start_autosave(self) -> None:
@@ -792,6 +773,8 @@ class PageEditorState:
         self.page = NormalDraft.new(reference)
         self.editing = True
         self.conflict = None
+        self.blocking_message = None
+        self.report = None
 
     def reset(self) -> None:
         """Return the editor to its initial state."""

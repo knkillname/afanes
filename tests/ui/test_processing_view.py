@@ -638,15 +638,6 @@ class TestProcessingView:
         assert view.done_button.visible is True
         assert str(target) in view.success_text.value
 
-    def test_message_is_shown_in_a_banner(self) -> None:
-        state = _open_capture()
-        state.status.message = "boom"
-
-        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
-
-        assert view.banners.visible is True
-        assert len(view.banners.controls) == 1
-
     def test_invalid_due_date_is_reported_without_planning(self) -> None:
         _open_capture()
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)

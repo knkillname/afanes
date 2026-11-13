@@ -19,7 +19,6 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.search import ProjectSummary, ReviewItem
-from afanes.ui.components.banner import Banner
 from afanes.ui.components.panel import Card
 from afanes.ui.components.status import StatusLabel
 from afanes.ui.components.step_text import StepText, StepTextOptions
@@ -76,8 +75,6 @@ class ReviewView:
         """Rebuild the review controls from the current session."""
         session = self._state.review.review_session
         controls: list[ft.Control] = []
-        if self._state.status.message is not None:
-            controls.append(Banner(self._state.status.message).build())
         if session is None:
             controls.append(self._start_card())
         elif session.complete:
@@ -600,7 +597,8 @@ class ReviewView:
             self._typed = ""
             self._form_error = None
         else:
-            self._form_error = self._state.status.message
+            notice = self._state.status.take_notice()
+            self._form_error = None if notice is None else notice.message
         self.refresh()
         self._update()
 

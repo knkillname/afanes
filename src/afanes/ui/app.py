@@ -619,7 +619,10 @@ class AppShell:
                 self._show_create_error(error, afanes.ui.strings.VAULT_PATH_REQUIRED)
                 return
             if not await self.state.workspace.create_vault(Path(text), template=selector.value or None):
-                self._show_create_error(error, self.state.status.message or afanes.ui.strings.VAULT_PATH_REQUIRED)
+                self._show_create_error(
+                    error,
+                    self.state.workspace.take_banner(afanes.ui.strings.VAULT_PATH_REQUIRED),
+                )
                 return
             self.page.pop_dialog()
             await self.render()
@@ -667,6 +670,22 @@ class AppShell:
         error.visible = True
         self.page.update()
 
+    def _take_notice(self, fallback: str) -> str:
+        """Return the waiting notice text and clear it.
+
+        Parameters
+        ----------
+        fallback : str
+            Text returned when no notice is waiting.
+
+        Returns
+        -------
+        str
+            The notice message, or ``fallback`` when none is waiting.
+        """
+        notice = self.state.status.take_notice()
+        return fallback if notice is None else notice.message
+
     async def show_new_reference_dialog(self) -> None:
         """Ask for a name and template card, then create the reference.
 
@@ -709,7 +728,10 @@ class AppShell:
             category = card.category if card is not None and card.category is not None else CategoryLabel("general")
             scaffold = card.body if card is not None and card.body.strip() else None
             if not await self.state.navigation.create_reference(name, category, scaffold):
-                self._show_create_error(error, self.state.status.message or afanes.ui.strings.BROWSER_NAME_REQUIRED)
+                self._show_create_error(
+                    error,
+                    self._take_notice(afanes.ui.strings.BROWSER_NAME_REQUIRED),
+                )
                 return
             self.page.pop_dialog()
             self.page.update()
@@ -881,7 +903,7 @@ class AppShell:
             if not await self.state.navigation.open_or_create_log_entry(date, title, scaffold):
                 self._show_create_error(
                     error,
-                    self.state.status.message or afanes.ui.strings.LOG_TITLE_REQUIRED,
+                    self._take_notice(afanes.ui.strings.LOG_TITLE_REQUIRED),
                 )
                 return
             self.page.pop_dialog()

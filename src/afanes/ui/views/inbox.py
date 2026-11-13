@@ -99,7 +99,7 @@ class WelcomeView:
                 text_align=ft.TextAlign.CENTER,
             ),
         )
-        message = afanes.ui.state.app_state.status.message
+        message = afanes.ui.state.app_state.workspace.banner
         if message is not None:
             controls.append(Banner(message).build())
         return ft.Container(

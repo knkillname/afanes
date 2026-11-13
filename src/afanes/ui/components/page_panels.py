@@ -231,6 +231,13 @@ class RenamePanel:
             width=afanes.ui.theme.PAGE_RENAME_WIDTH,
             on_change=on_change,
         )
+        self.error = ft.Text(
+            "",
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
+            color=afanes.ui.theme.ERROR_TEXT_COLOR,
+            visible=False,
+            selectable=True,
+        )
         self.preview_text = ft.Text("", selectable=True)
         self.preview = ft.OutlinedButton(
             content=afanes.ui.strings.PAGE_RENAME_PREVIEW_ACTION,
@@ -256,6 +263,7 @@ class RenamePanel:
                 controls=[
                     ft.Text(afanes.ui.strings.PAGE_RENAME_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-4"]),
                     self.field,
+                    self.error,
                     self.preview_text,
                     ft.Row(
                         controls=[self.cancel, self.preview, self.confirm],

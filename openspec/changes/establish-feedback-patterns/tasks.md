@@ -21,16 +21,16 @@
 ## 4. Immediate trash flow
 
 - [x] 4.1 Replace `PageDialogState.begin_trash`, `apply_trash`, and `cancel_trash` with one immediate trash command and an `undo_trash` command, keep one in-memory undo record, and emit the moved, restored, and failure notices; verify focused state tests cover immediate move, undo, collision, replacement by a second trash, and restart loss.
-- [ ] 4.2 Update `PageView` so the Trash menu action calls the immediate command, remove its trash confirmation methods and panel wiring, delete `TrashPanel` from `page_panels.py`, and verify `hatch test tests/ui/test_page_view.py` passes.
-- [ ] 4.3 Update the copy: `PAGE_TRASH` loses its ellipsis, remove `PAGE_TRASH_TITLE`, `PAGE_TRASH_BODY`, and `PAGE_TRASH_CONFIRM`, add the moved, restored, failure, and Undo constants, update the copy-gate classifications and `ELLIPSIS_ACTIONS`, and verify `hatch test tests/ui/test_copy.py` passes.
-- [ ] 4.4 Remove the `TrashPanel` entry from the conformance baseline, verify the baseline still only shrinks, and run `hatch test tests/ui/test_conformance.py`.
+- [x] 4.2 Update `PageView` so the Trash menu action calls the immediate command, remove its trash confirmation methods and panel wiring, delete `TrashPanel` from `page_panels.py`, and verify `hatch test tests/ui/test_page_view.py` passes.
+- [x] 4.3 Update the copy: `PAGE_TRASH` loses its ellipsis, remove `PAGE_TRASH_TITLE`, `PAGE_TRASH_BODY`, and `PAGE_TRASH_CONFIRM`, add the moved, restored, failure, and Undo constants, update the copy-gate classifications and `ELLIPSIS_ACTIONS`, and verify `hatch test tests/ui/test_copy.py` passes.
+- [x] 4.4 Remove the `TrashPanel` entry from the conformance baseline, verify the baseline still only shrinks, and run `hatch test tests/ui/test_conformance.py`.
 
 ## 5. Feedback migration
 
-- [ ] 5.1 Migrate `PageEditorState` and `PageDialogState` to the new channels: conflict and blocking state to the page banner, partial rewrite reports to the page banner, one-time failures to notices, and category and rename validation inline; verify focused tests cover a conflict across a background refresh and a failed save as a notice.
-- [ ] 5.2 Migrate `VaultSession`, `WorkspaceController`, `PageNavigator`, `ReviewState`, and `ProcessingState`: refresh failures to owner banners, one-time failures to notices, and form failures inline; verify the review form and processing form still show their own errors and the post-processing refresh failure uses the processing banner.
-- [ ] 5.3 Render the owned banners in the workspace shell and the page view, remove the duplicate status-message banners from the inbox, review, and processing views, and verify a background refresh preserves each banner and each notice.
-- [ ] 5.4 Remove `UiStatus.message` and `show_message` after every call site is migrated, update the remaining tests, and verify `grep -rn "show_message\|status.message" src tests` returns no output and the full suite passes.
+- [x] 5.1 Migrate `PageEditorState` and `PageDialogState` to the new channels: conflict and blocking state to the page banner, partial rewrite reports to the page banner, one-time failures to notices, and category and rename validation inline; verify focused tests cover a conflict across a background refresh and a failed save as a notice.
+- [x] 5.2 Migrate `VaultSession`, `WorkspaceController`, `PageNavigator`, `ReviewState`, and `ProcessingState`: refresh failures to owner banners, one-time failures to notices, and form failures inline; verify the review form and processing form still show their own errors and the post-processing refresh failure uses the processing banner.
+- [x] 5.3 Render the owned banners in the workspace shell and the page view, remove the duplicate status-message banners from the inbox, review, and processing views, and verify a background refresh preserves each banner and each notice.
+- [x] 5.4 Remove `UiStatus.message` and `show_message` after every call site is migrated, update the remaining tests, and verify `grep -rn "show_message\|status.message" src tests` returns no output and the full suite passes.
 
 ## 6. Overlay audit
 

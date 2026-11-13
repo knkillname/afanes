@@ -90,6 +90,7 @@ class PageView:
         self._pick_role = actions.pick_role
         self._on_back = actions.on_back
         self._rename_open = False
+        self._rename_error: str | None = None
         self._role_suggestion_field: str | None = None
         self._build_header()
         self._build_meta()
@@ -339,6 +340,13 @@ class PageView:
             width=afanes.ui.theme.PAGE_FIELD_WIDTH,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
+        self.category_error = ft.Text(
+            "",
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
+            color=afanes.ui.theme.ERROR_TEXT_COLOR,
+            visible=False,
+            selectable=True,
+        )
         self.status_dropdown = ft.Dropdown(
             label=afanes.ui.strings.PAGE_STATUS_LABEL,
             options=[],
@@ -409,6 +417,7 @@ class PageView:
                 self.identity_text,
                 self.form_fields,
                 self.name_suggestions,
+                self.category_error,
                 self.date_error,
                 self.due_error,
                 self.body_field,
@@ -497,6 +506,7 @@ class PageView:
             self.cancel_rename,
         )
         self.rename_field = self.rename.field
+        self.rename_error = self.rename.error
         self.rename_preview_text = self.rename.preview_text
         self.rename_preview_button = self.rename.preview
         self.rename_confirm_button = self.rename.confirm
@@ -1031,8 +1041,8 @@ class PageView:
         self.raw_save_button.disabled = self._state.status.busy or self._state.pages.saving
 
     def _refresh_banners(self) -> None:
-        """Refresh the message banner."""
-        message = self._state.status.message
+        """Refresh the page's persistent banner."""
+        message = self._state.pages.banner
         self.banners.controls = [] if message is None else [Banner(message).build()]
         self.banners.visible = message is not None
 
@@ -1098,6 +1108,8 @@ class PageView:
         self.rename_field.visible = preview is None
         self.rename_preview_button.visible = preview is None
         self.rename_confirm_button.visible = preview is not None
+        self.rename_error.value = self._rename_error or ""
+        self.rename_error.visible = self._rename_error is not None
         if preview is None:
             self.rename_preview_text.value = ""
             return
@@ -1242,10 +1254,11 @@ class PageView:
         try:
             category = CategoryLabel(value) if value else None
         except ValueError:
-            self._state.status.show_message(afanes.ui.strings.PAGE_CATEGORY_INVALID)
-            self.refresh()
+            self.category_error.value = afanes.ui.strings.PAGE_CATEGORY_INVALID
+            self.category_error.visible = True
             self._update()
             return
+        self.category_error.visible = False
         await self._state.dialogs.set_page_category(category)
         self.refresh()
         self._update()
@@ -1460,7 +1473,6 @@ class PageView:
     async def discard_draft(self) -> None:
         """Discard the draft without writing."""
         self._state.pages.clear()
-        self._state.status.clear_message()
         self.refresh()
         self._update()
 
@@ -1512,6 +1524,7 @@ class PageView:
         if page is None:
             return
         self._rename_open = True
+        self._rename_error = None
         self.rename_field.value = page.identity
         await self._state.dialogs.cancel_rename()
         self.refresh()
@@ -1521,10 +1534,11 @@ class PageView:
         """Plan the rename and show its reference counts."""
         title = (self.rename_field.value or "").strip()
         if not title:
-            self._state.status.show_message(afanes.ui.strings.PAGE_RENAME_LABEL)
+            self._rename_error = afanes.ui.strings.PAGE_RENAME_LABEL
             self.refresh()
             self._update()
             return
+        self._rename_error = None
         await self._state.dialogs.begin_rename(title)
         self.refresh()
         self._update()
@@ -1533,6 +1547,7 @@ class PageView:
         """Apply the retained rename preview."""
         await self._state.dialogs.apply_rename()
         self._rename_open = False
+        self._rename_error = None
         self.refresh()
         self._update()
 
@@ -1540,6 +1555,7 @@ class PageView:
         """Close the rename panel without changing the page."""
         await self._state.dialogs.cancel_rename()
         self._rename_open = False
+        self._rename_error = None
         self.refresh()
         self._update()
 

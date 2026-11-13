@@ -15,6 +15,7 @@ import afanes.core.search
 import afanes.core.settings
 import afanes.core.vault.service
 import afanes.ui.state
+import afanes.ui.state.status
 import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.workspace
@@ -25,6 +26,7 @@ from tests.support import ensure_vault, versioned
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
 SECTION_COUNT = 5
+OWNED_BANNER_COUNT = 3
 TWO_ENTRIES = 2
 FIRST_DAY = 1
 SECOND_DAY = 2
@@ -87,11 +89,22 @@ def _write_note(
     return path
 
 
-def _open_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.views.workspace.WorkspaceView:
+def _open_workspace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    on_notice: Callable[[afanes.ui.state.status.Notice], None] | None = None,
+) -> afanes.ui.views.workspace.WorkspaceView:
     _use_settings_file(monkeypatch, tmp_path / "settings.json")
     asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
     return afanes.ui.views.workspace.WorkspaceView(
-        afanes.ui.views.workspace.WorkspaceActions(_noop, _change_vault, _create_vault, _close_vault)
+        afanes.ui.views.workspace.WorkspaceActions(
+            _noop,
+            _change_vault,
+            _create_vault,
+            _close_vault,
+            on_notice=on_notice,
+        )
     )
 
 
@@ -131,6 +144,19 @@ def _find_control(control: ft.Control, key: str) -> ft.Control | None:
 
 
 class TestWorkspaceShell:
+    def test_shell_renders_the_owned_banners(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        state = afanes.ui.state.app_state
+        state.workspace.banner = "vault condition"
+        state.session.banner = "refresh failure"
+        state.processing.banner = "processing refresh failure"
+        state.pages.conflict = "changed"
+
+        view.refresh()
+
+        assert view.banners.visible is True
+        assert len(view.banners.controls) == OWNED_BANNER_COUNT
+
     def test_builds_capture_bar_and_browser(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         versioned(vault)
@@ -496,14 +522,15 @@ class TestCaptureBar:
     def test_empty_capture_keeps_the_field_and_reports(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         versioned(vault)
-        view = _open_workspace(tmp_path, monkeypatch)
+        notices: list[afanes.ui.state.status.Notice] = []
+        view = _open_workspace(tmp_path, monkeypatch, on_notice=notices.append)
         view.capture_field.value = "   "
 
         assert view.capture_button.disabled is True
         asyncio.run(_handler(view.capture_button)())
 
         assert view.capture_field.value == "   "
-        assert afanes.ui.state.app_state.status.message == afanes.ui.strings.CAPTURE_EMPTY
+        assert notices == [afanes.ui.state.status.Notice(message=afanes.ui.strings.CAPTURE_EMPTY)]
         assert list((vault / "inbox").glob("*.md")) == []
 
 

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026-present Mario Abarca <knkillname@gmail.com>
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Shared notice, message, busy, and session flags for the interface."""
+"""Shared notice, busy, and session flags for the interface."""
 
 import dataclasses
 import logging
@@ -44,8 +44,6 @@ class UiStatus:
 
     Attributes
     ----------
-    message : str | None
-        Banner text for the current error or warning.
     notice : Notice | None
         Latest transient notice waiting for a view to consume it.
     busy : bool
@@ -54,24 +52,9 @@ class UiStatus:
         Whether a presentation session currently drives the workspace.
     """
 
-    message: str | None = None
     notice: Notice | None = None
     busy: bool = False
     session_active: bool = False
-
-    def show_message(self, message: str | None) -> None:
-        """Show a banner message, or clear it when ``None``.
-
-        Parameters
-        ----------
-        message : str | None
-            Text to show, or ``None`` to leave the banner empty.
-        """
-        self.message = message
-
-    def clear_message(self) -> None:
-        """Clear the banner message."""
-        self.message = None
 
     def show_notice(self, message: str, action: NoticeAction | None = None) -> None:
         """Store the latest transient notice, replacing any earlier one.
@@ -141,7 +124,6 @@ class UiStatus:
 
     def reset(self) -> None:
         """Return every flag to its initial value."""
-        self.message = None
         self.notice = None
         self.busy = False
         self.session_active = False

@@ -16,7 +16,6 @@ from afanes.core.processing import AppendStepPlan, ProcessingOutcome, Processing
 from afanes.core.vault.snapshot import VaultNote
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import Status
-from afanes.ui.components.banner import Banner
 from afanes.ui.components.template_cards import TemplateCardContext, TemplateCardPicker
 
 
@@ -89,7 +88,6 @@ class ProcessingView:
                 spacing=afanes.ui.theme.ITEM_GAP,
             ),
         )
-        self.banners = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
         self.form_error = ft.Text(
             "",
             color=afanes.ui.theme.ERROR_TEXT_COLOR,
@@ -282,7 +280,6 @@ class ProcessingView:
             controls=[
                 self.title,
                 self.capture_panel,
-                self.banners,
                 self.form,
                 self.plan_panel,
                 self.success_panel,
@@ -501,7 +498,7 @@ class ProcessingView:
         self._update()
 
     def _refresh_dynamic(self) -> None:
-        """Refresh visibility, plan details, and banners from application state."""
+        """Refresh visibility and plan details from application state."""
         state = self._state
         self._refresh_template()
         self.capture_title.value = (
@@ -539,11 +536,6 @@ class ProcessingView:
         if show_plan:
             self._populate_plan(plan)
 
-        banners: list[ft.Control] = []
-        if state.status.message is not None:
-            banners.append(Banner(state.status.message).build())
-        self.banners.controls = banners
-        self.banners.visible = bool(banners)
         self.progress.visible = self._working or state.status.busy
 
     def _populate_plan(self, plan: ProcessingPlan | AppendStepPlan) -> None:

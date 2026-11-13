@@ -121,7 +121,6 @@ class BrowserState:
         async with self.command_lock:
             self.active_section = section
             self.query = ""
-            self.session.status.clear_message()
 
     async def set_query(self, query: str) -> None:
         """Filter browser entries by display title or identity.
@@ -133,7 +132,6 @@ class BrowserState:
         """
         async with self.command_lock:
             self.query = query
-            self.session.status.clear_message()
 
     def listing(self) -> BrowserListing | None:
         """Return the current browser groups after applying the query.
@@ -288,7 +286,6 @@ class BrowserState:
             Entries or Everything.
         """
         self.log_mode = mode
-        self.session.status.clear_message()
 
     def show_log_month(self, year: int, month: int) -> None:
         """Select the month shown by the Log calendar.
@@ -303,7 +300,6 @@ class BrowserState:
         self.log_year = year
         self.log_month = month
         self.log_day = None
-        self.session.status.clear_message()
 
     def select_log_day(self, day: int | None) -> None:
         """Select the calendar day whose rows should expand.
@@ -314,7 +310,6 @@ class BrowserState:
             Calendar day, or ``None`` to collapse the selected day.
         """
         self.log_day = day
-        self.session.status.clear_message()
 
     def select_log_entry(self, path: Path | None) -> None:
         """Remember which log entry is selected in the tree.

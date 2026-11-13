@@ -148,7 +148,7 @@ class PageNavigator:
         """
         display_name = name.strip()
         if not display_name:
-            self.status.show_message(afanes.ui.strings.BROWSER_NAME_REQUIRED)
+            self.status.show_notice(afanes.ui.strings.BROWSER_NAME_REQUIRED)
             return False
         async with self.command_lock:
             vault = self.session.vault
@@ -170,7 +170,7 @@ class PageNavigator:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Browser reference could not be created", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.BROWSER_CREATE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.BROWSER_CREATE_FAILED.format(detail=str(exc)))
                     return False
                 refresh_error: str | None = None
                 try:
@@ -186,7 +186,7 @@ class PageNavigator:
                 self.ambiguous = ()
                 self._push_history(previous)
                 if refresh_error is not None:
-                    self.status.show_message(refresh_error)
+                    self.session.banner = refresh_error
                 return True
             finally:
                 self.status.set_busy(busy=False)
@@ -218,7 +218,7 @@ class PageNavigator:
         """
         display_name = name.strip()
         if not display_name:
-            self.status.show_message(afanes.ui.strings.BROWSER_NAME_REQUIRED)
+            self.status.show_notice(afanes.ui.strings.BROWSER_NAME_REQUIRED)
             return False
         async with self.command_lock:
             vault = self.session.vault
@@ -240,7 +240,7 @@ class PageNavigator:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Role reference could not be created", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.BROWSER_CREATE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.BROWSER_CREATE_FAILED.format(detail=str(exc)))
                     return False
                 refresh_error: str | None = None
                 try:
@@ -255,7 +255,7 @@ class PageNavigator:
                 self.ambiguous = ()
                 self._push_history(previous)
                 if refresh_error is not None:
-                    self.status.show_message(refresh_error)
+                    self.session.banner = refresh_error
                 return True
             finally:
                 self.status.set_busy(busy=False)
@@ -316,7 +316,7 @@ class PageNavigator:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Log entry could not be created", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.LOG_CREATE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.LOG_CREATE_FAILED.format(detail=str(exc)))
                     return False
                 refresh_error: str | None = None
                 try:
@@ -333,7 +333,7 @@ class PageNavigator:
                 self.ambiguous = ()
                 self._push_history(previous)
                 if refresh_error is not None:
-                    self.status.show_message(refresh_error)
+                    self.session.banner = refresh_error
                 return True
             finally:
                 self.status.set_busy(busy=False)
@@ -429,7 +429,7 @@ class PageNavigator:
         try:
             reference = ReferenceParser().parse(destination)
         except InvalidReferenceError as exc:
-            self.status.show_message(str(exc))
+            self.status.show_notice(str(exc))
             return
         snapshot = self.session.snapshot
         if snapshot is None:
@@ -446,7 +446,6 @@ class PageNavigator:
         if target.outcome is LinkOutcome.AMBIGUOUS or (target.outcome is LinkOutcome.BROKEN and len(target.paths) > 1):
             async with self.command_lock:
                 self.ambiguous = target.paths
-                self.status.clear_message()
             return
         if target.outcome is LinkOutcome.BROKEN:
             await self.open_page(target.paths[0])
@@ -490,7 +489,6 @@ class PageNavigator:
         if target.outcome is LinkOutcome.AMBIGUOUS:
             async with self.command_lock:
                 self.ambiguous = target.paths
-                self.status.clear_message()
             return RoleFollowOutcome.AMBIGUOUS
         if target.outcome is LinkOutcome.BROKEN and len(target.paths) == 1:
             await self.open_page(target.paths[0])
@@ -547,7 +545,6 @@ class PageNavigator:
                 self.pages.start_new(reference)
                 self.ambiguous = ()
                 self._push_history(previous)
-                self.status.clear_message()
                 return True
             finally:
                 self.status.set_busy(busy=False)

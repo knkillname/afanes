@@ -465,7 +465,7 @@ class TestWebPresentation:
         asyncio.run(scenario())
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
         assert isinstance(page.controls[0], ft.Container)
         assert not settings.exists()
 
@@ -918,11 +918,12 @@ class TestCreation:
         asyncio.run(scenario())
 
         assert state.session.vault_root is None
-        assert state.status.message == afanes.ui.strings.VAULT_NOT_EMPTY
+        assert state.workspace.banner is None
         assert not settings.exists()
         assert len(page.dialogs) == 1
         error = _typed(_find_by_key(page.dialogs[0], "create-vault-error"), ft.Text)
         assert error.visible is True
+        assert error.value == afanes.ui.strings.VAULT_NOT_EMPTY
         assert error.value == afanes.ui.strings.VAULT_NOT_EMPTY
 
     def test_web_creation_dialog_previews_and_creates_the_vault(

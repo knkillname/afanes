@@ -289,19 +289,12 @@ class VaultSession:
             snapshot = await asyncio.to_thread(vault.scan)
         except (VaultError, OSError) as exc:
             logger.debug("Snapshot refresh failed", exc_info=True)
-            self.status.show_message(afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc)))
+            self.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
             return
         self.apply_snapshot(snapshot)
 
-    async def refresh_if_changed(self, *, preserve_message: bool = False) -> VaultSnapshot | None:
+    async def refresh_if_changed(self) -> VaultSnapshot | None:
         """Rescan the vault only when its change fingerprint moved.
-
-        Parameters
-        ----------
-        preserve_message : bool
-            Whether to keep the current banner message when the new snapshot is
-            applied. Background refresh sets this so feedback from a user
-            command survives an unrequested scan.
 
         Returns
         -------
@@ -334,15 +327,13 @@ class VaultSession:
         except (VaultError, OSError):
             logger.debug("Background rescan failed", exc_info=True)
             return None
-        self.apply_snapshot(snapshot, preserve_message=preserve_message)
+        self.apply_snapshot(snapshot)
         return snapshot
 
     def apply_snapshot(
         self,
         snapshot: VaultSnapshot,
         focus: Path | None = None,
-        *,
-        preserve_message: bool = False,
     ) -> None:
         """Replace the inbox list from a scan result.
 
@@ -352,8 +343,6 @@ class VaultSession:
             Scan result to retain.
         focus : Path | None
             Note to promote to the top of the inbox list.
-        preserve_message : bool
-            Whether to keep the current banner message instead of clearing it.
         """
         self.snapshot = snapshot
         self.fingerprint = snapshot.fingerprint
@@ -365,11 +354,10 @@ class VaultSession:
                     break
         self.notes = tuple(notes)
         self.failures = snapshot.failures
+        self.banner = None
         if self.selected is not None and all(note.path != self.selected for note in self.notes):
             self.selected = None
             self.preview_body = None
-        if not preserve_message:
-            self.status.clear_message()
 
     async def template_summaries(self) -> tuple[TemplateSummary, ...] | None:
         """Read the bundled template catalog without blocking the interface.
@@ -413,7 +401,7 @@ class VaultSession:
             return await asyncio.to_thread(self._read_template_cards, vault)
         except (VaultError, OSError) as exc:
             logger.debug("Reference template cards could not be read", exc_info=True)
-            self.status.show_message(afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc)))
+            self.status.show_notice(afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc)))
             return None
 
     @staticmethod
@@ -456,28 +444,27 @@ class VaultSession:
         """
         async with self.command_lock:
             if not text.strip():
-                self.status.show_message(afanes.ui.strings.CAPTURE_EMPTY)
+                self.status.show_notice(afanes.ui.strings.CAPTURE_EMPTY)
                 return None
             vault = self.vault
             if vault is None:
                 return None
             self.status.set_busy(busy=True)
-            self.status.clear_message()
             try:
                 try:
                     path = await asyncio.to_thread(afanes.core.vault.pages.VaultPages(vault).capture, text)
                 except EmptyCaptureError:
-                    self.status.show_message(afanes.ui.strings.CAPTURE_EMPTY)
+                    self.status.show_notice(afanes.ui.strings.CAPTURE_EMPTY)
                     return None
                 except (AfanesError, OSError) as exc:
                     logger.debug("Capture failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.CAPTURE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.CAPTURE_FAILED.format(detail=str(exc)))
                     return None
                 try:
                     snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Inbox refresh after capture failed", exc_info=True)
-                    self.status.show_message(afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc)))
+                    self.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
                     return path
                 self.apply_snapshot(snapshot, focus=path)
                 return path
@@ -510,10 +497,9 @@ class VaultSession:
                     logger.debug("Note preview failed", exc_info=True)
                     self.selected = None
                     self.preview_body = None
-                    self.status.show_message(afanes.ui.strings.PREVIEW_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(afanes.ui.strings.PREVIEW_FAILED.format(detail=str(exc)))
                     return
                 self.selected = path
                 self.preview_body = body
-                self.status.clear_message()
             finally:
                 self.status.set_busy(busy=False)
