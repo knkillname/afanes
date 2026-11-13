@@ -28,6 +28,10 @@ def _noop() -> None:
     return None
 
 
+def _freeze(control: ft.Control) -> None:
+    object.__setattr__(control, "_frozen", True)
+
+
 def _write_note(
     path: Path,
     *,
@@ -476,6 +480,21 @@ class TestProjectFocus:
         assert _ring(view, "projects/Launch.md") == afanes.ui.theme.TRANSPARENT_COLOR
         assert _ring(view, "projects/Ship.md") == afanes.ui.theme.FOCUS_RING_COLOR
         assert [path.name for path in opened] == ["Ship.md"]
+
+    def test_a_frozen_row_is_recovered_before_the_ring_is_painted(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "projects" / "Launch.md", status="active")
+        view = _open_view(tmp_path, monkeypatch)
+        first = _button(view, "projects/Launch.md")
+        row = _row(view, "projects/Launch.md")
+        _freeze(row)
+
+        asyncio.run(typing.cast("FocusHandler", first.on_focus)(None))
+
+        assert _ring(view, "projects/Launch.md") == afanes.ui.theme.FOCUS_RING_COLOR
+        assert not hasattr(row, "_frozen")
 
     def test_keyboard_focus_moves_the_ring_between_rows(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

@@ -17,6 +17,7 @@ import afanes.ui.state
 import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.search import ProjectGroup, ProjectStage, ProjectSummary
+from afanes.ui.components.frozen import FrozenControlRecovery
 from afanes.ui.components.status import StatusLabel
 from afanes.ui.components.step_text import StepText
 
@@ -203,8 +204,11 @@ class ProjectsView:
         -----
         The accent ring belongs to the open row only. Any selection change that
         leaves the previously focused row behind clears the ring, so a link or
-        keyboard navigation cannot leave a second row looking selected.
+        keyboard navigation cannot leave a second row looking selected. Flet can
+        mark a row immutable while reconciling a keyed update, so the markers
+        are cleared before any row property is assigned.
         """
+        FrozenControlRecovery.clear(self.root)
         page = self._state.pages.page
         if page is None or page.path != self._focused:
             self._focused = None
@@ -270,6 +274,7 @@ class ProjectsView:
 
     def _apply_focus(self) -> None:
         """Paint the accent ring on the focused row and clear every other row."""
+        FrozenControlRecovery.clear(self.root)
         for path, row in self._rows.items():
             color = afanes.ui.theme.FOCUS_RING_COLOR if path == self._focused else afanes.ui.theme.TRANSPARENT_COLOR
             row.border = ft.Border.all(afanes.ui.theme.FOCUS_RING_WIDTH, color)
