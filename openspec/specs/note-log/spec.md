@@ -172,67 +172,121 @@ without a match MUST NOT be accented while a query is active.
   query
 - **THEN** the project is listed
 
-### Requirement: Log entries are created from dated actions
+### Requirement: Dated actions open log drafts
 
-The Log SHALL offer **Today's entry**, creation from an empty calendar day, and a plus control on an
-empty month or year row. Each action SHALL ask for a title and a log card or Empty, SHALL write the
-entry with the action's date, and SHALL open it in edit mode. A blank title SHALL be rejected.
+The Log SHALL open an unsaved log draft for **Today's entry**, an empty calendar day, and the plus on
+an empty month or year row. Each draft SHALL use the action's date and open in edit mode without a
+title or starter dialog. An occupied date SHALL open its existing entry in read mode instead. A day
+with more than one entry SHALL expand in the date tree rather than open one entry.
 
-#### Scenario: Today's entry creates today's page
-
-- **WHEN** today has no entry and the user chooses **Today's entry**
-- **THEN** the dialog asks for a title and a card, and the page is written with today's date
-
-#### Scenario: An empty day creates an entry
+#### Scenario: An empty day opens a draft
 
 - **WHEN** the user clicks a calendar day with no entry
-- **THEN** the dialog asks for a title and a card, and the page is written for that day
+- **THEN** the editor opens an unsaved log draft for that day without a dialog
 
-#### Scenario: An occupied day opens its entry
+#### Scenario: Today's entry opens a draft
 
-- **WHEN** the user clicks a calendar day with one entry
-- **THEN** that entry opens and no dialog appears
+- **WHEN** today has no entry and the user chooses **Today's entry**
+- **THEN** the editor opens an unsaved log draft for today
 
-#### Scenario: A month plus creates a month entry
+#### Scenario: A month plus opens a draft
 
 - **WHEN** the user clicks the plus on an empty month row
-- **THEN** the dialog writes an entry dated `YYYY-MM`
+- **THEN** the editor opens an unsaved log draft dated `YYYY-MM`
 
-#### Scenario: A year plus creates a year entry
+#### Scenario: A year plus opens a draft
 
 - **WHEN** the user clicks the plus on an empty year row
-- **THEN** the dialog writes an entry dated `YYYY`
+- **THEN** the editor opens an unsaved log draft dated `YYYY`
 
-#### Scenario: A blank title is rejected
+#### Scenario: An occupied day opens read mode
 
-- **WHEN** the user submits a blank title
-- **THEN** no entry is written and the dialog reports that a title is required
+- **WHEN** the user clicks a calendar day with one entry
+- **THEN** that entry opens in read mode and no draft appears
+
+#### Scenario: Today's entry opens an occupied date in read mode
+
+- **WHEN** today has an entry and the user chooses **Today's entry**
+- **THEN** the existing entry opens in read mode
+
+#### Scenario: Several entries expand the tree
+
+- **WHEN** the user clicks a calendar day with more than one entry
+- **THEN** the day expands in the date tree and no entry opens
+
+### Requirement: A new log entry has a default date title
+
+A new log entry SHALL start with the long date of its action as its level-1 heading: a month name,
+day, and year for a day, a month name and year for a month, and a year for a year. The heading SHALL
+remain editable, and the filename SHALL remain the ISO date.
+
+#### Scenario: A day draft gets a long date title
+
+- **WHEN** the user opens a draft for `2026-11-13`
+- **THEN** the draft heading is `November 13, 2026`
+
+#### Scenario: A month draft gets a long date title
+
+- **WHEN** the user opens a draft for `2026-11`
+- **THEN** the draft heading is `November 2026`
+
+#### Scenario: A year draft gets the year title
+
+- **WHEN** the user opens a draft for `2026`
+- **THEN** the draft heading is `2026`
+
+#### Scenario: The default title is editable
+
+- **WHEN** the user replaces the heading before the first write
+- **THEN** the written entry uses the replacement heading
+
+#### Scenario: The filename stays ISO
+
+- **WHEN** an entry titled `November 13, 2026` is written
+- **THEN** its filename is `2026-11-13.md`
 
 ### Requirement: Log cards provide only a starter body
 
-The log creation dialog SHALL list every valid `type: log` card and Empty. A card SHALL supply only a
-starter body below the entry's heading; it MUST NOT supply a category, status, or date. Empty SHALL
-create a log entry with no starter body.
+A new log draft SHALL offer a Starter control that lists every valid `type: log` card and Empty.
+Choosing a card SHALL supply only a starter body below the entry's heading; Empty SHALL leave only
+the heading. The control MUST NOT supply a category, status, or date. It SHALL be available only
+while the draft has no content beyond its generated heading and selected starter, and an existing
+entry MUST NOT offer it.
 
 #### Scenario: A card supplies the starter body
 
-- **WHEN** the user creates an entry from the Daily entry card
+- **WHEN** the user chooses the Daily entry card in a new log draft
 - **THEN** the body contains the title heading followed by the card's headings
 
 #### Scenario: A card does not set the date
 
-- **WHEN** an entry is created from a log card for a chosen day
-- **THEN** the date is the chosen day, not a value from the card
+- **WHEN** the user chooses a log card for a draft dated `2025-10-12`
+- **THEN** the date remains `2025-10-12`, not a value from the card
 
 #### Scenario: Empty creates a bare entry
 
-- **WHEN** the user chooses Empty
+- **WHEN** the user chooses Empty in a new log draft
 - **THEN** the body contains only the title heading
 
 #### Scenario: An invalid card is reported
 
 - **WHEN** a log card is malformed
-- **THEN** the dialog names the file and lists the valid cards
+- **THEN** the Starter control names the file and still lists the valid cards
+
+#### Scenario: Selecting Empty removes a starter
+
+- **WHEN** the user chooses a card and then Empty before adding content
+- **THEN** the body returns to only the title heading
+
+#### Scenario: The starter disappears after content
+
+- **WHEN** the user types body text beyond the generated heading and selected starter
+- **THEN** the Starter control is no longer available
+
+#### Scenario: An existing entry has no starter
+
+- **WHEN** an existing log entry is open
+- **THEN** no Starter control appears
 
 ### Requirement: Viewing the Log performs no write
 
@@ -258,8 +312,8 @@ change, edit, rename, or trash action SHALL write.
 ### Requirement: Log entries are not renamed directly
 
 The page for a log entry SHALL NOT offer the Rename action. Its date SHALL be changed through the
-Date field, which performs the rename and move. The entry's level-1 heading SHALL NOT be rewritten by
-a date change.
+Date field, which performs the rename and move. The entry's level-1 heading SHALL be updated only
+when it equals the generated date title for its old date, as defined by `note-identity`.
 
 #### Scenario: Rename is absent
 

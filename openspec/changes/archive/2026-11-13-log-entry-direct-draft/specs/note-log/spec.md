@@ -45,6 +45,27 @@ entry MUST NOT offer it.
 - **WHEN** an existing log entry is open
 - **THEN** no Starter control appears
 
+### Requirement: Log entries are not renamed directly
+
+The page for a log entry SHALL NOT offer the Rename action. Its date SHALL be changed through the
+Date field, which performs the rename and move. The entry's level-1 heading SHALL be updated only
+when it equals the generated date title for its old date, as defined by `note-identity`.
+
+#### Scenario: Rename is absent
+
+- **WHEN** a log entry is open
+- **THEN** the page offers no Rename action
+
+#### Scenario: A date change keeps the heading
+
+- **WHEN** a log entry titled `A quiet Tuesday` is changed from `2025-10-12` to `2025-10-13`
+- **THEN** the heading remains `A quiet Tuesday`
+
+#### Scenario: Trash remains available
+
+- **WHEN** a log entry is open
+- **THEN** the page still offers the Trash action
+
 ## REMOVED Requirements
 
 ### Requirement: Log entries are created from dated actions

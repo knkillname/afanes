@@ -459,8 +459,9 @@ reference.
 
 Changing a log entry's `date` SHALL rename the file to the new ISO date, move it to the folder the
 new date selects, and rewrite every inbound `log:` reference to the new name. The change SHALL NOT
-ask for confirmation. The entry's level-1 heading SHALL be preserved. Failures SHALL be reported and
-the operation SHALL be safe to re-run.
+ask for confirmation. The entry's level-1 heading SHALL be preserved unless it equals the default
+date title for its old date, in which case it SHALL be replaced with the default date title for the
+new date. Failures SHALL be reported and the operation SHALL be safe to re-run.
 
 #### Scenario: A date change renames the file
 
@@ -482,10 +483,25 @@ the operation SHALL be safe to re-run.
 - **WHEN** the user changes a log entry's date
 - **THEN** the rename, move, and rewrites run without a preview dialog
 
+#### Scenario: The generated heading follows the date
+
+- **WHEN** an entry titled `October 12, 2025` changes to `2025-10-13`
+- **THEN** its heading becomes `October 13, 2025`
+
+#### Scenario: The generated heading follows a precision change
+
+- **WHEN** an entry titled `October 2025` changes to `2025`
+- **THEN** its heading becomes `2025`
+
 #### Scenario: The heading is kept
 
 - **WHEN** an entry titled `A quiet Tuesday` changes date
 - **THEN** its heading remains `A quiet Tuesday`
+
+#### Scenario: A date-shaped custom heading is kept
+
+- **WHEN** an entry titled `2025-10-12` changes date
+- **THEN** its heading remains `2025-10-12`
 
 #### Scenario: A failed rewrite is reported
 

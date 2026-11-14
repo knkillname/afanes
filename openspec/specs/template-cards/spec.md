@@ -96,10 +96,10 @@ be the starter body. The body MUST NOT contain a level-1 heading, and MAY be emp
 
 ### Requirement: The picker lists valid cards and the Empty option
 
-The reference creation pickers SHALL list every valid reference card and SHALL always offer Empty.
-The log creation picker SHALL list every valid log card and SHALL always offer Empty. Each list SHALL
-be ordered deterministically by title and then by file path, and duplicate titles SHALL remain
-distinguishable by their paths.
+The reference creation pickers SHALL list every valid reference card and SHALL always offer Empty. A
+new log draft's Starter control SHALL list every valid log card and SHALL always offer Empty. Each
+list SHALL be ordered deterministically by title and then by file path, and duplicate titles SHALL
+remain distinguishable by their paths.
 
 #### Scenario: Cards are listed by title
 
@@ -109,7 +109,7 @@ distinguishable by their paths.
 #### Scenario: Empty is always available
 
 - **WHEN** the folder is missing, empty, or contains only invalid cards
-- **THEN** the picker still offers Empty
+- **THEN** the picker or Starter control still offers Empty
 
 #### Scenario: Duplicate titles are distinguishable
 
@@ -124,14 +124,14 @@ distinguishable by their paths.
 #### Scenario: The log picker lists only log cards
 
 - **WHEN** the folder contains a reference card and a log card
-- **THEN** the log picker lists the log card and not the reference card
+- **THEN** the Starter control lists the log card and not the reference card
 
 ### Requirement: A card supplies a category and starter body
 
 Creating a reference from a reference card SHALL set the note's category to the card's category and
-SHALL use the card's starter body as appended content. Creating a log entry from a log card SHALL use
-only the card's starter body; the card MUST NOT supply a category, status, or date. The card's title
-and description SHALL NOT be copied into the note.
+SHALL use the card's starter body as appended content. Choosing a log card in a new log draft SHALL
+use only the card's starter body; the card MUST NOT supply a category, status, or date. The card's
+title and description SHALL NOT be copied into the note.
 
 #### Scenario: The category is applied
 
@@ -142,6 +142,11 @@ and description SHALL NOT be copied into the note.
 
 - **WHEN** the user creates a reference from a card with a starter body
 - **THEN** the note's body contains the title followed by the starter body
+
+#### Scenario: The starter body fills a log draft
+
+- **WHEN** the user chooses a log card with a starter body in a new log draft
+- **THEN** the draft body contains the title heading followed by the starter body
 
 #### Scenario: Metadata is not copied
 
@@ -278,8 +283,8 @@ Daily entry card SHALL declare `type: log` with no category.
 
 ### Requirement: Empty creates an untemplated log entry
 
-The Empty option in the log creation picker SHALL create a log entry with no starter body. It MUST
-NOT add a category, status, due date, or requester.
+The Empty option in a new log draft's Starter control SHALL leave only the title heading and no
+starter body. It MUST NOT add a category, status, due date, or requester.
 
 #### Scenario: Empty log entry
 
