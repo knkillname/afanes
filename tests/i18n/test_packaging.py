@@ -39,6 +39,52 @@ def wheel(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
 
 
 class TestBundledCatalogs:
+    def test_the_wheel_declares_the_offline_time_zone_dependencies(self, wheel: tuple[Path, Path]) -> None:
+        wheel_path, _extract_root = wheel
+
+        with zipfile.ZipFile(wheel_path) as archive:
+            metadata_name = next(name for name in archive.namelist() if name.endswith(".dist-info/METADATA"))
+            metadata = archive.read(metadata_name).decode("utf-8")
+
+        assert "Requires-Dist: tzdata" in metadata
+        assert "Requires-Dist: tzlocal" in metadata
+
+    def test_the_installed_reminder_model_resolves_a_zone(
+        self,
+        wheel: tuple[Path, Path],
+        tmp_path: Path,
+    ) -> None:
+        _wheel_path, extract_root = wheel
+        run_root = tmp_path / "run"
+        run_root.mkdir()
+        environment = dict(os.environ)
+        environment["PYTHONPATH"] = str(extract_root)
+        code = (
+            "import datetime\n"
+            "import afanes.models.reminder\n"
+            "reminder = afanes.models.reminder.Reminder(\n"
+            "    schedule=afanes.models.reminder.Recurrence(\n"
+            "        kind=afanes.models.reminder.ReminderKind.DAILY,\n"
+            "        times=(afanes.models.reminder.ClockTime(9, 0),),\n"
+            "    ),\n"
+            "    zone='America/Mexico_City',\n"
+            ")\n"
+            "reference = datetime.datetime(2026, 11, 14, 18, 0, tzinfo=datetime.UTC)\n"
+            "assert reminder.due_occurrence(reference, 'UTC') is not None\n"
+            "print('ok')\n"
+        )
+
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, "-c", code],
+            cwd=run_root,
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.stdout.strip() == "ok"
+
     def test_the_wheel_contains_every_catalog_source_and_compiled_file(self, wheel: tuple[Path, Path]) -> None:
         wheel_path, _extract_root = wheel
         sources = {path.relative_to(LOCALES_ROOT).as_posix() for path in LOCALES_ROOT.rglob("*.po")}

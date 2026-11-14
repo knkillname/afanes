@@ -52,6 +52,15 @@ check it, so every manual check above runs there.
 Record each manual result with the version, date, and machine. A check that has
 not run stays pending; it never becomes a silent assumption.
 
+Packaging evidence at `0.10.0` on 2026-11-14 (`Linux tlacoyo x86_64`): the
+wheel metadata declares `tzdata>=2026.6,<2027` and `tzlocal>=5.4.5,<6`, and an
+offline reminder calculation resolves `America/Mexico_City` from the packaged
+model. The Flet build staging directory contains `tzdata 2026.6` with the
+`America/Mexico_City` zone file and `tzlocal 5.4.5`. The native Linux link step
+was not run because `clang`, `cmake`, `ninja`, and `pkg-config` are absent on
+this machine; the Flet build stops after staging and before producing an
+artifact.
+
 ### Advisory nightly builds
 
 A scheduled GitHub Actions workflow runs `hatch check` and `hatch test` on
