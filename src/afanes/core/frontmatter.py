@@ -4,10 +4,10 @@
 """Frontmatter-aware note documents.
 
 The module exposes one cohesive value object, :class:`NoteDocument`, which
-owns fence parsing, safe YAML loading, serialization, and validation of the seven
+owns fence parsing, safe YAML loading, serialization, and validation of the eight
 recognized frontmatter keys. Keeping those behaviors together preserves the
 document's invariants: metadata, body, newline style, declared type, category,
-status, due date, requester, and note date always travel as one unit.
+status, due date, requester, note date, and reminder always travel as one unit.
 """
 
 import dataclasses
@@ -21,6 +21,7 @@ from yaml import YAMLError
 
 from afanes.core.errors import DomainMessage, MessageCode, NoteParseError, RetiredValueError
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
+from afanes.models.reminder import Reminder, ReminderProblem
 
 # Public canonical frontmatter delimiter.
 FRONTMATTER_FENCE = "---"
@@ -29,6 +30,20 @@ FRONTMATTER_FENCE = "---"
 RETIRED_KEYS = frozenset({"people", "project"})
 # Public retired note type value.
 RETIRED_NOTE_TYPES = frozenset({"action", "person"})
+
+_REMINDER_MESSAGES: dict[ReminderProblem, MessageCode] = {
+    ReminderProblem.NOT_MAPPING: MessageCode.REMINDER_INVALID_MAPPING,
+    ReminderProblem.SCHEDULE: MessageCode.REMINDER_INVALID_SCHEDULE,
+    ReminderProblem.UNKNOWN_KIND: MessageCode.REMINDER_UNKNOWN_KIND,
+    ReminderProblem.TIMES: MessageCode.REMINDER_INVALID_TIME,
+    ReminderProblem.WEEKDAYS: MessageCode.REMINDER_INVALID_WEEKDAYS,
+    ReminderProblem.DAY: MessageCode.REMINDER_INVALID_DAY,
+    ReminderProblem.ORDINAL: MessageCode.REMINDER_INVALID_ORDINAL,
+    ReminderProblem.WEEKDAY: MessageCode.REMINDER_INVALID_WEEKDAY,
+    ReminderProblem.ONCE: MessageCode.REMINDER_INVALID_ONCE,
+    ReminderProblem.HANDLED: MessageCode.REMINDER_INVALID_HANDLED,
+    ReminderProblem.ZONE: MessageCode.REMINDER_UNKNOWN_ZONE,
+}
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -85,14 +100,19 @@ class NoteDocument:
     date_error : DomainMessage | None
         Validation message for a malformed ``date``, or ``None`` when the value
         is absent or valid.
+    reminder : Reminder | None
+        Whole-note reminder schedule, or ``None`` when absent or malformed.
+    reminder_error : DomainMessage | None
+        Validation message for a malformed or ineligible ``reminder``, or
+        ``None`` when the value is absent or valid.
 
     Notes
     -----
     Use :meth:`from_text` to build a validated document from source. The raw
     mapping is kept so a rewrite can preserve unknown keys; callers receive a
-    fresh copy from the parser. A malformed ``date`` is preserved in the raw
-    mapping, reported through :attr:`date_error`, and treated as absent by the
-    scan instead of making the note unreadable.
+    fresh copy from the parser. A malformed ``date`` or ``reminder`` is
+    preserved in the raw mapping, reported through its error attribute, and
+    treated as absent by the scan instead of making the note unreadable.
     """
 
     raw: dict[str, object]
@@ -107,6 +127,8 @@ class NoteDocument:
     owner: str | None = None
     date: NoteDate | None = None
     date_error: DomainMessage | None = None
+    reminder: Reminder | None = None
+    reminder_error: DomainMessage | None = None
 
     @classmethod
     def from_text(cls, text: str) -> Self:
@@ -122,7 +144,7 @@ class NoteDocument:
         -------
         NoteDocument
             Raw metadata, body, newline style, declared type, category, status,
-            due date, requester, owner, and note date.
+            due date, requester, owner, note date, and reminder.
 
         Raises
         ------
@@ -140,8 +162,9 @@ class NoteDocument:
         -----
         Frontmatter exists only when the first line is exactly ``---``. A body
         that later begins with ``---`` is ordinary content and is preserved. A
-        malformed ``date`` does not raise; it is preserved in :attr:`raw`,
-        reported through :attr:`date_error`, and treated as absent.
+        malformed ``date`` or ``reminder`` does not raise; it is preserved in
+        :attr:`raw`, reported through its error attribute, and treated as
+        absent.
         """
         split = cls._split_frontmatter(text)
         newline = "\r\n" if "\r\n" in text else "\n"
@@ -153,6 +176,7 @@ class NoteDocument:
         asked_by = cls._declared_asked_by(split.raw, note_type)
         owner = cls._declared_owner(split.raw, note_type)
         note_date, date_error = cls._declared_date(split.raw)
+        reminder, reminder_error = cls._declared_reminder(split.raw, note_type)
         return cls(
             raw=split.raw,
             body=split.body,
@@ -166,6 +190,8 @@ class NoteDocument:
             owner=owner,
             date=note_date,
             date_error=date_error,
+            reminder=reminder,
+            reminder_error=reminder_error,
         )
 
     def to_text(self) -> str:
@@ -308,8 +334,9 @@ class NoteDocument:
         Notes
         -----
         Unknown keys are preserved. Category values preserve their written
-        form; retired keys are never accepted back. A malformed ``date`` is
-        preserved and reported through :attr:`date_error` rather than raising.
+        form; retired keys are never accepted back. A malformed ``date`` or
+        ``reminder`` is preserved and reported through its error attribute
+        rather than raising.
         """
         new_raw = dict(raw)
         self._reject_retired_keys(new_raw)
@@ -320,6 +347,7 @@ class NoteDocument:
         asked_by = self._declared_asked_by(new_raw, note_type)
         owner = self._declared_owner(new_raw, note_type)
         note_date, date_error = self._declared_date(new_raw)
+        reminder, reminder_error = self._declared_reminder(new_raw, note_type)
         return dataclasses.replace(
             self,
             raw=new_raw,
@@ -331,6 +359,8 @@ class NoteDocument:
             owner=owner,
             date=note_date,
             date_error=date_error,
+            reminder=reminder,
+            reminder_error=reminder_error,
         )
 
     @staticmethod
@@ -559,6 +589,62 @@ class NoteDocument:
             raw["date"] = note_date.to_yaml_value()
             return note_date, None
         return None, warning
+
+    @staticmethod
+    def _declared_reminder(
+        raw: dict[str, object],
+        note_type: NoteType | None,
+    ) -> tuple[Reminder | None, DomainMessage | None]:
+        """Return the parsed reminder and any malformed-value warning.
+
+        Parameters
+        ----------
+        raw : dict[str, object]
+            Frontmatter mapping exactly as loaded. A malformed value is left
+            untouched.
+        note_type : NoteType | None
+            Declared note type, or ``None`` when the note has no type.
+
+        Returns
+        -------
+        tuple[Reminder | None, DomainMessage | None]
+            Parsed reminder and ``None``, or ``None`` and an actionable
+            warning. An absent or null key returns ``(None, None)``. A capture
+            or an untyped note keeps the raw value and reports why it is
+            ignored.
+        """
+        if "reminder" not in raw or raw["reminder"] is None:
+            return None, None
+        if note_type is None:
+            return None, DomainMessage.of(MessageCode.REMINDER_WITHOUT_TYPE)
+        if note_type is NoteType.NOTE:
+            return None, DomainMessage.of(MessageCode.REMINDER_ON_CAPTURE)
+        parsed = Reminder.from_mapping(raw["reminder"])
+        if parsed.reminder is None:
+            return None, NoteDocument._reminder_message(parsed.problem, parsed.detail)
+        return parsed.reminder, None
+
+    @staticmethod
+    def _reminder_message(problem: ReminderProblem | None, detail: str) -> DomainMessage:
+        """Return the actionable warning for one malformed reminder.
+
+        Parameters
+        ----------
+        problem : ReminderProblem | None
+            First parser problem, or ``None`` when no reminder was parsed.
+        detail : str
+            Written value associated with the problem, when useful.
+
+        Returns
+        -------
+        DomainMessage
+            Warning identity for the active catalog.
+        """
+        effective = problem or ReminderProblem.NOT_MAPPING
+        code = _REMINDER_MESSAGES.get(effective, MessageCode.REMINDER_INVALID_MAPPING)
+        if effective in (ReminderProblem.UNKNOWN_KIND, ReminderProblem.ZONE):
+            return DomainMessage.of(code, value=detail)
+        return DomainMessage.of(code)
 
     @staticmethod
     def _calendar_date(value: object) -> datetime.date:

@@ -967,6 +967,71 @@ msgctxt "reference-repair-confirmation"
 msgid "Reference repairs require explicit confirmation"
 msgstr "Reparar referencias requiere confirmación explícita"
 
+#: src/afanes/i18n/messages/en.py REMINDER_ON_CAPTURE
+msgctxt "reminder-on-capture"
+msgid "A capture cannot carry a reminder; it will be ignored"
+msgstr "Una captura no puede tener un recordatorio; se ignorará"
+
+#: src/afanes/i18n/messages/en.py REMINDER_WITHOUT_TYPE
+msgctxt "reminder-without-type"
+msgid "A reminder requires a note type"
+msgstr "Un recordatorio necesita un tipo de nota"
+
+#: src/afanes/i18n/messages/en.py REMINDER_INVALID_MAPPING
+msgctxt "reminder-invalid-mapping"
+msgid "The reminder must be a mapping with a schedule"
+msgstr "El recordatorio debe ser un mapa con una programación"
+
+#: src/afanes/i18n/messages/en.py REMINDER_INVALID_SCHEDULE
+msgctxt "reminder-invalid-schedule"
+msgid "The reminder must declare exactly one of recurrence or once"
+msgstr "El recordatorio debe declarar recurrence o once, pero no ambos"
+
+#: src/afanes/i18n/messages/en.py REMINDER_UNKNOWN_KIND
+msgctxt "reminder-unknown-kind"
+msgid "Unknown reminder recurrence kind: {value}"
+msgstr "Tipo de recurrencia del recordatorio desconocido: {value}"
+
+#: src/afanes/i18n/messages/en.py REMINDER_INVALID_TIME
+msgctxt "reminder-invalid-time"
+msgid "A reminder time must be written as HH:MM"
+msgstr "La hora del recordatorio debe escribirse como HH:MM"
+
+#: src/afanes/i18n/messages/en.py REMINDER_INVALID_WEEKDAYS
+msgctxt "reminder-invalid-weekdays"
+msgid "A weekday reminder needs one or more weekdays written as mon, tue, wed, thu, fri, sat, or sun"
+msgstr "Un recordatorio semanal necesita uno o más días escritos como mon, tue, wed, thu, fri, sat o sun"
+
+#: src/afanes/i18n/messages/en.py REMINDER_INVALID_DAY
+msgctxt "reminder-invalid-day"
+msgid "A monthly reminder day must be a number from 1 to 31"
+msgstr "El día de un recordatorio mensual debe ser un número del 1 al 31"
+
+#: src/afanes/i18n/messages/en.py REMINDER_INVALID_ORDINAL
+msgctxt "reminder-invalid-ordinal"
+msgid "An nth-weekday reminder must choose the first to fifth weekday"
+msgstr "Un recordatorio del enésimo día de la semana debe elegir del primero al quinto"
+
+#: src/afanes/i18n/messages/en.py REMINDER_INVALID_WEEKDAY
+msgctxt "reminder-invalid-weekday"
+msgid "Choose one weekday written as mon, tue, wed, thu, fri, sat, or sun"
+msgstr "Elige un día escrito como mon, tue, wed, thu, fri, sat o sun"
+
+#: src/afanes/i18n/messages/en.py REMINDER_INVALID_ONCE
+msgctxt "reminder-invalid-once"
+msgid "A one-shot reminder must be a local date and time written as YYYY-MM-DDTHH:MM"
+msgstr "Un recordatorio único debe ser una fecha y hora local escrita como YYYY-MM-DDTHH:MM"
+
+#: src/afanes/i18n/messages/en.py REMINDER_INVALID_HANDLED
+msgctxt "reminder-invalid-handled"
+msgid "The reminder handled value must be an absolute date and time with an offset"
+msgstr "El valor handled del recordatorio debe ser una fecha y hora absoluta con desplazamiento"
+
+#: src/afanes/i18n/messages/en.py REMINDER_UNKNOWN_ZONE
+msgctxt "reminder-unknown-zone"
+msgid "Unknown time zone: {value}"
+msgstr "Zona horaria desconocida: {value}"
+
 #: src/afanes/i18n/templates/en.py TEMPLATE_PERSONAL_LABEL
 msgctxt "TEMPLATE_PERSONAL_LABEL"
 msgid "Personal"

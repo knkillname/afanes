@@ -51,7 +51,7 @@ SECTION_HEADING_PATTERN = re.compile(r"^#{2,3}\s+(\d+(?:\.\d+)?)\b", re.MULTILIN
 SECTION_CITATION_PATTERN = re.compile(r"[Ss]ections?\s+(\d+(?:\.\d+)?)|(?:see|through)\s+(\d+(?:\.\d+)?)")
 APP_STATE_SURFACE_BUDGET = 10
 DOMAIN_CONTROLLER_SURFACE_BUDGET = 25
-LABEL_KEYS = frozenset({"type", "category", "status", "due_date", "asked_by", "owner", "date"})
+LABEL_KEYS = frozenset({"type", "category", "status", "due_date", "asked_by", "owner", "date", "reminder"})
 LABEL_OWNER_MODULES = frozenset({"core/labels.py", "core/frontmatter.py"})
 TEMPLATE_OPTION_HELPERS = frozenset(
     {"_template_options", "_template_option_text", "_reference_template_options", "_reference_template_text"}

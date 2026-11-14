@@ -10,6 +10,7 @@ import afanes.models.note
 from afanes.core.errors import MessageCode, NoteParseError, RetiredValueError
 from afanes.core.frontmatter import FrontmatterSplit, NoteDocument
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
+from afanes.models.reminder import ClockTime, Recurrence, ReminderKind
 
 CUSTOM_VALUE = 42
 SAMPLE = """---
@@ -535,6 +536,156 @@ class TestOwner:
 
         with pytest.raises(NoteParseError, match="frontmatter-assignment-only-project"):
             document.with_metadata({"type": "reference", "owner": "Sam Rivera"})
+
+
+class TestReminder:
+    @pytest.mark.parametrize("note_type", ["reference", "project", "log"])
+    def test_an_eligible_note_parses_its_reminder(self, note_type: str) -> None:
+        document = NoteDocument.from_text(
+            f"""---
+type: {note_type}
+reminder:
+  zone: America/Mexico_City
+  recurrence:
+    kind: daily
+    times: ["09:00"]
+---
+
+Body.
+"""
+        )
+
+        assert document.reminder is not None
+        assert document.reminder.zone == "America/Mexico_City"
+        assert document.reminder_error is None
+
+    def test_a_capture_reminder_is_ignored_with_a_warning(self) -> None:
+        document = NoteDocument.from_text(
+            """---
+type: note
+reminder:
+  zone: America/Mexico_City
+  recurrence:
+    kind: daily
+    times: ["09:00"]
+---
+
+Body.
+"""
+        )
+
+        assert document.reminder is None
+        assert document.reminder_error is not None
+        assert document.reminder_error.code is MessageCode.REMINDER_ON_CAPTURE
+        assert document.raw["reminder"] is not None
+
+    def test_a_reminder_without_a_type_is_ignored(self) -> None:
+        document = NoteDocument.from_text(
+            """---
+reminder:
+  recurrence:
+    kind: daily
+    times: ["09:00"]
+---
+
+Body.
+"""
+        )
+
+        assert document.reminder is None
+        assert document.reminder_error is not None
+        assert document.reminder_error.code is MessageCode.REMINDER_WITHOUT_TYPE
+
+    def test_a_null_reminder_is_absent(self) -> None:
+        document = NoteDocument.from_text("---\ntype: reference\nreminder: null\n---\n\nBody.\n")
+
+        assert document.reminder is None
+        assert document.reminder_error is None
+
+    @pytest.mark.parametrize(
+        ("raw", "expected", "code"),
+        [
+            ("[]", [], MessageCode.REMINDER_INVALID_MAPPING),
+            ("not-a-map", "not-a-map", MessageCode.REMINDER_INVALID_MAPPING),
+            ("{zone: Mars/Olympus}", {"zone": "Mars/Olympus"}, MessageCode.REMINDER_UNKNOWN_ZONE),
+        ],
+    )
+    def test_a_malformed_reminder_is_preserved_and_reported(
+        self,
+        raw: str,
+        expected: object,
+        code: MessageCode,
+    ) -> None:
+        source = f"---\ntype: reference\nreminder: {raw}\n---\n\nBody.\n"
+
+        document = NoteDocument.from_text(source)
+
+        assert document.reminder is None
+        assert document.reminder_error is not None
+        assert document.reminder_error.code is code
+        assert document.raw["reminder"] == expected
+
+    def test_unknown_nested_keys_are_preserved(self) -> None:
+        document = NoteDocument.from_text(
+            """---
+type: reference
+reminder:
+  recurrence:
+    kind: daily
+    times: ["09:00"]
+    label: morning
+  extra: keep
+---
+
+Body.
+"""
+        )
+
+        assert document.reminder is not None
+        assert dict(document.reminder.extra) == {"extra": "keep"}
+        assert isinstance(document.reminder.schedule, Recurrence)
+        assert dict(document.reminder.schedule.extra) == {"label": "morning"}
+
+    def test_with_metadata_reparses_the_reminder(self) -> None:
+        document = NoteDocument.from_text("---\ntype: reference\n---\n\nBody.\n")
+
+        updated = document.with_metadata(
+            {
+                "type": "reference",
+                "reminder": {
+                    "zone": "America/Mexico_City",
+                    "recurrence": {"kind": "daily", "times": ["09:00"]},
+                },
+            }
+        )
+
+        assert document.reminder is None
+        assert updated.reminder is not None
+        assert updated.reminder.zone == "America/Mexico_City"
+
+    def test_a_valid_mapping_normalizes_on_the_value_object(self) -> None:
+        document = NoteDocument.from_text(
+            """---
+type: reference
+reminder:
+  zone: America/Mexico_City
+  recurrence:
+    kind: weekdays
+    weekdays: [fri, mon]
+    times: ["17:30", "09:00"]
+---
+
+Body.
+"""
+        )
+
+        assert document.reminder is not None
+        recurrence = document.reminder.schedule
+        assert isinstance(recurrence, Recurrence)
+        assert recurrence.kind is ReminderKind.WEEKDAYS
+        assert [day.value for day in recurrence.weekdays] == ["mon", "fri"]
+        assert [time.text for time in recurrence.times] == ["09:00", "17:30"]
+        assert recurrence.times == (ClockTime(9, 0), ClockTime(17, 30))
 
 
 class TestSerializeDocument:

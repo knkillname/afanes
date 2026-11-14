@@ -9,12 +9,33 @@ mutates. It performs no file I/O and never reaches into the vault.
 
 import dataclasses
 import datetime
+from enum import StrEnum
 from typing import Self
 
 from afanes.core.errors import DomainMessage, MessageCode, NoteParseError
 from afanes.core.frontmatter import NoteDocument
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
+from afanes.models.reminder import Reminder
+
+
+class ReminderEdit(StrEnum):
+    """Pending change to a page's reminder.
+
+    Attributes
+    ----------
+    UNCHANGED : str
+        Keep the reminder exactly as it was loaded, including a malformed raw
+        value.
+    SET : str
+        Write the reminder carried by :attr:`PageLabels.reminder`.
+    REMOVED : str
+        Remove the ``reminder`` key.
+    """
+
+    UNCHANGED = "unchanged"
+    SET = "set"
+    REMOVED = "removed"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -118,6 +139,11 @@ class PageLabels:
         Project-owner field text exactly as shown in the editor.
     date_text : str
         Note-date field text exactly as shown in the editor.
+    reminder : Reminder | None
+        Reminder carried for the next write, or the loaded reminder while the
+        edit state is unchanged.
+    reminder_edit : ReminderEdit
+        Pending reminder change. The default keeps the raw value untouched.
     """
 
     note_type: NoteType
@@ -127,6 +153,8 @@ class PageLabels:
     asked_by_text: str = ""
     owner_text: str = ""
     date_text: str = ""
+    reminder: Reminder | None = None
+    reminder_edit: ReminderEdit = ReminderEdit.UNCHANGED
 
     @classmethod
     def from_document(cls, document: NoteDocument) -> Self:
@@ -141,7 +169,7 @@ class PageLabels:
         -------
         PageLabels
             Labels populated from the document's type, category, status, due
-            date, requester, and owner.
+            date, requester, owner, note date, and reminder.
 
         Raises
         ------
@@ -160,6 +188,7 @@ class PageLabels:
             asked_by_text=document.asked_by or "",
             owner_text=document.owner or "",
             date_text=PageLabels._date_text(document.raw.get("date")),
+            reminder=document.reminder,
         )
 
     @staticmethod
@@ -283,7 +312,8 @@ class PageLabels:
         non-blank note date already present in the document is left untouched
         so it can be corrected later; a blank date removes the key. Category,
         status, due date, requester, and owner are removed when the note type
-        does not allow them.
+        does not allow them. A reminder is written only when the editor set it;
+        an unchanged reminder keeps its raw value, and a capture removes it.
         """
         raw = dict(document.raw)
         raw["type"] = self.note_type.value
@@ -311,6 +341,7 @@ class PageLabels:
             raw["owner"] = owner
         else:
             raw.pop("owner", None)
+        self._apply_reminder(raw)
         return document.with_metadata(raw)
 
     def _apply_date(self, raw: dict[str, object]) -> None:
@@ -328,6 +359,22 @@ class PageLabels:
         if note_date is not None:
             raw["date"] = note_date.to_yaml_value()
 
+    def _apply_reminder(self, raw: dict[str, object]) -> None:
+        """Write, remove, or preserve the reminder in a raw mapping.
+
+        Parameters
+        ----------
+        raw : dict[str, object]
+            Mapping copied from the source document. The method mutates it.
+        """
+        if self.note_type not in (NoteType.REFERENCE, NoteType.PROJECT, NoteType.LOG):
+            raw.pop("reminder", None)
+            return
+        if self.reminder_edit is ReminderEdit.SET and self.reminder is not None:
+            raw["reminder"] = self.reminder.to_mapping()
+        elif self.reminder_edit is ReminderEdit.REMOVED or self.reminder_edit is ReminderEdit.SET:
+            raw.pop("reminder", None)
+
     def with_type(self, note_type: NoteType) -> Self:
         """Return labels adjusted for a new note type.
 
@@ -341,13 +388,19 @@ class PageLabels:
         PageLabels
             New labels. Category is kept only for references, due-date,
             requester, and owner text are kept only for projects, and a status
-            the new type does not allow is cleared.
+            the new type does not allow is cleared. A reminder is removed when
+            the new type is a capture.
         """
         category = self.category if note_type is NoteType.REFERENCE else None
         due_date_text = self.due_date_text if note_type is NoteType.PROJECT else ""
         asked_by_text = self.asked_by_text if note_type is NoteType.PROJECT else ""
         owner_text = self.owner_text if note_type is NoteType.PROJECT else ""
         status = self.status if self.status in note_type.allowed_statuses else None
+        reminder = self.reminder
+        reminder_edit = self.reminder_edit
+        if note_type is NoteType.NOTE:
+            reminder = None
+            reminder_edit = ReminderEdit.REMOVED
         return dataclasses.replace(
             self,
             note_type=note_type,
@@ -356,7 +409,37 @@ class PageLabels:
             due_date_text=due_date_text,
             asked_by_text=asked_by_text,
             owner_text=owner_text,
+            reminder=reminder,
+            reminder_edit=reminder_edit,
         )
+
+    def with_reminder(self, reminder: Reminder) -> Self:
+        """Return labels that write a reminder on the next save.
+
+        Parameters
+        ----------
+        reminder : Reminder
+            Reminder to write. A capture ignores the value and removes any raw
+            reminder instead.
+
+        Returns
+        -------
+        PageLabels
+            New labels carrying the reminder and a set edit state.
+        """
+        if self.note_type is NoteType.NOTE:
+            return self.without_reminder()
+        return dataclasses.replace(self, reminder=reminder, reminder_edit=ReminderEdit.SET)
+
+    def without_reminder(self) -> Self:
+        """Return labels that remove the reminder on the next save.
+
+        Returns
+        -------
+        PageLabels
+            New labels with no reminder and a removed edit state.
+        """
+        return dataclasses.replace(self, reminder=None, reminder_edit=ReminderEdit.REMOVED)
 
     def with_category(self, category: CategoryLabel | None) -> Self:
         """Return labels with a reference category.

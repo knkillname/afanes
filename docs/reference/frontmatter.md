@@ -6,8 +6,8 @@ Afanes uses to classify the note; the rest of the file is ordinary Markdown.
 :::{admonition} tl;dr
 :class: note
 
-Only the recognized keys are `type`, `date`, `category`, `status`, `due_date`, `asked_by`, and
-`owner`. Unknown keys are preserved, and a missing status means the default for that note type.
+Only the recognized keys are `type`, `date`, `category`, `status`, `due_date`, `asked_by`, `owner`,
+and `reminder`. Unknown keys are preserved, and a missing status means the default for that note type.
 :::
 
 ## 🧾 Keys
@@ -21,6 +21,7 @@ Only the recognized keys are `type`, `date`, `category`, `status`, `due_date`, `
 | `due_date` | projects only | a calendar date written as `YYYY-MM-DD` |
 | `asked_by` | projects only | a single non-empty name, treated as a metadata reference |
 | `owner` | projects only | a single non-empty name or team, treated as a metadata reference |
+| `reminder` | references, projects, and log entries | one optional schedule mapping; see [Reminder](#reminder-key) |
 
 Unknown keys are preserved when Afanes rewrites a note. A null `status` or `due_date` is treated as
 absent on every note type, including notes and log entries where the key is otherwise forbidden. The
@@ -80,6 +81,63 @@ A project without a status is active. `done`, `cancelled`, and `archived` projec
 `due_date` is valid only on projects and must be a calendar date written as `YYYY-MM-DD`. It is not
 tied to any step. A project may have a due date without steps, and a step may have a plan date without
 the project having a due date.
+
+(reminder-key)=
+## ⏰ Reminder
+
+A reference, project, or log entry may declare one `reminder` mapping. A capture cannot carry an
+effective reminder; the key is ignored with a warning and left in the file. The mapping contains a
+`zone`, exactly one of `recurrence` or `once`, and an optional `handled` instant.
+
+A recurring reminder names one kind and one or more 24-hour times:
+
+```yaml
+reminder:
+  zone: America/Mexico_City
+  recurrence:
+    kind: weekdays
+    weekdays: [mon, wed, fri]
+    times: ["09:00", "17:30"]
+```
+
+The kinds are `daily`, `weekdays` with one or more `weekdays`, `month_day` with `day` from 1 to 31,
+`nth_weekday` with `nth` from 1 to 5 and a `weekday`, `last_day`, and `last_weekday` with a `weekday`.
+Weekdays are written `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, or `sun`, and times use `HH:MM` on the
+24-hour clock. An `nth_weekday` of 5 or a `month_day` of 29 through 31 skips months that do not contain
+that date.
+
+A one-shot stores one local date and time instead:
+
+```yaml
+reminder:
+  zone: America/Mexico_City
+  once: 2026-11-20T09:00
+```
+
+`zone` is an IANA time-zone name such as `America/Mexico_City`, `Europe/Madrid`, or `Asia/Tokyo`. When
+the key is absent, the computer's current zone is used. An unknown zone is a warning. A daylight-saving
+gap skips that occurrence, and a repeated hour produces at most one entry.
+
+`handled` is the absolute instant of the last dismissed occurrence:
+
+```yaml
+reminder:
+  zone: America/Mexico_City
+  recurrence:
+    kind: daily
+    times: ["09:00"]
+  handled: 2026-11-14T15:00:00+00:00
+```
+
+Dismissing writes `handled`; it never changes the body, status, or schedule. Editing the recurrence,
+the one-shot, or the zone clears `handled` so the edited schedule starts from its latest occurrence.
+Saving the body alone, or saving an unchanged schedule, preserves it. A future `handled` value is
+treated as absent so a hand-edited value cannot suppress a reminder indefinitely.
+
+A malformed mapping keeps the page readable, shows a warning, and is preserved exactly as written.
+The schedule is ignored until the value is corrected or removed, and opening or scanning the vault
+never rewrites it. Unknown keys inside the reminder mapping are preserved. See
+[Review](../guide/review.md) for due occurrences and dismissal.
 
 ## 🙋 Asked by
 

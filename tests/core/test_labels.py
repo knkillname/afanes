@@ -8,8 +8,29 @@ from hypothesis import strategies as st
 
 from afanes.core.errors import NoteParseError
 from afanes.core.frontmatter import NoteDocument
-from afanes.core.labels import PageLabels
+from afanes.core.labels import PageLabels, ReminderEdit
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
+from afanes.models.reminder import ClockTime, Recurrence, Reminder, ReminderKind
+
+REMINDER_SOURCE = """---
+type: reference
+reminder:
+  zone: America/Mexico_City
+  recurrence:
+    kind: daily
+    times: ["09:00"]
+  label: keep
+---
+
+# Ada
+
+Body.
+"""
+
+REMINDER = Reminder(
+    schedule=Recurrence(kind=ReminderKind.DAILY, times=(ClockTime(9, 0),)),
+    zone="America/Mexico_City",
+)
 
 PROJECT_SOURCE = """---
 type: project
@@ -242,6 +263,95 @@ def _label_sets(draw: st.DrawFn) -> PageLabels:
         owner_text=owner_text or "",
         date_text=date_text or "",
     )
+
+
+class TestReminderEdit:
+    def test_labels_load_the_reminder(self) -> None:
+        document = NoteDocument.from_text(REMINDER_SOURCE)
+
+        labels = PageLabels.from_document(document)
+
+        assert labels.reminder == document.reminder
+        assert labels.reminder_edit is ReminderEdit.UNCHANGED
+
+    def test_an_unchanged_reminder_preserves_the_raw_mapping(self) -> None:
+        document = NoteDocument.from_text(REMINDER_SOURCE)
+
+        applied = PageLabels.from_document(document).apply_to(document)
+
+        assert applied.reminder is not None
+        assert dict(applied.reminder.extra) == {"label": "keep"}
+
+    def test_a_body_save_preserves_a_malformed_reminder(self) -> None:
+        source = "---\ntype: reference\nreminder: [broken]\n---\n\nBody.\n"
+        document = NoteDocument.from_text(source)
+        assert document.reminder_error is not None
+
+        applied = PageLabels.from_document(document).apply_to(document)
+
+        assert applied.raw["reminder"] == ["broken"]
+        assert applied.reminder is None
+        assert applied.reminder_error is not None
+
+    def test_setting_a_reminder_writes_the_mapping(self) -> None:
+        document = NoteDocument.from_text("---\ntype: reference\n---\n\nBody.\n")
+
+        applied = PageLabels.from_document(document).with_reminder(REMINDER).apply_to(document)
+
+        assert applied.reminder == REMINDER
+        assert applied.raw["reminder"] == REMINDER.to_mapping()
+
+    def test_setting_a_reminder_replaces_a_malformed_value(self) -> None:
+        document = NoteDocument.from_text("---\ntype: reference\nreminder: [broken]\n---\n\nBody.\n")
+
+        applied = PageLabels.from_document(document).with_reminder(REMINDER).apply_to(document)
+
+        assert applied.reminder == REMINDER
+        assert applied.reminder_error is None
+
+    def test_removing_a_reminder_pops_the_key(self) -> None:
+        document = NoteDocument.from_text(REMINDER_SOURCE)
+
+        applied = PageLabels.from_document(document).without_reminder().apply_to(document)
+
+        assert "reminder" not in applied.raw
+        assert applied.reminder is None
+
+    def test_setting_without_a_reminder_removes_the_key(self) -> None:
+        document = NoteDocument.from_text(REMINDER_SOURCE)
+        labels = PageLabels.from_document(document)
+        forced = PageLabels(
+            note_type=labels.note_type,
+            reminder=None,
+            reminder_edit=ReminderEdit.SET,
+        )
+
+        applied = forced.apply_to(document)
+
+        assert "reminder" not in applied.raw
+
+    def test_changing_to_a_capture_removes_the_reminder(self) -> None:
+        document = NoteDocument.from_text(REMINDER_SOURCE)
+
+        applied = PageLabels.from_document(document).with_type(NoteType.NOTE).apply_to(document)
+
+        assert "reminder" not in applied.raw
+        assert applied.reminder is None
+
+    def test_changing_between_eligible_types_keeps_the_reminder(self) -> None:
+        document = NoteDocument.from_text(REMINDER_SOURCE)
+
+        applied = PageLabels.from_document(document).with_type(NoteType.PROJECT).apply_to(document)
+
+        assert applied.reminder == document.reminder
+
+    def test_a_capture_cannot_set_a_reminder(self) -> None:
+        document = NoteDocument.from_text("---\ntype: note\n---\n\nBody.\n")
+
+        labels = PageLabels.from_document(document).with_reminder(REMINDER)
+
+        assert labels.reminder is None
+        assert labels.reminder_edit is ReminderEdit.REMOVED
 
 
 class TestApplyToRoundTrip:

@@ -215,6 +215,19 @@ class MessageCode(StrEnum):
     RENAME_INSPECT_FAILED = "rename-inspect-failed"
     REFERENCE_REPAIR_SCHEME = "reference-repair-scheme"
     REFERENCE_REPAIR_CONFIRMATION = "reference-repair-confirmation"
+    REMINDER_ON_CAPTURE = "reminder-on-capture"
+    REMINDER_WITHOUT_TYPE = "reminder-without-type"
+    REMINDER_INVALID_MAPPING = "reminder-invalid-mapping"
+    REMINDER_INVALID_SCHEDULE = "reminder-invalid-schedule"
+    REMINDER_UNKNOWN_KIND = "reminder-unknown-kind"
+    REMINDER_INVALID_TIME = "reminder-invalid-time"
+    REMINDER_INVALID_WEEKDAYS = "reminder-invalid-weekdays"
+    REMINDER_INVALID_DAY = "reminder-invalid-day"
+    REMINDER_INVALID_ORDINAL = "reminder-invalid-ordinal"
+    REMINDER_INVALID_WEEKDAY = "reminder-invalid-weekday"
+    REMINDER_INVALID_ONCE = "reminder-invalid-once"
+    REMINDER_INVALID_HANDLED = "reminder-invalid-handled"
+    REMINDER_UNKNOWN_ZONE = "reminder-unknown-zone"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

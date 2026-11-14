@@ -16,10 +16,10 @@
 
 ## 3. Frontmatter and page labels
 
-- [ ] 3.1 Add `reminder` and `reminder_error` to `NoteDocument` and parse the key as a warning rather than a fatal error; verify valid, malformed, null, misplaced-capture, and unknown-nested-key tests.
-- [ ] 3.2 Add the `ReminderEdit` state to `PageLabels` with set, remove, and unchanged behavior; verify a body-only save preserves a malformed raw value and the editor can replace or remove it.
-- [ ] 3.3 Add `reminder` to the architecture gate's `LABEL_KEYS`; verify the label ownership test and that only `core/labels.py` and `core/frontmatter.py` write the key.
-- [ ] 3.4 Update `docs/reference/frontmatter.md` with the `reminder` shape, eligibility, `handled`, zone, and malformed-value behavior; verify the examples parse and the page builds.
+- [x] 3.1 Add `reminder` and `reminder_error` to `NoteDocument` and parse the key as a warning rather than a fatal error; verify valid, malformed, null, misplaced-capture, and unknown-nested-key tests.
+- [x] 3.2 Add the `ReminderEdit` state to `PageLabels` with set, remove, and unchanged behavior; verify a body-only save preserves a malformed raw value and the editor can replace or remove it.
+- [x] 3.3 Add `reminder` to the architecture gate's `LABEL_KEYS`; verify the label ownership test and that only `core/labels.py` and `core/frontmatter.py` write the key.
+- [x] 3.4 Update `docs/reference/frontmatter.md` with the `reminder` shape, eligibility, `handled`, zone, and malformed-value behavior; verify the examples parse and the page builds.
 
 ## 4. Schema 2 and the open flow
 

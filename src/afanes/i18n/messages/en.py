@@ -199,4 +199,27 @@ TEMPLATES: dict[afanes.core.errors.MessageCode, str] = {
     afanes.core.errors.MessageCode.RENAME_INSPECT_FAILED: "Could not inspect the note before renaming: {path}",
     afanes.core.errors.MessageCode.REFERENCE_REPAIR_SCHEME: "Reference repair must stay within one scheme",
     afanes.core.errors.MessageCode.REFERENCE_REPAIR_CONFIRMATION: "Reference repairs require explicit confirmation",
+    afanes.core.errors.MessageCode.REMINDER_ON_CAPTURE: "A capture cannot carry a reminder; it will be ignored",
+    afanes.core.errors.MessageCode.REMINDER_WITHOUT_TYPE: "A reminder requires a note type",
+    afanes.core.errors.MessageCode.REMINDER_INVALID_MAPPING: "The reminder must be a mapping with a schedule",
+    afanes.core.errors.MessageCode.REMINDER_INVALID_SCHEDULE: "The reminder must declare exactly one of recurrence or once",
+    afanes.core.errors.MessageCode.REMINDER_UNKNOWN_KIND: "Unknown reminder recurrence kind: {value}",
+    afanes.core.errors.MessageCode.REMINDER_INVALID_TIME: "A reminder time must be written as HH:MM",
+    afanes.core.errors.MessageCode.REMINDER_INVALID_WEEKDAYS: (
+        "A weekday reminder needs one or more weekdays written as mon, tue, wed, thu, fri, sat, or sun"
+    ),
+    afanes.core.errors.MessageCode.REMINDER_INVALID_DAY: "A monthly reminder day must be a number from 1 to 31",
+    afanes.core.errors.MessageCode.REMINDER_INVALID_ORDINAL: (
+        "An nth-weekday reminder must choose the first to fifth weekday"
+    ),
+    afanes.core.errors.MessageCode.REMINDER_INVALID_WEEKDAY: (
+        "Choose one weekday written as mon, tue, wed, thu, fri, sat, or sun"
+    ),
+    afanes.core.errors.MessageCode.REMINDER_INVALID_ONCE: (
+        "A one-shot reminder must be a local date and time written as YYYY-MM-DDTHH:MM"
+    ),
+    afanes.core.errors.MessageCode.REMINDER_INVALID_HANDLED: (
+        "The reminder handled value must be an absolute date and time with an offset"
+    ),
+    afanes.core.errors.MessageCode.REMINDER_UNKNOWN_ZONE: "Unknown time zone: {value}",
 }
