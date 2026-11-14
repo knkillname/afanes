@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-14
+
 ### Added
+
+- **English and Spanish interface, command line, and starter content.** The interface, headless
+  commands, validation messages, log titles, metadata dates, date picker, and bundled guide,
+  templates, cards, labels, and descriptions now follow the active language. English remains the
+  source language and Spanish lives in reviewed gettext `.po` catalogs compiled to `.mo` build
+  artifacts generated at test and packaging time and never committed; switching the preference is
+  restart-only, saved in `preferences.json` outside every vault, and never rewrites
+  existing note content. The copy gate validates both catalogs, placeholder parity, capitalization,
+  and stale compiled files. This implements the `interface-localization` OpenSpec change.
+  **BREAKING:** `afanes.ui.strings` and `afanes.cli.strings` are removed; copy comes from
+  `afanes.i18n.ui.UiCopy`, `afanes.i18n.cli.CliCopy`, and `afanes.i18n.messages.MessageCatalog`.
+  `AfanesError` now requires a `DomainMessage`, and `StepWarning`, `VaultFailure`,
+  `TemplateCardIssue`, `NoteDocument.date_error`, `DueDateText.error`, and `RewriteFailure.message`
+  carry `DomainMessage` values. `VaultTemplate` no longer stores English labels;
+  `TemplateCatalog.summaries` takes localized labels, `TemplateCardCatalog.bundled` takes a locale,
+  `LogTitle.for_date` takes a locale, and `Vault.create_directory` accepts a locale for bundled
+  content. `LocaleTag`, `LocaleResolver`, `LocaleFormat`, `Preferences`, and `PreferencesStore` are
+  new. Resolved runtime dependencies: `flet==1.1.2`, `markdown-it-py==4.3.0`, `PyYAML==6.0.3`.
+  README: updated. Docs: updated.
 
 - **Fluid workspace layout.** The browser and detail now fill the window without maximum widths, page
   content uses the full detail card, the Log date controls share one row, and the page label fields

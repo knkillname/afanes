@@ -87,12 +87,12 @@ records the limitation in the release notes.
 - The first development desktop run may fetch the Flet client once as
   provisioning; a packaged build bundles the client and starts offline.
 - There is no cloud sync, account, telemetry, or hidden network call.
-- `0.8.0` is the current version. Intermediate `0.x` releases group completed
+- `0.10.0` is the current version. Intermediate `0.x` releases group completed
   work; no future `0.x` version is named as a checkpoint.
 
 ## Version path
 
-`0.8.0` is the current version. An archive that completes a coherent group of
+`0.10.0` is the current version. An archive that completes a coherent group of
 work is a MINOR release; an archive that completes no milestone keeps its entry
 under `Unreleased` and does not bump the version. `1.0.0` follows only when every
 row in the unified gate is green. The maintainer confirms the transition after
