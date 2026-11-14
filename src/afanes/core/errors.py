@@ -228,6 +228,7 @@ class MessageCode(StrEnum):
     REMINDER_INVALID_ONCE = "reminder-invalid-once"
     REMINDER_INVALID_HANDLED = "reminder-invalid-handled"
     REMINDER_UNKNOWN_ZONE = "reminder-unknown-zone"
+    REMINDER_MISSING = "reminder-missing"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

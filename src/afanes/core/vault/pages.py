@@ -27,7 +27,8 @@ from afanes.core.errors import (
 )
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.labels import PageLabels
-from afanes.core.vault.service import NoteDraft, Vault
+from afanes.core.vault.note import NoteDraft
+from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status

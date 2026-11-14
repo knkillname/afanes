@@ -59,6 +59,8 @@ nitpick_ignore_regex = [
     ("py:class", r"^(pathlib\.)?Path$"),
     ("py:mod", r"^pathlib$"),
     ("py:class", r"^datetime\.date$"),
+    ("py:class", r"^datetime\.datetime$"),
+    ("py:class", r"^zoneinfo\.ZoneInfo$"),
     ("py:attr", r"^datetime\.date\.\w+$"),
     ("py:class", r"^enum\.StrEnum$"),
     ("py:class", r"^(collections\.abc|importlib\.resources\.abc)\..+$"),

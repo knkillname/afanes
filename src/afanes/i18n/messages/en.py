@@ -222,4 +222,5 @@ TEMPLATES: dict[afanes.core.errors.MessageCode, str] = {
         "The reminder handled value must be an absolute date and time with an offset"
     ),
     afanes.core.errors.MessageCode.REMINDER_UNKNOWN_ZONE: "Unknown time zone: {value}",
+    afanes.core.errors.MessageCode.REMINDER_MISSING: "The note no longer has a reminder",
 }

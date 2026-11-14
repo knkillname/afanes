@@ -85,6 +85,8 @@ class ReviewView:
                 controls.append(self._completion_card(session.reviewed_count, session.skipped_count))
             elif item.kind is afanes.core.search.ReviewItemKind.INBOX:
                 controls.append(self._capture_card(item))
+            elif item.kind is afanes.core.search.ReviewItemKind.REMINDER:
+                controls.append(self._reminder_card(item))
             elif item.step is not None:
                 controls.append(self._step_card(item))
             else:
@@ -153,6 +155,50 @@ class ReviewView:
                             content=self._state.status.copy.REVIEW_PROCESS_ACTION,
                             on_click=self._process_handler(item.path),
                             key="review-process-capture",
+                        ),
+                        ft.TextButton(
+                            content=self._state.status.copy.REVIEW_SKIP,
+                            on_click=self._skip,
+                            key="review-skip",
+                        ),
+                    ],
+                    spacing=afanes.ui.theme.ITEM_GAP,
+                    wrap=True,
+                ),
+            ],
+            spacing=afanes.ui.theme.ITEM_GAP,
+        )
+        return Card(body).build()
+
+    def _reminder_card(self, item: ReviewItem) -> ft.Control:
+        """Build the card for one due reminder."""
+        occurrence = item.occurrence
+        if occurrence is None:
+            return self._broken_card(item)
+        title = self._state.session.note_title(item.path)
+        relative = self._state.status.copy.locale_format.relative_time(
+            occurrence,
+            datetime.datetime.now(tz=datetime.UTC),
+        )
+        body = ft.Column(
+            controls=[
+                ft.Text(
+                    self._state.status.copy.REVIEW_REMINDER_TITLE,
+                    style=afanes.ui.theme.TEXT_ROLES["heading"],
+                ),
+                ft.Text(title, style=afanes.ui.theme.TEXT_ROLES["title-2"], selectable=True),
+                ft.Text(relative, color=afanes.ui.theme.MUTED_TEXT_COLOR, selectable=True),
+                ft.Row(
+                    controls=[
+                        ft.OutlinedButton(
+                            content=self._state.status.copy.REVIEW_OPEN_PAGE,
+                            on_click=self._open_reminder,
+                            key="review-open-reminder",
+                        ),
+                        ft.TextButton(
+                            content=self._state.status.copy.REVIEW_DISMISS,
+                            on_click=self._dismiss_reminder,
+                            key="review-dismiss-reminder",
                         ),
                         ft.TextButton(
                             content=self._state.status.copy.REVIEW_SKIP,
@@ -524,6 +570,19 @@ class ReviewView:
     async def _open_project(self) -> None:
         """Open the current item's project page."""
         await self._state.review.open_project()
+        self.refresh()
+        self._update()
+
+    async def _open_reminder(self) -> None:
+        """Open the current reminder's page without dismissing it."""
+        await self._state.review.open_reminder()
+        self.refresh()
+        self._update()
+
+    async def _dismiss_reminder(self) -> None:
+        """Dismiss the current reminder occurrence."""
+        await self._state.review.dismiss_reminder()
+        self._reset_local_state()
         self.refresh()
         self._update()
 

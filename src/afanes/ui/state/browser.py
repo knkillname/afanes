@@ -271,7 +271,9 @@ class BrowserState:
         snapshot = self.session.snapshot
         if snapshot is None:
             return 0
-        return afanes.core.search.ReviewPlanner(snapshot).pending_count()
+        return afanes.core.search.ReviewPlanner(
+            snapshot, reminders_enabled=self.session.reminders_enabled
+        ).pending_count()
 
     def due_count(self) -> int:
         """Return the number of due or overdue own steps.
@@ -284,7 +286,7 @@ class BrowserState:
         snapshot = self.session.snapshot
         if snapshot is None:
             return 0
-        return afanes.core.search.ReviewPlanner(snapshot).due_count()
+        return afanes.core.search.ReviewPlanner(snapshot, reminders_enabled=self.session.reminders_enabled).due_count()
 
     def timeline(self) -> LogTimeline | None:
         """Return the Log timeline for the current snapshot and query.

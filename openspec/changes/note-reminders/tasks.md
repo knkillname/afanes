@@ -31,12 +31,12 @@
 
 ## 5. Snapshot and Review
 
-- [ ] 5.1 Add `reminder` to `VaultNote` and populate it during the scan; verify snapshot and vault integration tests with valid, absent, and malformed reminders.
-- [ ] 5.2 Add `ReviewItemKind.REMINDER`, the occurrence value, the reference instant, and the `reminders_enabled` flag to `ReviewPlanner`; implement queue order, pending count, and digest count; verify `tests/core/test_search.py`.
-- [ ] 5.3 Update `BrowserState` and `ReviewState` to pass the flag and reference instant, start a session with reminders, and enter a reminder item; verify `tests/ui/test_state.py`.
-- [ ] 5.4 Add `core/vault/reminders.py` with a dismissal write that uses the content-hash guard and records `handled`; add the `ReviewState` dismiss and open commands; verify success, conflict, and read-only failure tests.
-- [ ] 5.5 Add the reminder card to `ReviewView` with Open Page primary, Dismiss secondary, Skip text, and relative time; extend the existing 5-second app loop to repaint only when the reminder count changes; verify `tests/ui/test_review_view.py`, `tests/ui/test_app.py`, and the lifecycle cancellation tests.
-- [ ] 5.6 Update `docs/guide/review.md` and add a reminder section or page linked from the docs index; verify the queue order, card actions, digest wording, and pause behavior match the specs.
+- [x] 5.1 Add `reminder` to `VaultNote` and populate it during the scan; verify snapshot and vault integration tests with valid, absent, and malformed reminders.
+- [x] 5.2 Add `ReviewItemKind.REMINDER`, the occurrence value, the reference instant, and the `reminders_enabled` flag to `ReviewPlanner`; implement queue order, pending count, and digest count; verify `tests/core/test_search.py`.
+- [x] 5.3 Update `BrowserState` and `ReviewState` to pass the flag and reference instant, start a session with reminders, and enter a reminder item; verify `tests/ui/test_state.py`.
+- [x] 5.4 Add `core/vault/reminders.py` with a dismissal write that uses the content-hash guard and records `handled`; add the `ReviewState` dismiss and open commands; verify success, conflict, and read-only failure tests.
+- [x] 5.5 Add the reminder card to `ReviewView` with Open Page primary, Dismiss secondary, Skip text, and relative time; extend the existing 5-second app loop to repaint only when the reminder count changes; verify `tests/ui/test_review_view.py`, `tests/ui/test_app.py`, and the lifecycle cancellation tests.
+- [x] 5.6 Update `docs/guide/review.md` and add a reminder section or page linked from the docs index; verify the queue order, card actions, digest wording, and pause behavior match the specs.
 
 ## 6. Page summary and editor
 

@@ -1032,6 +1032,11 @@ msgctxt "reminder-unknown-zone"
 msgid "Unknown time zone: {value}"
 msgstr "Zona horaria desconocida: {value}"
 
+#: src/afanes/i18n/messages/en.py REMINDER_MISSING
+msgctxt "reminder-missing"
+msgid "The note no longer has a reminder"
+msgstr "La nota ya no tiene un recordatorio"
+
 #: src/afanes/i18n/templates/en.py TEMPLATE_PERSONAL_LABEL
 msgctxt "TEMPLATE_PERSONAL_LABEL"
 msgid "Personal"

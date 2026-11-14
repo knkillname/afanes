@@ -10,6 +10,7 @@ import flet as ft
 import pytest
 
 import afanes.core.localization
+import afanes.core.search
 import afanes.core.settings
 import afanes.i18n.ui
 import afanes.i18n.ui.en
@@ -132,6 +133,24 @@ def _start(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> afanes.ui.state.c
     return state
 
 
+def _write_reminder(path: Path, *, handled: bool = False) -> Path:
+    ensure_vault(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    once = (datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M")
+    lines = [
+        "---",
+        "type: reference",
+        "reminder:",
+        "  zone: UTC",
+        f"  once: {once}",
+    ]
+    if handled:
+        lines.append("  handled: 2026-01-01T00:00:00+00:00")
+    lines.extend(["---", "", f"# {path.stem}", ""])
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
 class TestReviewEntry:
     def test_zero_pending_shows_the_zero_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -167,6 +186,67 @@ class TestReviewEntry:
         asyncio.run(_handler(skip)())
         assert state.review.review_session is not None
         assert state.review.review_session.skipped_count == 1
+
+
+class TestReminderCard:
+    def test_the_card_shows_the_note_and_relative_time(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_reminder(vault / "reference" / "Ada.md")
+        _start(tmp_path, monkeypatch)
+
+        view = afanes.ui.views.review.ReviewView(_noop)
+        texts = _texts(view.root)
+
+        assert afanes.i18n.ui.en.REVIEW_REMINDER_TITLE in texts
+        assert "Ada" in texts
+        assert any("hours ago" in value for value in texts)
+        assert _find_by_key(view.root, "review-open-reminder") is not None
+        assert _find_by_key(view.root, "review-dismiss-reminder") is not None
+        assert _find_by_key(view.root, "review-skip") is not None
+
+    def test_dismiss_writes_handled_and_advances(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_reminder(vault / "reference" / "Ada.md")
+        state = _start(tmp_path, monkeypatch)
+        view = afanes.ui.views.review.ReviewView(_noop)
+        dismiss = _find_by_key(view.root, "review-dismiss-reminder")
+
+        asyncio.run(_handler(dismiss)())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.reminder is not None
+        assert document.reminder.handled is not None
+        assert state.review.review_session is not None
+        assert state.review.review_session.complete is True
+
+    def test_open_page_keeps_the_reminder_due(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_reminder(vault / "reference" / "Ada.md")
+        state = _start(tmp_path, monkeypatch)
+        view = afanes.ui.views.review.ReviewView(_noop)
+        open_page = _find_by_key(view.root, "review-open-reminder")
+
+        asyncio.run(_handler(open_page)())
+
+        assert state.pages.page is not None
+        assert state.pages.page.path == path.resolve()
+        assert state.review.review_session is not None
+        assert state.review.review_session.current is not None
+        assert state.review.review_session.current.kind is afanes.core.search.ReviewItemKind.REMINDER
+        assert "handled" not in path.read_text(encoding="utf-8")
+
+    def test_skip_leaves_the_reminder_due(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_reminder(vault / "reference" / "Ada.md")
+        state = _start(tmp_path, monkeypatch)
+        view = afanes.ui.views.review.ReviewView(_noop)
+        skip = _find_by_key(view.root, "review-skip")
+
+        asyncio.run(_handler(skip)())
+
+        assert state.review.review_session is not None
+        assert state.review.review_session.skipped_count == 1
+        assert "handled" not in path.read_text(encoding="utf-8")
 
 
 class TestDueStepCard:

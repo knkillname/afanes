@@ -13,14 +13,46 @@ import datetime
 from pathlib import Path
 
 import afanes.core.names
+from afanes.core.errors import DomainMessage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
+from afanes.models.reminder import Reminder
 from afanes.models.step import ProjectStep
 
 # Public default inbox storage layout.
 INBOX_DIRECTORY = Path("inbox")
 
 MIN_INBOX_PART_COUNT = 2
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class NoteDraft:
+    """Initial data for one note creation.
+
+    Attributes
+    ----------
+    title : str
+        Name to sanitize into the identity filename. The new note's display
+        title is derived separately from its body.
+    note_type : NoteType
+        Declared type for the new note.
+    category : CategoryLabel | None
+        Reference category. Only valid when ``note_type`` is a reference.
+    directory : pathlib.Path | None
+        Vault-relative or absolute classification directory. ``None`` uses the
+        layout destination for the type and category.
+    body : str
+        Initial Markdown body.
+    status : Status | None
+        Initial status value. ``None`` omits the ``status`` key entirely.
+    """
+
+    title: str
+    note_type: NoteType
+    category: CategoryLabel | None = None
+    directory: Path | None = None
+    body: str = ""
+    status: Status | None = None
 
 
 @dataclasses.dataclass(frozen=True, slots=True, order=True)
@@ -243,6 +275,10 @@ class VaultNote:
     owner : str | None
         Accountable person or team declared by a project, or ``None`` when the
         key is absent or the note is not a project.
+    reminder : Reminder | None
+        Whole-note reminder, or ``None`` when absent or malformed.
+    reminder_error : DomainMessage | None
+        Warning for a malformed or ineligible reminder, or ``None``.
     """
 
     path: Path
@@ -261,6 +297,8 @@ class VaultNote:
     search_text: str
     asked_by: str | None = None
     owner: str | None = None
+    reminder: Reminder | None = None
+    reminder_error: DomainMessage | None = None
 
     @property
     def references(self) -> tuple[NoteReference, ...]:

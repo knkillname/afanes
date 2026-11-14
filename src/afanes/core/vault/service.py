@@ -37,7 +37,7 @@ from afanes.core.frontmatter import NoteDocument
 from afanes.core.labels import PageLabels
 from afanes.core.links import CatalogEntry, NameCatalog
 from afanes.core.template_cards import TemplateCard, TemplateCardCatalog
-from afanes.core.vault.note import VaultNote
+from afanes.core.vault.note import NoteDraft, VaultNote
 from afanes.core.vault.snapshot import (
     NotePath,
     PageContent,
@@ -60,36 +60,6 @@ REFERENCE_DIRECTORY = afanes.core.vault.snapshot.REFERENCE_DIRECTORY
 PROJECTS_DIRECTORY = afanes.core.vault.snapshot.PROJECTS_DIRECTORY
 LOG_DIRECTORY = afanes.core.vault.snapshot.LOG_DIRECTORY
 TEMPLATES_DIRECTORY = afanes.core.vault.snapshot.TEMPLATES_DIRECTORY
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class NoteDraft:
-    """Initial data for one note creation.
-
-    Attributes
-    ----------
-    title : str
-        Name to sanitize into the identity filename. The new note's display
-        title is derived separately from its body.
-    note_type : NoteType
-        Declared type for the new note.
-    category : CategoryLabel | None
-        Reference category. Only valid when ``note_type`` is a reference.
-    directory : pathlib.Path | None
-        Vault-relative or absolute classification directory. ``None`` uses the
-        layout destination for the type and category.
-    body : str
-        Initial Markdown body.
-    status : Status | None
-        Initial status value. ``None`` omits the ``status`` key entirely.
-    """
-
-    title: str
-    note_type: NoteType
-    category: CategoryLabel | None = None
-    directory: Path | None = None
-    body: str = ""
-    status: Status | None = None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -559,6 +529,8 @@ class Vault:
             search_text=search_text,
             asked_by=document.asked_by,
             owner=document.owner,
+            reminder=document.reminder,
+            reminder_error=document.reminder_error,
         )
 
     def directory_for(self, note_type: NoteType, category: CategoryLabel | None = None) -> Path:

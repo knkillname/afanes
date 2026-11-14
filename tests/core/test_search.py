@@ -3,6 +3,8 @@
 import datetime
 from pathlib import Path
 
+import pytest
+
 import afanes.core.search
 import afanes.core.vault.service
 import afanes.core.vault.snapshot
@@ -14,6 +16,10 @@ TODAY = datetime.date(2026, 11, 14)
 TOMORROW = datetime.date(2026, 11, 15)
 TWO_STEPS = 2
 FOUR_PENDING = 4
+REFERENCE = datetime.datetime(2026, 11, 14, 18, 0, tzinfo=datetime.UTC)
+TWO_PENDING = 2
+DAILY_MORNING = 'zone: America/Mexico_City\nrecurrence:\n  kind: daily\n  times: ["09:00"]'
+DAILY_MIDMORNING = 'zone: America/Mexico_City\nrecurrence:\n  kind: daily\n  times: ["10:00"]'
 
 
 def _write_note(
@@ -48,6 +54,27 @@ def _write_note(
 
 def _snapshot(root: Path) -> afanes.core.vault.snapshot.VaultSnapshot:
     return Vault(root).scan()
+
+
+def _write_reminder(
+    root: Path,
+    relative: str,
+    note_type: str,
+    reminder: str,
+    *,
+    status: str | None = None,
+    body: str = "",
+) -> Path:
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["---", f"type: {note_type}"]
+    if status is not None:
+        lines.append(f"status: {status}")
+    lines.append("reminder:")
+    lines.extend(f"  {line}" for line in reminder.splitlines())
+    lines.extend(["---", "", body or f"# {path.stem}\n"])
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
 
 
 class TestBrowserGroups:
@@ -509,3 +536,121 @@ class TestPendingCount:
 
         assert ReviewPlanner(_snapshot(root), today=TODAY).pending_count() == 0
         assert ReviewPlanner(_snapshot(root), today=TOMORROW).pending_count() == 1
+
+
+class TestReviewReminders:
+    def test_a_due_reminder_leads_the_queue(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        reminder = _write_reminder(root, "reference/Ada.md", "reference", DAILY_MORNING)
+        _write_note(root, "inbox/Capture.md", "note", "# Capture\n")
+
+        queue = ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE).queue()
+
+        assert [item.kind for item in queue] == [ReviewItemKind.REMINDER, ReviewItemKind.INBOX]
+        assert queue[0].path == reminder
+
+    def test_reminders_are_ordered_most_overdue_first(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        morning = _write_reminder(root, "reference/Morning.md", "reference", DAILY_MORNING)
+        midmorning = _write_reminder(root, "reference/Later.md", "reference", DAILY_MIDMORNING)
+
+        queue = ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE).queue()
+
+        assert [item.path for item in queue] == [morning, midmorning]
+
+    def test_the_due_occurrence_is_exposed(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(root, "reference/Ada.md", "reference", DAILY_MORNING)
+
+        item = ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE).queue()[0]
+
+        assert item.occurrence == datetime.datetime(2026, 11, 14, 15, 0, tzinfo=datetime.UTC)
+
+    def test_pending_and_due_counts_include_reminders(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(root, "reference/Ada.md", "reference", DAILY_MORNING)
+        _write_note(root, "inbox/Capture.md", "note", "# Capture\n")
+
+        planner = ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE)
+
+        assert planner.pending_count() == TWO_PENDING
+        assert planner.due_count() == 1
+
+    def test_disabled_reminders_are_ignored(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(root, "reference/Ada.md", "reference", DAILY_MORNING)
+
+        planner = ReviewPlanner(
+            _snapshot(root),
+            today=TODAY,
+            reference=REFERENCE,
+            reminders_enabled=False,
+        )
+
+        assert planner.queue() == ()
+        assert planner.pending_count() == 0
+        assert planner.due_count() == 0
+
+    def test_a_future_one_shot_is_not_due(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(root, "reference/Ada.md", "reference", "zone: America/Mexico_City\nonce: 2026-11-20T09:00")
+
+        assert ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE).queue() == ()
+
+    def test_a_past_one_shot_is_due(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(root, "reference/Ada.md", "reference", "zone: America/Mexico_City\nonce: 2026-11-10T09:00")
+
+        queue = ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE).queue()
+
+        assert [item.kind for item in queue] == [ReviewItemKind.REMINDER]
+
+    def test_handled_suppresses_the_due_occurrence(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(
+            root,
+            "reference/Ada.md",
+            "reference",
+            f"{DAILY_MORNING}\nhandled: 2026-11-14T15:00:00+00:00",
+        )
+
+        assert ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE).queue() == ()
+
+    @pytest.mark.parametrize("status", ["done", "cancelled", "archived", "later"])
+    def test_a_closed_status_pauses_a_project_reminder(self, tmp_path: Path, status: str) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(root, "projects/Home.md", "project", DAILY_MORNING, status=status)
+
+        queue = ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE).queue()
+
+        assert all(item.kind is not ReviewItemKind.REMINDER for item in queue)
+
+    def test_waiting_keeps_a_project_reminder_active(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(root, "projects/Home.md", "project", DAILY_MORNING, status="waiting")
+
+        queue = ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE).queue()
+
+        assert queue[0].kind is ReviewItemKind.REMINDER
+
+    def test_a_log_reminder_is_active(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(root, "log/2026/2026-11-14.md", "log", DAILY_MORNING)
+
+        queue = ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE).queue()
+
+        assert [item.kind for item in queue] == [ReviewItemKind.REMINDER]
+
+    def test_a_malformed_reminder_is_not_queued(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(root, "reference/Ada.md", "reference", "- broken")
+
+        assert ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE).queue() == ()
+
+    def test_a_capture_reminder_is_not_queued(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(root, "inbox/Ada.md", "note", DAILY_MORNING)
+
+        queue = ReviewPlanner(_snapshot(root), today=TODAY, reference=REFERENCE).queue()
+
+        assert all(item.kind is not ReviewItemKind.REMINDER for item in queue)

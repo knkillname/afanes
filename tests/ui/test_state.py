@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+import afanes.core.atomic
 import afanes.core.connections
 import afanes.core.editing
 import afanes.core.localization
@@ -152,6 +153,37 @@ def _write_typed_note(
     if project is not None:
         lines.append(f'project: "{project}"')
     lines.extend(["---", body])
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def _write_reminder_note(
+    path: Path,
+    note_type: str = "reference",
+    *,
+    status: str | None = None,
+    zone: str = "UTC",
+    time: str = "00:00",
+) -> Path:
+    _ensure_vault(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["---", f"type: {note_type}"]
+    if status is not None:
+        lines.append(f"status: {status}")
+    lines.extend(
+        [
+            "reminder:",
+            f"  zone: {zone}",
+            "  recurrence:",
+            "    kind: daily",
+            f'    times: ["{time}"]',
+            "---",
+            "",
+            f"# {path.stem}",
+            "",
+            "Body.",
+        ]
+    )
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
 
@@ -2043,6 +2075,29 @@ class TestRefreshWorkspace:
 
         assert asyncio.run(state.workspace.refresh_workspace()) is False
 
+    def test_a_reminder_count_change_repaints_without_a_rescan(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _write_reminder_note(vault / "reference" / "Ada.md")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[bool, bool, bool]:
+            await state.workspace.choose_vault(vault)
+            snapshot = state.session.snapshot
+            state.session.reminders_enabled = False
+            first = await state.workspace.refresh_workspace()
+            state.session.reminders_enabled = True
+            second = await state.workspace.refresh_workspace()
+            return first, second, snapshot is state.session.snapshot
+
+        first, second, same_snapshot = asyncio.run(scenario())
+
+        assert first is True
+        assert second is True
+        assert same_snapshot is True
+
     def test_busy_lock_skips_the_tick(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _versioned(vault)
@@ -3834,6 +3889,145 @@ class TestReviewState:
         assert [item.path.stem for item in state.review.review_session.items] == ["Buy milk", "Stalled", "Healthy"]
         assert state.processing.note == capture
         assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW
+
+    def test_start_review_includes_a_due_reminder(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = _versioned(tmp_path / "vault")
+        reminder_note = vault / "reference" / "Ada.md"
+        reminder_note.parent.mkdir(parents=True)
+        reminder_note.write_text(
+            '---\ntype: reference\nreminder:\n  zone: UTC\n  recurrence:\n    kind: daily\n    times: ["00:00"]\n---\n\n# Ada\n',
+            encoding="utf-8",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.review.start()
+
+        started = asyncio.run(scenario())
+
+        assert started is True
+        assert state.review.review_session is not None
+        assert [item.kind for item in state.review.review_session.items] == [afanes.core.search.ReviewItemKind.REMINDER]
+        assert state.review.review_session.current is not None
+        assert state.review.review_session.current.occurrence is not None
+        assert state.processing.note is None
+
+    def test_start_review_skips_reminders_when_disabled(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = _versioned(tmp_path / "vault")
+        reminder_note = vault / "reference" / "Ada.md"
+        reminder_note.parent.mkdir(parents=True)
+        reminder_note.write_text(
+            '---\ntype: reference\nreminder:\n  zone: UTC\n  recurrence:\n    kind: daily\n    times: ["00:00"]\n---\n\n# Ada\n',
+            encoding="utf-8",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            state.session.reminders_enabled = False
+            return await state.review.start()
+
+        started = asyncio.run(scenario())
+
+        assert started is False
+        assert state.review.review_session is None
+
+    def test_dismiss_reminder_writes_handled_and_advances(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_reminder_note(vault / "reference" / "Ada.md")
+        before = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[bool, bool]:
+            await state.workspace.choose_vault(vault)
+            started = await state.review.start()
+            return started, await state.review.dismiss_reminder()
+
+        started, dismissed = asyncio.run(scenario())
+
+        after = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert started is True
+        assert dismissed is True
+        assert after.reminder is not None
+        assert after.reminder.handled is not None
+        assert after.body == before.body
+        assert state.review.review_session is not None
+        assert state.review.review_session.complete is True
+        assert state.browser.pending_count() == 0
+
+    def test_dismiss_reminder_conflict_leaves_it_due(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_reminder_note(vault / "reference" / "Ada.md")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.review.start()
+            path.write_text(path.read_text(encoding="utf-8") + "\nExternal.\n", encoding="utf-8")
+            return await state.review.dismiss_reminder()
+
+        dismissed = asyncio.run(scenario())
+
+        assert dismissed is False
+        assert state.review.review_session is not None
+        assert state.review.review_session.current is not None
+        assert state.review.review_session.current.kind is afanes.core.search.ReviewItemKind.REMINDER
+        assert "Could not dismiss this reminder" in (_notice_message(state) or "")
+
+    def test_dismiss_reminder_reports_a_read_only_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_reminder_note(vault / "reference" / "Ada.md")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        def fail_write(_path: Path, _text: str) -> None:
+            message = "read-only vault"
+            raise PermissionError(message)
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.review.start()
+            monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail_write)
+            return await state.review.dismiss_reminder()
+
+        dismissed = asyncio.run(scenario())
+
+        assert dismissed is False
+        assert "handled" not in path.read_text(encoding="utf-8")
+        assert "Could not dismiss this reminder" in (_notice_message(state) or "")
+
+    def test_open_reminder_opens_the_page_without_dismissing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_reminder_note(vault / "reference" / "Ada.md")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.review.start()
+            return await state.review.open_reminder()
+
+        opened = asyncio.run(scenario())
+
+        assert opened is True
+        assert state.pages.page is not None
+        assert state.pages.page.path == path.resolve()
+        assert state.review.review_session is not None
+        assert state.review.review_session.current is not None
+        assert state.review.review_session.current.kind is afanes.core.search.ReviewItemKind.REMINDER
+        assert "handled" not in path.read_text(encoding="utf-8")
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
 
     def test_review_start_loads_template_cards(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

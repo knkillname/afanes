@@ -29,3 +29,12 @@ They are frozen dataclasses or enumerations and import only the standard library
 .. automodule:: afanes.models.step
    :members:
 ```
+
+## ⏰ Reminders
+
+### 🧩 afanes.models.reminder
+
+```{eval-rst}
+.. automodule:: afanes.models.reminder
+   :members:
+```

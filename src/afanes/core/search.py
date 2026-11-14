@@ -16,6 +16,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
+import tzlocal
+
 import afanes.core.names
 from afanes.core.vault.note import NoteOrder, VaultNote
 from afanes.core.vault.snapshot import VaultFailure, VaultSnapshot
@@ -72,6 +74,8 @@ class ReviewItemKind(StrEnum):
     ----------
     INBOX : str
         A capture that still needs an explicit processing outcome.
+    REMINDER : str
+        A note whose reminder occurrence is due.
     DUE_STEP : str
         An own, unchecked step whose plan date is today or earlier.
     WAITING_STEP : str
@@ -81,6 +85,7 @@ class ReviewItemKind(StrEnum):
     """
 
     INBOX = "inbox"
+    REMINDER = "reminder"
     DUE_STEP = "due_step"
     WAITING_STEP = "waiting_step"
     PROJECT = "project"
@@ -253,19 +258,23 @@ class ReviewItem:
     Attributes
     ----------
     kind : ReviewItemKind
-        Whether the item is an inbox capture, a step, or a project.
+        Whether the item is an inbox capture, a reminder, a step, or a project.
     path : Path
-        Absolute path of the capture or project note.
+        Absolute path of the capture, reminder, or project note.
     project : ProjectSummary | None
-        Project data for a step or project item; ``None`` for an inbox item.
+        Project data for a step or project item; ``None`` for an inbox or
+        reminder item.
     step : ProjectStep | None
-        Step under review, or ``None`` for inbox and project items.
+        Step under review, or ``None`` for inbox, reminder, and project items.
+    occurrence : datetime.datetime | None
+        Due reminder instant for a reminder item, or ``None`` for other kinds.
     """
 
     kind: ReviewItemKind
     path: Path
     project: ProjectSummary | None = None
     step: ProjectStep | None = None
+    occurrence: datetime.datetime | None = None
 
 
 class Browser:
@@ -500,10 +509,23 @@ class ReviewPlanner:
     today : datetime.date | None
         Calendar date used to decide which own steps are due. ``None`` uses
         the current local date.
+    reference : datetime.datetime | None
+        Timezone-aware instant used to evaluate reminders. ``None`` uses the
+        current instant.
+    reminders_enabled : bool
+        Whether due reminders participate in the queue, count, and digest. A
+        schema ``1`` read-only vault passes ``False``.
     """
 
-    def __init__(self, snapshot: VaultSnapshot, today: datetime.date | None = None) -> None:
-        """Store the snapshot and reference date this planner queries.
+    def __init__(
+        self,
+        snapshot: VaultSnapshot,
+        today: datetime.date | None = None,
+        reference: datetime.datetime | None = None,
+        *,
+        reminders_enabled: bool = True,
+    ) -> None:
+        """Store the snapshot, reference date, and reminder capability.
 
         Parameters
         ----------
@@ -511,9 +533,16 @@ class ReviewPlanner:
             Read-only scan result.
         today : datetime.date | None
             Calendar date used to decide which own steps are due.
+        reference : datetime.datetime | None
+            Timezone-aware instant used to evaluate reminders.
+        reminders_enabled : bool
+            Whether reminders participate in review.
         """
         self._snapshot = snapshot
         self._today = today or datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+        self._reference = reference or datetime.datetime.now(tz=datetime.UTC)
+        self._reminders_enabled = reminders_enabled
+        self._system_zone = tzlocal.get_localzone_name()
 
     def queue(self) -> tuple[ReviewItem, ...]:
         """Build the ordered queue for one review session.
@@ -521,16 +550,19 @@ class ReviewPlanner:
         Returns
         -------
         tuple[ReviewItem, ...]
-            Pending inbox captures first, newest first; then due or overdue own
-            steps; then waiting steps; then open projects with no open step;
-            then healthy open projects. Closed projects are excluded.
+            Due reminders first, most overdue first; then pending inbox
+            captures newest first; then due or overdue own steps; then waiting
+            steps; then open projects with no open step; then healthy open
+            projects. Closed projects are excluded.
 
         Notes
         -----
         The result is a snapshot. Work created or changed after this call is
         not appended to an existing queue; start a new session to include it.
+        A reminder that becomes due during the session waits for the next one.
         """
         return (
+            *self._reminder_items(),
             *self._inbox_items(),
             *self._step_items(ReviewItemKind.DUE_STEP),
             *self._step_items(ReviewItemKind.WAITING_STEP),
@@ -544,9 +576,9 @@ class ReviewPlanner:
         Returns
         -------
         int
-            Pending inbox captures, due or overdue own steps, waiting steps,
-            and open projects with no open step. Healthy open projects do not
-            contribute to the count.
+            Due reminders, pending inbox captures, due or overdue own steps,
+            waiting steps, and open projects with no open step. Healthy open
+            projects do not contribute to the count.
 
         Notes
         -----
@@ -558,14 +590,51 @@ class ReviewPlanner:
         return len(self._inbox_items()) + due + waiting + stalled
 
     def due_count(self) -> int:
-        """Count due or overdue own steps.
+        """Count due steps and due reminders for the launch digest.
 
         Returns
         -------
         int
-            Own, unchecked steps whose plan date is today or earlier.
+            Own, unchecked steps whose plan date is today or earlier, plus due
+            reminders when the vault enables them.
         """
-        return len(self._step_items(ReviewItemKind.DUE_STEP))
+        return len(self._step_items(ReviewItemKind.DUE_STEP)) + len(self._reminder_items())
+
+    def _reminder_items(self) -> tuple[ReviewItem, ...]:
+        """Return due reminders in most-overdue-first order."""
+        if not self._reminders_enabled:
+            return ()
+        items = [
+            ReviewItem(kind=ReviewItemKind.REMINDER, path=note.path, occurrence=occurrence)
+            for note in self._snapshot.notes
+            if (occurrence := self._due_reminder(note)) is not None
+        ]
+        return tuple(sorted(items, key=ReviewPlanner._reminder_order))
+
+    def _due_reminder(self, note: VaultNote) -> datetime.datetime | None:
+        """Return one note's due occurrence, or ``None`` when it is paused."""
+        reminder = note.reminder
+        if reminder is None or note.note_type is NoteType.NOTE:
+            return None
+        if ReviewPlanner._reminder_paused(note):
+            return None
+        return reminder.due_occurrence(self._reference, self._system_zone)
+
+    @staticmethod
+    def _reminder_paused(note: VaultNote) -> bool:
+        """Return whether a note's status pauses its reminder."""
+        if note.note_type is NoteType.LOG:
+            return False
+        return note.status in (Status.DONE, Status.CANCELLED, Status.ARCHIVED, Status.LATER)
+
+    @staticmethod
+    def _reminder_order(item: ReviewItem) -> datetime.datetime:
+        """Return the absolute instant used to order one reminder item."""
+        occurrence = item.occurrence
+        if occurrence is None:
+            message = "A reminder review item requires an occurrence"
+            raise ValueError(message)
+        return occurrence.astimezone(datetime.UTC)
 
     def _inbox_items(self) -> tuple[ReviewItem, ...]:
         """Return pending inbox captures in newest-first order."""

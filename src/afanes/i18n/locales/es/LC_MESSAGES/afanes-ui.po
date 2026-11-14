@@ -342,6 +342,21 @@ msgctxt "REVIEW_OPEN_ACTION"
 msgid "Open"
 msgstr "Abrir"
 
+#: src/afanes/i18n/ui/en.py REVIEW_REMINDER_TITLE
+msgctxt "REVIEW_REMINDER_TITLE"
+msgid "Reminder"
+msgstr "Recordatorio"
+
+#: src/afanes/i18n/ui/en.py REVIEW_OPEN_PAGE
+msgctxt "REVIEW_OPEN_PAGE"
+msgid "Open Page"
+msgstr "Abrir página"
+
+#: src/afanes/i18n/ui/en.py REVIEW_DISMISS
+msgctxt "REVIEW_DISMISS"
+msgid "Dismiss"
+msgstr "Descartar"
+
 #: src/afanes/i18n/ui/en.py REVIEW_NEXT_STEP
 msgctxt "REVIEW_NEXT_STEP"
 msgid "Next Step"
@@ -431,6 +446,11 @@ msgstr "No se pudo actualizar este proyecto: {detail}"
 msgctxt "REVIEW_CAPTURE_READ_FAILED"
 msgid "Could not read this capture: {detail}"
 msgstr "No se pudo leer esta captura: {detail}"
+
+#: src/afanes/i18n/ui/en.py REVIEW_REMINDER_FAILED
+msgctxt "REVIEW_REMINDER_FAILED"
+msgid "Could not dismiss this reminder: {detail}"
+msgstr "No se pudo descartar este recordatorio: {detail}"
 
 #: src/afanes/i18n/ui/en.py REVIEW_DUE
 msgctxt "REVIEW_DUE"

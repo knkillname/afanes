@@ -70,6 +70,7 @@ class WorkspaceController:
     status: UiStatus
     command_lock: CommandLock
     banner: str | None = None
+    _last_review_count: int | None = dataclasses.field(default=None, repr=False)
 
     async def start(self) -> None:
         """Load saved settings and open the remembered vault.
@@ -552,6 +553,7 @@ class WorkspaceController:
         self.dialogs.clear()
         self.pages.clear()
         self.session.apply_snapshot(snapshot)
+        self._last_review_count = self.browser.pending_count()
         if opened.upgraded:
             self.status.show_notice(self.status.copy.REMINDER_SCHEMA_UPGRADED)
         await self.session.maintain_trash(vault.today())
@@ -658,8 +660,11 @@ class WorkspaceController:
         async with self.command_lock:
             snapshot = await self.session.refresh_if_changed()
             trash_snapshot = await self.session.refresh_trash_if_changed()
+            count = self.browser.pending_count()
+            count_changed = self._last_review_count is not None and count != self._last_review_count
+            self._last_review_count = count
             if snapshot is None and trash_snapshot is None:
-                return False
+                return count_changed
             focused = (
                 self.processing.note is None and self.processing.result is None and self.review.review_session is None
             )
@@ -681,3 +686,4 @@ class WorkspaceController:
         self.processing.clear()
         self.pages.clear()
         self.banner = message
+        self._last_review_count = None

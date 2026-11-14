@@ -519,6 +519,17 @@ class TestVaultCreation:
             assert all(path.is_relative_to(root) for path in creation.seeded_directories)
 
 
+def _write_reminder(root: Path, name: str, note_type: str, reminder: str) -> Path:
+    path = root / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"---\ntype: {note_type}\nreminder:\n{reminder}\n---\n\n# {path.stem}\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    return path
+
+
 class TestScanVault:
     def test_finds_nested_notes_in_deterministic_order(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -526,6 +537,53 @@ class TestScanVault:
         _write_note(root / "a/Alpha.md")
         snapshot = afanes.core.vault.service.Vault(root).scan()
         assert [note.name for note in snapshot.notes] == ["Alpha", "Beta"]
+
+    def test_scan_populates_a_valid_reminder(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(
+            root,
+            "reference/Ada.md",
+            "reference",
+            '  zone: America/Mexico_City\n  recurrence:\n    kind: daily\n    times: ["09:00"]',
+        )
+
+        note = afanes.core.vault.service.Vault(root).scan().notes[0]
+
+        assert note.reminder is not None
+        assert note.reminder.zone == "America/Mexico_City"
+        assert note.reminder_error is None
+
+    def test_scan_keeps_a_malformed_reminder_as_a_warning(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(root, "reference/Ada.md", "reference", "  - broken")
+
+        note = afanes.core.vault.service.Vault(root).scan().notes[0]
+
+        assert note.reminder is None
+        assert note.reminder_error is not None
+
+    def test_scan_ignores_a_capture_reminder(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_reminder(
+            root,
+            "inbox/Ada.md",
+            "note",
+            '  zone: America/Mexico_City\n  recurrence:\n    kind: daily\n    times: ["09:00"]',
+        )
+
+        note = afanes.core.vault.service.Vault(root).scan().notes[0]
+
+        assert note.reminder is None
+        assert note.reminder_error is not None
+
+    def test_scan_keeps_a_note_without_a_reminder(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "reference/Ada.md", note_type="reference")
+
+        note = afanes.core.vault.service.Vault(root).scan().notes[0]
+
+        assert note.reminder is None
+        assert note.reminder_error is None
 
     def test_the_settings_file_is_not_scanned_as_a_note(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

@@ -22,6 +22,9 @@ SUPPORTED_LANGUAGES = ("en", "es")
 DEFAULT_LANGUAGE = "en"
 MONTHS_PER_YEAR = 12
 HOURS_PER_HALF_DAY = 12
+SECONDS_PER_MINUTE = 60
+MINUTES_PER_HOUR = 60
+HOURS_PER_DAY = 24
 
 # Public environment precedence. The first present variable wins.
 LOCALE_ENVIRONMENT_VARIABLES = ("LC_ALL", "LC_MESSAGES", "LANG")
@@ -444,6 +447,53 @@ class LocaleFormat:
             hour = HOURS_PER_HALF_DAY
         marker = "AM" if value.hour < HOURS_PER_HALF_DAY else "PM"
         return f"{hour}:{value.minute:02d} {marker}"
+
+    def relative_time(self, moment: datetime.datetime, reference: datetime.datetime) -> str:
+        """Return a localized relative time for a past instant.
+
+        Parameters
+        ----------
+        moment : datetime.datetime
+            Timezone-aware instant to describe.
+        reference : datetime.datetime
+            Timezone-aware instant used as "now".
+
+        Returns
+        -------
+        str
+            ``just now``, ``N minutes ago``, ``N hours ago``, ``yesterday``,
+            or ``N days ago`` in English; the matching Spanish forms use
+            ``ahora mismo`` and ``hace ...``. A future or zero difference
+            renders as the smallest past value.
+
+        Notes
+        -----
+        The comparison uses absolute instants, so a reminder stored in another
+        zone is described correctly. Month and year wording is intentionally
+        absent; the oldest unit is the calendar day.
+        """
+        elapsed = max(0, int((reference - moment).total_seconds()))
+        if elapsed < SECONDS_PER_MINUTE:
+            return "ahora mismo" if self.language == "es" else "just now"
+        minutes = elapsed // SECONDS_PER_MINUTE
+        if minutes < MINUTES_PER_HOUR:
+            return self._relative_unit(minutes, ("minuto", "minutos", "minute", "minutes"))
+        hours = minutes // MINUTES_PER_HOUR
+        if hours < HOURS_PER_DAY:
+            return self._relative_unit(hours, ("hora", "horas", "hour", "hours"))
+        days = hours // HOURS_PER_DAY
+        if days == 1:
+            return "ayer" if self.language == "es" else "yesterday"
+        return self._relative_unit(days, ("día", "días", "day", "days"))
+
+    def _relative_unit(self, value: int, units: tuple[str, str, str, str]) -> str:
+        """Format one past-time unit with the active language."""
+        spanish_singular, spanish_plural, english_singular, english_plural = units
+        if self.language == "es":
+            unit = spanish_singular if value == 1 else spanish_plural
+            return f"hace {value} {unit}"
+        unit = english_singular if value == 1 else english_plural
+        return f"{value} {unit} ago"
 
     def count(self, value: int) -> str:
         """Return an integer with comma grouping.
