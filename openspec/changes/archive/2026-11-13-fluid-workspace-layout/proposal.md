@@ -30,6 +30,6 @@ None.
 - `src/afanes/ui/theme.py`: retire the browser and content maximum-width tokens; add the fluid layout and minimum field-width tokens.
 - `src/afanes/ui/views/workspace.py`: size the browser and detail from available width and put the Log controls in one wrapping row.
 - `src/afanes/ui/views/page.py`: fill the detail region, move the Starter dropdown into the label flow, and use an adaptive field layout.
-- A new shared flow component under `src/afanes/ui/components/` if the adaptive field layout is reused or exceeds a local helper.
-- `tests/ui/test_theme.py`, `tests/ui/test_workspace_view.py`, `tests/ui/test_page_view.py`, and `tests/ui/test_conformance.py`: update width expectations, add flow and Log-row coverage, and keep the conformance baseline shrinking.
-- `docs/develop/interface-standard.md`, `docs/guide/workspace.md`, and `docs/guide/pages-and-editing.md`: document fluid columns, the page-width change, and the shared Log control row.
+- A shared `FieldFlow` component under `src/afanes/ui/components/` that owns the adaptive label rows.
+- `tests/ui/test_theme.py`, `tests/ui/test_workspace_view.py`, `tests/ui/test_page_view.py`, `tests/ui/test_field_flow.py`, and `tests/ui/test_conformance.py`: update width expectations, add flow and Log-row coverage, and keep the conformance baseline shrinking.
+- `docs/develop/interface-standard.md`, `docs/guide/workspace.md`, `docs/guide/log.md`, and `docs/guide/pages-and-editing.md`: document fluid columns, the page-width change, and the shared Log control row.

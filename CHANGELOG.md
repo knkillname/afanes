@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **Fluid workspace layout.** The browser and detail now fill the window without maximum widths, page
+  content uses the full detail card, the Log date controls share one row, and the page label fields
+  flow into flex rows that stretch every visible control. The 720 px reading cap and fixed label
+  widths are removed. This implements the `fluid-workspace-layout` OpenSpec change. Resolved runtime
+  dependencies: `flet==1.1.2`, `markdown-it-py==4.3.0`, `PyYAML==6.0.3`. README: no change required.
+  Docs: updated.
+
 - **Direct log drafts.** An empty calendar day, **Today’s Entry**, and the plus on an empty month or
   year row now open an unsaved log draft in the editor instead of a title-and-card dialog. A new draft
   uses the long date as its heading (`November 13, 2026`, `November 2026`, or `2026`), keeps the

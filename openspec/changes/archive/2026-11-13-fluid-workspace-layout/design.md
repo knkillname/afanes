@@ -79,7 +79,7 @@ No new sticky positioning is added. The existing fixed headers and detail toolba
 - [Dropdowns keep their intrinsic width inside a grid cell] → Use flex rows where every visible control sets `expand=True`; keep a regression test and the three-width visual check.
 - [Rebuilding rows on each resize moves controls between parents] → The new tree is serialized whole and tests plus the visual check cover repeated width changes.
 - [Visibility changes do not reflow the flow] → Every type change, starter change, and refresh calls the flow layout method; tests cover the log and project label sets.
-- [Removing `fit_width` breaks callers] → It is a public method used only by the page card's size-change handler; remove the handler with the method and update the width tests together.
+- [Removing `fit_width` breaks callers] → Replace it and its width-tracking handler with the `FieldFlow` reflow handler, and update the width tests together.
 - [Conformance baseline changes] → Use named tokens for the share, minimum field width, and gaps; run the conformance gate and only shrink baseline entries that no longer occur.
 
 ## Migration Plan
