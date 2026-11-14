@@ -4,6 +4,7 @@ import asyncio
 import dataclasses
 import datetime
 import logging
+import os
 from pathlib import Path
 
 import afanes.core.connections
@@ -35,6 +36,12 @@ from afanes.core.errors import (
 from afanes.core.template_cards import TemplateCardCatalog, TemplateCardListing
 from afanes.core.templates import TemplateSummary
 from afanes.core.vault.note import VaultNote
+from afanes.core.vault.schema import (
+    UPGRADABLE_SCHEMA_VERSION,
+    VaultSchema,
+    VaultSchemaStore,
+    VaultSchemaWriteError,
+)
 from afanes.core.vault.service import Vault, VaultCreation
 from afanes.core.vault.snapshot import (
     VaultFailure,
@@ -53,6 +60,33 @@ logger = logging.getLogger(__name__)
 REFRESH_SECONDS = 5
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class VaultOpen:
+    """Validated vault and the compatibility result that opened it.
+
+    Attributes
+    ----------
+    vault : Vault
+        Validated vault service for the directory.
+    schema : VaultSchema
+        Schema recorded by the settings file after any upgrade attempt.
+    upgraded : bool
+        Whether this open rewrote a writable schema ``1`` settings file.
+    reminders_enabled : bool
+        Whether reminder data is available for this vault. It is ``False`` for
+        a schema ``1`` vault that could not be upgraded.
+    read_only_old_format : bool
+        Whether the vault is an older schema that opened for browsing with
+        reminders off.
+    """
+
+    vault: Vault
+    schema: VaultSchema
+    upgraded: bool
+    reminders_enabled: bool
+    read_only_old_format: bool
+
+
 class VaultOpener:
     """Translate vault path failures into interface messages.
 
@@ -65,8 +99,8 @@ class VaultOpener:
     """
 
     @staticmethod
-    def open(path: Path) -> Vault:
-        """Open and validate a vault directory.
+    def open(path: Path) -> VaultOpen:
+        """Open, validate, and maybe upgrade a vault directory.
 
         Parameters
         ----------
@@ -76,8 +110,11 @@ class VaultOpener:
 
         Returns
         -------
-        Vault
-            Validated vault service for the directory.
+        VaultOpen
+            Validated vault, declared schema, upgrade result, and reminder
+            capability. A writable schema ``1`` vault is upgraded before the
+            caller scans it. A schema ``1`` vault that cannot be rewritten
+            opens for browsing with reminders off.
 
         Raises
         ------
@@ -87,24 +124,62 @@ class VaultOpener:
         VaultSchemaMissingError
             If the directory has no settings file.
         VaultSchemaInvalidError
-            If its settings file does not match the current shape.
+            If its settings file does not match the settings shape.
         VaultSchemaUnsupportedError
-            If its settings file declares another schema version.
+            If its settings file declares an unsupported schema version.
 
         Notes
         -----
         Path failures become interface messages here. Schema failures keep
         their domain type so the caller can distinguish a missing file that can
-        be adopted from a file that must be repaired by hand.
+        be adopted from a file that must be repaired by hand. The upgrade
+        writes only ``afanes.yaml`` and never changes a note.
         """
         try:
-            return Vault.open(path)
+            vault = Vault.open(path)
         except VaultMissingError as exc:
             raise VaultError(DomainMessage.of(MessageCode.UI_VAULT_MISSING)) from exc
         except VaultNotDirectoryError as exc:
             raise VaultError(DomainMessage.of(MessageCode.UI_VAULT_NOT_DIRECTORY)) from exc
         except VaultUnreadableError as exc:
             raise VaultError(DomainMessage.of(MessageCode.UI_VAULT_UNREADABLE)) from exc
+        store = VaultSchemaStore(vault.root)
+        schema = store.require()
+        if schema.version != UPGRADABLE_SCHEMA_VERSION:
+            return VaultOpen(
+                vault=vault,
+                schema=schema,
+                upgraded=False,
+                reminders_enabled=True,
+                read_only_old_format=False,
+            )
+        if not os.access(vault.root, os.W_OK | os.X_OK):
+            return VaultOpen(
+                vault=vault,
+                schema=schema,
+                upgraded=False,
+                reminders_enabled=False,
+                read_only_old_format=True,
+            )
+        try:
+            upgraded = store.upgrade(schema)
+        except VaultSchemaWriteError:
+            logger.debug("Vault schema upgrade failed", exc_info=True)
+            return VaultOpen(
+                vault=vault,
+                schema=schema,
+                upgraded=False,
+                reminders_enabled=False,
+                read_only_old_format=True,
+            )
+        current = store.require()
+        return VaultOpen(
+            vault=vault,
+            schema=current,
+            upgraded=upgraded,
+            reminders_enabled=True,
+            read_only_old_format=False,
+        )
 
     @staticmethod
     def create(path: Path, copy: afanes.i18n.ui.UiCopy, *, template: str | None = None) -> VaultCreation:
@@ -192,6 +267,13 @@ class VaultSession:
     trash_banner : str | None
         Persistent trash maintenance failure shown until a later pass
         succeeds, or ``None`` when no failure is active.
+    schema : VaultSchema | None
+        Schema recorded by the active vault, or ``None`` when no vault is open.
+    reminders_enabled : bool
+        Whether reminder data is read, counted, and edited in this session.
+    schema_banner : str | None
+        Persistent notice for a schema ``1`` vault that opened with reminders
+        off, or ``None`` when no compatibility notice is needed.
     """
 
     status: UiStatus
@@ -208,6 +290,9 @@ class VaultSession:
     trash_snapshot: TrashSnapshot | None = None
     trash_fingerprint: tuple[tuple[str, int, int], ...] | None = None
     trash_banner: str | None = None
+    schema: VaultSchema | None = None
+    reminders_enabled: bool = False
+    schema_banner: str | None = None
     _connections: afanes.core.connections.Connections | None = dataclasses.field(default=None, repr=False)
     _connections_snapshot: VaultSnapshot | None = dataclasses.field(default=None, repr=False)
 
@@ -261,6 +346,9 @@ class VaultSession:
         self.trash_snapshot = None
         self.trash_fingerprint = None
         self.trash_banner = None
+        self.schema = None
+        self.reminders_enabled = False
+        self.schema_banner = None
         self._connections = None
         self._connections_snapshot = None
 

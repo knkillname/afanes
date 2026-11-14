@@ -203,7 +203,7 @@ class TestVaultOpen:
         root = tmp_path / "vault"
         root.mkdir()
         _write_schema(root)
-        (root / "afanes.yaml").write_text("schema_version: 2\n", encoding="utf-8")
+        (root / "afanes.yaml").write_text("schema_version: 3\n", encoding="utf-8")
 
         with pytest.raises(VaultSchemaUnsupportedError):
             afanes.core.vault.service.Vault.open(root)
@@ -452,7 +452,7 @@ class TestVaultCreation:
         creation = afanes.core.vault.service.Vault.create_directory(target)
 
         assert creation.settings_file == target.resolve() / "afanes.yaml"
-        assert creation.settings_file.read_text(encoding="utf-8") == "schema_version: 1\n"
+        assert creation.settings_file.read_text(encoding="utf-8") == "schema_version: 2\n"
 
     def test_a_new_vault_opens_immediately(self, tmp_path: Path) -> None:
         target = tmp_path / "vault"
@@ -475,7 +475,7 @@ class TestVaultCreation:
         with pytest.raises(TemplateWriteError):
             afanes.core.vault.service.Vault.create_directory(target)
 
-        assert (target / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"
+        assert (target / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 2\n"
         assert afanes.core.vault.service.Vault.open(target).root == target.resolve()
 
     def test_the_settings_file_survives_a_layout_failure(
@@ -493,7 +493,7 @@ class TestVaultCreation:
         with pytest.raises(VaultError, match="vault-seed-failed"):
             afanes.core.vault.service.Vault.create_directory(target)
 
-        assert (target / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"
+        assert (target / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 2\n"
         assert afanes.core.vault.service.Vault.open(target).root == target.resolve()
 
     def test_refusal_writes_nothing(self, tmp_path: Path) -> None:

@@ -1169,7 +1169,7 @@ class TestAdoption:
     ) -> None:
         vault = tmp_path / "vault"
         vault.mkdir()
-        (vault / "afanes.yaml").write_text("schema_version: 2\n", encoding="utf-8")
+        (vault / "afanes.yaml").write_text("schema_version: 3\n", encoding="utf-8")
         settings = tmp_path / "settings.json"
         _write_settings(settings, vault)
         _use_settings_file(monkeypatch, settings)
@@ -1180,6 +1180,96 @@ class TestAdoption:
         assert state.session.vault_root is None
         assert state.session.adoption_target is None
         assert "update Afanes" in (state.workspace.banner or "")
+
+    def test_a_writable_older_schema_is_upgraded_on_open(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = _versioned(tmp_path / "vault")
+        path = vault / "afanes.yaml"
+        path.write_text("schema_version: 1\n", encoding="utf-8")
+        settings = tmp_path / "settings.json"
+        _write_settings(settings, vault)
+        _use_settings_file(monkeypatch, settings)
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.start())
+
+        assert state.session.vault_root == vault.resolve()
+        assert state.session.schema is not None
+        assert state.session.schema.version == afanes.core.vault.schema.CURRENT_SCHEMA_VERSION
+        assert state.session.reminders_enabled is True
+        assert state.session.schema_banner is None
+        assert path.read_text(encoding="utf-8") == "schema_version: 2\n"
+        assert _notice_message(state) == afanes.i18n.ui.en.REMINDER_SCHEMA_UPGRADED
+
+    def test_a_read_only_older_schema_opens_with_reminders_off(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = _versioned(tmp_path / "vault")
+        path = vault / "afanes.yaml"
+        path.write_text("schema_version: 1\n", encoding="utf-8")
+        settings = tmp_path / "settings.json"
+        _write_settings(settings, vault)
+        _use_settings_file(monkeypatch, settings)
+        monkeypatch.setattr(afanes.ui.state.session.os, "access", access_readable)
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.start())
+
+        assert state.session.vault_root == vault.resolve()
+        assert state.session.reminders_enabled is False
+        assert state.session.schema_banner == afanes.i18n.ui.en.REMINDER_SCHEMA_READ_ONLY
+        assert path.read_text(encoding="utf-8") == "schema_version: 1\n"
+
+    def test_a_failed_upgrade_opens_with_reminders_off(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = _versioned(tmp_path / "vault")
+        path = vault / "afanes.yaml"
+        path.write_text("schema_version: 1\n", encoding="utf-8")
+        settings = tmp_path / "settings.json"
+        _write_settings(settings, vault)
+        _use_settings_file(monkeypatch, settings)
+        state = afanes.ui.state.app_state
+
+        def fail_upgrade(
+            _store: afanes.core.vault.schema.VaultSchemaStore,
+            _schema: afanes.core.vault.schema.VaultSchema,
+        ) -> bool:
+            raise VaultSchemaWriteError(simulated_message("read-only file"))
+
+        monkeypatch.setattr(afanes.core.vault.schema.VaultSchemaStore, "upgrade", fail_upgrade)
+
+        asyncio.run(state.workspace.start())
+
+        assert state.session.vault_root == vault.resolve()
+        assert state.session.reminders_enabled is False
+        assert state.session.schema_banner == afanes.i18n.ui.en.REMINDER_SCHEMA_READ_ONLY
+        assert path.read_text(encoding="utf-8") == "schema_version: 1\n"
+
+    def test_a_current_schema_opens_with_reminders_enabled(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = _versioned(tmp_path / "vault")
+        settings = tmp_path / "settings.json"
+        _write_settings(settings, vault)
+        _use_settings_file(monkeypatch, settings)
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.start())
+
+        assert state.session.vault_root == vault.resolve()
+        assert state.session.reminders_enabled is True
+        assert state.session.schema_banner is None
+        assert _notice_message(state) is None
 
     def test_a_read_only_unversioned_folder_is_refused_without_an_offer(
         self,

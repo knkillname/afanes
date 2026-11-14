@@ -48,6 +48,7 @@ The recognized keys are:
 | `due_date` | projects only | a calendar date written as `YYYY-MM-DD` |
 | `asked_by` | projects only | a single non-empty name; a metadata reference |
 | `owner` | projects only | a single non-empty name or team; a metadata reference |
+| `reminder` | references, projects, and log entries | one optional schedule mapping |
 
 Unknown keys are preserved. A capture has no status; `status: inbox` is not valid because the folder is
 the queue. A due date is a date, not a timestamp. `asked_by` records who requested the project and
@@ -93,27 +94,43 @@ A vault root contains `afanes.yaml`. The filename is exact and must be a regular
 symbolic link or a directory. The current contents are exactly:
 
 ```yaml
-schema_version: 1
+schema_version: 2
 ```
 
 The file records the on-disk vault format, not the Afanes package version. Opening a folder without a
-valid file is refused. Opening a versioned vault never creates, changes, or repairs the file, so a
-read-only vault with a valid file still opens for browsing.
+valid file is refused. Validating or scanning a versioned vault never creates, changes, or repairs a
+note, so a read-only vault with a valid file still opens for browsing.
 
 The file is validated strictly. Extra keys, duplicate keys, malformed YAML, a missing
-`schema_version`, a non-integer value, and any version other than `1` are refused. An invalid or
+`schema_version`, a non-integer value, and an unsupported version are refused. An invalid or
 unsupported file is preserved byte for byte; Afanes never guesses, rewrites, or deletes it.
+
+Schema `1` is the previous writable format. When a writable schema `1` vault opens, Afanes rewrites
+only `afanes.yaml` to schema `2`, before scanning, and reports the upgrade once. No note, folder,
+guide, or card changes. A read-only schema `1` vault opens for browsing with reminders off and a
+persistent notice explaining that the vault must be writable to upgrade. It is written only after
+validation, and a failed write leaves the schema `1` file intact so a later writable open can retry.
+Schema `3` and newer are always refused; update Afanes instead.
 
 A folder created before this file existed can be adopted. Adoption is offered only for a writable
 folder that contains all five default folders: `inbox/`, `trash/`, `reference/`, `projects/`, and
 `log/`. Folder names are matched case-insensitively, `templates/` is optional, and extra folders are
-allowed. Adoption writes only `afanes.yaml`; it does not create notes, folders, the guide, or template
-cards. Use the adoption action in the interface or `afanes vault adopt DIR` on the command line.
+allowed. Adoption writes only `afanes.yaml` with the current schema; it does not create notes,
+folders, the guide, or template cards. Use the adoption action in the interface or
+`afanes vault adopt DIR` on the command line.
 
 The schema version changes only when the on-disk vault contract changes. Before 1.0, a schema change
-may refuse older vaults. From 1.0 onward, every schema bump ships with a forward migration. A newer
-schema is always refused by an older application, and downgrades are not supported. The application
-preferences file is separate and lives outside the vault.
+may accept, migrate, or refuse an older vault; this version accepts a writable schema `1` vault and
+opens a read-only one with reminders off. From 1.0 onward, every schema bump ships with a forward
+migration. A newer schema is always refused by an older application, and downgrades are not
+supported. The application preferences file is separate and lives outside the vault.
+
+:::{note}
+A schema `2` vault is refused by older Afanes releases. To return to an older release, change
+`afanes.yaml` back to `schema_version: 1`. The older release preserves the unknown `reminder` key and
+ignores it, and the current release upgrades the file again on its next writable open. Reminder data
+is not deleted by the rollback.
+:::
 
 ## 📁 Default layout
 

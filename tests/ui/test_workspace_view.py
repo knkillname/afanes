@@ -31,7 +31,7 @@ from tests.support import constant, ensure_vault, versioned
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
 SECTION_COUNT = 6
 PRIMARY_MENU_ITEM_COUNT = 4
-OWNED_BANNER_COUNT = 3
+OWNED_BANNER_COUNT = 4
 TWO_ENTRIES = 2
 FIRST_DAY = 1
 SECOND_DAY = 2
@@ -162,6 +162,7 @@ class TestWorkspaceShell:
         state = afanes.ui.state.app_state
         state.workspace.banner = "vault condition"
         state.session.banner = "refresh failure"
+        state.session.schema_banner = "older format"
         state.processing.banner = "processing refresh failure"
         state.pages.conflict = "changed"
 

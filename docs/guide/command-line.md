@@ -29,7 +29,7 @@ Missing folders in the path are created too, and the report names them:
 Created vault /home/you/Notes/Work
 Parent folders created: /home/you/Notes
 Seeded: inbox/, trash/, reference/, projects/
-Settings file: afanes.yaml (schema version 1)
+Settings file: afanes.yaml (schema version 2)
 Template: work
 Notes written: reference/Getting started.md, projects/Follow up on the incident.md, ...
 Remembered as the vault to open next launch.
@@ -48,7 +48,8 @@ be writable and contain all five default folders (`inbox/`, `trash/`, `reference
 writes only the settings file, reports its path and schema version, and remembers the vault unless
 `--no-remember` is supplied.
 
-A folder that is already versioned is reported unchanged. A folder missing a default folder, a folder
+A folder that is already versioned is reported unchanged. A schema `1` vault keeps its declared
+version until the interface opens it and upgrades it. A folder missing a default folder, a folder
 without write access, and an invalid settings file are refused with exit status `1`; no note is
 changed.
 

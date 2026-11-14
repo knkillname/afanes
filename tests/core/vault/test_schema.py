@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import afanes.core.atomic
 import afanes.core.vault.schema
 from afanes.core.errors import (
     VaultMissingError,
@@ -13,6 +14,7 @@ from afanes.core.errors import (
     VaultSchemaMissingError,
     VaultSchemaNotAdoptableError,
     VaultSchemaUnsupportedError,
+    VaultSchemaWriteError,
 )
 from tests.support import constant
 
@@ -29,11 +31,16 @@ def _store(root: Path) -> afanes.core.vault.schema.VaultSchemaStore:
 
 class TestVaultSchemaFile:
     def test_accepts_the_current_schema(self, tmp_path: Path) -> None:
-        _write_settings(tmp_path, "schema_version: 1\n")
+        _write_settings(tmp_path, "schema_version: 2\n")
 
         schema = _store(tmp_path).require()
 
         assert schema.version == afanes.core.vault.schema.CURRENT_SCHEMA_VERSION
+
+    def test_accepts_an_older_schema(self, tmp_path: Path) -> None:
+        _write_settings(tmp_path, "schema_version: 1\n")
+
+        assert _store(tmp_path).require().version == 1
 
     def test_accepts_a_comment_and_a_bom(self, tmp_path: Path) -> None:
         _write_settings(tmp_path, "\ufeff# Afanes vault\nschema_version: 1\n")
@@ -107,7 +114,7 @@ class TestVaultSchemaValidation:
             _store(tmp_path).load()
 
     def test_a_newer_schema_is_unsupported(self, tmp_path: Path) -> None:
-        _write_settings(tmp_path, "schema_version: 2\n")
+        _write_settings(tmp_path, "schema_version: 3\n")
 
         with pytest.raises(VaultSchemaUnsupportedError, match="schema-newer"):
             _store(tmp_path).load()
@@ -150,7 +157,7 @@ class TestVaultSchemaValidation:
     @pytest.mark.parametrize(
         "text",
         [
-            "schema_version: 2\n",
+            "schema_version: 3\n",
             "schema_version: 1\nextra: true\n",
             "schema_version: one\n",
             "schema_version: [unclosed\n",
@@ -209,6 +216,79 @@ def _make_adoptable(root: Path, *, templates: bool = False) -> None:
 
 def _tree_state(root: Path) -> dict[str, bytes]:
     return {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+
+
+class TestSchemaUpgrade:
+    def test_a_writable_older_file_is_upgraded(self, tmp_path: Path) -> None:
+        path = _write_settings(tmp_path, "schema_version: 1\n")
+        store = _store(tmp_path)
+        schema = store.load()
+        assert schema is not None
+
+        upgraded = store.upgrade(schema)
+
+        assert upgraded is True
+        assert path.read_text(encoding="utf-8") == "schema_version: 2\n"
+        assert store.require().version == afanes.core.vault.schema.CURRENT_SCHEMA_VERSION
+
+    def test_only_the_settings_file_changes(self, tmp_path: Path) -> None:
+        _write_settings(tmp_path, "schema_version: 1\n")
+        (tmp_path / "note.md").write_text("Body\n", encoding="utf-8")
+        before = _tree_state(tmp_path)
+        store = _store(tmp_path)
+        schema = store.load()
+        assert schema is not None
+
+        store.upgrade(schema)
+
+        after = _tree_state(tmp_path)
+        assert after["note.md"] == before["note.md"]
+        assert after["afanes.yaml"] == b"schema_version: 2\n"
+
+    def test_a_current_file_is_not_upgraded(self, tmp_path: Path) -> None:
+        path = _write_settings(tmp_path, "schema_version: 2\n")
+        store = _store(tmp_path)
+        schema = store.load()
+        assert schema is not None
+
+        upgraded = store.upgrade(schema)
+
+        assert upgraded is False
+        assert path.read_text(encoding="utf-8") == "schema_version: 2\n"
+
+    def test_a_changed_file_is_not_overwritten(self, tmp_path: Path) -> None:
+        path = _write_settings(tmp_path, "schema_version: 1\n")
+        store = _store(tmp_path)
+        schema = store.load()
+        assert schema is not None
+        path.write_text("schema_version: 2\n", encoding="utf-8")
+
+        upgraded = store.upgrade(schema)
+
+        assert upgraded is False
+        assert path.read_text(encoding="utf-8") == "schema_version: 2\n"
+
+    def test_a_failed_write_leaves_the_older_file(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        path = _write_settings(tmp_path, "schema_version: 1\n")
+        before = path.read_bytes()
+        store = _store(tmp_path)
+        schema = store.load()
+        assert schema is not None
+
+        def fail_write(_path: Path, _text: str) -> None:
+            message = "permission denied"
+            raise PermissionError(message)
+
+        monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail_write)
+        with pytest.raises(VaultSchemaWriteError):
+            store.upgrade(schema)
+
+        assert path.read_bytes() == before
+        assert store.require().version == 1
 
 
 class TestAdoptionEligibility:
@@ -278,9 +358,9 @@ class TestAdoptionWrite:
 
         assert adoption.created is True
         assert adoption.root == tmp_path.resolve()
-        assert adoption.schema.version == 1
-        assert (tmp_path / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"
-        assert _tree_state(tmp_path) == {**before, "afanes.yaml": b"schema_version: 1\n"}
+        assert adoption.schema.version == afanes.core.vault.schema.CURRENT_SCHEMA_VERSION
+        assert (tmp_path / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 2\n"
+        assert _tree_state(tmp_path) == {**before, "afanes.yaml": b"schema_version: 2\n"}
         assert sorted(path.name for path in tmp_path.iterdir()) == sorted([*before_entries, "afanes.yaml"])
 
     def test_an_adopted_folder_has_a_valid_schema(self, tmp_path: Path) -> None:
@@ -288,7 +368,7 @@ class TestAdoptionWrite:
 
         _store(tmp_path).adopt()
 
-        assert _store(tmp_path).require().version == 1
+        assert _store(tmp_path).require().version == afanes.core.vault.schema.CURRENT_SCHEMA_VERSION
 
     def test_an_already_versioned_folder_is_reused_unchanged(self, tmp_path: Path) -> None:
         _make_adoptable(tmp_path)
@@ -312,7 +392,7 @@ class TestAdoptionWrite:
 
     def test_an_invalid_file_is_refused_and_preserved(self, tmp_path: Path) -> None:
         _make_adoptable(tmp_path)
-        path = _write_settings(tmp_path, "schema_version: 2\n")
+        path = _write_settings(tmp_path, "schema_version: 3\n")
         before = path.read_bytes()
 
         with pytest.raises(VaultSchemaUnsupportedError):

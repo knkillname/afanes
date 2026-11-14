@@ -17,7 +17,6 @@ from afanes.core.errors import (
 from afanes.core.log import LogMode
 from afanes.core.settings import Settings, SettingsStore
 from afanes.core.vault.schema import VaultSchemaStore
-from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.ui.state.browser import BrowserState
 from afanes.ui.state.dialogs import PageDialogState
@@ -26,7 +25,7 @@ from afanes.ui.state.navigation import PageNavigator
 from afanes.ui.state.pages import PageEditorState
 from afanes.ui.state.processing import ProcessingState
 from afanes.ui.state.review import ReviewState
-from afanes.ui.state.session import VaultOpener, VaultSession
+from afanes.ui.state.session import VaultOpen, VaultOpener, VaultSession
 from afanes.ui.state.status import UiStatus
 
 logger = logging.getLogger(__name__)
@@ -95,8 +94,8 @@ class WorkspaceController:
                     self._show_welcome(None)
                     return
                 try:
-                    vault = await asyncio.to_thread(VaultOpener.open, settings.vault)
-                    snapshot = await asyncio.to_thread(vault.scan)
+                    opened = await asyncio.to_thread(VaultOpener.open, settings.vault)
+                    snapshot = await asyncio.to_thread(opened.vault.scan)
                 except VaultSchemaMissingError:
                     logger.debug("Remembered vault has no settings file", exc_info=True)
                     await self._offer_adoption(settings.vault, welcome=True)
@@ -109,7 +108,7 @@ class WorkspaceController:
                     logger.debug("Saved vault could not be opened", exc_info=True)
                     self._show_welcome(self.status.copy.render_error(exc))
                     return
-                await self._enter_vault(vault, snapshot, settings.log_mode_for(vault.root))
+                await self._enter_vault(opened, snapshot, settings.log_mode_for(opened.vault.root))
             finally:
                 self.status.set_busy(busy=False)
 
@@ -215,8 +214,8 @@ class WorkspaceController:
         try:
             existing = await self._load_settings()
             try:
-                vault = await asyncio.to_thread(VaultOpener.open, path)
-                snapshot = await asyncio.to_thread(vault.scan)
+                opened = await asyncio.to_thread(VaultOpener.open, path)
+                snapshot = await asyncio.to_thread(opened.vault.scan)
             except VaultSchemaMissingError:
                 logger.debug("Selected folder has no settings file", exc_info=True)
                 if remember:
@@ -236,7 +235,7 @@ class WorkspaceController:
                 try:
                     await asyncio.to_thread(
                         SettingsStore.default().save,
-                        self._settings_for(existing, vault.root),
+                        self._settings_for(existing, opened.vault.root),
                     )
                 except ConfigurationError as exc:
                     logger.debug("Vault selection could not be saved", exc_info=True)
@@ -245,9 +244,9 @@ class WorkspaceController:
                     )
                     return
             await self._enter_vault(
-                vault,
+                opened,
                 snapshot,
-                existing.log_mode_for(vault.root) if existing is not None else "entries",
+                existing.log_mode_for(opened.vault.root) if existing is not None else "entries",
             )
         finally:
             self.status.set_busy(busy=False)
@@ -371,8 +370,8 @@ class WorkspaceController:
         try:
             try:
                 await asyncio.to_thread(VaultSchemaStore(target).adopt)
-                vault = await asyncio.to_thread(VaultOpener.open, target)
-                snapshot = await asyncio.to_thread(vault.scan)
+                opened = await asyncio.to_thread(VaultOpener.open, target)
+                snapshot = await asyncio.to_thread(opened.vault.scan)
             except VaultSchemaNotAdoptableError as exc:
                 logger.debug("Adoption target is no longer eligible", exc_info=True)
                 self.banner = self.status.copy.VAULT_SCHEMA_NOT_ADOPTABLE.format(
@@ -388,7 +387,7 @@ class WorkspaceController:
             try:
                 await asyncio.to_thread(
                     SettingsStore.default().save,
-                    self._settings_for(existing, vault.root),
+                    self._settings_for(existing, opened.vault.root),
                 )
             except ConfigurationError as exc:
                 logger.debug("Adopted vault could not be remembered", exc_info=True)
@@ -396,9 +395,9 @@ class WorkspaceController:
                     detail=self.status.copy.render_error(exc)
                 )
             await self._enter_vault(
-                vault,
+                opened,
                 snapshot,
-                existing.log_mode_for(vault.root) if existing is not None else "entries",
+                existing.log_mode_for(opened.vault.root) if existing is not None else "entries",
             )
             if remember_failure is not None:
                 self.banner = remember_failure
@@ -416,7 +415,8 @@ class WorkspaceController:
             existing = await self._load_settings()
             try:
                 creation = await asyncio.to_thread(VaultOpener.create, path, self.status.copy, template=template)
-                snapshot = await asyncio.to_thread(creation.vault.scan)
+                opened = await asyncio.to_thread(VaultOpener.open, creation.vault.root)
+                snapshot = await asyncio.to_thread(opened.vault.scan)
             except (VaultError, OSError) as exc:
                 logger.debug("New vault could not be created", exc_info=True)
                 self.banner = self.status.copy.render_error(exc)
@@ -433,7 +433,7 @@ class WorkspaceController:
                     detail=self.status.copy.render_error(exc)
                 )
             await self._enter_vault(
-                creation.vault,
+                opened,
                 snapshot,
                 existing.log_mode_for(creation.vault.root) if existing is not None else "entries",
             )
@@ -512,13 +512,14 @@ class WorkspaceController:
             return Settings(vault=vault)
         return dataclasses.replace(existing, vault=vault)
 
-    async def _enter_vault(self, vault: Vault, snapshot: VaultSnapshot, log_mode: str = "entries") -> None:
+    async def _enter_vault(self, opened: VaultOpen, snapshot: VaultSnapshot, log_mode: str = "entries") -> None:
         """Reset per-vault state, apply a snapshot, and run trash retention.
 
         Parameters
         ----------
-        vault : Vault
-            Vault that was just opened.
+        opened : VaultOpen
+            Vault that was just opened, its schema, and its reminder
+            capability.
         snapshot : VaultSnapshot
             Scan result for the opened vault.
         log_mode : str
@@ -528,11 +529,18 @@ class WorkspaceController:
         -----
         Retention runs after schema validation and after the active scan, but
         before the workspace is shown. A failure becomes the persistent trash
-        banner and never blocks the open.
+        banner and never blocks the open. A successful schema upgrade is
+        announced once, and a schema ``1`` vault that could not be upgraded
+        keeps a persistent compatibility banner.
         """
+        vault = opened.vault
         self.banner = None
         self.session.reset()
         self.session.vault = vault
+        self.session.schema = opened.schema
+        self.session.reminders_enabled = opened.reminders_enabled
+        if opened.read_only_old_format:
+            self.session.schema_banner = self.status.copy.REMINDER_SCHEMA_READ_ONLY
         self.processing.clear()
         self.browser.reset()
         try:
@@ -544,6 +552,8 @@ class WorkspaceController:
         self.dialogs.clear()
         self.pages.clear()
         self.session.apply_snapshot(snapshot)
+        if opened.upgraded:
+            self.status.show_notice(self.status.copy.REMINDER_SCHEMA_UPGRADED)
         await self.session.maintain_trash(vault.today())
 
     async def change_vault(self, path: Path) -> None:

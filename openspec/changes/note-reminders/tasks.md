@@ -23,11 +23,11 @@
 
 ## 4. Schema 2 and the open flow
 
-- [ ] 4.1 Set `CURRENT_SCHEMA_VERSION` to `2`; accept schema `1` and `2`, refuse `3` and newer, add the atomic upgrade, and keep creation/adoption on schema `2`; verify `tests/core/vault/test_schema.py`.
-- [ ] 4.2 Update `VaultOpener`/`VaultSession` with the schema version, upgrade result, and `reminders_enabled` flag; upgrade a writable schema `1` vault after validation and before scanning; verify the open, upgrade, read-only, and failure paths.
-- [ ] 4.3 Add the one-time upgrade toast and the persistent read-only old-format banner; verify the workspace state and view tests, including a failed upgrade falling back to reminders off.
-- [ ] 4.4 Update `tests/core/vault/test_service.py`, `tests/cli/test_main.py`, `tests/ui/test_state.py`, and the template creation tests for schema `2`; verify the old `schema_version: 1` fixtures are either upgraded intentionally or changed.
-- [ ] 4.5 Update `docs/reference/vault-format.md`, `docs/reference/troubleshooting.md`, and `docs/guide/command-line.md` for schema `2`, the upgrade, read-only compatibility, and the new CLI output; verify the documented commands and examples.
+- [x] 4.1 Set `CURRENT_SCHEMA_VERSION` to `2`; accept schema `1` and `2`, refuse `3` and newer, add the atomic upgrade, and keep creation/adoption on schema `2`; verify `tests/core/vault/test_schema.py`.
+- [x] 4.2 Update `VaultOpener`/`VaultSession` with the schema version, upgrade result, and `reminders_enabled` flag; upgrade a writable schema `1` vault after validation and before scanning; verify the open, upgrade, read-only, and failure paths.
+- [x] 4.3 Add the one-time upgrade toast and the persistent read-only old-format banner; verify the workspace state and view tests, including a failed upgrade falling back to reminders off.
+- [x] 4.4 Update `tests/core/vault/test_service.py`, `tests/cli/test_main.py`, `tests/ui/test_state.py`, and the template creation tests for schema `2`; verify the old `schema_version: 1` fixtures are either upgraded intentionally or changed.
+- [x] 4.5 Update `docs/reference/vault-format.md`, `docs/reference/troubleshooting.md`, and `docs/guide/command-line.md` for schema `2`, the upgrade, read-only compatibility, and the new CLI output; verify the documented commands and examples.
 
 ## 5. Snapshot and Review
 

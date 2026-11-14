@@ -80,7 +80,7 @@ Afanes accepts a folder only when its root contains a valid `afanes.yaml` settin
 contents are exactly:
 
 ```yaml
-schema_version: 1
+schema_version: 2
 ```
 
 - **The folder has no settings file.** If it is writable and has all five default folders (`inbox/`,
@@ -89,9 +89,11 @@ schema_version: 1
   without write access cannot be adopted.
 - **The settings file is invalid.** Extra keys, malformed YAML, a missing or non-integer
   `schema_version`, and duplicate keys are refused. The file is left byte for byte unchanged. Fix it by
-  hand to contain only `schema_version: 1`, or restore a copy from a backup.
-- **The schema is newer or older.** This version of Afanes supports schema `1`. A newer file asks you
-  to update Afanes. An older schema is refused before 1.0 rather than migrated.
+  hand to contain only `schema_version: 2`, or restore a copy from a backup.
+- **The schema is newer or older.** This version of Afanes supports schema `1` and `2`. A writable
+  schema `1` vault is upgraded to `2` when it opens and reports the change once. A read-only schema `1`
+  vault opens for browsing with reminders off and a persistent notice; make it writable and reopen it
+  to upgrade. A schema `3` or newer file asks you to update Afanes and is left unchanged.
 - **The vault is read-only.** A valid versioned vault opens for browsing even when it cannot be
   written. An unversioned read-only folder cannot be adopted because the settings file cannot be
   created; add `afanes.yaml` from a writable copy.

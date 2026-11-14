@@ -507,7 +507,7 @@ class TestAdoptionPanel:
 
         asyncio.run(scenario())
 
-        assert (vault / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"
+        assert (vault / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 2\n"
         assert state.session.vault_root == vault.resolve()
         assert state.session.adoption_target is None
         assert _find_by_key(page.controls[0], "adoption-panel") is None

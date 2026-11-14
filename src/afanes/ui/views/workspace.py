@@ -1556,6 +1556,7 @@ class WorkspaceView:
         messages = (
             self._state.workspace.banner,
             self._state.session.banner,
+            self._state.session.schema_banner,
             self._state.session.trash_banner,
             self._state.processing.banner,
         )

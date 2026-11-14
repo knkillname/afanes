@@ -71,6 +71,8 @@ VAULT_SCHEMA_UNAVAILABLE = (
 )
 VAULT_SCHEMA_NOT_ADOPTABLE = "The folder cannot be adopted: {detail}"
 VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED = "The vault was adopted but could not be remembered: {detail}"
+REMINDER_SCHEMA_UPGRADED = "The vault was upgraded to the current format"
+REMINDER_SCHEMA_READ_ONLY = "This vault uses an older format. Make it writable and reopen it to enable reminders"
 
 INBOX_TITLE = "Inbox"
 REVIEW_TITLE = "Review"

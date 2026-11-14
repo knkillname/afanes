@@ -120,11 +120,16 @@ class TestCreateCommand:
         assert f"Created vault {target.resolve()}" in captured.out
         assert f"Parent folders created: {tmp_path / 'notes'}" in captured.out
         assert "Seeded: inbox/, trash/, reference/, projects/" in captured.out
-        assert "Settings file: afanes.yaml (schema version 1)" in captured.out
+        assert (
+            f"Settings file: afanes.yaml (schema version {afanes.core.vault.schema.CURRENT_SCHEMA_VERSION})"
+            in captured.out
+        )
         assert "Template: none" in captured.out
         assert "Notes written: reference/Getting started.md" in captured.out
         assert "Remembered" in captured.out
-        assert (target / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"
+        assert (target / "afanes.yaml").read_text(
+            encoding="utf-8"
+        ) == f"schema_version: {afanes.core.vault.schema.CURRENT_SCHEMA_VERSION}\n"
         assert (target / "reference").is_dir()
         assert (target / "projects").is_dir()
         assert not (target / "reference" / "people").exists()
@@ -302,9 +307,14 @@ class TestAdoptCommand:
         assert status == 0
         assert captured.err == ""
         assert f"Adopted vault {target.resolve()}" in captured.out
-        assert "Settings file: afanes.yaml (schema version 1)" in captured.out
+        assert (
+            f"Settings file: afanes.yaml (schema version {afanes.core.vault.schema.CURRENT_SCHEMA_VERSION})"
+            in captured.out
+        )
         assert "Remembered" in captured.out
-        assert (target / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"
+        assert (target / "afanes.yaml").read_text(
+            encoding="utf-8"
+        ) == f"schema_version: {afanes.core.vault.schema.CURRENT_SCHEMA_VERSION}\n"
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(target.resolve())
 
     def test_no_remember_leaves_preferences_untouched(
@@ -379,14 +389,14 @@ class TestAdoptCommand:
         _use_settings_file(monkeypatch, settings)
         target = _adoptable(tmp_path / "vault")
         path = target / "afanes.yaml"
-        path.write_text("schema_version: 2\n", encoding="utf-8")
+        path.write_text("schema_version: 3\n", encoding="utf-8")
         before = path.read_bytes()
 
         status = afanes.cli.main.CommandLine.main(*["vault", "adopt", str(target)])
 
         captured = capsys.readouterr()
         assert status == 1
-        assert "schema version 2" in captured.err
+        assert f"supports ({afanes.core.vault.schema.CURRENT_SCHEMA_VERSION})" in captured.err
         assert path.read_bytes() == before
         assert not settings.exists()
 
@@ -400,7 +410,7 @@ class TestAdoptCommand:
         _use_settings_file(monkeypatch, settings)
         target = _adoptable(tmp_path / "vault")
         path = target / "afanes.yaml"
-        path.write_text("schema_version: 1\n", encoding="utf-8")
+        path.write_text(f"schema_version: {afanes.core.vault.schema.CURRENT_SCHEMA_VERSION}\n", encoding="utf-8")
         before = path.read_bytes()
 
         status = afanes.cli.main.CommandLine.main(*["vault", "adopt", str(target)])

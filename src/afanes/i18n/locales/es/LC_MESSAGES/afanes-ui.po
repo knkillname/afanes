@@ -252,6 +252,16 @@ msgctxt "VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED"
 msgid "The vault was adopted but could not be remembered: {detail}"
 msgstr "La bóveda se adoptó, pero no se pudo recordar: {detail}"
 
+#: src/afanes/i18n/ui/en.py REMINDER_SCHEMA_UPGRADED
+msgctxt "REMINDER_SCHEMA_UPGRADED"
+msgid "The vault was upgraded to the current format"
+msgstr "La bóveda se actualizó al formato actual"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SCHEMA_READ_ONLY
+msgctxt "REMINDER_SCHEMA_READ_ONLY"
+msgid "This vault uses an older format. Make it writable and reopen it to enable reminders"
+msgstr "Esta bóveda usa un formato anterior. Hazla escribible y vuelve a abrirla para activar los recordatorios"
+
 #: src/afanes/i18n/ui/en.py INBOX_TITLE
 msgctxt "INBOX_TITLE"
 msgid "Inbox"

@@ -37,7 +37,13 @@ from afanes.core.errors import (
 SCHEMA_FILENAME = "afanes.yaml"
 
 # Public current on-disk schema version.
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
+
+# Public schema versions this application can read.
+SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2})
+
+# Public writable older schema upgraded after validation.
+UPGRADABLE_SCHEMA_VERSION = 1
 
 # Public maximum size accepted for the settings file.
 SCHEMA_MAX_BYTES = 4096
@@ -163,15 +169,15 @@ class VaultSchemaStore:
         -------
         VaultSchema | None
             Validated schema, or ``None`` when the exact settings file is
-            absent.
+            absent. Schema ``1`` and the current schema are both returned.
 
         Raises
         ------
         VaultSchemaInvalidError
             If the path is a symlink, is not a regular file, is too large, is
-            not UTF-8 YAML, or does not match the current file shape.
+            not UTF-8 YAML, or does not match the settings file shape.
         VaultSchemaUnsupportedError
-            If the file declares a schema version other than the current one.
+            If the file declares a schema version this application cannot read.
 
         Notes
         -----
@@ -213,16 +219,16 @@ class VaultSchemaStore:
         Returns
         -------
         VaultSchema
-            Validated current schema.
+            Validated current or readable older schema.
 
         Raises
         ------
         VaultSchemaMissingError
             If the vault has no exact settings file.
         VaultSchemaInvalidError
-            If the settings file does not match the current shape.
+            If the settings file does not match the settings shape.
         VaultSchemaUnsupportedError
-            If the file declares another schema version.
+            If the file declares a schema version this application cannot read.
         """
         schema = self.load()
         if schema is None:
@@ -320,6 +326,44 @@ class VaultSchemaStore:
             raise VaultSchemaWriteError(message) from exc
         return schema
 
+    def upgrade(self, schema: VaultSchema) -> bool:
+        """Atomically rewrite a writable older settings file to the current schema.
+
+        Parameters
+        ----------
+        schema : VaultSchema
+            Schema returned by :meth:`load` for this store.
+
+        Returns
+        -------
+        bool
+            ``True`` when the file was rewritten, ``False`` when the schema is
+            already current or the file changed before the write.
+
+        Raises
+        ------
+        VaultSchemaWriteError
+            If the file cannot be rewritten. The previous file remains intact.
+
+        Notes
+        -----
+        Only ``afanes.yaml`` is written. The file is validated again before the
+        atomic replace, so a concurrent edit is never overwritten by a stale
+        upgrade. No note, folder, guide, or card is created or changed.
+        """
+        if schema.version != UPGRADABLE_SCHEMA_VERSION:
+            return False
+        current = self.load()
+        if current is None or current.version != UPGRADABLE_SCHEMA_VERSION:
+            return False
+        text = f"schema_version: {CURRENT_SCHEMA_VERSION}\n"
+        try:
+            afanes.core.atomic.AtomicWriter.write_text_atomic(self.settings_path, text)
+        except (VaultError, OSError) as exc:
+            message = DomainMessage.of(MessageCode.SCHEMA_WRITE_FAILED, path=str(self.root), detail=str(exc))
+            raise VaultSchemaWriteError(message) from exc
+        return True
+
     def _parse(self, path: Path, data: bytes) -> VaultSchema:
         """Validate one settings file's bytes and return its schema.
 
@@ -333,7 +377,7 @@ class VaultSchemaStore:
         Returns
         -------
         VaultSchema
-            Validated current schema.
+            Validated schema.
 
         Raises
         ------
@@ -341,7 +385,7 @@ class VaultSchemaStore:
             If the file is not UTF-8, is not YAML, or does not contain exactly
             one ``schema_version`` integer.
         VaultSchemaUnsupportedError
-            If the declared version is not the current one.
+            If the declared version is not one this application can read.
         """
         try:
             text = data.decode("utf-8-sig")
@@ -365,12 +409,12 @@ class VaultSchemaStore:
         except ValueError as exc:
             message = DomainMessage.of(MessageCode.SCHEMA_VERSION_NOT_INT, path=str(path))
             raise VaultSchemaInvalidError(message) from exc
-        if version != CURRENT_SCHEMA_VERSION:
+        if version not in SUPPORTED_SCHEMA_VERSIONS:
             raise VaultSchemaUnsupportedError(self._unsupported_message(path, version))
         return VaultSchema(version=version)
 
     def _shape_message(self, path: Path) -> DomainMessage:
-        """Return the diagnostic for a file that does not match version 1."""
+        """Return the diagnostic for a file that does not match the settings shape."""
         return DomainMessage.of(MessageCode.SCHEMA_SHAPE, version=str(CURRENT_SCHEMA_VERSION), path=str(path))
 
     def _unsupported_message(self, path: Path, version: int) -> DomainMessage:
