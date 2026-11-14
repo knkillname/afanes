@@ -78,16 +78,17 @@ and the detail uses the note-view surface, so the four reference roles stay unch
 ## 📐 Window and columns
 
 The window starts at 1100x760 and cannot shrink below 1024x600, the desktop floor in the reference
-guidelines. The workspace divides the window into three regions with bounded widths:
+guidelines. The workspace divides the window into three regions that fill it, with minimum widths
+protecting each resizable column:
 
 | Token | Value | Use |
 | --- | --- | --- |
 | `NAVIGATION_WIDTH` | 240 | Destinations, counts, vault identity, primary menu |
 | `DRAWER_WIDTH` | 280 | Transient navigation drawer at medium widths |
 | `BROWSER_MIN_WIDTH` | 320 | Smallest usable browser column |
-| `BROWSER_MAX_WIDTH` | 360 | Browser column ceiling |
+| `BROWSER_SHARE` | 0.35 | Browser share of the width left beside the navigation |
 | `PAGE_MIN_WIDTH` | 420 | Smallest detail region |
-| `CONTENT_MAX_WIDTH` | 720 | Maximum reading width for prose and forms |
+| `FIELD_MIN_WIDTH` | 200 | Smallest label-field column in the page form |
 | `SHELL_WIDE_MIN` | 1100 | Three-region breakpoint |
 | `SHELL_MEDIUM_MIN` | 1024 | Browser-and-detail breakpoint |
 | `HEADER_HEIGHT` | 48 | Shared height of the three aligned headers |
@@ -96,10 +97,10 @@ At `SHELL_WIDE_MIN` and above the navigation, browser, and detail are side by si
 `SHELL_MEDIUM_MIN` and `SHELL_WIDE_MIN` the navigation moves behind a transient toggle. A narrower
 presentation shows one region at a time. The browser is the root and Back returns to it from the
 detail. The shell follows the last region the user worked in, so narrowing the window during an
-edit keeps the edit screen; choosing a destination returns to the browser. Long-form content stays
-within `CONTENT_MAX_WIDTH` on very wide windows. Below that width the page column tracks the detail
-card, and long forms wrap their fields instead of clipping, so every region adapts to the space the
-shell actually gives it.
+edit keeps the edit screen; choosing a destination returns to the browser. The browser takes its
+share of the remaining width, the detail takes every remaining pixel, and neither has a maximum
+width. Page content fills the detail card, and long forms wrap their fields instead of clipping, so
+every region adapts to the space the shell actually gives it.
 
 ## 🧱 Workspace regions
 

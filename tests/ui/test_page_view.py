@@ -2160,28 +2160,48 @@ class TestLogStarter:
 
 
 class TestPageWidth:
-    def test_column_caps_at_the_reading_width(self) -> None:
+    def test_the_column_expands_in_read_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
         view = PageView(PageActions(update=lambda: None))
 
-        view.fit_width(2000)
+        assert view.page_column.expand is True
+        assert view.page_column.width is None
+        assert view.edit_form.visible is False
 
-        assert view.page_column.width == afanes.ui.theme.CONTENT_MAX_WIDTH
-
-    def test_column_shrinks_to_the_available_card_width(self) -> None:
+    def test_the_column_expands_in_edit_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody.\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
         view = PageView(PageActions(update=lambda: None))
 
-        view.fit_width(600)
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            view.refresh()
+            await view.start_edit()
 
-        assert view.page_column.width == 600 - 2 * afanes.ui.theme.ITEM_GAP
+        asyncio.run(scenario())
 
-    def test_a_degenerate_width_keeps_the_current_column(self) -> None:
+        assert view.page_column.expand is True
+        assert view.page_column.width is None
+        assert view.edit_form.visible is True
+        assert view.body_field.expand is True
+
+    def test_the_page_card_no_longer_tracks_a_reading_width(self) -> None:
         view = PageView(PageActions(update=lambda: None))
-        view.fit_width(600)
-        assert view.page_column.width is not None
 
-        view.fit_width(10)
-
-        assert view.page_column.width == 600 - 2 * afanes.ui.theme.ITEM_GAP
+        assert not hasattr(view, "fit_width")
+        assert view.root.on_size_change is None
 
 
 class TestConflictActions:

@@ -136,6 +136,7 @@ class WorkspaceView:
         self._breakpoint = "wide"
         self._drawer_open = False
         self._show_detail = False
+        self._viewport_width = afanes.ui.theme.SHELL_WIDE_MIN
         self._build_header()
         self._build_navigation()
         self._build_browser()
@@ -365,7 +366,6 @@ class WorkspaceView:
             key="browser-top",
         )
         self.browser_region = ft.Container(
-            width=afanes.ui.theme.BROWSER_MAX_WIDTH,
             bgcolor=afanes.ui.theme.PAGE_SURFACE_COLOR,
             content=ft.Column(
                 controls=[self.browser_top, self.browser_body],
@@ -465,6 +465,7 @@ class WorkspaceView:
         else:
             arrangement = "narrow"
         self._breakpoint = arrangement
+        self._viewport_width = width
         self._render_shell()
         self._update()
 
@@ -509,7 +510,8 @@ class WorkspaceView:
             self.navigation.bottom = afanes.ui.theme.PAGE_PADDING
             self.navigation.width = afanes.ui.theme.DRAWER_WIDTH
         if wide:
-            self.browser_region.width = afanes.ui.theme.BROWSER_MAX_WIDTH
+            available = self._viewport_width - afanes.ui.theme.NAVIGATION_WIDTH - 2 * afanes.ui.theme.WORKSPACE_BODY_GAP
+            self.browser_region.width = self._browser_width(max(0, available))
             self.browser_region.expand = False
             self.shell_row.controls = [self.navigation, self.browser_region, self.detail_region]
         elif narrow:
@@ -517,13 +519,33 @@ class WorkspaceView:
             self.browser_region.expand = True
             self.shell_row.controls = [self.detail_region if self._show_detail else self.browser_region]
         else:
-            self.browser_region.width = afanes.ui.theme.BROWSER_MAX_WIDTH
+            available = self._viewport_width - afanes.ui.theme.WORKSPACE_BODY_GAP
+            self.browser_region.width = self._browser_width(max(0, available))
             self.browser_region.expand = False
             self.shell_row.controls = [self.browser_region, self.detail_region]
         overlay = self._drawer_control() if self._drawer_open and not wide else None
         self.root.controls = [self.shell_column] if overlay is None else [self.shell_column, overlay]
         if self._breakpoint == "narrow":
             self.detail_back_button.visible = self._show_detail
+
+    def _browser_width(self, available: int) -> int:
+        """Return the browser width that fills its share of the workspace.
+
+        Parameters
+        ----------
+        available : int
+            Width left after the navigation region and shell gaps.
+
+        Returns
+        -------
+        int
+            Browser width above its minimum and below the width that would
+            starve the detail region.
+        """
+        share = round(available * afanes.ui.theme.BROWSER_SHARE)
+        floor = afanes.ui.theme.BROWSER_MIN_WIDTH
+        ceiling = max(floor, available - afanes.ui.theme.PAGE_MIN_WIDTH)
+        return min(max(share, floor), ceiling)
 
     def _drawer_control(self) -> ft.Control:
         """Return the transient navigation overlay with its scrim."""

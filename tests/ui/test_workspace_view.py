@@ -1135,6 +1135,53 @@ class TestAdaptiveLayout:
         assert view.navigation.padding == afanes.ui.theme.NAVIGATION_PADDING
         assert view.navigation.left is None
         assert view.navigation.width == afanes.ui.theme.NAVIGATION_WIDTH
+        assert view.browser_region.width is not None
+        assert view.browser_region.expand is False
+        assert view.detail_region.expand is True
+
+    def test_a_wide_window_keeps_the_browser_at_its_minimum(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        available = (
+            afanes.ui.theme.SHELL_WIDE_MIN
+            - afanes.ui.theme.NAVIGATION_WIDTH
+            - 2 * afanes.ui.theme.WORKSPACE_BODY_GAP
+        )
+
+        view.resize(afanes.ui.theme.SHELL_WIDE_MIN)
+
+        assert view.browser_region.width == afanes.ui.theme.BROWSER_MIN_WIDTH
+        assert available - afanes.ui.theme.BROWSER_MIN_WIDTH >= afanes.ui.theme.PAGE_MIN_WIDTH
+
+    def test_a_wide_window_grows_the_browser_past_its_minimum(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        window_width = afanes.ui.theme.SHELL_WIDE_MIN * 2
+        available = (
+            window_width - afanes.ui.theme.NAVIGATION_WIDTH - 2 * afanes.ui.theme.WORKSPACE_BODY_GAP
+        )
+
+        view.resize(window_width)
+
+        assert view.browser_region.width == round(available * afanes.ui.theme.BROWSER_SHARE)
+        assert view.browser_region.width is not None
+        assert view.browser_region.width > afanes.ui.theme.BROWSER_MIN_WIDTH
+        assert available - view.browser_region.width >= afanes.ui.theme.PAGE_MIN_WIDTH
+
+    def test_a_medium_window_shares_the_available_width(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        available = afanes.ui.theme.SHELL_MEDIUM_MIN - afanes.ui.theme.WORKSPACE_BODY_GAP
+
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN)
+
+        assert view.browser_region.width == round(available * afanes.ui.theme.BROWSER_SHARE)
+        assert view.browser_region.width is not None
+        assert view.browser_region.width >= afanes.ui.theme.BROWSER_MIN_WIDTH
+        assert available - view.browser_region.width >= afanes.ui.theme.PAGE_MIN_WIDTH
 
     def test_a_medium_window_keeps_browser_and_detail(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
@@ -1160,6 +1207,7 @@ class TestAdaptiveLayout:
 
         assert view.shell_row.controls == [view.browser_region]
         assert view.browser_region.expand is True
+        assert view.browser_region.width is None
 
     def test_a_narrow_presentation_opens_and_returns_from_the_detail(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

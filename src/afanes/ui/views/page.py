@@ -606,7 +606,7 @@ class PageView:
             expand=True,
         )
         self.page_column = ft.Container(
-            width=afanes.ui.theme.CONTENT_MAX_WIDTH,
+            expand=True,
             content=self.page_content,
         )
         self.root = ft.Container(
@@ -615,12 +615,10 @@ class PageView:
             bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
             border_radius=afanes.ui.theme.SURFACE_RADIUS,
-            on_size_change=self._fit_page_width,
             content=ft.Row(
                 controls=[self.page_column],
                 spacing=afanes.ui.theme.ITEM_GAP,
                 vertical_alignment=ft.CrossAxisAlignment.STRETCH,
-                alignment=ft.MainAxisAlignment.CENTER,
                 expand=True,
             ),
         )
@@ -660,36 +658,6 @@ class PageView:
             expand=True,
             key="page-view",
         )
-
-    def fit_width(self, width: float) -> None:
-        """Fit the page column inside one rendered card width.
-
-        Parameters
-        ----------
-        width : float
-            Rendered width of the page card in logical pixels.
-
-        Notes
-        -----
-        The detail region is narrower than :data:`CONTENT_MAX_WIDTH` whenever
-        the three-region shell shares the window, so a fixed column would be
-        clipped. The column tracks the card up to the reading width instead.
-        """
-        available = int(width) - 2 * afanes.ui.theme.ITEM_GAP
-        if available <= 0:
-            return
-        column_width = min(afanes.ui.theme.CONTENT_MAX_WIDTH, available)
-        if column_width == self.page_column.width:
-            return
-        self.page_column.width = column_width
-        try:
-            self.page_column.update()
-        except RuntimeError:
-            return
-
-    def _fit_page_width(self, event: ft.LayoutSizeChangeEvent[ft.LayoutControl]) -> None:
-        """Forward one rendered card size to :meth:`fit_width`."""
-        self.fit_width(event.width)
 
     async def scroll_to_top(self) -> None:
         """Move the reusable page pane to its starting scroll position.

@@ -83,10 +83,11 @@ starter body below the heading; Empty leaves only the heading. Choosing a card i
 autosave or **Done** writes the entry. The control disappears once the body has any other content.
 
 The body includes its level-1 heading, which is the display title, and project steps with their
-metadata. There are no `people` or `project` fields. The label fields sit in one wrapping row: Date
-stays beside Type, Category, and Status when the pane is wide, and the fields wrap onto more rows when
-it narrows. The body editor fills the detail region, with its text starting at the top-left, so the
-Markdown area grows with the window while the label fields stay above it.
+metadata. There are no `people` or `project` fields. The page uses the full width of the detail card.
+The label fields sit in one adaptive flow: siblings share a row when the pane is wide, and the fields
+wrap onto more rows when it narrows. The body editor fills the remaining detail region, with its text
+starting at the top-left, so the Markdown area grows with the window while the label fields stay
+above it.
 
 Changing a reference's category previews its new folder and moves the file only after confirmation.
 See [References and categories](references-and-categories.md) for the move rules.

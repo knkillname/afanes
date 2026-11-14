@@ -64,7 +64,9 @@ needed. The primary menu above the destinations offers **Open Another Vault…**
 
 On a window narrower than 1100 pixels, the navigation moves behind a toggle in the browser header. A
 narrow browser presentation shows one region at a time: the browser comes first, and **Back** returns
-from a note to the browser. The window cannot shrink below 1024x600.
+from a note to the browser. The window cannot shrink below 1024x600. On wider windows the browser
+keeps a share of the space beside the navigation and the detail takes the rest; both grow with the
+window, and page content fills the detail card instead of stopping at a fixed reading width.
 
 ## 🔍 Search
 
