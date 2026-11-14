@@ -198,23 +198,16 @@ class VaultPages:
         afanes.core.atomic.AtomicWriter.write_text_atomic(target, content)
         return target
 
-    def create_log_entry(
-        self,
-        date: NoteDate,
-        title: str,
-        scaffold: str | None = None,
-    ) -> Path:
-        """Create a dated log entry under its ISO date name.
+    def create_log_page(self, date: NoteDate, text: str) -> Path:
+        """Create a dated log entry from the exact draft text.
 
         Parameters
         ----------
         date : NoteDate
             Entry date. Its precision selects the filename and folder.
-        title : str
-            Display title written as the level-1 heading. It is trimmed and
-            must not be blank.
-        scaffold : str | None
-            Starter body from a log card, or ``None`` for an empty entry.
+        text : str
+            Complete note text written exactly as provided. It must declare
+            ``type: log``, the same date, and a nonblank level-1 heading.
 
         Returns
         -------
@@ -224,7 +217,8 @@ class VaultPages:
         Raises
         ------
         NoteParseError
-            If the title is blank.
+            If the text does not parse, declares another type or date, or has
+            no nonblank level-1 heading.
         NameCollisionError
             If another log entry already uses the date or the target file
             exists.
@@ -235,18 +229,21 @@ class VaultPages:
 
         Notes
         -----
-        The entry declares only ``type: log`` and ``date``. The starter body is
-        placed below the title heading. The caller opens the returned page in
-        edit mode.
+        The draft, not this method, owns the body. The text is validated and
+        written unchanged so the first save preserves exactly what the user
+        typed. Collision checks run before the destination directory is created
+        and before any file is written.
         """
-        display_title = title.strip()
-        if not display_title:
+        parsed = NoteDocument.from_text(text)
+        if parsed.note_type is not NoteType.LOG:
+            message = "Log page text must declare type log"
+            raise NoteParseError(message)
+        if parsed.date != date:
+            message = f"Log page text must declare date {date.text}"
+            raise NoteParseError(message)
+        if parsed.title is None:
             message = "A log entry needs a title"
             raise NoteParseError(message)
-        starter = (scaffold or "").strip("\r\n")
-        body = f"# {display_title}\n"
-        if starter:
-            body = f"{body}\n{starter}\n"
 
         snapshot = self.vault.scan()
         if snapshot.log_entry(date) is not None:
@@ -257,20 +254,13 @@ class VaultPages:
         if target_directory.exists() and not target_directory.is_dir():
             message = f"Note directory is not a directory: {target_directory}"
             raise VaultError(message)
-        target = target_directory / f"{date.text}{afanes.core.vault.snapshot.NOTE_SUFFIX}"
+        target = self.vault.contained(target_directory / f"{date.text}{afanes.core.vault.snapshot.NOTE_SUFFIX}")
         if target.exists():
             message = f"Destination already exists: {target}"
             raise NameCollisionError(message)
 
-        content = self.vault.new_note_document(
-            NoteType.LOG,
-            None,
-            None,
-            body,
-            date=date,
-        ).to_text()
         target_directory.mkdir(parents=True, exist_ok=True)
-        afanes.core.atomic.AtomicWriter.write_text_atomic(target, content)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(target, text)
         return target
 
     def set_status(

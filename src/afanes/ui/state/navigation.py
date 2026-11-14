@@ -8,6 +8,7 @@ from pathlib import Path
 
 import afanes.core.links
 import afanes.core.names
+import afanes.core.template_cards
 import afanes.core.vault.pages
 import afanes.ui.state.browser
 import afanes.ui.strings
@@ -149,6 +150,49 @@ class PageNavigator:
             finally:
                 self.status.set_busy(busy=False)
 
+    async def start_log_draft(
+        self,
+        date: NoteDate,
+        listing: afanes.core.template_cards.TemplateCardListing | None,
+    ) -> bool:
+        """Open an unsaved log draft for one date.
+
+        Parameters
+        ----------
+        date : NoteDate
+            Entry date selected by a dated action.
+        listing : afanes.core.template_cards.TemplateCardListing | None
+            Vault template cards offered by the Starter control, or ``None``
+            when the folder could not be read.
+
+        Returns
+        -------
+        bool
+            ``True`` when the draft was installed in edit mode.
+
+        Notes
+        -----
+        The current draft is committed first. The new draft is clean, so an
+        untouched draft writes nothing. The browser query and Log selection are
+        cleared, and the previous page is pushed onto the shared history.
+        """
+        async with self.command_lock:
+            if self.session.vault is None:
+                return False
+            self.status.set_busy(busy=True)
+            try:
+                if not await self.pages.commit():
+                    return False
+                previous = self.pages.page.path if self.pages.page is not None else None
+                self.pages.start_log_draft(date, listing)
+                self.browser.query = ""
+                self.browser.select_log_entry(None)
+                self.ambiguous = ()
+                self._push_history(previous)
+                return True
+            finally:
+                self.status.set_busy(busy=False)
+
     async def create_reference(
         self,
         name: str,
@@ -285,84 +329,6 @@ class PageNavigator:
                     refresh_error = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
                 else:
                     self.session.apply_snapshot(snapshot, focus=path)
-                if not await self.pages.load(path, editing=True):
-                    return False
-                self.ambiguous = ()
-                self._push_history(previous)
-                if refresh_error is not None:
-                    self.session.banner = refresh_error
-                return True
-            finally:
-                self.status.set_busy(busy=False)
-
-    async def open_or_create_log_entry(
-        self,
-        date: NoteDate,
-        title: str,
-        scaffold: str | None = None,
-    ) -> bool:
-        """Open an existing log entry or create one for a date.
-
-        Parameters
-        ----------
-        date : NoteDate
-            Entry date. Its precision selects the filename and folder.
-        title : str
-            Display title for a new entry. It is ignored when the date already
-            has an entry.
-        scaffold : str | None
-            Starter body from a log card, or ``None`` for an empty entry.
-
-        Returns
-        -------
-        bool
-            ``True`` when an entry was opened in edit mode.
-
-        Notes
-        -----
-        The current draft is committed first. An occupied date opens the
-        existing entry without writing. A new entry is written atomically, the
-        scan is refreshed, the browser query is cleared, and the page opens in
-        edit mode. If the scan fails after the write, the entry remains and the
-        banner reports the refresh failure. Blocking I/O runs in a worker
-        thread.
-        """
-        async with self.command_lock:
-            vault = self.session.vault
-            if vault is None:
-                return False
-            self.status.set_busy(busy=True)
-            try:
-                if not await self.pages.commit():
-                    return False
-                snapshot = self.session.snapshot
-                existing = snapshot.log_entry(date) if snapshot is not None else None
-                if existing is not None:
-                    self.browser.log_selected = existing.path
-                    self.ambiguous = ()
-                    return await self.pages.load(existing.path, editing=True)
-                previous = self.pages.page.path if self.pages.page is not None else None
-                try:
-                    path = await asyncio.to_thread(
-                        afanes.core.vault.pages.VaultPages(vault).create_log_entry,
-                        date,
-                        title,
-                        scaffold,
-                    )
-                except (AfanesError, OSError) as exc:
-                    logger.debug("Log entry could not be created", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.LOG_CREATE_FAILED.format(detail=str(exc)))
-                    return False
-                refresh_error: str | None = None
-                try:
-                    refreshed = await asyncio.to_thread(vault.scan)
-                except (VaultError, OSError) as exc:
-                    logger.debug("Snapshot refresh after creating a log entry failed", exc_info=True)
-                    refresh_error = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
-                else:
-                    self.session.apply_snapshot(refreshed, focus=path)
-                self.browser.query = ""
-                self.browser.log_selected = path
                 if not await self.pages.load(path, editing=True):
                     return False
                 self.ambiguous = ()

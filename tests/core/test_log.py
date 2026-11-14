@@ -4,6 +4,7 @@ from pathlib import Path
 
 import afanes.core.log
 import afanes.core.vault.service
+from afanes.models.note import NoteDate
 
 YEAR = 2025
 MONTH = 10
@@ -38,6 +39,28 @@ def _timeline(
     root: Path, mode: afanes.core.log.LogMode = afanes.core.log.LogMode.ENTRIES
 ) -> afanes.core.log.LogTimeline:
     return afanes.core.log.LogTimeline(afanes.core.vault.service.Vault(root).scan(), mode)
+
+
+class TestLogTitle:
+    def test_day_precision_uses_a_long_date(self) -> None:
+        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026-11-13"))
+
+        assert title.text == "November 13, 2026"
+
+    def test_month_precision_names_the_month_and_year(self) -> None:
+        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026-11"))
+
+        assert title.text == "November 2026"
+
+    def test_year_precision_is_the_year(self) -> None:
+        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026"))
+
+        assert title.text == "2026"
+
+    def test_single_digit_day_has_no_leading_zero(self) -> None:
+        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026-11-03"))
+
+        assert title.text == "November 3, 2026"
 
 
 class TestLogBuckets:

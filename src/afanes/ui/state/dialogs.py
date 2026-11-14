@@ -3,6 +3,7 @@
 import asyncio
 import dataclasses
 import logging
+import typing
 from collections.abc import Callable
 from pathlib import Path
 
@@ -345,17 +346,33 @@ class PageDialogState:
         -------
         bool
             ``True`` when the page reloaded at its new path.
+
+        Notes
+        -----
+        A dirty draft is written before the date change is planned, so the
+        preview sees the current body and the move cannot discard unsaved
+        edits. A failed draft write leaves the page and file unchanged.
         """
         vault = self.session.vault
         if vault is None or page.path is None:
             return False
+        wrote = False
+        if page.is_dirty:
+            if not await self.pages.autosave(force=True):
+                return False
+            updated = self.pages.page
+            if not isinstance(updated, NormalDraft) or updated.path is None:
+                return False
+            page = updated
+            wrote = True
+        source_path = typing.cast("Path", page.path)
         naming = LogConversions(vault)
         try:
             preview = await asyncio.to_thread(
                 naming.plan_log_date_change,
-                page.path,
+                source_path,
                 note_date,
-                snapshot=self.session.snapshot,
+                snapshot=None if wrote else self.session.snapshot,
             )
             report = await asyncio.to_thread(naming.apply, preview)
         except (AfanesError, OSError) as exc:

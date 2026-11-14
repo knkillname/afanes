@@ -11,6 +11,7 @@ move, and reference rewrite.
 import dataclasses
 from pathlib import Path
 
+import afanes.core.log
 import afanes.core.names
 import afanes.core.vault.snapshot
 from afanes.core.errors import NameCollisionError, VaultError
@@ -90,7 +91,9 @@ class LogConversions:
         The source note is excluded from :attr:`afanes.core.vault.naming_reports.RenamePreview.affected` so a
         self-reference cannot be rewritten after the date write. The source
         hash is included in :attr:`afanes.core.vault.naming_reports.RenamePreview.content_hashes` so apply can
-        detect an external edit before writing the date.
+        detect an external edit before writing the date. A heading that equals
+        the old generated date title follows the new date; any other heading is
+        preserved.
         """
         source = self.vault.contained(note_path)
         vault = snapshot or self.vault.scan()
@@ -115,6 +118,9 @@ class LogConversions:
         affected = tuple(site for site in vault.affected_sites(source) if not VaultPath.same(site.path, source))
         hashes = {site.path: vault.hash_for_note(site.path) for site in affected}
         hashes[source] = note.content_hash
+        new_heading: str | None = None
+        if note.date is not None and note.title == afanes.core.log.LogTitle.for_date(note.date).text:
+            new_heading = afanes.core.log.LogTitle.for_date(new_date).text
         return RenamePreview(
             note_path=source,
             target_path=target,
@@ -128,6 +134,7 @@ class LogConversions:
             new_date=new_date,
             new_scheme=ReferenceScheme.LOG,
             new_type=NoteType.LOG,
+            new_heading=new_heading,
         )
 
     def plan_type_change(

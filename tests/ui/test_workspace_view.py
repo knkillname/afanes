@@ -1335,10 +1335,10 @@ class TestLogSection:
         asyncio.run(view.open_log_day(today.day))
 
         assert afanes.ui.state.app_state.pages.page is not None
-        assert (
-            afanes.ui.state.app_state.pages.page.path
-            == vault / "log" / f"{today.year:04d}" / f"{today.month:02d}" / f"{today.isoformat()}.md"
+        assert afanes.ui.state.app_state.pages.page.path == (
+            vault / "log" / f"{today.year:04d}" / f"{today.month:02d}" / f"{today.isoformat()}.md"
         )
+        assert afanes.ui.state.app_state.pages.editing is False
 
     def test_empty_calendar_day_requests_creation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -1458,6 +1458,41 @@ class TestLogSection:
         asyncio.run(view.open_log_month(today.year, today.month))
 
         assert requested == [NoteDate.from_text(f"{today.year:04d}-{today.month:02d}")]
+
+    def test_year_plus_requests_a_year_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        today = _today()
+        self._log_path(vault, today, "Today")
+        requested: list[NoteDate] = []
+
+        async def on_log_entry(date: NoteDate) -> None:
+            requested.append(date)
+
+        view = self._open_log(tmp_path, monkeypatch, on_log_entry=on_log_entry)
+
+        asyncio.run(view.open_log_year(today.year))
+
+        assert requested == [NoteDate.from_text(f"{today.year:04d}")]
+
+    def test_a_day_with_several_entries_expands_the_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        today = _today()
+        self._log_path(vault, today, "First")
+        _write_note(
+            vault / "log" / f"{today.year:04d}" / f"{today.month:02d}" / f"{today.isoformat()} second.md",
+            note_type="log",
+            body="# Second\n",
+            date=today.isoformat(),
+        )
+        view = self._open_log(tmp_path, monkeypatch)
+
+        asyncio.run(view.open_log_day(today.day))
+
+        state = afanes.ui.state.app_state
+        assert state.pages.page is None
+        assert state.browser.log_day == today.day
+        assert view.log_tree is not None
+        assert view.log_tree.day_tiles[(today.year, today.month, today.day)].expanded
 
     def test_tree_refreshes_after_a_new_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

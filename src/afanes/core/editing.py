@@ -21,7 +21,7 @@ from afanes.core.frontmatter import NoteDocument
 from afanes.core.labels import PageLabels
 from afanes.core.vault.snapshot import PageContent, ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import NoteType
+from afanes.models.note import NoteDate, NoteType
 
 
 class DraftMode(StrEnum):
@@ -152,6 +152,56 @@ class NormalDraft:
             path=None,
             identity=identity,
             reference=reference,
+            baseline_body=body,
+            baseline_labels=labels,
+            baseline_raw_text=template,
+            baseline_hash="",
+        )
+        return cls(common=common, body=body, labels=labels, source=document)
+
+    @classmethod
+    def for_log(cls, date: NoteDate, title: str) -> Self:
+        """Build an unwritten log draft for one date.
+
+        Parameters
+        ----------
+        date : NoteDate
+            Entry date. Its ISO text becomes the identity and its precision
+            selects the folder when the draft is first written.
+        title : str
+            Display title written as the level-1 heading. Surrounding whitespace
+            is removed and the title must not be blank.
+
+        Returns
+        -------
+        NormalDraft
+            Clean draft declaring ``type: log`` and the matching date, with the
+            title heading and a blank line ready for content.
+
+        Raises
+        ------
+        NoteParseError
+            If the title is blank.
+        """
+        display_title = title.strip()
+        if not display_title:
+            message = "A log entry needs a title"
+            raise NoteParseError(message)
+        body = f"# {display_title}\n\n"
+        document = NoteDocument(
+            raw={},
+            body=body,
+            newline="\n",
+            has_frontmatter=True,
+            note_type=None,
+        )
+        labels = PageLabels(note_type=NoteType.LOG, date_text=date.text)
+        document = labels.apply_to(document)
+        template = document.to_text()
+        common = DraftCommon(
+            path=None,
+            identity=date.text,
+            reference=None,
             baseline_body=body,
             baseline_labels=labels,
             baseline_raw_text=template,

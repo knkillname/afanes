@@ -140,6 +140,32 @@ class TestNewDraft:
         assert draft.with_labels(labels).is_dirty
 
 
+class TestLogDraft:
+    def test_builds_a_clean_log_draft(self) -> None:
+        draft = NormalDraft.for_log(NoteDate.from_text("2025-10-12"), "October 12, 2025")
+
+        assert draft.is_new
+        assert not draft.is_dirty
+        assert draft.identity == "2025-10-12"
+        assert draft.labels is not None
+        assert draft.labels.note_type is NoteType.LOG
+        assert draft.labels.date == NoteDate.from_text("2025-10-12")
+        assert draft.body == "# October 12, 2025\n\n"
+
+    def test_the_title_heading_is_editable(self) -> None:
+        draft = NormalDraft.for_log(NoteDate.from_text("2025-10-12"), "October 12, 2025")
+
+        edited = draft.with_body("# A quiet Tuesday\n\nBody.\n")
+        document = NoteDocument.from_text(edited.to_text())
+
+        assert edited.is_dirty
+        assert document.title == "A quiet Tuesday"
+
+    def test_a_blank_title_is_rejected(self) -> None:
+        with pytest.raises(NoteParseError, match="title"):
+            NormalDraft.for_log(NoteDate.from_text("2025-10-12"), "   ")
+
+
 class TestLoadDraft:
     def test_loads_body_and_labels(self) -> None:
         draft = _normal(PROJECT_NOTE)

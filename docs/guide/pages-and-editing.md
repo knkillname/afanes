@@ -63,7 +63,8 @@ Choose **Edit** to change the raw Markdown body and the labels:
 
 - **Type**: `note`, `reference`, `project`, or `log`.
 - **Date**: offered for every note. Use `YYYY`, `YYYY-MM`, or `YYYY-MM-DD`. For a log entry, changing
-  the date renames and moves the entry and updates its `log:` links.
+  the date renames and moves the entry, updates its `log:` links, and follows the new date only when
+  the heading still equals the old generated date title.
 - **Category**: offered only for references; pick an existing label from the combobox or type a new
   one.
 - **Status**: choices follow the selected type.
@@ -72,7 +73,14 @@ Choose **Edit** to change the raw Markdown body and the labels:
   note names from the vault.
 
 A log entry shows only the Date field and the body. It has no category, status, due date, requester, or
-owner.
+owner. A new log draft also shows the **Starter** control above the body.
+
+A new page draft is written only after its body or labels change. An untouched draft creates no file. A
+new log draft uses the action date as its identity and starts with a long date title: `November 13,
+2026`, `November 2026`, or `2026`. The heading is editable. While the body has no content beyond the
+heading and the selected starter, **Starter** offers the valid log cards and Empty. A card appends its
+starter body below the heading; Empty leaves only the heading. Choosing a card is content, so the next
+autosave or **Done** writes the entry. The control disappears once the body has any other content.
 
 The body includes its level-1 heading, which is the display title, and project steps with their
 metadata. There are no `people` or `project` fields. The label fields sit in one wrapping row: Date

@@ -307,7 +307,7 @@ class AppShell:
                     self.close_vault,
                     on_new_reference=self.show_new_reference_dialog,
                     pick_date=self.pick_date,
-                    on_log_entry=self.show_log_entry_dialog,
+                    on_log_entry=self.open_log_date,
                     on_missing_role=self.show_role_reference_dialog,
                     pick_role=self.pick_role,
                     on_about=self.show_about_dialog,
@@ -864,97 +864,32 @@ class AppShell:
             self.page.pop_dialog()
             self.page.update()
 
-    async def show_log_entry_dialog(self, date: NoteDate) -> None:
-        """Open or create the log entry for one date.
+    async def open_log_date(self, date: NoteDate) -> None:
+        """Open the log entry for one date or start an unsaved draft.
 
         Parameters
         ----------
         date : NoteDate
-            Entry date selected in the Log calendar or date tree.
+            Entry date selected in the Log calendar, **Today's entry**, or a
+            month or year control.
 
         Notes
         -----
-        An occupied date opens its entry without showing a form. An empty date
-        shows a title-and-card form, writes the entry through the navigation
-        command, and opens it in edit mode. A blank title or a write failure is
-        reported inline and the dialog stays open.
+        An occupied date opens its existing entry in read mode through the
+        normal page command. A free date installs a new log draft in edit mode
+        with the Starter control; no dialog and no immediate write are created.
+        Both paths repaint the workspace after the page command finishes.
         """
         snapshot = self.state.session.snapshot
         existing = snapshot.log_entry(date) if snapshot is not None else None
         if existing is not None:
-            await self.state.navigation.open_or_create_log_entry(date, "", None)
-            await self.render()
-            return
-
-        listing = await self.state.session.template_cards()
-        if listing is None:
-            listing = TemplateCardListing(cards=(), issues=())
-        picker = TemplateCardPicker(TemplateCardContext.LOG, "new-log", self.page.update)
-        picker.refresh(listing.for_type(NoteType.LOG), listing.issues)
-        title_field = ft.TextField(
-            label=afanes.ui.strings.LOG_TITLE_LABEL,
-            autofocus=True,
-            key="new-log-title",
-        )
-        error = ft.Text(
-            "",
-            color=afanes.ui.theme.ERROR_TEXT_COLOR,
-            visible=False,
-            key="new-log-error",
-        )
-
-        async def submit() -> None:
-            title = (title_field.value or "").strip()
-            if not title:
-                self._show_create_error(error, afanes.ui.strings.LOG_TITLE_REQUIRED)
-                return
-            card = picker.selected_card
-            scaffold = card.body if card is not None and card.body.strip() else None
-            if not await self.state.navigation.open_or_create_log_entry(date, title, scaffold):
-                self._show_create_error(
-                    error,
-                    self._take_notice(afanes.ui.strings.LOG_TITLE_REQUIRED),
-                )
-                return
-            self.page.pop_dialog()
-            self.page.update()
-            self._refresh_current_workspace()
-
-        async def cancel() -> None:
-            self.page.pop_dialog()
-            self.page.update()
-
-        title_field.on_submit = submit
-        self.page.show_dialog(
-            ft.AlertDialog(
-                title=ft.Text(afanes.ui.strings.LOG_ENTRY_TITLE),
-                content=ft.Column(
-                    controls=[
-                        ft.Text(afanes.ui.strings.LOG_ENTRY_BODY.format(date=date.text)),
-                        title_field,
-                        picker.dropdown,
-                        picker.description,
-                        picker.warning,
-                        error,
-                    ],
-                    tight=True,
-                ),
-                actions=[
-                    ft.TextButton(
-                        content=afanes.ui.strings.CANCEL_ACTION,
-                        on_click=cancel,
-                        key="new-log-cancel",
-                    ),
-                    ft.FilledButton(
-                        content=afanes.ui.strings.LOG_CREATE_ACTION,
-                        on_click=submit,
-                        key="new-log-submit",
-                    ),
-                ],
-                on_dismiss=self._dialog_dismissed,
-            ),
-        )
-        self.page.update()
+            await self.state.navigation.open_page(existing.path)
+        else:
+            listing = await self.state.session.template_cards()
+            if listing is None:
+                listing = TemplateCardListing(cards=(), issues=())
+            await self.state.navigation.start_log_draft(date, listing)
+        await self.render()
 
     def show_vault_dialog(self) -> None:
         """Ask for a vault path in a dialog, for a browser session."""

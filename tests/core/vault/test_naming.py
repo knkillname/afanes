@@ -1350,6 +1350,7 @@ class TestLogDateChange:
         assert preview.target_path == root / "log" / "2025" / "10" / "2025-10-13.md"
         assert preview.new_date == NoteDate.from_text("2025-10-13")
         assert preview.scheme is ReferenceScheme.LOG
+        assert preview.new_heading is None
 
     def test_plans_a_day_to_month_change(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -1368,6 +1369,60 @@ class TestLogDateChange:
         preview = naming.plan_log_date_change(source, NoteDate.from_text("2025"))
 
         assert preview.target_path == root / "log" / "2025" / "2025.md"
+
+    def test_generated_day_heading_follows_the_new_date(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root, body="# October 12, 2025\n")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10-13"))
+        naming.apply(preview)
+
+        target = root / "log" / "2025" / "10" / "2025-10-13.md"
+        assert preview.new_heading == "October 13, 2025"
+        assert NoteDocument.from_text(target.read_text(encoding="utf-8")).title == "October 13, 2025"
+
+    def test_generated_month_heading_follows_a_precision_change(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root, "2025-10", body="# October 2025\n")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025"))
+
+        assert preview.new_heading == "2025"
+
+    def test_generated_year_heading_follows_a_precision_change(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = _write_note(root / "log" / "2025" / "2025.md", "log", body="# 2025\n", date="2025")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10"))
+
+        assert preview.new_heading == "October 2025"
+
+    def test_a_custom_heading_is_preserved(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root)
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10-13"))
+        naming.apply(preview)
+
+        target = root / "log" / "2025" / "10" / "2025-10-13.md"
+        assert preview.new_heading is None
+        assert NoteDocument.from_text(target.read_text(encoding="utf-8")).title == "A quiet Tuesday"
+
+    def test_a_date_shaped_custom_heading_is_preserved(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root, body="# 2025-10-12\n")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10-13"))
+        naming.apply(preview)
+
+        target = root / "log" / "2025" / "10" / "2025-10-13.md"
+        assert preview.new_heading is None
+        assert NoteDocument.from_text(target.read_text(encoding="utf-8")).title == "2025-10-12"
 
     def test_rejects_an_occupied_date(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -1396,6 +1451,21 @@ class TestLogDateChange:
         document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
         assert document.date == NoteDate.from_text("2025-10-13")
         assert document.title == "A quiet Tuesday"
+
+    def test_writes_a_replacement_heading_with_the_date(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root)
+        vault = afanes.core.vault.service.Vault(root)
+        naming = afanes.core.vault.log_conversions.LogConversions(vault)
+        preview = naming.plan_log_date_change(source, NoteDate.from_text("2025-10-13"))
+        preview = dataclasses.replace(preview, new_heading="October 13, 2025")
+
+        naming.apply(preview)
+
+        target = root / "log" / "2025" / "10" / "2025-10-13.md"
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert document.date == NoteDate.from_text("2025-10-13")
+        assert document.title == "October 13, 2025"
 
     def test_skips_a_changed_referrer(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

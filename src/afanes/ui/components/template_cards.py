@@ -201,6 +201,23 @@ class TemplateCardPicker:
         """
         return self._choices.get(self.dropdown.value or EMPTY_KEY)
 
+    def select(self, card: TemplateCard | None) -> None:
+        """Show one card or Empty as selected without notifying the caller.
+
+        Parameters
+        ----------
+        card : TemplateCard | None
+            Card that matches an already refreshed option, or ``None`` for
+            Empty.
+
+        Notes
+        -----
+        An unknown card leaves the dropdown on Empty after the next refresh.
+        The caller repaints the surrounding page.
+        """
+        self.dropdown.value = EMPTY_KEY if card is None else f"card:{card.relative_path.as_posix()}"
+        self._refresh_description()
+
     def refresh(
         self,
         cards: Sequence[TemplateCard],

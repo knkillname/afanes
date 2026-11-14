@@ -75,6 +75,9 @@ class RenamePreview:
     new_type : NoteType | None
         Replacement note type written before the move, or ``None`` for an
         ordinary rename.
+    new_heading : str | None
+        Replacement level-1 heading written in the same atomic conversion,
+        or ``None`` to preserve the current heading.
     """
 
     note_path: Path
@@ -89,6 +92,7 @@ class RenamePreview:
     new_date: NoteDate | None = None
     new_scheme: ReferenceScheme | None = None
     new_type: NoteType | None = None
+    new_heading: str | None = None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

@@ -44,8 +44,9 @@ actions ask for confirmation and place Cancel first. The Trash destination remai
 read-only vault; maintenance failures appear in a persistent banner.
 
 The **Log** section offers a calendar and a collapsed date tree instead of a flat list. **Entries** shows
-only log notes; **Everything** is a date lens over every parsed note. **Today’s Entry** opens or creates
-today's page, and the calendar and tree controls create entries for a chosen day, month, or year. See
+only log notes; **Everything** is a date lens over every parsed note. **Today’s Entry** opens today's
+entry in read mode, or an unsaved draft when the day is free. The calendar and tree controls follow the
+same rule for a chosen day, month, or year. See
 [Log](log.md) for the calendar marks, date rules, and linking.
 
 The **References** section also offers **New Reference…** in the browser header. The dialog asks for a

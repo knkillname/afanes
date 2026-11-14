@@ -44,10 +44,12 @@ A log entry is a diary page. Its `date` is its identity and its filename: `2025.
 `2025-10-12.md`, filed under `log/<year>/` or `log/<year>/<month>/`. Only one log entry may exist for
 each exact date. The first heading is the display title, so the filename stays a date.
 
-Open the **Log** section to see the calendar and the collapsed year tree. **Today's entry** opens or
-creates today's page; an empty calendar day or the plus on an empty month or year row creates an
-entry for that date. **Entries** shows only log notes; **Everything** is a date lens over the whole
-vault. Changing an entry's date renames and moves it and updates inbound `log:` links.
+Open the **Log** section to see the calendar and the collapsed year tree. **Today's entry** opens
+today's page in read mode, or an unsaved draft when the day is free; an empty calendar day or the plus
+on an empty month or year row opens the same draft for that date. A **Starter** control in the draft
+offers the log cards until the body has content. **Entries** shows only log notes; **Everything** is a
+date lens over the whole vault. Changing an entry's date renames and moves it, updates inbound
+`log:` links, and rewrites the heading only while it still equals the old generated date title.
 
 ## How a capture becomes a project
 

@@ -20,19 +20,23 @@ Open **Log** in the navigation region. The browser region shows a month calendar
 - A year with a whole-year entry has a dot next to the year.
 - The arrows move one month at a time.
 
-Clicking a day with one entry opens it. A day with several entries expands the day in the tree. An
-empty day asks for a title and starter, then writes the entry for that date.
+Clicking a day with one entry opens it in read mode. A day with several entries expands the day in the
+tree. An empty day opens an unsaved draft for that date.
 
 ## ✍️ Creating an entry
 
-- **Today’s Entry** opens today's page or creates it.
-- Clicking an empty calendar day creates an entry for that day.
-- The **+** on an empty month or year row creates an entry for that whole month or year.
+- **Today’s Entry** opens today's entry in read mode, or an unsaved draft when the day is free.
+- Clicking an empty calendar day opens an unsaved draft for that day.
+- The **+** on an empty month or year row opens an unsaved draft for that whole month or year.
 - A month or year that already has an entry shows an open control instead of the plus.
 
-The form asks for a title and a starter card or Empty. The Daily entry card adds the
-`## What happened`, `## What I learned`, and `## Next` prompts. The title becomes the level-1 heading;
-the filename stays the date.
+The draft starts with a long date title: `November 13, 2026`, `November 2026`, or `2026`. The heading is
+editable; the filename stays the ISO date. While the draft has no content beyond that heading, a
+**Starter** control above the body offers every valid log card and Empty. The Daily entry card adds the
+`## What happened`, `## What I learned`, and `## Next` prompts; Empty leaves only the heading.
+
+The draft is written the first time its body or labels change, or when a starter card is selected.
+Leaving an untouched draft creates no file.
 
 ## 🌳 The date tree
 
@@ -50,8 +54,9 @@ mode for each vault. Search filters both the tree and the calendar.
 
 A log entry's date is its identity. Change it in the page's Date field. Afanes writes the new date,
 renames the file, moves it to the matching `log/<year>/<month>/` folder, and rewrites inbound `log:`
-links. The entry's heading is preserved. The Rename action is not offered for a log entry; the Date
-field is the rename.
+links. The heading follows the new date only while it still equals the old generated date title; a
+custom heading is preserved. The Rename action is not offered for a log entry; the Date field is the
+rename.
 
 A day, month, or year can hold only one log entry. Creating or moving onto an occupied date is refused.
 

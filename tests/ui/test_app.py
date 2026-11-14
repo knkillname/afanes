@@ -1,6 +1,7 @@
 """Tests for the application shell routing without a rendered window."""
 
 import asyncio
+import datetime
 import json
 import typing
 from collections.abc import Awaitable, Callable
@@ -25,7 +26,7 @@ import afanes.ui.views.workspace
 from afanes.core.errors import TemplateContentError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.settings import Settings
-from afanes.models.note import CategoryLabel, NoteDate
+from afanes.models.note import CategoryLabel
 from tests.support import constant, versioned
 
 Handler = Callable[[], Awaitable[None]]
@@ -276,8 +277,8 @@ class TestAppShell:
         assert _find_by_key(page.controls[0], "process-note") is not None
 
 
-class TestLogEntryDialog:
-    def test_empty_option_describes_a_log_entry_without_a_reference_category(
+class TestLogEntryDirectDraft:
+    def test_today_opens_an_unsaved_draft_without_a_dialog(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         vault = tmp_path / "vault"
@@ -286,6 +287,7 @@ class TestLogEntryDialog:
         _use_settings_file(monkeypatch, settings)
         afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
         page = FakePage()
+        state = afanes.ui.state.app_state
 
         async def scenario() -> None:
             await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
@@ -296,13 +298,42 @@ class TestLogEntryDialog:
 
         asyncio.run(scenario())
 
-        selector = _typed(_find_by_key(page.dialogs[-1], "new-log-template"), ft.Dropdown)
-        empty = selector.options[-1]
-        assert empty.text == afanes.ui.strings.LOG_CARD_EMPTY
-        assert "category" not in (empty.text or "").casefold()
-        description = _typed(_find_by_key(page.dialogs[-1], "new-log-template-description"), ft.Text)
-        assert description.value == afanes.ui.strings.LOG_CARD_DESCRIPTION_EMPTY
-        assert "category" not in (description.value or "").casefold()
+        today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+        assert page.dialogs == []
+        assert state.pages.editing is True
+        assert state.pages.page is not None
+        assert state.pages.page.path is None
+        assert state.pages.page.identity == today.isoformat()
+        assert state.pages.log_starter is not None
+        assert not (vault / "log" / f"{today.year:04d}" / f"{today.month:02d}" / f"{today.isoformat()}.md").exists()
+
+    def test_today_opens_an_occupied_entry_in_read_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        versioned(vault)
+        today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+        path = vault / "log" / f"{today.year:04d}" / f"{today.month:02d}" / f"{today.isoformat()}.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"---\ntype: log\ndate: {today.isoformat()}\n---\n\n# Today\n", encoding="utf-8")
+        settings = tmp_path / "settings.json"
+        _use_settings_file(monkeypatch, settings)
+        afanes.core.settings.SettingsStore(settings).save(Settings(vault=vault))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
+            section = _typed(_find_by_key(page.controls[0], "section-log"), ft.ListTile)
+            await typing.cast("Handler", section.on_click)()
+            today_button = _typed(_find_by_key(page.controls[0], "log-today-entry"), ft.TextButton)
+            await typing.cast("Handler", today_button.on_click)()
+
+        asyncio.run(scenario())
+
+        assert page.dialogs == []
+        assert state.pages.editing is False
+        assert state.pages.page is not None
+        assert state.pages.page.path == path
+        assert "# Today" in state.pages.page.body
 
 
 class TestAdoptionPanel:
@@ -1585,7 +1616,6 @@ class TestDialogAudit:
             ft.AlertDialog,
             ft.AlertDialog,
             ft.AlertDialog,
-            ft.AlertDialog,
         ]:
             await shell.show_about_dialog()
             about = page.dialogs.pop()
@@ -1593,15 +1623,13 @@ class TestDialogAudit:
             create = page.dialogs.pop()
             await shell.show_new_reference_dialog()
             reference = page.dialogs.pop()
-            await shell.show_log_entry_dialog(NoteDate.from_text("2025-10-12"))
-            log = page.dialogs.pop()
             shell.show_vault_dialog()
             vault = page.dialogs.pop()
-            return about, create, reference, log, vault
+            return about, create, reference, vault
 
-        about, create, reference, log, vault = asyncio.run(scenario())
+        about, create, reference, vault = asyncio.run(scenario())
 
-        for dialog in (about, create, reference, log, vault):
+        for dialog in (about, create, reference, vault):
             assert dialog.on_dismiss is not None
             assert all(
                 getattr(action, "style", None) != afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE for action in dialog.actions
@@ -1614,7 +1642,6 @@ class TestDialogAudit:
         for dialog, key in (
             (create, "create-vault-path"),
             (reference, "new-reference-name"),
-            (log, "new-log-title"),
             (vault, "change-vault-path"),
         ):
             field = _typed(_find_by_key(dialog, key), ft.TextField)

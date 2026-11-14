@@ -1250,6 +1250,16 @@ class WorkspaceView:
         """
         await self._log_create_month(year, month)
 
+    async def open_log_year(self, year: int) -> None:
+        """Open or create the entry for a whole year.
+
+        Parameters
+        ----------
+        year : int
+            Calendar year.
+        """
+        await self._log_create_year(year)
+
     def _log_controls(self) -> list[ft.Control]:
         """Build the calendar, mode switch, and date tree for the Log."""
         state = self._state
@@ -1376,6 +1386,7 @@ class WorkspaceView:
             if target is not None:
                 await self._select(target.path)
                 return
+        state.browser.show_log_month(year, month)
         state.browser.select_log_day(day)
         self._refresh_dynamic()
         self._update()

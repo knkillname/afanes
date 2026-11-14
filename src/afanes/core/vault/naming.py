@@ -432,14 +432,15 @@ class VaultNaming:
 
     @staticmethod
     def _write_conversion(source: Path, preview: RenamePreview) -> None:
-        """Write the replacement type and date before a conversion move.
+        """Write the replacement type, date, and heading before a conversion.
 
         Parameters
         ----------
         source : Path
             Existing note path.
         preview : RenamePreview
-            Preview carrying the source hash, new date, and new type.
+            Preview carrying the source hash, new date, new type, and optional
+            replacement heading.
 
         Raises
         ------
@@ -463,7 +464,10 @@ class VaultNaming:
             labels = labels.with_type(preview.new_type)
         if preview.new_date is not None:
             labels = labels.with_date_text(preview.new_date.text)
-        afanes.core.atomic.AtomicWriter.write_text_atomic(source, labels.apply_to(document).to_text())
+        document = labels.apply_to(document)
+        if preview.new_heading is not None:
+            document = document.with_heading(preview.new_heading)
+        afanes.core.atomic.AtomicWriter.write_text_atomic(source, document.to_text())
 
     def _apply_heading_update(
         self,

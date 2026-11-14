@@ -8,6 +8,7 @@ commands. It performs no Markdown parsing, SQL, or file I/O. Confirmation
 flows are inline panels so the pane stays usable without a rendered dialog.
 """
 
+import asyncio
 import dataclasses
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -28,6 +29,7 @@ from afanes.models.note import CategoryLabel, NoteType, Status
 from afanes.ui.components.banner import Banner
 from afanes.ui.components.frozen import FrozenControlRecovery
 from afanes.ui.components.panel import Panel
+from afanes.ui.components.template_cards import TemplateCardContext, TemplateCardPicker
 from afanes.ui.state.navigation import RoleFollowOutcome
 from afanes.ui.views.project_body import PickDate, ProjectBodyView
 
@@ -91,6 +93,7 @@ class PageView:
         self._on_back = actions.on_back
         self._rename_open = False
         self._rename_error: str | None = None
+        self._starter_task: asyncio.Task[None] | None = None
         self._role_suggestion_field: str | None = None
         self._build_header()
         self._build_meta()
@@ -325,6 +328,20 @@ class PageView:
     def _build_edit_form(self) -> None:
         """Build the edit form controls."""
         self.identity_text = ft.Text("", selectable=True, style=afanes.ui.theme.TEXT_ROLES["caption"])
+        self.log_starter_picker = TemplateCardPicker(
+            TemplateCardContext.LOG,
+            "log-draft",
+            self._starter_changed,
+        )
+        self.log_starter_panel = ft.Column(
+            controls=[
+                self.log_starter_picker.dropdown,
+                self.log_starter_picker.description,
+                self.log_starter_picker.warning,
+            ],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            visible=False,
+        )
         self.body_field = ft.TextField(
             label=afanes.ui.strings.PAGE_BODY_LABEL,
             multiline=True,
@@ -434,6 +451,7 @@ class PageView:
                 self.category_error,
                 self.date_error,
                 self.due_error,
+                self.log_starter_panel,
                 self.body_field,
             ],
             spacing=afanes.ui.theme.SECTION_GAP,
@@ -1039,6 +1057,7 @@ class PageView:
         visible = page is not None and editing and state.pages.page_mode is DraftMode.NORMAL and labels is not None
         self.edit_form.visible = visible
         if not visible or page is None or labels is None:
+            self.log_starter_panel.visible = False
             self._clear_role_suggestions()
             return
 
@@ -1082,7 +1101,18 @@ class PageView:
             self.owner_field.value = labels.owner_text
         self.due_error.value = labels.due_date_error or ""
         self.due_error.visible = labels.due_date_error is not None
+        self._refresh_log_starter()
         self._refresh_role_suggestions()
+
+    def _refresh_log_starter(self) -> None:
+        """Show the Starter control while a new log draft is otherwise empty."""
+        starter = self._state.pages.log_starter
+        visible = self._state.pages.log_starter_visible and starter is not None
+        self.log_starter_panel.visible = visible
+        if not visible or starter is None:
+            return
+        self.log_starter_picker.refresh(starter.cards, starter.issues)
+        self.log_starter_picker.select(starter.selected)
 
     def _refresh_raw(self, page: PageDraft | None) -> None:
         """Refresh raw rescue mode."""
@@ -1243,6 +1273,16 @@ class PageView:
     async def commit_date(self) -> None:
         """Write the Date field when the user leaves it."""
         await self._state.dialogs.save_page_date(self.date_field.value or "")
+        self.refresh()
+        self._update()
+
+    def _starter_changed(self) -> None:
+        """Schedule the Starter selection command from a picker event."""
+        self._starter_task = asyncio.create_task(self.change_log_starter())
+
+    async def change_log_starter(self) -> None:
+        """Apply the Starter card or Empty choice to the open log draft."""
+        await self._state.pages.select_log_starter(self.log_starter_picker.selected_card)
         self.refresh()
         self._update()
 

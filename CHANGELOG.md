@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- **Direct log drafts.** An empty calendar day, **Today’s Entry**, and the plus on an empty month or
+  year row now open an unsaved log draft in the editor instead of a title-and-card dialog. A new draft
+  uses the long date as its heading (`November 13, 2026`, `November 2026`, or `2026`), keeps the
+  heading editable, and is written only on first content. A **Starter** control offers the valid log
+  cards and Empty until the body has other content. An occupied date opens its existing entry in read
+  mode. Changing a log date rewrites the heading only while it still equals the old generated date
+  title, so custom headings are preserved. This implements the `log-entry-direct-draft` OpenSpec
+  change. **BREAKING:** `VaultPages.create_log_entry(date, title, scaffold)` is replaced by
+  `VaultPages.create_log_page(date, text)`, and `PageNavigator.open_or_create_log_entry` is removed.
+  Resolved runtime dependencies: `flet==1.1.2`, `markdown-it-py==4.3.0`, `PyYAML==6.0.3`.
+  README: no change required. Docs: updated.
+
 ## [0.9.0] - 2026-11-13
 
 ### Added

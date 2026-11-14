@@ -8,7 +8,7 @@ need. A log card supplies only a starter body for a dated log entry.
 :class: note
 
 Template cards live in `templates/` at the vault root. Add, edit, or delete them with any text editor.
-Processing, the References section, and the Log offer the valid cards plus an **Empty** option.
+Processing, the References section, and a new log draft offer the valid cards plus an **Empty** option.
 :::
 
 ## 📁 The templates folder
@@ -44,8 +44,9 @@ description: A contact, colleague, or someone you deal with.
 | `description` | No | One-line explanation shown in the picker. |
 
 The Markdown after the frontmatter is the starter body. It is appended below the note's title when a
-note is created from the card. The body may be empty, but it must not contain a level-1 heading,
-because the note's own title supplies that heading.
+note is created from the card. The **Starter** control in a new log draft appends the card's body below
+the generated heading. The body may be empty, but it must not contain a level-1 heading, because the
+note's own title supplies that heading.
 
 A card must not declare `status` or `due_date`. Those keys belong to workflow, not to a reusable
 shape.
@@ -74,15 +75,16 @@ open.
 
 ## 🧭 Empty
 
-The Processing Wizard, the References section, and the Log always offer **Empty**. Empty creates a
-reference with `category: general` and no starter body. For a log entry, Empty creates a dated entry
-with only its title heading. It is the right choice when no card fits or when you only want a title.
+The Processing Wizard, the References section, and the Starter control in a new log draft always offer
+**Empty**. Empty creates a reference with `category: general` and no starter body. For a log draft,
+Empty leaves only the title heading. It is the right choice when no card fits or when you only want a
+title.
 
 ## ⚠️ Invalid cards
 
-A card that cannot be read, parsed, or validated is skipped. The picker still lists every valid card
-and names the skipped files in a warning. Nothing is rewritten automatically, so you can repair the
-file and reopen the picker.
+A card that cannot be read, parsed, or validated is skipped. The picker or Starter control still lists
+every valid card and names the skipped files in a warning. Nothing is rewritten automatically, so you
+can repair the file and reopen the picker.
 
 Invalid cards are also the likeliest explanation when a `templates/` folder from an older vault holds
 ordinary notes: that folder is now reserved, so those notes leave the browser and their files are

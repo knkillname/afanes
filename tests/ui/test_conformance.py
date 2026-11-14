@@ -82,7 +82,7 @@ BASELINE: dict[str, dict[str, int]] = {
         "views/workspace.py": 9,
     },
     "suggested_or_destructive_buttons": {
-        "app.py::AppShell": 6,
+        "app.py::AppShell": 5,
         "components/capture_bar.py::CaptureBar": 1,
         "components/page_panels.py::CategoryMovePanel": 1,
         "components/page_panels.py::ConflictPanel": 1,

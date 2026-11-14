@@ -1277,8 +1277,8 @@ class TestLogMode:
         assert asyncio.run(scenario()) is LogMode.ENTRIES
 
 
-class TestLogEntryCreation:
-    def test_creates_and_opens_a_log_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+class TestLogDraftStart:
+    def test_opens_an_unsaved_log_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -1286,49 +1286,78 @@ class TestLogEntryCreation:
 
         async def scenario() -> bool:
             await state.workspace.choose_vault(vault)
-            return await state.navigation.open_or_create_log_entry(
-                NoteDate.from_text("2025-10-12"),
-                "A quiet Tuesday",
-                "## What happened\n",
-            )
+            listing = await state.session.template_cards()
+            return await state.navigation.start_log_draft(NoteDate.from_text("2025-10-12"), listing)
+
+        assert asyncio.run(scenario()) is True
+        assert state.pages.editing is True
+        assert isinstance(state.pages.page, NormalDraft)
+        assert state.pages.page.path is None
+        assert state.pages.page.identity == "2025-10-12"
+        assert state.pages.page.body == "# October 12, 2025\n\n"
+        assert state.pages.page.labels is not None
+        assert state.pages.page.labels.note_type is NoteType.LOG
+        assert state.pages.log_starter is not None
+        assert not (vault / "log" / "2025" / "10" / "2025-10-12.md").exists()
+
+    def test_commits_the_previous_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        previous = _write_note(vault / "inbox" / "Previous.md", _note_text("# Previous\n\nOld\n"))
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(previous)
+            await state.pages.set_page_body("# Previous\n\nChanged\n")
+            listing = await state.session.template_cards()
+            return await state.navigation.start_log_draft(NoteDate.from_text("2025-10-12"), listing)
+
+        assert asyncio.run(scenario()) is True
+        assert "Changed" in previous.read_text(encoding="utf-8")
+
+    def test_pushes_the_previous_page_onto_the_history(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        previous = _write_note(vault / "inbox" / "Previous.md", _note_text("# Previous\n\nBody\n"))
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(previous)
+            listing = await state.session.template_cards()
+            await state.navigation.start_log_draft(NoteDate.from_text("2025-10-12"), listing)
+            return await state.navigation.back()
+
+        assert asyncio.run(scenario()) is True
+        assert state.pages.page is not None
+        assert state.pages.page.path == previous
+        assert state.navigation.history == ()
+
+    def test_first_content_writes_the_entry_at_its_date(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            listing = await state.session.template_cards()
+            await state.navigation.start_log_draft(NoteDate.from_text("2025-10-12"), listing)
+            await state.pages.set_page_body("# October 12, 2025\n\nBody.\n")
+            return await state.pages.commit()
 
         assert asyncio.run(scenario()) is True
         path = vault / "log" / "2025" / "10" / "2025-10-12.md"
         assert path.is_file()
+        assert "Body." in path.read_text(encoding="utf-8")
         assert state.pages.page is not None
         assert state.pages.page.path == path
-        assert state.pages.editing is True
-        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
-        assert document.date == NoteDate.from_text("2025-10-12")
-        assert "## What happened" in document.body
+        assert state.pages.log_starter is None
 
-    def test_occupied_date_opens_the_existing_entry(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        vault = tmp_path / "vault"
-        _versioned(vault)
-        _use_settings_file(monkeypatch, tmp_path / "settings.json")
-        state = afanes.ui.state.app_state
-
-        async def scenario() -> tuple[bool, bool]:
-            await state.workspace.choose_vault(vault)
-            first = await state.navigation.open_or_create_log_entry(
-                NoteDate.from_text("2025-10-12"),
-                "First",
-                None,
-            )
-            second = await state.navigation.open_or_create_log_entry(
-                NoteDate.from_text("2025-10-12"),
-                "Second",
-                None,
-            )
-            return first, second
-
-        assert asyncio.run(scenario()) == (True, True)
-        path = vault / "log" / "2025" / "10" / "2025-10-12.md"
-        assert path.is_file()
-        assert "First" in path.read_text(encoding="utf-8")
-        assert "Second" not in path.read_text(encoding="utf-8")
-
-    def test_blank_title_is_reported(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_an_untouched_draft_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _versioned(vault)
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -1336,15 +1365,162 @@ class TestLogEntryCreation:
 
         async def scenario() -> bool:
             await state.workspace.choose_vault(vault)
-            return await state.navigation.open_or_create_log_entry(
-                NoteDate.from_text("2025-10-12"),
-                "   ",
-                None,
-            )
+            listing = await state.session.template_cards()
+            await state.navigation.start_log_draft(NoteDate.from_text("2025-10-12"), listing)
+            return await state.pages.commit()
+
+        assert asyncio.run(scenario()) is True
+        assert not (vault / "log" / "2025" / "10" / "2025-10-12.md").exists()
+        assert state.pages.page is None
+
+    def test_a_starter_selection_is_content(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        card = afanes.core.template_cards.TemplateCard(
+            relative_path=Path("daily.md"),
+            note_type=NoteType.LOG,
+            category=None,
+            title="Daily entry",
+            description=None,
+            body="## What happened\n",
+            text="",
+        )
+        listing = afanes.core.template_cards.TemplateCardListing(cards=(card,), issues=())
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[bool, bool]:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.start_log_draft(NoteDate.from_text("2025-10-12"), listing)
+            selected = await state.pages.select_log_starter(card)
+            return selected, await state.pages.commit()
+
+        assert asyncio.run(scenario()) == (True, True)
+        path = vault / "log" / "2025" / "10" / "2025-10-12.md"
+        text = path.read_text(encoding="utf-8")
+        assert "# October 12, 2025" in text
+        assert "## What happened" in text
+
+    def test_an_occupied_date_refuses_the_first_write(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        existing = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            "---\ntype: log\ndate: 2025-10-12\n---\n\n# Existing\n",
+        )
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            listing = await state.session.template_cards()
+            await state.navigation.start_log_draft(NoteDate.from_text("2025-10-12"), listing)
+            await state.pages.set_page_body("# Replacement\n\nBody.\n")
+            return await state.pages.commit()
 
         assert asyncio.run(scenario()) is False
+        assert "Existing" in existing.read_text(encoding="utf-8")
+        assert state.pages.page is not None
+        assert state.pages.page.path is None
         assert _notice_message(state) is not None
-        assert not (vault / "log" / "2025" / "10" / "2025-10-12.md").exists()
+
+
+class TestLogStarter:
+    @staticmethod
+    def _card() -> afanes.core.template_cards.TemplateCard:
+        return afanes.core.template_cards.TemplateCard(
+            relative_path=Path("daily.md"),
+            note_type=NoteType.LOG,
+            category=None,
+            title="Daily entry",
+            description=None,
+            body="## What happened\n",
+            text="",
+        )
+
+    def _start(
+        self, vault: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> tuple[afanes.ui.state.controller.AppState, afanes.core.template_cards.TemplateCard]:
+        _use_settings_file(monkeypatch, vault.parent / "settings.json")
+        state = afanes.ui.state.app_state
+        card = self._card()
+        listing = afanes.core.template_cards.TemplateCardListing(cards=(card,), issues=())
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.start_log_draft(NoteDate.from_text("2025-10-12"), listing)
+
+        asyncio.run(scenario())
+        return state, card
+
+    def test_selecting_a_card_fills_the_body(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        state, card = self._start(vault, monkeypatch)
+
+        async def scenario() -> bool:
+            return await state.pages.select_log_starter(card)
+
+        assert asyncio.run(scenario()) is True
+        assert state.pages.page is not None
+        assert state.pages.page.body == "# October 12, 2025\n\n## What happened\n"
+        assert state.pages.page.is_dirty
+        assert state.pages.log_starter is not None
+        assert state.pages.log_starter.selected is card
+        assert state.pages.log_starter_visible is True
+
+    def test_selecting_empty_restores_the_heading(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        state, card = self._start(vault, monkeypatch)
+
+        async def scenario() -> bool:
+            await state.pages.select_log_starter(card)
+            return await state.pages.select_log_starter(None)
+
+        assert asyncio.run(scenario()) is True
+        assert state.pages.page is not None
+        assert state.pages.page.body == "# October 12, 2025\n\n"
+        assert not state.pages.page.is_dirty
+        assert state.pages.log_starter is not None
+        assert state.pages.log_starter.selected is None
+
+    def test_typing_beyond_the_generated_body_hides_the_control(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        state, card = self._start(vault, monkeypatch)
+
+        async def scenario() -> tuple[bool, bool]:
+            await state.pages.select_log_starter(card)
+            await state.pages.set_page_body("# October 12, 2025\n\n## What happened\n\nExtra\n")
+            return state.pages.log_starter_visible, await state.pages.select_log_starter(None)
+
+        visible, selected = asyncio.run(scenario())
+
+        assert visible is False
+        assert selected is False
+        assert state.pages.page is not None
+        assert "Extra" in state.pages.page.body
+
+    def test_an_existing_entry_has_no_starter(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, vault.parent / "settings.json")
+        path = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            "---\ntype: log\ndate: 2025-10-12\n---\n\n# A quiet Tuesday\n",
+        )
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            return await state.navigation.open_page(path)
+
+        assert asyncio.run(scenario()) is True
+        assert state.pages.log_starter is None
+        assert state.pages.log_starter_visible is False
 
 
 class TestCapture:
@@ -4827,6 +5003,30 @@ class TestRewriteReports:
         assert "notes/Failed.md (permission denied)" in message
         assert (vault / "log" / "2025" / "10" / "2025-10-13.md").is_file()
         assert "log:2025-10-13" in referrer.read_text(encoding="utf-8")
+
+    def test_date_change_commits_a_dirty_log_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        path = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            "---\ntype: log\ndate: 2025-10-12\n---\n\n# October 12, 2025\n\nOld body.\n",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            await state.pages.set_page_body("# October 12, 2025\n\nCurrent body.\n")
+            return await state.dialogs.save_page_date("2025-10-13")
+
+        assert asyncio.run(scenario()) is True
+        target = vault / "log" / "2025" / "10" / "2025-10-13.md"
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert document.title == "October 13, 2025"
+        assert "Current body." in document.body
+        assert state.pages.page is not None
+        assert state.pages.page.path == target
 
     def test_repair_reports_updated_and_failed_notes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

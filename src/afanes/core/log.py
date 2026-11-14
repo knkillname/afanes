@@ -12,11 +12,12 @@ import calendar
 import dataclasses
 from collections.abc import Iterable
 from enum import StrEnum
+from typing import Self
 
 import afanes.core.names
 import afanes.core.search
 from afanes.core.vault.snapshot import VaultNote, VaultSnapshot
-from afanes.models.note import DatePrecision, NoteType
+from afanes.models.note import DatePrecision, NoteDate, NoteType
 
 
 class LogMode(StrEnum):
@@ -43,6 +44,47 @@ class LogMode(StrEnum):
             Stable lowercase mode value.
         """
         return self.value
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class LogTitle:
+    """Default display title for a log entry date.
+
+    Attributes
+    ----------
+    text : str
+        Long date title: a month name, day, and year for a day, a month name
+        and year for a month, or a four-digit year for a year.
+    """
+
+    text: str
+
+    @classmethod
+    def for_date(cls, date: NoteDate) -> Self:
+        """Build the default title for one note date.
+
+        Parameters
+        ----------
+        date : NoteDate
+            Entry date at year, month, or day precision.
+
+        Returns
+        -------
+        LogTitle
+            Long date title using the standard library English month names.
+            A single-digit day is written without a leading zero.
+
+        Notes
+        -----
+        The title stays independent from the filename, which always uses the
+        ISO date text.
+        """
+        if date.precision is DatePrecision.YEAR:
+            return cls(f"{date.year:04d}")
+        month_name = calendar.month_name[date.month]
+        if date.precision is DatePrecision.MONTH:
+            return cls(f"{month_name} {date.year:04d}")
+        return cls(f"{month_name} {date.day}, {date.year:04d}")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

@@ -8,9 +8,11 @@ import logging
 from pathlib import Path
 
 import afanes.core.editing
+import afanes.core.log
 import afanes.core.names
 import afanes.core.project_body
 import afanes.core.steps
+import afanes.core.template_cards
 import afanes.core.vault.naming
 import afanes.core.vault.pages
 import afanes.core.vault.steps
@@ -23,7 +25,7 @@ from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.core.vault.trash_catalog import TrashEntry, TrashSnapshot
 from afanes.models.link import NoteReference
-from afanes.models.note import NoteType
+from afanes.models.note import NoteDate, NoteType
 from afanes.models.step import StepEdit, StepEditKind
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.session import VaultSession
@@ -32,6 +34,61 @@ from afanes.ui.state.status import UiStatus
 logger = logging.getLogger(__name__)
 
 AUTOSAVE_SECONDS = 30
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class LogDraftStarter:
+    """Starter choices available while a new log draft is otherwise empty.
+
+    Attributes
+    ----------
+    title : str
+        Generated display title without the heading marker.
+    cards : tuple[afanes.core.template_cards.TemplateCard, ...]
+        Valid log cards offered by the Starter control.
+    issues : tuple[afanes.core.template_cards.TemplateCardIssue, ...]
+        Refused card files reported beside the control.
+    selected : afanes.core.template_cards.TemplateCard | None
+        Chosen card, or ``None`` for Empty.
+    """
+
+    title: str
+    cards: tuple[afanes.core.template_cards.TemplateCard, ...]
+    issues: tuple[afanes.core.template_cards.TemplateCardIssue, ...]
+    selected: afanes.core.template_cards.TemplateCard | None = None
+
+    @property
+    def generated_body(self) -> str:
+        """Return the draft body for the current selection.
+
+        Returns
+        -------
+        str
+            The title heading followed by the selected card's starter body, or
+            only the heading and a blank line for Empty.
+        """
+        heading = f"# {self.title}\n\n"
+        if self.selected is None:
+            return heading
+        starter = self.selected.body.strip("\r\n")
+        if not starter.strip():
+            return heading
+        return f"{heading}{starter}\n"
+
+    def with_selected(self, card: afanes.core.template_cards.TemplateCard | None) -> "LogDraftStarter":
+        """Return a starter state with a different selected card.
+
+        Parameters
+        ----------
+        card : afanes.core.template_cards.TemplateCard | None
+            Chosen log card, or ``None`` for Empty.
+
+        Returns
+        -------
+        LogDraftStarter
+            New state; the original is unchanged.
+        """
+        return dataclasses.replace(self, selected=card)
 
 
 @dataclasses.dataclass(slots=True)
@@ -66,6 +123,9 @@ class PageEditorState:
         when the last rewrite completed without a problem.
     trash_entry : afanes.core.vault.trash_catalog.TrashEntry | None
         Managed trashed note shown read-only, or ``None`` for an active page.
+    log_starter : LogDraftStarter | None
+        Starter choices for an unwritten log draft, or ``None`` for every other
+        page.
     """
 
     session: VaultSession
@@ -80,6 +140,7 @@ class PageEditorState:
     repair_preview: ReferenceRepairPreview | None = None
     report: str | None = None
     trash_entry: TrashEntry | None = None
+    log_starter: LogDraftStarter | None = None
 
     @property
     def banner(self) -> str | None:
@@ -141,6 +202,7 @@ class PageEditorState:
         self.editing = self.editing or draft.mode is DraftMode.RAW
         self.conflict = None
         self.report = None
+        self.log_starter = None
 
     def _raise_page_conflict(self, conflict: str) -> None:
         """Set one disk conflict without replacing an existing one.
@@ -614,20 +676,37 @@ class PageEditorState:
         reference = page.reference
         name = reference.name if reference is not None else page.identity
         try:
-            path = await asyncio.to_thread(
-                afanes.core.vault.pages.VaultPages(vault).create_page,
-                name,
-                labels.note_type,
-                labels.category,
-                text=text,
-            )
+            if labels.note_type is NoteType.LOG:
+                entry_date = labels.date
+                if entry_date is None:
+                    self.status.show_notice(afanes.ui.strings.PAGE_LOG_DATE_REQUIRED)
+                    return False
+                path = await asyncio.to_thread(
+                    afanes.core.vault.pages.VaultPages(vault).create_log_page,
+                    entry_date,
+                    text,
+                )
+            else:
+                path = await asyncio.to_thread(
+                    afanes.core.vault.pages.VaultPages(vault).create_page,
+                    name,
+                    labels.note_type,
+                    labels.category,
+                    text=text,
+                )
         except (AfanesError, OSError) as exc:
             logger.debug("New page could not be created", exc_info=True)
-            self.status.show_notice(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
+            notice = (
+                afanes.ui.strings.LOG_WRITE_FAILED
+                if labels.note_type is NoteType.LOG
+                else afanes.ui.strings.PAGE_SAVE_FAILED
+            )
+            self.status.show_notice(notice.format(detail=str(exc)))
             return False
         new_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
         updated = page.after_write(text, content_hash=new_hash, path=path)
         self.page = updated
+        self.log_starter = None
         await self._plan_repair_after_create(updated, vault)
         return True
 
@@ -747,6 +826,7 @@ class PageEditorState:
         self.blocking_message = None
         self.repair_preview = None
         self.report = None
+        self.log_starter = None
         return True
 
     async def follow_trash_change(self, snapshot: TrashSnapshot) -> bool:
@@ -817,6 +897,7 @@ class PageEditorState:
         self.conflict = None
         self.blocking_message = None
         self.report = None
+        self.log_starter = None
         return True
 
     def start_autosave(self) -> None:
@@ -834,6 +915,7 @@ class PageEditorState:
         """Clear the page and its persistent conditions."""
         self.page = None
         self.trash_entry = None
+        self.log_starter = None
         self.editing = False
         self.conflict = None
         self.saving = False
@@ -851,10 +933,96 @@ class PageEditorState:
         """
         self.page = NormalDraft.new(reference)
         self.trash_entry = None
+        self.log_starter = None
         self.editing = True
         self.conflict = None
         self.blocking_message = None
         self.report = None
+
+    def start_log_draft(
+        self,
+        date: NoteDate,
+        listing: afanes.core.template_cards.TemplateCardListing | None,
+    ) -> None:
+        """Open an unwritten log draft for one date.
+
+        Parameters
+        ----------
+        date : NoteDate
+            Entry date. Its ISO text becomes the identity and the generated
+            long date becomes the heading.
+        listing : afanes.core.template_cards.TemplateCardListing | None
+            Vault template cards offered by the Starter control, or ``None``
+            when the folder could not be read.
+
+        Notes
+        -----
+        The draft is clean until its body or labels change, so leaving it
+        untouched writes nothing. Only log cards from the listing are kept.
+        """
+        title = afanes.core.log.LogTitle.for_date(date).text
+        cards = listing.for_type(NoteType.LOG) if listing is not None else ()
+        issues = listing.issues if listing is not None else ()
+        self.page = NormalDraft.for_log(date, title)
+        self.log_starter = LogDraftStarter(title=title, cards=cards, issues=issues)
+        self.trash_entry = None
+        self.editing = True
+        self.conflict = None
+        self.blocking_message = None
+        self.repair_preview = None
+        self.report = None
+
+    @property
+    def log_starter_visible(self) -> bool:
+        """Return whether the Starter control belongs on the open draft.
+
+        Returns
+        -------
+        bool
+            ``True`` only for an unwritten log draft whose body still equals
+            the generated heading plus the selected starter.
+        """
+        starter = self.log_starter
+        page = self.page
+        if starter is None or not isinstance(page, NormalDraft) or not page.is_new:
+            return False
+        labels = page.labels
+        return labels is not None and labels.note_type is NoteType.LOG and page.body == starter.generated_body
+
+    async def select_log_starter(self, card: afanes.core.template_cards.TemplateCard | None) -> bool:
+        """Fill a new log draft with one starter card or Empty.
+
+        Parameters
+        ----------
+        card : afanes.core.template_cards.TemplateCard | None
+            Valid log card chosen in the Starter control, or ``None`` for
+            Empty.
+
+        Returns
+        -------
+        bool
+            ``True`` when the draft body was replaced with the generated body
+            for the new selection.
+
+        Notes
+        -----
+        The command refuses when the open page is not an untouched new log
+        draft or when the card is not part of the current listing. Selecting a
+        card makes the draft dirty; selecting Empty restores the heading.
+        """
+        async with self.command_lock:
+            starter = self.log_starter
+            page = self.page
+            if starter is None or self.trash_entry is not None or not isinstance(page, NormalDraft) or not page.is_new:
+                return False
+            if card is not None and card not in starter.cards:
+                return False
+            if page.body != starter.generated_body:
+                return False
+            updated = starter.with_selected(card)
+            self.log_starter = updated
+            self.page = page.with_body(updated.generated_body)
+            return True
 
     def reset(self) -> None:
         """Return the editor to its initial state."""
@@ -863,6 +1031,7 @@ class PageEditorState:
             self.autosave_task = None
         self.page = None
         self.trash_entry = None
+        self.log_starter = None
         self.editing = False
         self.conflict = None
         self.saving = False

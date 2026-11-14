@@ -9,10 +9,12 @@ import flet as ft
 import pytest
 
 import afanes.core.settings
+import afanes.core.template_cards
 import afanes.core.vault.service
 import afanes.core.vault.trash_catalog
 import afanes.ui.state
 import afanes.ui.state.browser
+import afanes.ui.state.controller
 import afanes.ui.state.status
 import afanes.ui.strings
 import afanes.ui.theme
@@ -20,7 +22,7 @@ from afanes.core.editing import DraftMode
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.steps import StepDocument
 from afanes.models.link import ReferenceScheme
-from afanes.models.note import NoteType
+from afanes.models.note import NoteDate, NoteType
 from afanes.ui.views.page import PageActions, PageView
 from tests.support import constant, ensure_vault, versioned
 from tests.ui.control_tree import emphasis_controls
@@ -28,6 +30,7 @@ from tests.ui.test_conformance import HEADER_ACTION_KEYS
 
 TWO_CANDIDATES = 2
 FOUR_SUBSECTIONS = 4
+STARTER_OPTION_COUNT = 2
 PAGE_MENU_ITEM_COUNT = 4
 
 
@@ -2051,6 +2054,109 @@ class TestPageDates:
         assert document.date is not None
         assert document.date.text == "2025-10"
         assert path.is_file()
+
+
+class TestLogStarter:
+    @staticmethod
+    def _card() -> afanes.core.template_cards.TemplateCard:
+        return afanes.core.template_cards.TemplateCard(
+            relative_path=Path("daily.md"),
+            note_type=NoteType.LOG,
+            category=None,
+            title="Daily entry",
+            description=None,
+            body="## What happened\n",
+            text="",
+        )
+
+    def _open(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        issues: tuple[afanes.core.template_cards.TemplateCardIssue, ...] = (),
+    ) -> tuple[
+        afanes.ui.state.controller.AppState,
+        afanes.core.template_cards.TemplateCard,
+        PageView,
+    ]:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        card = self._card()
+        listing = afanes.core.template_cards.TemplateCardListing(cards=(card,), issues=issues)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(versioned(tmp_path / "vault"))
+            await state.navigation.start_log_draft(NoteDate.from_text("2025-10-12"), listing)
+
+        asyncio.run(scenario())
+        return state, card, PageView(PageActions(update=lambda: None))
+
+    def test_the_starter_is_visible_for_a_new_log_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _state, _card, view = self._open(tmp_path, monkeypatch)
+
+        assert view.log_starter_panel.visible is True
+        assert view.log_starter_picker.dropdown.value == "empty"
+        assert view.log_starter_picker.dropdown.options[-1].text == afanes.ui.strings.LOG_CARD_EMPTY
+
+    def test_selecting_a_card_fills_the_body(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        state, _card, view = self._open(tmp_path, monkeypatch)
+        view.log_starter_picker.dropdown.value = "card:daily.md"
+
+        asyncio.run(view.change_log_starter())
+
+        assert state.pages.page is not None
+        assert state.pages.page.body == "# October 12, 2025\n\n## What happened\n"
+        assert view.body_field.value == state.pages.page.body
+        assert view.log_starter_panel.visible is True
+
+    def test_selecting_empty_restores_the_heading(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        state, _card, view = self._open(tmp_path, monkeypatch)
+        view.log_starter_picker.dropdown.value = "card:daily.md"
+        asyncio.run(view.change_log_starter())
+        view.log_starter_picker.dropdown.value = "empty"
+
+        asyncio.run(view.change_log_starter())
+
+        assert state.pages.page is not None
+        assert state.pages.page.body == "# October 12, 2025\n\n"
+        assert view.body_field.value == state.pages.page.body
+
+    def test_typing_beyond_the_body_hides_the_starter(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _state, _card, view = self._open(tmp_path, monkeypatch)
+        view.body_field.value = "# October 12, 2025\n\nExtra\n"
+
+        asyncio.run(view.change_body())
+
+        assert view.log_starter_panel.visible is False
+
+    def test_invalid_cards_are_named_beside_the_starter(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        issue = afanes.core.template_cards.TemplateCardIssue(relative_path=Path("broken.md"), message="bad")
+        _state, _card, view = self._open(tmp_path, monkeypatch, issues=(issue,))
+
+        assert view.log_starter_picker.warning.visible is True
+        assert "broken.md" in (view.log_starter_picker.warning.value or "")
+        assert len(view.log_starter_picker.dropdown.options) == STARTER_OPTION_COUNT
+
+    def test_an_existing_entry_has_no_starter(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        path = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            _typed_note("log", "# Tuesday\n", extra="date: 2025-10-12"),
+        )
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(versioned(vault))
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
+        view = PageView(PageActions(update=lambda: None))
+        asyncio.run(view.start_edit())
+
+        assert view.log_starter_panel.visible is False
+        assert state.pages.log_starter is None
 
 
 class TestPageWidth:
