@@ -8,11 +8,11 @@
 
 ## 2. Reminder model and recurrence
 
-- [ ] 2.1 Add `models/reminder.py` with `Weekday`, `ClockTime`, `ReminderKind`, `Recurrence`, `OneShot`, and `Reminder`; verify strict docstrings and a pure-model import test.
-- [ ] 2.2 Implement mapping parse and serialization for the six recurrence kinds and the one-shot form, preserving unknown nested keys; verify round-trip tests for every kind.
-- [ ] 2.3 Implement `latest_occurrence`, `next_occurrence`, and `due_occurrence` on the reminder value objects; verify unit tests for daily, weekdays, month-day, nth-weekday, last-day, last-weekday, and one-shot schedules.
-- [ ] 2.4 Add Hypothesis property tests for occurrence bounds, sorted unique times, month skips, nth-weekday bounds, and the latest-occurrence rule; verify the property suite.
-- [ ] 2.5 Add deterministic regression tests for DST gap and repeated hour, a month without the chosen day, a fifth weekday that does not exist, a past one-shot, and a future `handled` value; verify the tests pass.
+- [x] 2.1 Add `models/reminder.py` with `Weekday`, `ClockTime`, `ReminderKind`, `Recurrence`, `OneShot`, and `Reminder`; verify strict docstrings and a pure-model import test.
+- [x] 2.2 Implement mapping parse and serialization for the six recurrence kinds and the one-shot form, preserving unknown nested keys; verify round-trip tests for every kind.
+- [x] 2.3 Implement `latest_occurrence`, `next_occurrence`, and `due_occurrence` on the reminder value objects; verify unit tests for daily, weekdays, month-day, nth-weekday, last-day, last-weekday, and one-shot schedules.
+- [x] 2.4 Add Hypothesis property tests for occurrence bounds, sorted unique times, month skips, nth-weekday bounds, and the latest-occurrence rule; verify the property suite.
+- [x] 2.5 Add deterministic regression tests for DST gap and repeated hour, a month without the chosen day, a fifth weekday that does not exist, a past one-shot, and a future `handled` value; verify the tests pass.
 
 ## 3. Frontmatter and page labels
 
