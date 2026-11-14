@@ -61,6 +61,12 @@ was not run because `clang`, `cmake`, `ninja`, and `pkg-config` are absent on
 this machine; the Flet build stops after staging and before producing an
 artifact.
 
+Manual reminder evidence at `0.10.0` on 2026-11-14 (`Linux tlacoyo x86_64`):
+the source desktop session passed the recurrence, one-shot, single catch-up,
+dismissal preserving body and status, live Review count, pause and restore,
+writable schema `1` upgrade, read-only schema `1` browsing with reminders off,
+and removal with Undo checks.
+
 ### Advisory nightly builds
 
 A scheduled GitHub Actions workflow runs `hatch check` and `hatch test` on

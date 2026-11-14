@@ -72,7 +72,7 @@
 - [x] 10.3 Run `openspec validate --all --strict` and `openspec doctor`; verify both pass.
 - [x] 10.4 Run the vocabulary greps and `git diff --check`; verify no prohibited vocabulary, no trailing whitespace, and no tracked `.mo` files.
 - [x] 10.5 Verify the wheel and Flet build include `tzdata` and `tzlocal` and that zone lookup works offline; record the packaging result.
-- [ ] 10.6 Run the Linux manual check: create one recurrence and one one-shot, confirm the due card and single catch-up, dismiss without changing the note body or status, pause through Trash or a status, upgrade a schema `1` vault, open a read-only schema `1` vault with reminders off, and record the version, date, and machine.
+- [x] 10.6 Run the Linux manual check: create one recurrence and one one-shot, confirm the due card and single catch-up, dismiss without changing the note body or status, pause through Trash or a status, upgrade a schema `1` vault, open a read-only schema `1` vault with reminders off, and record the version, date, and machine.
 
 ## Workflow follow-up
 
