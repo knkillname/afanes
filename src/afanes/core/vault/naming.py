@@ -40,8 +40,9 @@ from afanes.core.vault.naming_reports import (
     RewriteReport,
     TrashPreview,
 )
+from afanes.core.vault.note import VaultPath
 from afanes.core.vault.service import Vault
-from afanes.core.vault.snapshot import ReferenceSite, VaultPath, VaultSnapshot
+from afanes.core.vault.snapshot import ReferenceSite, VaultSnapshot
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType
 

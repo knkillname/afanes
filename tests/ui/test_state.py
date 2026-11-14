@@ -20,6 +20,7 @@ import afanes.core.templates
 import afanes.core.vault.log_conversions
 import afanes.core.vault.naming
 import afanes.core.vault.naming_reports
+import afanes.core.vault.note
 import afanes.core.vault.pages
 import afanes.core.vault.processing
 import afanes.core.vault.schema
@@ -749,7 +750,7 @@ class TestAssignmentCandidates:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
-        async def scenario() -> tuple[afanes.core.vault.snapshot.VaultNote, ...]:
+        async def scenario() -> tuple[afanes.core.vault.note.VaultNote, ...]:
             await state.workspace.choose_vault(vault)
             _write_note(
                 vault / "projects/Launch.md",

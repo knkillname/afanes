@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import Self
 
 import afanes.core.names
-from afanes.core.vault.snapshot import NoteOrder, VaultFailure, VaultNote, VaultSnapshot
+from afanes.core.vault.note import NoteOrder, VaultNote
+from afanes.core.vault.snapshot import VaultFailure, VaultSnapshot
 from afanes.models.note import CategoryLabel, NoteType, Status
 from afanes.models.step import ProjectStep
 

@@ -14,7 +14,8 @@ import dataclasses
 from pathlib import Path
 
 from afanes.core.links import ResolutionOutcome
-from afanes.core.vault.snapshot import VaultNote, VaultSnapshot
+from afanes.core.vault.note import VaultNote
+from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteType
 from afanes.models.step import ProjectStep

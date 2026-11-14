@@ -34,10 +34,10 @@ from afanes.core.errors import (
 )
 from afanes.core.template_cards import TemplateCardCatalog, TemplateCardListing
 from afanes.core.templates import TemplateSummary
+from afanes.core.vault.note import VaultNote
 from afanes.core.vault.service import Vault, VaultCreation
 from afanes.core.vault.snapshot import (
     VaultFailure,
-    VaultNote,
     VaultSnapshot,
 )
 from afanes.core.vault.trash_catalog import TrashCatalog, TrashEntry, TrashMaintenanceReport, TrashSnapshot

@@ -13,7 +13,7 @@ import afanes.models.note
 import afanes.ui.state
 import afanes.ui.theme
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
-from afanes.core.vault.snapshot import VaultNote
+from afanes.core.vault.note import VaultNote
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import Status
 from afanes.ui.components.template_cards import TemplateCardContext, TemplateCardPicker

@@ -14,6 +14,7 @@ from pathlib import Path
 
 import afanes.core.atomic
 import afanes.core.steps
+import afanes.core.vault.note
 import afanes.core.vault.snapshot
 from afanes.core.errors import (
     AfanesError,
@@ -26,8 +27,9 @@ from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan, ProcessingTarget
 from afanes.core.template_cards import TemplateCard
 from afanes.core.vault.naming import VaultNaming
+from afanes.core.vault.note import VaultNote, VaultPath
 from afanes.core.vault.service import Vault
-from afanes.core.vault.snapshot import VaultNote, VaultPath, VaultSnapshot
+from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
@@ -625,8 +627,8 @@ class VaultProcessing:
         """Require a source path to be under the vault's inbox directory."""
         relative = source.relative_to(self.vault.root)
         if (
-            len(relative.parts) < afanes.core.vault.snapshot.MIN_INBOX_PART_COUNT
-            or relative.parts[0].casefold() != afanes.core.vault.snapshot.INBOX_DIRECTORY.name.casefold()
+            len(relative.parts) < afanes.core.vault.note.MIN_INBOX_PART_COUNT
+            or relative.parts[0].casefold() != afanes.core.vault.note.INBOX_DIRECTORY.name.casefold()
         ):
             message = DomainMessage.of(MessageCode.PROCESSING_INBOX_ONLY)
             raise ProcessingError(message)

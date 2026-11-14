@@ -34,7 +34,8 @@ import afanes.ui.views.page
 import afanes.ui.views.processing
 import afanes.ui.views.projects
 import afanes.ui.views.review
-from afanes.core.vault.snapshot import VaultFailure, VaultNote
+from afanes.core.vault.note import VaultNote
+from afanes.core.vault.snapshot import VaultFailure
 from afanes.models.note import DatePrecision, NoteDate
 from afanes.ui.components.banner import Banner
 from afanes.ui.components.frozen import FrozenControlRecovery

@@ -63,6 +63,10 @@ Runtime dependencies use compatible ranges in `pyproject.toml`, with the lower b
 floor matrix. There is no lock or constraints file. Documentation tools live in the `docs` dependency
 group and are installed only by the `docs` Hatch environment.
 
+Reminder schedules use IANA time zones. `tzdata` supplies the zone rules on Linux, macOS, and
+Windows, so every platform resolves the same zones offline; `tzlocal` reports the computer's current
+IANA zone as the editor default. Both are offline libraries with no runtime network access.
+
 A new dependency needs an approved OpenSpec change covering the need, alternatives, license, offline
 behavior, and cross-platform impact. Never add cloud, telemetry, or auto-update packages.
 

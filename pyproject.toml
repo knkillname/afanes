@@ -26,6 +26,8 @@ dependencies = [
   "flet>=1.0.4,<2",
   "markdown-it-py>=4.0,<5",
   "PyYAML>=6.0.3,<7",
+  "tzdata>=2026.6,<2027",
+  "tzlocal>=5.4.5,<6",
 ]
 
 [project.optional-dependencies]
@@ -117,6 +119,8 @@ matrix.deps.extra-dependencies = [
   { value = "flet[desktop]==1.0.4", if = ["floor"] },
   { value = "markdown-it-py==4.0.0", if = ["floor"] },
   { value = "PyYAML==6.0.3", if = ["floor"] },
+  { value = "tzdata==2026.6", if = ["floor"] },
+  { value = "tzlocal==5.4.5", if = ["floor"] },
 ]
 
 [tool.hatch.envs.hatch-check-types]

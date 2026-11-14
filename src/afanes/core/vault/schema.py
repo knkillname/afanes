@@ -17,6 +17,7 @@ from pathlib import Path
 import yaml
 
 import afanes.core.atomic
+import afanes.core.vault.note
 import afanes.core.vault.snapshot
 from afanes.core.errors import (
     DomainMessage,
@@ -43,7 +44,7 @@ SCHEMA_MAX_BYTES = 4096
 
 # Public folders that make an unversioned folder eligible for adoption.
 DEFAULT_FOLDERS = (
-    afanes.core.vault.snapshot.INBOX_DIRECTORY,
+    afanes.core.vault.note.INBOX_DIRECTORY,
     afanes.core.vault.snapshot.TRASH_DIRECTORY,
     afanes.core.vault.snapshot.REFERENCE_DIRECTORY,
     afanes.core.vault.snapshot.PROJECTS_DIRECTORY,

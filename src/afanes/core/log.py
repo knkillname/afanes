@@ -17,7 +17,8 @@ from typing import Self
 import afanes.core.localization
 import afanes.core.names
 import afanes.core.search
-from afanes.core.vault.snapshot import VaultNote, VaultSnapshot
+from afanes.core.vault.note import VaultNote
+from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.models.note import DatePrecision, NoteDate, NoteType
 
 

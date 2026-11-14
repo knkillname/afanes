@@ -2,9 +2,9 @@
 
 ## 1. Foundation, dependencies, and architecture headroom
 
-- [ ] 1.1 Extract `VaultNote`, `NoteOrder`, `InboxOrder`, and `VaultPath` from `core/vault/snapshot.py` into `core/vault/note.py`; update imports without behavior changes; verify `hatch test tests/core/test_architecture.py tests/core/vault` and the line ceilings.
-- [ ] 1.2 Add `tzdata>=2026.6,<2027` and `tzlocal>=5.4.5,<6` to `pyproject.toml` and the floor matrix; verify `hatch env create` and a test that `ZoneInfo("America/Mexico_City")` and `tzlocal.get_localzone_name()` resolve.
-- [ ] 1.3 Document the new dependencies and module layout in `docs/develop/setup.md` and `docs/develop/architecture.md`; verify the pages describe offline, cross-platform behavior and the existing DAG.
+- [x] 1.1 Extract `VaultNote`, `NoteOrder`, `InboxOrder`, and `VaultPath` from `core/vault/snapshot.py` into `core/vault/note.py`; update imports without behavior changes; verify `hatch test tests/core/test_architecture.py tests/core/vault` and the line ceilings.
+- [x] 1.2 Add `tzdata>=2026.6,<2027` and `tzlocal>=5.4.5,<6` to `pyproject.toml` and the floor matrix; verify `hatch env create` and a test that `ZoneInfo("America/Mexico_City")` and `tzlocal.get_localzone_name()` resolve.
+- [x] 1.3 Document the new dependencies and module layout in `docs/develop/setup.md` and `docs/develop/architecture.md`; verify the pages describe offline, cross-platform behavior and the existing DAG.
 
 ## 2. Reminder model and recurrence
 

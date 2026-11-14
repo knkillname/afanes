@@ -89,6 +89,10 @@ There is no SQLite index. Each vault is scanned into an in-memory `VaultSnapshot
 derives the browser, project, and review views from it. `Browser`, `ProjectBoard`, and `ReviewPlanner`
 are read-only over the snapshot and never read files.
 
+Scanned note value objects live in `core/vault/note.py`: `VaultNote`, its ordering keys, and the
+vault path policy. The snapshot module owns the scan result and page value objects and imports the
+note values without importing a write service.
+
 Do not add an indexer, a persistent index, or a background index process without an approved change.
 
 ## 🔒 Write rules

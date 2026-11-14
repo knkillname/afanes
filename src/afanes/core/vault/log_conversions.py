@@ -18,8 +18,9 @@ import afanes.core.vault.snapshot
 from afanes.core.errors import DomainMessage, MessageCode, NameCollisionError, VaultError
 from afanes.core.vault.naming import VaultNaming
 from afanes.core.vault.naming_reports import RenamePreview, RenameReport
+from afanes.core.vault.note import VaultPath
 from afanes.core.vault.service import Vault
-from afanes.core.vault.snapshot import VaultPath, VaultSnapshot
+from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import NoteDate, NoteType
 

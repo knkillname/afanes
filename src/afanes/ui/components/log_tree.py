@@ -18,7 +18,7 @@ import afanes.core.log
 import afanes.i18n.ui
 import afanes.models.note
 import afanes.ui.theme
-from afanes.core.vault.snapshot import VaultNote
+from afanes.core.vault.note import VaultNote
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

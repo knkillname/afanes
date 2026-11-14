@@ -28,6 +28,13 @@ rechecks containment and preserves the note bytes it did not intend to change.
 .. autotype:: afanes.core.vault.snapshot.PageContent
 ```
 
+### 🧩 afanes.core.vault.note
+
+```{eval-rst}
+.. automodule:: afanes.core.vault.note
+   :members:
+```
+
 ## ✍️ Write services
 
 ### 🧩 afanes.core.vault.naming

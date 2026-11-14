@@ -37,6 +37,7 @@ from afanes.core.frontmatter import NoteDocument
 from afanes.core.labels import PageLabels
 from afanes.core.links import CatalogEntry, NameCatalog
 from afanes.core.template_cards import TemplateCard, TemplateCardCatalog
+from afanes.core.vault.note import VaultNote
 from afanes.core.vault.snapshot import (
     NotePath,
     PageContent,
@@ -44,7 +45,6 @@ from afanes.core.vault.snapshot import (
     ParsedPage,
     UnparsedPage,
     VaultFailure,
-    VaultNote,
     VaultSnapshot,
 )
 from afanes.models.link import ReferenceScheme

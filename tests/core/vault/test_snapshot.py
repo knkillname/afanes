@@ -5,7 +5,8 @@ import os
 from pathlib import Path
 
 import afanes.core.vault.service
-from afanes.core.vault.snapshot import LinkOutcome, NoteOrder, VaultNote
+from afanes.core.vault.note import NoteOrder, VaultNote
+from afanes.core.vault.snapshot import LinkOutcome
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteDate, NoteType, Status
 

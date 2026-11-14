@@ -20,7 +20,8 @@ from afanes.core.vault.naming_reports import (
     RewriteReport,
     TrashPreview,
 )
-from afanes.core.vault.snapshot import ReferenceSite, VaultPath
+from afanes.core.vault.note import VaultPath
+from afanes.core.vault.snapshot import ReferenceSite
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.navigation import PageNavigator
