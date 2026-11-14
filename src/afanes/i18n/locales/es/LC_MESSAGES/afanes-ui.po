@@ -357,6 +357,251 @@ msgctxt "REVIEW_DISMISS"
 msgid "Dismiss"
 msgstr "Descartar"
 
+#: src/afanes/i18n/ui/en.py REMINDER_KIND_LABELS
+msgctxt "REMINDER_KIND_LABELS.daily"
+msgid "Daily"
+msgstr "Diario"
+
+#: src/afanes/i18n/ui/en.py REMINDER_KIND_LABELS
+msgctxt "REMINDER_KIND_LABELS.weekdays"
+msgid "Selected Weekdays"
+msgstr "Días seleccionados"
+
+#: src/afanes/i18n/ui/en.py REMINDER_KIND_LABELS
+msgctxt "REMINDER_KIND_LABELS.month_day"
+msgid "Day of Month"
+msgstr "Día del mes"
+
+#: src/afanes/i18n/ui/en.py REMINDER_KIND_LABELS
+msgctxt "REMINDER_KIND_LABELS.nth_weekday"
+msgid "Nth Weekday"
+msgstr "Enésimo día de la semana"
+
+#: src/afanes/i18n/ui/en.py REMINDER_KIND_LABELS
+msgctxt "REMINDER_KIND_LABELS.last_day"
+msgid "Last Day"
+msgstr "Último día"
+
+#: src/afanes/i18n/ui/en.py REMINDER_KIND_LABELS
+msgctxt "REMINDER_KIND_LABELS.last_weekday"
+msgid "Last Weekday"
+msgstr "Último día de la semana"
+
+#: src/afanes/i18n/ui/en.py REMINDER_ORDINAL_LABELS
+msgctxt "REMINDER_ORDINAL_LABELS.1"
+msgid "First"
+msgstr "Primero"
+
+#: src/afanes/i18n/ui/en.py REMINDER_ORDINAL_LABELS
+msgctxt "REMINDER_ORDINAL_LABELS.2"
+msgid "Second"
+msgstr "Segundo"
+
+#: src/afanes/i18n/ui/en.py REMINDER_ORDINAL_LABELS
+msgctxt "REMINDER_ORDINAL_LABELS.3"
+msgid "Third"
+msgstr "Tercero"
+
+#: src/afanes/i18n/ui/en.py REMINDER_ORDINAL_LABELS
+msgctxt "REMINDER_ORDINAL_LABELS.4"
+msgid "Fourth"
+msgstr "Cuarto"
+
+#: src/afanes/i18n/ui/en.py REMINDER_ORDINAL_LABELS
+msgctxt "REMINDER_ORDINAL_LABELS.5"
+msgid "Fifth"
+msgstr "Quinto"
+
+#: src/afanes/i18n/ui/en.py REMINDER_MODE_RECURRING
+msgctxt "REMINDER_MODE_RECURRING"
+msgid "Repeats"
+msgstr "Se repite"
+
+#: src/afanes/i18n/ui/en.py REMINDER_MODE_ONCE
+msgctxt "REMINDER_MODE_ONCE"
+msgid "One Shot"
+msgstr "Única vez"
+
+#: src/afanes/i18n/ui/en.py REMINDER_TIMES_LABEL
+msgctxt "REMINDER_TIMES_LABEL"
+msgid "Times"
+msgstr "Horas"
+
+#: src/afanes/i18n/ui/en.py REMINDER_TIME_HINT
+msgctxt "REMINDER_TIME_HINT"
+msgid "HH:MM"
+msgstr "HH:MM"
+
+#: src/afanes/i18n/ui/en.py REMINDER_ADD_TIME
+msgctxt "REMINDER_ADD_TIME"
+msgid "Add Time"
+msgstr "Añadir hora"
+
+#: src/afanes/i18n/ui/en.py REMINDER_REMOVE_TIME
+msgctxt "REMINDER_REMOVE_TIME"
+msgid "Remove"
+msgstr "Quitar"
+
+#: src/afanes/i18n/ui/en.py REMINDER_ZONE_LABEL
+msgctxt "REMINDER_ZONE_LABEL"
+msgid "Time Zone"
+msgstr "Zona horaria"
+
+#: src/afanes/i18n/ui/en.py REMINDER_ZONE_HINT
+msgctxt "REMINDER_ZONE_HINT"
+msgid "Search time zones"
+msgstr "Buscar zonas horarias"
+
+#: src/afanes/i18n/ui/en.py REMINDER_WEEKDAYS_LABEL
+msgctxt "REMINDER_WEEKDAYS_LABEL"
+msgid "Weekdays"
+msgstr "Días de la semana"
+
+#: src/afanes/i18n/ui/en.py REMINDER_DAY_LABEL
+msgctxt "REMINDER_DAY_LABEL"
+msgid "Day"
+msgstr "Día"
+
+#: src/afanes/i18n/ui/en.py REMINDER_ORDINAL_LABEL
+msgctxt "REMINDER_ORDINAL_LABEL"
+msgid "Week"
+msgstr "Semana"
+
+#: src/afanes/i18n/ui/en.py REMINDER_WEEKDAY_LABEL
+msgctxt "REMINDER_WEEKDAY_LABEL"
+msgid "Weekday"
+msgstr "Día de la semana"
+
+#: src/afanes/i18n/ui/en.py REMINDER_ONCE_LABEL
+msgctxt "REMINDER_ONCE_LABEL"
+msgid "Date and Time"
+msgstr "Fecha y hora"
+
+#: src/afanes/i18n/ui/en.py REMINDER_ONCE_HINT
+msgctxt "REMINDER_ONCE_HINT"
+msgid "YYYY-MM-DDTHH:MM"
+msgstr "YYYY-MM-DDTHH:MM"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SHORTCUT_DUE
+msgctxt "REMINDER_SHORTCUT_DUE"
+msgid "Due Date"
+msgstr "Fecha de vencimiento"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SHORTCUT_DAY_BEFORE
+msgctxt "REMINDER_SHORTCUT_DAY_BEFORE"
+msgid "One Day Before"
+msgstr "Un día antes"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SHORTCUT_WEEK_BEFORE
+msgctxt "REMINDER_SHORTCUT_WEEK_BEFORE"
+msgid "One Week Before"
+msgstr "Una semana antes"
+
+#: src/afanes/i18n/ui/en.py REMINDER_FORM_INVALID
+msgctxt "REMINDER_FORM_INVALID"
+msgid "Check the reminder values and try again"
+msgstr "Revisa los valores del recordatorio e inténtalo de nuevo"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SAVE
+msgctxt "REMINDER_SAVE"
+msgid "Save"
+msgstr "Guardar"
+
+#: src/afanes/i18n/ui/en.py REMINDER_REMOVE
+msgctxt "REMINDER_REMOVE"
+msgid "Remove Reminder"
+msgstr "Quitar recordatorio"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SET_ACTION
+msgctxt "REMINDER_SET_ACTION"
+msgid "Set Reminder"
+msgstr "Añadir recordatorio"
+
+#: src/afanes/i18n/ui/en.py REMINDER_EDIT_ACTION
+msgctxt "REMINDER_EDIT_ACTION"
+msgid "Edit Reminder"
+msgstr "Editar recordatorio"
+
+#: src/afanes/i18n/ui/en.py REMINDER_NO_REMINDER
+msgctxt "REMINDER_NO_REMINDER"
+msgid "No reminder"
+msgstr "Sin recordatorio"
+
+#: src/afanes/i18n/ui/en.py REMINDER_INVALID_SUMMARY
+msgctxt "REMINDER_INVALID_SUMMARY"
+msgid "The reminder cannot be read. Replace or remove it"
+msgstr "No se puede leer el recordatorio. Reemplázalo o quítalo"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SUMMARY_DAILY
+msgctxt "REMINDER_SUMMARY_DAILY"
+msgid "Daily at {times}"
+msgstr "Diario a las {times}"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SUMMARY_WEEKDAYS
+msgctxt "REMINDER_SUMMARY_WEEKDAYS"
+msgid "Every {weekdays} at {times}"
+msgstr "Cada {weekdays} a las {times}"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SUMMARY_MONTH_DAY
+msgctxt "REMINDER_SUMMARY_MONTH_DAY"
+msgid "Day {day} of every month at {times}"
+msgstr "El día {day} de cada mes a las {times}"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SUMMARY_NTH_WEEKDAY
+msgctxt "REMINDER_SUMMARY_NTH_WEEKDAY"
+msgid "The {ordinal} {weekday} of every month at {times}"
+msgstr "El {ordinal} {weekday} de cada mes a las {times}"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SUMMARY_LAST_DAY
+msgctxt "REMINDER_SUMMARY_LAST_DAY"
+msgid "The last day of every month at {times}"
+msgstr "El último día de cada mes a las {times}"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SUMMARY_LAST_WEEKDAY
+msgctxt "REMINDER_SUMMARY_LAST_WEEKDAY"
+msgid "The last {weekday} of every month at {times}"
+msgstr "El último {weekday} de cada mes a las {times}"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SUMMARY_ONCE
+msgctxt "REMINDER_SUMMARY_ONCE"
+msgid "Once on {date} at {time}"
+msgstr "Una vez el {date} a las {time}"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SUMMARY_ZONE
+msgctxt "REMINDER_SUMMARY_ZONE"
+msgid "Time zone: {zone}"
+msgstr "Zona horaria: {zone}"
+
+#: src/afanes/i18n/ui/en.py REMINDER_PAUSED
+msgctxt "REMINDER_PAUSED"
+msgid "Paused"
+msgstr "En pausa"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SHORT_MONTH_WARNING
+msgctxt "REMINDER_SHORT_MONTH_WARNING"
+msgid "Some months do not have this day. Choose Last Day to avoid skipped months"
+msgstr "Algunos meses no tienen este día. Elige último día para evitar meses omitidos"
+
+#: src/afanes/i18n/ui/en.py REMINDER_FIFTH_WEEKDAY_WARNING
+msgctxt "REMINDER_FIFTH_WEEKDAY_WARNING"
+msgid "Some months do not have a fifth {weekday}. Choose Last Weekday to avoid skipped months"
+msgstr "Algunos meses no tienen un quinto {weekday}. Elige último día de la semana para evitar meses omitidos"
+
+#: src/afanes/i18n/ui/en.py REMINDER_SAVED
+msgctxt "REMINDER_SAVED"
+msgid "Reminder saved"
+msgstr "Recordatorio guardado"
+
+#: src/afanes/i18n/ui/en.py REMINDER_REMOVED
+msgctxt "REMINDER_REMOVED"
+msgid "Reminder removed"
+msgstr "Recordatorio quitado"
+
+#: src/afanes/i18n/ui/en.py REMINDER_UNDO_FAILED
+msgctxt "REMINDER_UNDO_FAILED"
+msgid "Could not restore the reminder"
+msgstr "No se pudo restaurar el recordatorio"
+
 #: src/afanes/i18n/ui/en.py REVIEW_NEXT_STEP
 msgctxt "REVIEW_NEXT_STEP"
 msgid "Next Step"

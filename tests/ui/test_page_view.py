@@ -306,6 +306,141 @@ class TestReadMode:
         assert view.title.value == "First"
 
 
+class TestReminderSummary:
+    def _open(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, path: Path) -> afanes.ui.state.controller.AppState:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(tmp_path / "vault")
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
+        return state
+
+    def test_the_summary_shows_the_schedule(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "reference" / "Ada.md",
+            "---\n"
+            "type: reference\n"
+            "reminder:\n"
+            "  zone: America/Mexico_City\n"
+            "  recurrence:\n"
+            "    kind: daily\n"
+            '    times: ["09:00"]\n'
+            "---\n\n# Ada\n",
+        )
+        self._open(tmp_path, monkeypatch, path)
+
+        view = PageView(PageActions(update=lambda: None))
+
+        assert view.reminder_row.visible is True
+        assert "Daily at" in (view.reminder_text.value or "")
+        assert "America/Mexico_City" in (view.reminder_text.value or "")
+        assert view.reminder_action.content == afanes.i18n.ui.en.REMINDER_EDIT_ACTION
+
+    def test_a_page_without_a_reminder_offers_set(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
+        self._open(tmp_path, monkeypatch, path)
+
+        view = PageView(PageActions(update=lambda: None))
+
+        assert view.reminder_row.visible is True
+        assert view.reminder_action.content == afanes.i18n.ui.en.REMINDER_SET_ACTION
+
+    def test_a_malformed_reminder_shows_a_warning(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "reference" / "Ada.md",
+            "---\ntype: reference\nreminder: [broken]\n---\n\n# Ada\n",
+        )
+        self._open(tmp_path, monkeypatch, path)
+
+        view = PageView(PageActions(update=lambda: None))
+
+        assert view.reminder_text.value == afanes.i18n.ui.en.REMINDER_INVALID_SUMMARY
+        assert view.reminder_action.content == afanes.i18n.ui.en.REMINDER_EDIT_ACTION
+
+    def test_a_capture_shows_no_reminder_section(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "inbox" / "Ada.md", _note_text("# Ada\n"))
+        self._open(tmp_path, monkeypatch, path)
+
+        view = PageView(PageActions(update=lambda: None))
+
+        assert view.reminder_row.visible is False
+
+    def test_the_editor_opens_from_the_read_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
+        self._open(tmp_path, monkeypatch, path)
+        view = PageView(PageActions(update=lambda: None))
+
+        asyncio.run(view.open_reminder_editor())
+
+        assert view.reminder_editor.panel.visible is True
+        assert view.reminder_editor.kind_dropdown.value == "daily"
+
+    def test_removal_offers_undo_and_restores_the_reminder(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "reference" / "Ada.md",
+            "---\n"
+            "type: reference\n"
+            "reminder:\n"
+            "  zone: America/Mexico_City\n"
+            "  recurrence:\n"
+            "    kind: daily\n"
+            '    times: ["09:00"]\n'
+            "  handled: 2026-11-14T15:00:00+00:00\n"
+            "  extra: keep\n"
+            "---\n\n# Ada\n",
+        )
+        state = self._open(tmp_path, monkeypatch, path)
+        view = PageView(PageActions(update=lambda: None))
+
+        async def scenario() -> None:
+            assert await view.remove_reminder() is True
+            notice = state.status.notice
+            assert notice is not None
+            assert notice.action is afanes.ui.state.status.NoticeAction.UNDO_REMINDER
+            assert state.pages.removed_reminder is not None
+            assert state.pages.removed_reminder_path == path.resolve()
+            assert "reminder" not in path.read_text(encoding="utf-8")
+            assert await state.pages.set_page_reminder(state.pages.removed_reminder, save=True) is True
+
+        asyncio.run(scenario())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.reminder is not None
+        assert document.reminder.handled is not None
+        assert dict(document.reminder.extra) == {"extra": "keep"}
+
+    def test_removing_a_malformed_reminder_has_no_undo_value(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "reference" / "Ada.md",
+            "---\ntype: reference\nreminder: [broken]\n---\n\n# Ada\n",
+        )
+        state = self._open(tmp_path, monkeypatch, path)
+        view = PageView(PageActions(update=lambda: None))
+
+        async def scenario() -> None:
+            assert await view.remove_reminder() is True
+            notice = state.status.notice
+            assert notice is not None
+            assert notice.action is None
+            assert "reminder" not in path.read_text(encoding="utf-8")
+
+        asyncio.run(scenario())
+
+
 class TestEditMode:
     def test_edit_mode_renders_the_body_and_labels(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -2477,6 +2612,40 @@ class TestTrashPage:
 
         assert state.session.trash_count == 0
         assert state.pages.trash_entry is None
+
+    def test_a_trashed_reference_shows_the_summary_without_actions(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        source = _write_note(
+            vault / "reference" / "Ada.md",
+            "---\n"
+            "type: reference\n"
+            "reminder:\n"
+            "  zone: America/Mexico_City\n"
+            "  recurrence:\n"
+            "    kind: daily\n"
+            '    times: ["09:00"]\n'
+            "---\n\n# Ada\n",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(PageActions(update=lambda: None))
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(source)
+            assert await state.dialogs.trash_page() is True
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+            entry = state.browser.trash_entries()[0]
+            assert await state.navigation.open_trash(entry) is True
+
+        asyncio.run(scenario())
+        view.refresh()
+
+        assert view.reminder_row.visible is True
+        assert view.reminder_action.visible is False
+        assert afanes.i18n.ui.en.REMINDER_PAUSED in (view.reminder_text.value or "")
 
 
 class TestTrashedProjectPage:

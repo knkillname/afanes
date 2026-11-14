@@ -93,6 +93,66 @@ REVIEW_OPEN_ACTION = "Open"
 REVIEW_REMINDER_TITLE = "Reminder"
 REVIEW_OPEN_PAGE = "Open Page"
 REVIEW_DISMISS = "Dismiss"
+
+REMINDER_KIND_LABELS = MappingProxyType(
+    {
+        "daily": "Daily",
+        "weekdays": "Selected Weekdays",
+        "month_day": "Day of Month",
+        "nth_weekday": "Nth Weekday",
+        "last_day": "Last Day",
+        "last_weekday": "Last Weekday",
+    }
+)
+REMINDER_ORDINAL_LABELS = MappingProxyType(
+    {
+        "1": "First",
+        "2": "Second",
+        "3": "Third",
+        "4": "Fourth",
+        "5": "Fifth",
+    }
+)
+REMINDER_MODE_RECURRING = "Repeats"
+REMINDER_MODE_ONCE = "One Shot"
+REMINDER_TIMES_LABEL = "Times"
+REMINDER_TIME_HINT = "HH:MM"
+REMINDER_ADD_TIME = "Add Time"
+REMINDER_REMOVE_TIME = "Remove"
+REMINDER_ZONE_LABEL = "Time Zone"
+REMINDER_ZONE_HINT = "Search time zones"
+REMINDER_WEEKDAYS_LABEL = "Weekdays"
+REMINDER_DAY_LABEL = "Day"
+REMINDER_ORDINAL_LABEL = "Week"
+REMINDER_WEEKDAY_LABEL = "Weekday"
+REMINDER_ONCE_LABEL = "Date and Time"
+REMINDER_ONCE_HINT = "YYYY-MM-DDTHH:MM"
+REMINDER_SHORTCUT_DUE = "Due Date"
+REMINDER_SHORTCUT_DAY_BEFORE = "One Day Before"
+REMINDER_SHORTCUT_WEEK_BEFORE = "One Week Before"
+REMINDER_FORM_INVALID = "Check the reminder values and try again"
+REMINDER_SAVE = "Save"
+REMINDER_REMOVE = "Remove Reminder"
+REMINDER_SET_ACTION = "Set Reminder"
+REMINDER_EDIT_ACTION = "Edit Reminder"
+REMINDER_NO_REMINDER = "No reminder"
+REMINDER_INVALID_SUMMARY = "The reminder cannot be read. Replace or remove it"
+REMINDER_SUMMARY_DAILY = "Daily at {times}"
+REMINDER_SUMMARY_WEEKDAYS = "Every {weekdays} at {times}"
+REMINDER_SUMMARY_MONTH_DAY = "Day {day} of every month at {times}"
+REMINDER_SUMMARY_NTH_WEEKDAY = "The {ordinal} {weekday} of every month at {times}"
+REMINDER_SUMMARY_LAST_DAY = "The last day of every month at {times}"
+REMINDER_SUMMARY_LAST_WEEKDAY = "The last {weekday} of every month at {times}"
+REMINDER_SUMMARY_ONCE = "Once on {date} at {time}"
+REMINDER_SUMMARY_ZONE = "Time zone: {zone}"
+REMINDER_PAUSED = "Paused"
+REMINDER_SHORT_MONTH_WARNING = "Some months do not have this day. Choose Last Day to avoid skipped months"
+REMINDER_FIFTH_WEEKDAY_WARNING = (
+    "Some months do not have a fifth {weekday}. Choose Last Weekday to avoid skipped months"
+)
+REMINDER_SAVED = "Reminder saved"
+REMINDER_REMOVED = "Reminder removed"
+REMINDER_UNDO_FAILED = "Could not restore the reminder"
 REVIEW_NEXT_STEP = "Next Step"
 REVIEW_NO_NEXT_STEP = "This project has no next step yet"
 REVIEW_OTHER_STEPS = "Other Open Steps"

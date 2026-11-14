@@ -323,3 +323,25 @@ class UiCopy(afanes.i18n.catalog.LocalizedCatalog):
             Labels keyed by note type.
         """
         return self.mapping("PAGE_TYPE_LABELS")
+
+    @property
+    def REMINDER_KIND_LABELS(self) -> Mapping[str, str]:  # noqa: N802
+        """Return the localized reminder recurrence labels.
+
+        Returns
+        -------
+        collections.abc.Mapping[str, str]
+            Labels keyed by reminder kind.
+        """
+        return self.mapping("REMINDER_KIND_LABELS")
+
+    @property
+    def REMINDER_ORDINAL_LABELS(self) -> Mapping[str, str]:  # noqa: N802
+        """Return the localized reminder ordinal labels.
+
+        Returns
+        -------
+        collections.abc.Mapping[str, str]
+            Labels keyed by written ordinal from ``1`` to ``5``.
+        """
+        return self.mapping("REMINDER_ORDINAL_LABELS")

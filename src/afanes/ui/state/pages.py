@@ -25,6 +25,7 @@ from afanes.core.vault.snapshot import VaultSnapshot
 from afanes.core.vault.trash_catalog import TrashEntry, TrashSnapshot
 from afanes.models.link import NoteReference
 from afanes.models.note import NoteDate, NoteType
+from afanes.models.reminder import Reminder
 from afanes.models.step import StepEdit, StepEditKind
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.session import VaultSession
@@ -125,6 +126,11 @@ class PageEditorState:
     log_starter : LogDraftStarter | None
         Starter choices for an unwritten log draft, or ``None`` for every other
         page.
+    removed_reminder : Reminder | None
+        Last reminder removed in this session, used by the Undo toast.
+    removed_reminder_path : Path | None
+        Page that owned :attr:`removed_reminder`, or ``None`` when no Undo is
+        available.
     """
 
     session: VaultSession
@@ -140,6 +146,8 @@ class PageEditorState:
     report: str | None = None
     trash_entry: TrashEntry | None = None
     log_starter: LogDraftStarter | None = None
+    removed_reminder: Reminder | None = None
+    removed_reminder_path: Path | None = None
 
     @property
     def banner(self) -> str | None:
@@ -471,6 +479,83 @@ class PageEditorState:
             return False
         await self.session.refresh_snapshot()
         return True
+
+    async def set_page_reminder(self, reminder: Reminder, *, save: bool = False) -> bool:
+        """Set or change the draft reminder.
+
+        Parameters
+        ----------
+        reminder : Reminder
+            New schedule and zone. The current handled instant and unknown
+            nested keys are preserved when the schedule and zone are unchanged.
+        save : bool
+            Write the draft immediately and refresh the scan. Read-mode saves
+            use this; edit-mode saves keep the reminder in the draft.
+
+        Returns
+        -------
+        bool
+            ``True`` when the reminder was applied and, when requested, written.
+
+        Notes
+        -----
+        The write goes through the page draft and its content-hash guard. A
+        changed schedule or zone clears ``handled``; an unchanged one preserves
+        it. A failed write restores the previous draft and returns ``False``.
+        """
+        async with self.command_lock:
+            page = self.page
+            if not isinstance(page, NormalDraft) or self.trash_entry is not None:
+                return False
+            if page.labels.note_type is NoteType.NOTE:
+                return False
+            previous = page
+            current = page.labels.reminder
+            effective = reminder if current is None else current.with_schedule(reminder.schedule, reminder.zone)
+            self.page = page.with_labels(page.labels.with_reminder(effective))
+            if not save or not self.page.is_dirty:
+                return True
+        if not await self.autosave(force=True):
+            self.page = previous
+            return False
+        await self.session.refresh_snapshot()
+        return True
+
+    async def remove_page_reminder(self, *, save: bool = False) -> Reminder | None:
+        """Remove the draft reminder and return the previous value.
+
+        Parameters
+        ----------
+        save : bool
+            Write the draft immediately and refresh the scan.
+
+        Returns
+        -------
+        Reminder | None
+            Previous valid reminder for an Undo action, or ``None`` when the
+            draft has no valid reminder or the write failed.
+
+        Notes
+        -----
+        A malformed raw reminder is removed without an Undo value. A failed
+        write restores the previous draft and returns ``None``.
+        """
+        async with self.command_lock:
+            page = self.page
+            if not isinstance(page, NormalDraft) or self.trash_entry is not None:
+                return None
+            previous_reminder = page.labels.reminder
+            previous = page
+            self.page = page.with_labels(page.labels.without_reminder())
+            if not save or not self.page.is_dirty:
+                return previous_reminder
+        if not await self.autosave(force=True):
+            self.page = previous
+            return None
+        self.removed_reminder = previous_reminder
+        self.removed_reminder_path = page.path if previous_reminder is not None else None
+        await self.session.refresh_snapshot()
+        return previous_reminder
 
     async def toggle_page_step(self, line_index: int, *, checked: bool) -> bool:
         """Check or reopen one step of the open project page.
@@ -1047,3 +1132,5 @@ class PageEditorState:
         self.blocking_message = None
         self.repair_preview = None
         self.report = None
+        self.removed_reminder = None
+        self.removed_reminder_path = None

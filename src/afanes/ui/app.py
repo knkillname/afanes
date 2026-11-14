@@ -296,7 +296,26 @@ class AppShell:
         """
         if action is afanes.ui.state.status.NoticeAction.UNDO_TRASH:
             await self.state.dialogs.undo_trash()
+        elif action is afanes.ui.state.status.NoticeAction.UNDO_REMINDER:
+            await self._undo_reminder()
         self._refresh_current_workspace()
+
+    async def _undo_reminder(self) -> None:
+        """Restore the last removed reminder after an Undo toast action."""
+        pages = self.state.pages
+        reminder = pages.removed_reminder
+        path = pages.removed_reminder_path
+        if reminder is None or path is None:
+            return
+        needs_open = pages.page is None or pages.page.path != path
+        if needs_open and not await self.state.navigation.open_page(path):
+            self.state.status.show_notice(self.copy.REMINDER_UNDO_FAILED)
+            return
+        if not await pages.set_page_reminder(reminder, save=True):
+            self.state.status.show_notice(self.copy.REMINDER_UNDO_FAILED)
+            return
+        pages.removed_reminder = None
+        pages.removed_reminder_path = None
 
     async def set_language(self, language: str | None) -> None:
         """Store the language choice for the next launch.

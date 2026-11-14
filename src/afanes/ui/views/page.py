@@ -10,10 +10,12 @@ flows are inline panels so the pane stays usable without a rendered dialog.
 
 import asyncio
 import dataclasses
+import datetime
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import flet as ft
+import tzlocal
 
 import afanes.core.connections
 import afanes.core.search
@@ -23,15 +25,19 @@ import afanes.ui.components.field_flow
 import afanes.ui.components.page_panels
 import afanes.ui.state
 import afanes.ui.theme
-from afanes.core.editing import DraftMode, PageDraft
+from afanes.core.editing import DraftMode, NormalDraft, PageDraft
+from afanes.core.labels import PageLabels, ReminderEdit
 from afanes.core.vault.snapshot import LinkOutcome
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.reminder import Recurrence, Reminder
 from afanes.ui.components.banner import Banner
 from afanes.ui.components.frozen import FrozenControlRecovery
 from afanes.ui.components.panel import Panel
+from afanes.ui.components.reminder import ReminderEditor
 from afanes.ui.components.template_cards import TemplateCardContext, TemplateCardPicker
 from afanes.ui.state.navigation import RoleFollowOutcome
+from afanes.ui.state.status import NoticeAction
 from afanes.ui.views.project_body import PickDate, ProjectBodyView
 
 type PickRole = Callable[[str, str | None], Awaitable[str | None]]
@@ -97,6 +103,8 @@ class PageView:
         self._starter_task: asyncio.Task[None] | None = None
         self._role_suggestion_field: str | None = None
         self._field_flow_width = float(afanes.ui.theme.SHELL_WIDE_MIN)
+        self._system_zone = tzlocal.get_localzone_name()
+        self._reminder_page: Path | None = None
         self._build_header()
         self._build_meta()
         self._build_read_content()
@@ -284,6 +292,19 @@ class PageView:
             visible=False,
             key="page-meta",
         )
+        self.reminder_text = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"], selectable=True)
+        self.reminder_action = ft.TextButton(
+            content="",
+            on_click=self.open_reminder_editor,
+            key="page-reminder-action",
+        )
+        self.reminder_row = ft.Row(
+            controls=[self.reminder_text, self.reminder_action],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            visible=False,
+            key="page-reminder",
+        )
 
     def _build_read_content(self) -> None:
         """Build the read-mode content and connections panel."""
@@ -300,6 +321,12 @@ class PageView:
             on_tap_link=self.handle_link,
         )
         self.project_body = ProjectBodyView(self._update, self.follow, self._pick_date, self.follow_role)
+        self.reminder_editor = ReminderEditor(
+            self.save_reminder,
+            self.remove_reminder,
+            self.cancel_reminder,
+            copy=self._state.status.copy,
+        )
         self._show_completed_steps = False
         self._show_finished_projects = False
         self._connections_page: Path | None = None
@@ -603,8 +630,10 @@ class PageView:
                 self.body_header,
                 self.trash_info,
                 self.meta_row,
+                self.reminder_row,
                 self.banners,
                 self.dialogs,
+                self.reminder_editor.panel,
                 self.mode_host,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
@@ -786,6 +815,7 @@ class PageView:
         self.content.visible = not editing
         self._refresh_header(page, editing=editing)
         self._refresh_meta(page, editing=editing)
+        self._refresh_reminder(page, editing=editing)
         self._refresh_read(page, editing=editing)
         self._refresh_connections(page, editing=editing)
         self._refresh_edit(page, editing=editing)
@@ -1053,6 +1083,150 @@ class PageView:
             if due_date is not None
             else self._state.status.copy.PAGE_PROJECT_NO_DUE
         )
+
+    def _refresh_reminder(self, page: PageDraft | None, *, editing: bool) -> None:
+        """Refresh the reminder summary and its read-mode action."""
+        state = self._state
+        labels = state.pages.page_labels if page is not None else None
+        normal = page is not None and page.mode is DraftMode.NORMAL and not editing
+        eligible = (
+            normal
+            and labels is not None
+            and labels.note_type
+            in (
+                NoteType.REFERENCE,
+                NoteType.PROJECT,
+                NoteType.LOG,
+            )
+        )
+        trashed = state.pages.trash_entry is not None
+        self.reminder_row.visible = eligible
+        if not eligible or page is None or labels is None:
+            if self._reminder_page is not None:
+                self.reminder_editor.hide()
+                self._reminder_page = None
+            return
+        if self._reminder_page is not None and page.path != self._reminder_page:
+            self.reminder_editor.hide()
+            self._reminder_page = None
+        if trashed:
+            self.reminder_editor.hide()
+        raw_reminder = isinstance(page, NormalDraft) and page.source.raw.get("reminder") is not None
+        reminder = labels.reminder
+        if reminder is not None:
+            self.reminder_text.value = self._reminder_summary(labels, reminder)
+            self.reminder_action.content = state.status.copy.REMINDER_EDIT_ACTION
+        elif raw_reminder:
+            self.reminder_text.value = state.status.copy.REMINDER_INVALID_SUMMARY
+            self.reminder_action.content = state.status.copy.REMINDER_EDIT_ACTION
+        else:
+            self.reminder_text.value = state.status.copy.REMINDER_NO_REMINDER
+            self.reminder_action.content = state.status.copy.REMINDER_SET_ACTION
+        self.reminder_action.visible = not trashed
+
+    def _reminder_summary(self, labels: PageLabels, reminder: Reminder) -> str:
+        """Return the localized cadence, times, zone, and paused state."""
+        copy = self._state.status.copy
+        locale = copy.locale_format
+        schedule = reminder.schedule
+        if isinstance(schedule, Recurrence):
+            times = ", ".join(locale.time(datetime.time(time.hour, time.minute)) for time in schedule.times)
+            if schedule.kind.value == "daily":
+                summary = copy.REMINDER_SUMMARY_DAILY.format(times=times)
+            elif schedule.kind.value == "weekdays":
+                weekdays = ", ".join(locale.weekday_names()[weekday.position] for weekday in schedule.weekdays)
+                summary = copy.REMINDER_SUMMARY_WEEKDAYS.format(weekdays=weekdays, times=times)
+            elif schedule.kind.value == "month_day":
+                summary = copy.REMINDER_SUMMARY_MONTH_DAY.format(day=schedule.day, times=times)
+            elif schedule.kind.value == "nth_weekday":
+                weekday = locale.weekday_names()[schedule.weekday.position] if schedule.weekday else ""
+                ordinal = copy.REMINDER_ORDINAL_LABELS[str(schedule.nth or 1)]
+                summary = copy.REMINDER_SUMMARY_NTH_WEEKDAY.format(
+                    ordinal=ordinal,
+                    weekday=weekday,
+                    times=times,
+                )
+            elif schedule.kind.value == "last_day":
+                summary = copy.REMINDER_SUMMARY_LAST_DAY.format(times=times)
+            else:
+                weekday = locale.weekday_names()[schedule.weekday.position] if schedule.weekday else ""
+                summary = copy.REMINDER_SUMMARY_LAST_WEEKDAY.format(weekday=weekday, times=times)
+        else:
+            local = schedule.local
+            summary = copy.REMINDER_SUMMARY_ONCE.format(
+                date=locale.short_date(afanes.models.note.NoteDate.from_date(local.date())),
+                time=locale.time(datetime.time(local.hour, local.minute)),
+            )
+        zone = reminder.resolved_zone(self._system_zone)
+        lines = [summary, copy.REMINDER_SUMMARY_ZONE.format(zone=zone)]
+        if self._reminder_paused(labels):
+            lines.append(copy.REMINDER_PAUSED)
+        return "\n".join(lines)
+
+    def _reminder_paused(self, labels: PageLabels) -> bool:
+        """Return whether the page status or trash location pauses a reminder."""
+        if self._state.pages.trash_entry is not None:
+            return True
+        note_type = getattr(labels, "note_type", None)
+        status = getattr(labels, "status", None)
+        if note_type is NoteType.LOG:
+            return False
+        return status in (Status.DONE, Status.CANCELLED, Status.ARCHIVED, Status.LATER)
+
+    async def open_reminder_editor(self) -> None:
+        """Open the reminder editor for the current read-mode page."""
+        state = self._state
+        page = state.pages.page
+        labels = state.pages.page_labels
+        if (
+            not isinstance(page, NormalDraft)
+            or labels is None
+            or state.pages.trash_entry is not None
+            or labels.note_type is NoteType.NOTE
+        ):
+            return
+        due_date = labels.due_date if labels.note_type is NoteType.PROJECT else None
+        self._reminder_page = page.path
+        self.reminder_editor.load(
+            labels.reminder,
+            due_date,
+            allow_remove=page.source.raw.get("reminder") is not None or labels.reminder is not None,
+        )
+        self.reminder_editor.show()
+        self.refresh()
+        self._update()
+
+    async def save_reminder(self, reminder: Reminder) -> bool:
+        """Write the reminder from the editor."""
+        saved = await self._state.pages.set_page_reminder(reminder, save=not self._state.pages.editing)
+        if saved:
+            self._state.status.show_notice(self._state.status.copy.REMINDER_SAVED)
+            self._reminder_page = None
+            self.refresh()
+            self._update()
+        return saved
+
+    async def remove_reminder(self) -> bool:
+        """Remove the current reminder and offer its exact value for Undo."""
+        state = self._state
+        previous = await state.pages.remove_page_reminder(save=True)
+        labels = state.pages.page_labels
+        removed = labels is not None and labels.reminder_edit is ReminderEdit.REMOVED
+        if not removed:
+            return False
+        action = NoticeAction.UNDO_REMINDER if previous is not None else None
+        state.status.show_notice(state.status.copy.REMINDER_REMOVED, action)
+        self._reminder_page = None
+        self.refresh()
+        self._update()
+        return True
+
+    async def cancel_reminder(self) -> None:
+        """Close the reminder editor without writing."""
+        self._reminder_page = None
+        self.reminder_editor.hide()
+        self.refresh()
+        self._update()
 
     def _refresh_edit(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the body field and label form."""

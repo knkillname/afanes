@@ -40,11 +40,11 @@
 
 ## 6. Page summary and editor
 
-- [ ] 6.1 Add `set_page_reminder` and `remove_page_reminder` to `PageEditorState`; keep `PageDialogState` at 24 commands; verify the state tests and the architecture surface budgets.
-- [ ] 6.2 Add `ui/components/reminder.py` with the six kinds, time list, searchable zone picker, one-shot shortcuts, short-month warning, and fifth-weekday warning; verify the component tests.
-- [ ] 6.3 Add the read-mode reminder summary and the Set/Edit action to `page.py`; hide it for captures, raw-rescue pages, and trashed pages; verify `tests/ui/test_page_view.py`.
-- [ ] 6.4 Add removal with an Undo toast that restores the exact previous reminder; verify the removal, undo, transient, and failed-write tests.
-- [ ] 6.5 Update `docs/guide/pages-and-editing.md` with the summary, separate editor, zone picker, shortcuts, and Undo behavior; verify the page build.
+- [x] 6.1 Add `set_page_reminder` and `remove_page_reminder` to `PageEditorState`; keep `PageDialogState` at 24 commands; verify the state tests and the architecture surface budgets.
+- [x] 6.2 Add `ui/components/reminder.py` with the six kinds, time list, searchable zone picker, one-shot shortcuts, short-month warning, and fifth-weekday warning; verify the component tests.
+- [x] 6.3 Add the read-mode reminder summary and the Set/Edit action to `page.py`; hide it for captures, raw-rescue pages, and trashed pages; verify `tests/ui/test_page_view.py`.
+- [x] 6.4 Add removal with an Undo toast that restores the exact previous reminder; verify the removal, undo, transient, and failed-write tests.
+- [x] 6.5 Update `docs/guide/pages-and-editing.md` with the summary, separate editor, zone picker, shortcuts, and Undo behavior; verify the page build.
 
 ## 7. Localization and copy
 

@@ -54,6 +54,7 @@ from afanes.core.settings import Settings, SettingsStore
 from afanes.core.steps import StepDocument
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
+from afanes.models.reminder import ClockTime, Recurrence, Reminder, ReminderKind
 from afanes.models.step import ProjectStep, StepEdit, StepEditKind
 from tests.support import access_readable, constant, simulated_message
 from tests.support import ensure_vault as _ensure_vault
@@ -185,6 +186,34 @@ def _write_reminder_note(
         ]
     )
     path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def _reminder(hour: int = 9, zone: str = "America/Mexico_City") -> Reminder:
+    return Reminder(
+        schedule=Recurrence(kind=ReminderKind.DAILY, times=(ClockTime(hour, 0),)),
+        zone=zone,
+    )
+
+
+def _write_handled_reminder(path: Path, hour: int = 9) -> Path:
+    _ensure_vault(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "---\n"
+        "type: reference\n"
+        "reminder:\n"
+        "  zone: America/Mexico_City\n"
+        "  recurrence:\n"
+        "    kind: daily\n"
+        f'    times: ["{hour:02d}:00"]\n'
+        "  handled: 2026-11-14T15:00:00+00:00\n"
+        "  label: keep\n"
+        "---\n"
+        "\n"
+        f"# {path.stem}\n",
+        encoding="utf-8",
+    )
     return path
 
 
@@ -2723,6 +2752,162 @@ class TestPageLabels:
             assert not page.is_dirty
 
         asyncio.run(scenario())
+
+    def test_reminder_set_from_read_mode_writes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            return await state.pages.set_page_reminder(_reminder(), save=True)
+
+        written = asyncio.run(scenario())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert written is True
+        assert document.reminder is not None
+        assert document.reminder.zone == "America/Mexico_City"
+        assert state.pages.page is not None
+        assert state.pages.page.is_dirty is False
+
+    def test_reminder_set_in_edit_mode_waits_for_the_next_write(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            state.pages.edit_page()
+            assert await state.pages.set_page_reminder(_reminder()) is True
+            assert "reminder" not in path.read_text(encoding="utf-8")
+            assert state.pages.page is not None
+            assert state.pages.page.is_dirty is True
+            assert await state.pages.done_editing() is True
+
+        asyncio.run(scenario())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.reminder is not None
+
+    def test_changed_schedule_clears_handled(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_handled_reminder(vault / "reference" / "Ada.md")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            assert await state.pages.set_page_reminder(_reminder(hour=10), save=True) is True
+
+        asyncio.run(scenario())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.reminder is not None
+        assert document.reminder.handled is None
+        assert dict(document.reminder.extra) == {"label": "keep"}
+
+    def test_unchanged_schedule_preserves_handled(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_handled_reminder(vault / "reference" / "Ada.md")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            assert await state.pages.set_page_reminder(_reminder(hour=9), save=True) is True
+
+        asyncio.run(scenario())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.reminder is not None
+        assert document.reminder.handled is not None
+        assert dict(document.reminder.extra) == {"label": "keep"}
+
+    def test_remove_returns_the_previous_reminder_for_undo(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_handled_reminder(vault / "reference" / "Ada.md")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> Reminder | None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            previous = await state.pages.remove_page_reminder(save=True)
+            assert "reminder" not in path.read_text(encoding="utf-8")
+            assert previous is not None
+            assert await state.pages.set_page_reminder(previous, save=True) is True
+            return previous
+
+        previous = asyncio.run(scenario())
+
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert previous is not None
+        assert document.reminder is not None
+        assert document.reminder.handled == previous.handled
+
+    def test_remove_drops_a_malformed_raw_value(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "reference" / "Ada.md",
+            "---\ntype: reference\nreminder: [broken]\n---\n\n# Ada\n",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> Reminder | None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            return await state.pages.remove_page_reminder(save=True)
+
+        removed = asyncio.run(scenario())
+
+        assert removed is None
+        assert "reminder" not in path.read_text(encoding="utf-8")
+
+    def test_a_capture_cannot_set_a_reminder(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "inbox" / "Ada.md", _note_text("# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            return await state.pages.set_page_reminder(_reminder(), save=True)
+
+        assert asyncio.run(scenario()) is False
+
+    def test_a_failed_removal_keeps_the_reminder(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        path = _write_handled_reminder(vault / "reference" / "Ada.md")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        def fail_write(_path: Path, _text: str) -> None:
+            message = "read-only vault"
+            raise PermissionError(message)
+
+        async def scenario() -> Reminder | None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail_write)
+            return await state.pages.remove_page_reminder(save=True)
+
+        removed = asyncio.run(scenario())
+
+        assert removed is None
+        assert "reminder" in path.read_text(encoding="utf-8")
 
     def test_assignment_suggestions_come_from_the_scan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

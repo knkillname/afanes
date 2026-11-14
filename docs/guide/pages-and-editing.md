@@ -8,8 +8,9 @@ classified.
 :::{admonition} tl;dr
 :class: note
 
-The body is ordinary Markdown. Labels are type, date, category, status, and due date. Afanes compares
-the file before every write and stops if another program changed it.
+The body is ordinary Markdown. Labels are type, date, category, status, and due date. A reference,
+project, or log entry can also carry one reminder. Afanes compares the file before every write and
+stops if another program changed it.
 :::
 
 ## 📖 Reading a page
@@ -56,6 +57,32 @@ delete action.
 The same header has an owner action and a requester action. Each opens a name dialog with the vault's
 note names as suggestions, accepts a new name, and offers **Clear**. Confirming writes the value
 immediately without entering edit mode; cancelling writes nothing.
+
+## ⏰ Reminders
+
+Read mode shows a reminder summary under the metadata row for a reference, project, or log entry. The
+summary names the cadence, the times, and the stored time zone, and marks a paused reminder. A page
+without a reminder offers **Set Reminder**; a page with one offers **Edit Reminder**. Captures, raw
+rescue pages, and trashed pages do not offer editing; a trashed page still shows its summary.
+
+The editor is a separate panel, not part of the label form. It offers six recurrence kinds, one or
+more `HH:MM` times, a searchable IANA time-zone list that defaults to the computer's zone, and a
+one-shot date and time. A project with a due date also offers **Due Date**, **One Day Before**, and
+**One Week Before** shortcuts for a one-shot; the shortcut keeps the first chosen time. Choosing the
+29th, 30th, or 31st for a monthly reminder, or the fifth weekday, shows an inline warning and suggests
+the last-day or last-weekday choice. Invalid times, weekdays, dates, or zones keep the panel open with
+an inline message. Cancelling writes nothing.
+
+Saving from read mode writes immediately. Saving while the body has unsaved edits carries the
+reminder into the next draft write. Saving an unchanged schedule preserves `handled`; changing the
+cadence, time, or zone clears it. A file that changed on disk stops the write and shows the same
+conflict choices as the body editor.
+
+**Remove Reminder** takes effect immediately and offers **Undo** in a toast. Undo restores the exact
+previous schedule, zone, and handled occurrence; the opportunity ends when the toast is dismissed or
+replaced, or when the application exits. A reminder on a capture is ignored with a warning, and an
+unreadable reminder stays in the file until it is replaced or removed. See
+[Frontmatter](../reference/frontmatter.md) for the stored shape.
 
 ## ✏️ Editing labels
 

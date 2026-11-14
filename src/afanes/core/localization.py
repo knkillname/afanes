@@ -93,6 +93,8 @@ _SPANISH_SHORT_MONTHS = (
 )
 _ENGLISH_WEEKDAYS = ("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
 _SPANISH_WEEKDAYS = ("Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do")
+_ENGLISH_WEEKDAYS_FULL = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+_SPANISH_WEEKDAYS_FULL = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -380,6 +382,16 @@ class LocaleFormat:
             Seven two-letter labels, Monday first.
         """
         return _SPANISH_WEEKDAYS if self.language == "es" else _ENGLISH_WEEKDAYS
+
+    def weekday_names(self) -> tuple[str, ...]:
+        """Return the Monday-first full weekday names.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Seven full names, Monday first, in the active language.
+        """
+        return _SPANISH_WEEKDAYS_FULL if self.language == "es" else _ENGLISH_WEEKDAYS_FULL
 
     def log_title(self, date: afanes.models.note.NoteDate) -> str:
         """Return the long default title for a log date.

@@ -19,9 +19,12 @@ class NoticeAction(StrEnum):
     ----------
     UNDO_TRASH : str
         Restore the note the current session just moved to trash.
+    UNDO_REMINDER : str
+        Restore the reminder the current session just removed.
     """
 
     UNDO_TRASH = "undo-trash"
+    UNDO_REMINDER = "undo-reminder"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
