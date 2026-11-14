@@ -32,6 +32,7 @@ TWO_CANDIDATES = 2
 FOUR_SUBSECTIONS = 4
 STARTER_OPTION_COUNT = 2
 PAGE_MENU_ITEM_COUNT = 4
+HALF_ROW = 6
 
 
 @pytest.fixture(autouse=True)
@@ -2161,8 +2162,8 @@ class TestLogStarter:
 
         assert view.log_starter_panel.visible is False
         assert view.log_starter_picker.dropdown.visible is False
-        assert view.type_dropdown.col == 6
-        assert view.date_field.col == 6
+        assert view.type_dropdown.col == HALF_ROW
+        assert view.date_field.col == HALF_ROW
 
     def test_invalid_cards_are_named_beside_the_starter(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         issue = afanes.core.template_cards.TemplateCardIssue(relative_path=Path("broken.md"), message="bad")

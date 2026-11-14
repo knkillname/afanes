@@ -84,3 +84,11 @@ No new sticky positioning is added. The existing fixed headers and detail toolba
 ## Migration Plan
 
 No data migration. The change is presentational and reversible by restoring the removed width tokens and the two Log rows. Existing vault files, drafts, and log entries are untouched.
+
+## Verification
+
+The desktop app was run against a temporary vault with a new log draft open in the Log section, at 1024x700, 1100x760, and 1800x900.
+
+- At 1024, the Log controls share one row, Type and Date share the first label row, Starter wraps below them because three fields no longer fit, the body fills the card, and no region clips.
+- At 1100, the browser and detail fill the window, the two-row label flow remains, and no region clips.
+- At 1800, Today's Entry, Entries, and Everything stay in one row; Type, Date, and Starter share one label row and stretch across the card; the body fills the remaining width and height with no clipping.

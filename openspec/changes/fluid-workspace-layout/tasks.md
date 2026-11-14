@@ -27,11 +27,11 @@
 
 ## 5. Integration checks
 
-- [ ] 5.1 Run `hatch check` and fix lint, format, and type findings without changing behavior; verify the command exits 0
-- [ ] 5.2 Run `hatch test --cover` and keep coverage at or above 85%, with parser, link, and vault modules unchanged; verify the command exits 0
-- [ ] 5.3 Run `tests/ui/test_conformance.py` and shrink only baseline entries whose violations disappeared; verify no baseline entry is stale and no count grows
-- [ ] 5.4 Run `openspec validate --all --strict`, `openspec doctor`, and the AGENTS.md vocabulary compliance grep; verify all three pass with the documented exclusions
-- [ ] 5.5 Resize the running app at 1024, 1100, and a very wide window and confirm the Log controls share a row when they fit, the editor fields stretch, and no region clips; record the observation for the archive
+- [x] 5.1 Run `hatch check` and fix lint, format, and type findings without changing behavior; verify the command exits 0
+- [x] 5.2 Run `hatch test --cover` and keep coverage at or above 85%, with parser, link, and vault modules unchanged; verify the command exits 0
+- [x] 5.3 Run `tests/ui/test_conformance.py` and shrink only baseline entries whose violations disappeared; verify no baseline entry is stale and no count grows
+- [x] 5.4 Run `openspec validate --all --strict`, `openspec doctor`, and the AGENTS.md vocabulary compliance grep; verify all three pass with the documented exclusions
+- [x] 5.5 Resize the running app at 1024, 1100, and a very wide window and confirm the Log controls share a row when they fit, the editor fields stretch, and no region clips; record the observation for the archive
 
 ## Workflow follow-up
 

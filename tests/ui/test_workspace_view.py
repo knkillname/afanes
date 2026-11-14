@@ -1144,9 +1144,7 @@ class TestAdaptiveLayout:
     ) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
         available = (
-            afanes.ui.theme.SHELL_WIDE_MIN
-            - afanes.ui.theme.NAVIGATION_WIDTH
-            - 2 * afanes.ui.theme.WORKSPACE_BODY_GAP
+            afanes.ui.theme.SHELL_WIDE_MIN - afanes.ui.theme.NAVIGATION_WIDTH - 2 * afanes.ui.theme.WORKSPACE_BODY_GAP
         )
 
         view.resize(afanes.ui.theme.SHELL_WIDE_MIN)
@@ -1159,9 +1157,7 @@ class TestAdaptiveLayout:
     ) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
         window_width = afanes.ui.theme.SHELL_WIDE_MIN * 2
-        available = (
-            window_width - afanes.ui.theme.NAVIGATION_WIDTH - 2 * afanes.ui.theme.WORKSPACE_BODY_GAP
-        )
+        available = window_width - afanes.ui.theme.NAVIGATION_WIDTH - 2 * afanes.ui.theme.WORKSPACE_BODY_GAP
 
         view.resize(window_width)
 
@@ -1170,9 +1166,7 @@ class TestAdaptiveLayout:
         assert view.browser_region.width > afanes.ui.theme.BROWSER_MIN_WIDTH
         assert available - view.browser_region.width >= afanes.ui.theme.PAGE_MIN_WIDTH
 
-    def test_a_medium_window_shares_the_available_width(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_a_medium_window_shares_the_available_width(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
         available = afanes.ui.theme.SHELL_MEDIUM_MIN - afanes.ui.theme.WORKSPACE_BODY_GAP
 
