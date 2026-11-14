@@ -36,7 +36,11 @@ neither a recognized subcommand nor a recognized launch option SHALL be reported
 
 ### Requirement: A vault can be created from the command line
 
-`afanes vault create DIR` SHALL create a vault at the given path, write `afanes.yaml` with the current schema, seed the default folders, write the guide note, apply `--template ID` when supplied, and report the vault, created parents, seeded folders, settings file, template, notes, and remembered status, then exit `0`. It SHALL remember the vault unless `--no-remember` is supplied. A rejected path or template MUST leave the filesystem and preferences unchanged.
+`afanes vault create DIR` SHALL create a vault at the given path, write `afanes.yaml` with the current
+schema, seed the default folders, write the guide note, apply `--template ID` when supplied, and
+report the vault, created parents, seeded folders, settings file, template, notes, and remembered
+status, then exit `0`. It SHALL remember the vault unless `--no-remember` is supplied. A rejected path
+or template MUST leave the filesystem and preferences unchanged.
 
 #### Scenario: Missing path is created
 
@@ -51,7 +55,7 @@ neither a recognized subcommand nor a recognized launch option SHALL be reported
 #### Scenario: Created vault is versioned
 
 - **WHEN** a vault is created from the command line
-- **THEN** `afanes.yaml` exists at its root with `schema_version: 1`
+- **THEN** `afanes.yaml` exists at its root with `schema_version: 2`
 
 #### Scenario: Success output names what was created
 
@@ -110,12 +114,15 @@ neither a recognized subcommand nor a recognized launch option SHALL be reported
 
 ### Requirement: A vault can be adopted from the command line
 
-`afanes vault adopt DIR` SHALL write `afanes.yaml` with the current schema to an adoptable folder, report the path, the settings file, the schema version, and whether the vault was remembered, then exit with status `0`. It SHALL remember the adopted vault unless `--no-remember` is supplied. It MUST NOT write notes, default folders, the guide, or template cards.
+`afanes vault adopt DIR` SHALL write `afanes.yaml` with the current schema to an adoptable folder,
+report the path, the settings file, the schema version, and whether the vault was remembered, then
+exit with status `0`. It SHALL remember the adopted vault unless `--no-remember` is supplied. It MUST
+NOT write notes, default folders, the guide, or template cards.
 
 #### Scenario: Adoptable folder succeeds and is remembered
 
 - **WHEN** a user runs `afanes vault adopt` on a writable folder with all five default folders
-- **THEN** `afanes.yaml` is written with `schema_version: 1`, the vault is remembered, and the command exits `0`
+- **THEN** `afanes.yaml` is written with `schema_version: 2`, the vault is remembered, and the command exits `0`
 
 #### Scenario: no-remember leaves preferences unchanged
 

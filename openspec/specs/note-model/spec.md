@@ -9,10 +9,10 @@ Defines the four note types Afanes stores, the frontmatter keys they share, the 
 ### Requirement: Frontmatter keys are shared and scoped
 
 A note's recognized frontmatter keys SHALL be `type`, `date`, `category`, `status`, `due_date`,
-`asked_by`, and `owner`. `date` SHALL be valid on every note. `category` SHALL be valid only on a
-reference. `due_date`, `asked_by`, and `owner` SHALL be valid only on a project. A log note MUST NOT
-declare `category`, `status`, `due_date`, `asked_by`, or `owner`. A null `status` or `due_date` SHALL
-be treated as absent on every note type. Unknown keys SHALL be preserved.
+`asked_by`, `owner`, and `reminder`. `date` SHALL be valid on every note. `category` SHALL be valid
+only on a reference. `due_date`, `asked_by`, and `owner` SHALL be valid only on a project. A log note
+MUST NOT declare `category`, `status`, `due_date`, `asked_by`, or `owner`. A null `status` or
+`due_date` SHALL be treated as absent on every note type. Unknown keys SHALL be preserved.
 
 #### Scenario: Category on a reference
 
@@ -369,3 +369,24 @@ NOT be rewritten until the user saves a valid value.
 
 - **WHEN** a vault containing a malformed date is opened or scanned
 - **THEN** the file is not rewritten
+
+### Requirement: A reminder key is valid only on eligible notes
+
+A `reminder` key SHALL be valid on a reference, project, or log entry. A capture MUST NOT have an
+effective reminder; one declared on a capture SHALL be ignored with a warning and preserved. A null
+`reminder` SHALL be treated as absent.
+
+#### Scenario: A reference, project, or log accepts a reminder
+
+- **WHEN** a reference, project, or log declares a valid `reminder`
+- **THEN** the key is recognized and the note parses
+
+#### Scenario: A capture's reminder is ignored
+
+- **WHEN** a `type: note` declares a `reminder`
+- **THEN** the note parses, the reminder is ignored for scheduling, and a warning is shown
+
+#### Scenario: A null reminder is absent
+
+- **WHEN** an eligible note declares `reminder: null`
+- **THEN** the note parses with no reminder

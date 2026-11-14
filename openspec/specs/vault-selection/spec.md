@@ -123,7 +123,7 @@ be refused, and no open, scan, or recovery step may create a vault.
 #### Scenario: Created vault contains the settings file
 
 - **WHEN** a vault is created
-- **THEN** `afanes.yaml` exists at its root with `schema_version: 1`
+- **THEN** `afanes.yaml` exists at its root with `schema_version: 2`
 
 #### Scenario: Non-empty directory is refused
 
@@ -382,8 +382,13 @@ folder or confirms adoption.
 
 #### Scenario: Saved folder has an unsupported schema
 
-- **WHEN** the saved folder has an invalid or unsupported `afanes.yaml`
+- **WHEN** the saved folder has an invalid or newer `afanes.yaml`
 - **THEN** the welcome state explains the problem and leaves the file unchanged
+
+#### Scenario: Saved folder has an older schema
+
+- **WHEN** the saved folder has a schema `1` `afanes.yaml`
+- **THEN** it opens by the older-schema rules instead of showing the welcome state
 
 ### Requirement: Corrupt settings are not overwritten silently
 
@@ -406,9 +411,10 @@ When the settings file is unreadable or malformed, the application SHALL start i
 
 ### Requirement: Opening a vault is read-only
 
-Opening or scanning a vault SHALL NOT create or modify any vault file. After a vault opens,
-scheduled trash retention MAY delete expired managed trash entries before the workspace is shown.
-The `inbox/` directory SHALL be created only by a capture.
+Opening or scanning a vault SHALL NOT create or modify any vault file, except that a writable schema
+`1` vault MAY be upgraded by rewriting only `afanes.yaml` after validation and before scanning. After
+a vault opens, scheduled trash retention MAY delete expired managed trash entries before the
+workspace is shown. The `inbox/` directory SHALL be created only by a capture.
 
 #### Scenario: Opening does not create the inbox
 
@@ -434,6 +440,21 @@ The `inbox/` directory SHALL be created only by a capture.
 
 - **WHEN** trash retention cannot delete an expired entry
 - **THEN** the vault still opens, the entry remains, and the failure is reported
+
+#### Scenario: A writable old vault is upgraded
+
+- **WHEN** a writable schema `1` vault opens
+- **THEN** only `afanes.yaml` is rewritten to schema `2` after validation
+
+#### Scenario: A read-only old vault is not modified
+
+- **WHEN** a read-only schema `1` vault opens
+- **THEN** no vault file is created or modified
+
+#### Scenario: The upgrade does not touch notes
+
+- **WHEN** a writable schema `1` vault is upgraded
+- **THEN** no note, folder, guide, or card is created, changed, or removed
 
 ### Requirement: The vault path is stable across launches
 
@@ -522,3 +543,60 @@ locale. A corrupt preferences file SHALL be reported without being overwritten.
 
 - **WHEN** the user chooses a language
 - **THEN** no vault note, folder, or settings file is created, changed, or removed
+
+### Requirement: A writable older vault is upgraded on open
+
+Opening a writable schema `1` vault SHALL upgrade `afanes.yaml` to schema `2` before scanning and
+SHALL show a one-time notice. If the upgrade cannot be written, the vault SHALL still open for
+browsing with reminders off and a persistent notice. The upgrade MUST NOT change any note.
+
+#### Scenario: A writable old vault opens as version 2
+
+- **WHEN** a writable schema `1` vault opens
+- **THEN** it opens with reminders available and `afanes.yaml` at schema `2`
+
+#### Scenario: The upgrade is reported once
+
+- **WHEN** the upgrade succeeds
+- **THEN** a one-time toast reports the new vault format
+
+#### Scenario: An upgrade failure opens with reminders off
+
+- **WHEN** the schema `1` upgrade cannot be written
+- **THEN** the vault opens for browsing with reminders off and a persistent notice
+
+#### Scenario: A current vault shows no upgrade notice
+
+- **WHEN** a schema `2` vault opens
+- **THEN** no upgrade notice is shown
+
+### Requirement: A read-only older vault opens with reminders off
+
+Opening a read-only schema `1` vault SHALL show the workspace for browsing with reminders disabled
+and a persistent banner explaining that the vault must be writable to upgrade. It MUST NOT write any
+file.
+
+#### Scenario: A read-only old vault opens
+
+- **WHEN** a read-only schema `1` vault is chosen
+- **THEN** the workspace opens for browsing
+
+#### Scenario: The old format is explained
+
+- **WHEN** a read-only schema `1` vault is open
+- **THEN** a persistent banner says the vault must be writable to upgrade
+
+#### Scenario: Reminders are unavailable
+
+- **WHEN** a read-only schema `1` vault is open
+- **THEN** no reminder summary, editor, count, or card is shown
+
+#### Scenario: No file is written
+
+- **WHEN** a read-only schema `1` vault is open
+- **THEN** no note or settings file is created or modified
+
+#### Scenario: A later writable open upgrades
+
+- **WHEN** the same vault becomes writable and opens again
+- **THEN** it is upgraded to schema `2` and reminders become available

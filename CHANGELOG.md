@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-14
+
 ### Added
 
 - **Note reminders and vault schema `2`.** References, projects, and log entries can carry one

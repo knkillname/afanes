@@ -30,18 +30,20 @@ A vault SHALL contain `afanes.yaml` at its root, named exactly and stored as a r
 - **WHEN** a note links to `note:afanes` and the vault contains only `afanes.yaml`
 - **THEN** the reference is unresolved
 
-### Requirement: Version 1 is the current schema
+### Requirement: Version 2 is the current schema
 
-The settings file SHALL contain a YAML mapping with exactly one key, `schema_version`, whose value is the integer `1`. Extra keys, malformed YAML, a missing key, and a non-integer value SHALL make the file invalid.
+The settings file SHALL contain a YAML mapping with exactly one key, `schema_version`, whose value is
+the integer `2`. Extra keys, malformed YAML, a missing key, and a non-integer value SHALL make the
+file invalid.
 
 #### Scenario: The current schema is valid
 
-- **WHEN** the file contains exactly `schema_version: 1`
+- **WHEN** the file contains exactly `schema_version: 2`
 - **THEN** the file is valid
 
 #### Scenario: An extra key makes the file invalid
 
-- **WHEN** the file contains `schema_version: 1` and another key
+- **WHEN** the file contains `schema_version: 2` and another key
 - **THEN** the file is invalid
 
 #### Scenario: Malformed YAML makes the file invalid
@@ -63,7 +65,8 @@ The settings file SHALL contain a YAML mapping with exactly one key, `schema_ver
 
 Opening a folder without `afanes.yaml` SHALL be refused. Opening MUST NOT create the file. A vault
 with a valid file SHALL pass schema validation without modifying any vault file, including when the
-vault is read-only.
+vault is read-only. After validation, a writable schema `1` vault MAY be upgraded before scanning by
+rewriting only `afanes.yaml`.
 
 #### Scenario: A missing settings file is refused
 
@@ -95,38 +98,21 @@ vault is read-only.
 - **WHEN** a read-only folder has no `afanes.yaml`
 - **THEN** the application refuses to open it as a vault
 
-### Requirement: Unsupported schemas are refused and preserved
+#### Scenario: A writable old vault is upgraded after validation
 
-When the settings file declares a schema other than the current one, or the file is invalid, the application SHALL refuse to open the vault, leave the file unchanged, and report the problem. It MUST NOT repair, rewrite, delete, or replace the file.
-
-#### Scenario: A newer schema is refused
-
-- **WHEN** the file declares `schema_version: 2`
-- **THEN** the application refuses to open the vault and tells the user to update Afanes
-
-#### Scenario: An older schema is refused before 1.0
-
-- **WHEN** the file declares an older schema
-- **THEN** the application refuses to open the vault and does not run a migration
-
-#### Scenario: An invalid file is preserved
-
-- **WHEN** the settings file is malformed or contains an extra key
-- **THEN** the file is left byte-for-byte unchanged
-
-#### Scenario: An invalid file is not adopted
-
-- **WHEN** an unversioned-looking folder contains an invalid `afanes.yaml`
-- **THEN** the application does not offer adoption and does not overwrite the file
+- **WHEN** validation accepts a writable schema `1` file
+- **THEN** the file may be upgraded before scanning and validation still writes nothing
 
 ### Requirement: New vaults are created versioned
 
-Vault creation SHALL write `afanes.yaml` with the current schema before writing starter content. A creation that fails while writing notes SHALL leave a valid settings file so the partially created folder remains openable as a vault.
+Vault creation SHALL write `afanes.yaml` with the current schema before writing starter content. A
+creation that fails while writing notes SHALL leave a valid settings file so the partially created
+folder remains openable as a vault.
 
 #### Scenario: A new vault contains the settings file
 
 - **WHEN** a vault is created
-- **THEN** `afanes.yaml` exists at its root with `schema_version: 1`
+- **THEN** `afanes.yaml` exists at its root with `schema_version: 2`
 
 #### Scenario: The settings file is written before starter content
 
@@ -229,14 +215,81 @@ The schema version SHALL change only when the on-disk vault contract changes. A 
 - **WHEN** the on-disk vault contract changes
 - **THEN** the schema version changes with it
 
-### Requirement: Schema migrations are forward-only
+### Requirement: Settings file access is contained and atomic
 
-Before 1.0, schema changes MAY be breaking and old schemas MAY be refused. From 1.0 onward, a schema bump SHALL ship with a forward migration. A newer schema SHALL always be refused by an older application, and downgrades SHALL NOT be supported.
+The settings file SHALL be read and written only inside the vault root. A path that is a symlink, a
+directory, or resolves outside the vault SHALL be refused. Writes SHALL be atomic. Creation and
+adoption MUST NOT overwrite an existing settings file; a schema `1` upgrade MAY replace only a valid
+schema `1` file with schema `2`.
 
-#### Scenario: A pre-1.0 schema change may refuse old vaults
+#### Scenario: A symlink is refused
 
-- **WHEN** the schema changes before 1.0
-- **THEN** an old-schema vault may be refused without a migration
+- **WHEN** `afanes.yaml` is a symbolic link
+- **THEN** the application refuses to use it
+
+#### Scenario: A directory is refused
+
+- **WHEN** `afanes.yaml` is a directory
+- **THEN** the application refuses to use it
+
+#### Scenario: A failed write leaves the previous file intact
+
+- **WHEN** writing the settings file fails partway
+- **THEN** any previous settings file remains readable and unchanged
+
+#### Scenario: An upgrade replaces only a valid older file
+
+- **WHEN** a schema `1` file is upgraded
+- **THEN** only that file is replaced, atomically, with schema `2`
+
+#### Scenario: An upgrade does not replace a newer file
+
+- **WHEN** the file declares schema `2` or newer
+- **THEN** no upgrade write occurs
+
+### Requirement: Newer and invalid schemas are refused and preserved
+
+A file that declares a schema newer than the current one, or is invalid, SHALL be refused, left
+unchanged, and reported. It MUST NOT be repaired, rewritten, deleted, or replaced. A schema `1` file
+SHALL be accepted only for the upgrade or read-only behavior defined by the older-schema
+requirements.
+
+#### Scenario: A newer schema is refused
+
+- **WHEN** the file declares `schema_version: 3`
+- **THEN** the application refuses to open the vault and tells the user to update Afanes
+
+#### Scenario: An invalid file is preserved
+
+- **WHEN** the settings file is malformed, contains an extra key, or has an unsupported value
+- **THEN** the file is left byte-for-byte unchanged
+
+#### Scenario: An invalid file is not adopted
+
+- **WHEN** an unversioned-looking folder contains an invalid `afanes.yaml`
+- **THEN** the application does not offer adoption and does not overwrite the file
+
+#### Scenario: A schema 1 file is not invalid
+
+- **WHEN** the file declares exactly `schema_version: 1`
+- **THEN** the file is treated as an older valid schema, not as a malformed file
+
+### Requirement: Schema compatibility is forward-only
+
+Before 1.0, a schema change MAY accept, migrate, or refuse an old vault. This change upgrades a
+writable schema `1` vault and opens a read-only one with reminders off. From 1.0 onward, a schema bump
+SHALL ship with a forward migration. A newer schema SHALL always be refused by an older application,
+and downgrades SHALL NOT be supported.
+
+#### Scenario: A pre-1.0 schema change may accept an old vault
+
+- **WHEN** a writable vault uses schema `1`
+- **THEN** the vault is upgraded to schema `2`
+
+#### Scenario: A read-only old vault may open with a feature off
+
+- **WHEN** a read-only vault uses schema `1`
+- **THEN** it opens for browsing with reminders off
 
 #### Scenario: A post-1.0 schema change migrates old vaults
 
@@ -253,21 +306,64 @@ Before 1.0, schema changes MAY be breaking and old schemas MAY be refused. From 
 - **WHEN** a vault uses a newer schema than the application supports
 - **THEN** the application does not rewrite it to an older schema
 
-### Requirement: Settings file access is contained and atomic
+### Requirement: A writable schema 1 vault is upgraded
 
-The settings file SHALL be read and written only inside the vault root. A path that is a symlink, a directory, or resolves outside the vault SHALL be refused. Writes SHALL be atomic and MUST NOT overwrite an existing settings file.
+When a schema `1` file is writable, the application SHALL rewrite only `afanes.yaml` with
+`schema_version: 2` after validation and before scanning, using an atomic write. A failed write SHALL
+leave the previous file intact and SHALL NOT produce a partially upgraded vault. The upgrade SHALL be
+reported once to the user.
 
-#### Scenario: A symlink is refused
+#### Scenario: A writable old vault becomes version 2
 
-- **WHEN** `afanes.yaml` is a symbolic link
-- **THEN** the application refuses to use it
+- **WHEN** a writable schema `1` vault opens
+- **THEN** `afanes.yaml` contains `schema_version: 2`
 
-#### Scenario: A directory is refused
+#### Scenario: Only the settings file changes
 
-- **WHEN** `afanes.yaml` is a directory
-- **THEN** the application refuses to use it
+- **WHEN** a schema `1` vault is upgraded
+- **THEN** no note, folder, guide, or card is created, changed, or removed
 
-#### Scenario: A failed write leaves the previous file intact
+#### Scenario: A failed upgrade leaves version 1
 
-- **WHEN** writing the settings file fails partway
-- **THEN** any previous settings file remains readable and unchanged
+- **WHEN** the upgrade write fails
+- **THEN** the previous schema `1` file remains readable and unchanged
+
+#### Scenario: The upgrade is reported once
+
+- **WHEN** the upgrade succeeds
+- **THEN** a one-time notice reports the new vault format
+
+#### Scenario: An already current vault is not upgraded
+
+- **WHEN** a schema `2` vault opens
+- **THEN** no upgrade write occurs
+
+### Requirement: A read-only schema 1 vault opens with reminders off
+
+A schema `1` vault whose settings file cannot be rewritten SHALL open for browsing with the reminder
+capability disabled. It MUST NOT write any vault file and SHALL report the read-only old format.
+
+#### Scenario: A read-only old vault opens
+
+- **WHEN** a read-only folder contains a schema `1` `afanes.yaml`
+- **THEN** the vault opens for browsing
+
+#### Scenario: A read-only old vault is not upgraded
+
+- **WHEN** a read-only schema `1` vault opens
+- **THEN** `afanes.yaml` remains at schema `1`
+
+#### Scenario: Reminders are off in a read-only old vault
+
+- **WHEN** a read-only schema `1` vault is open
+- **THEN** reminders are not shown, counted, or offered
+
+#### Scenario: The read-only old format is reported
+
+- **WHEN** a read-only schema `1` vault is open
+- **THEN** a persistent notice explains that the vault must be writable to upgrade
+
+#### Scenario: A later writable open upgrades
+
+- **WHEN** the same vault becomes writable and opens again
+- **THEN** it is upgraded to schema `2` and reminders become available

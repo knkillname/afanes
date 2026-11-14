@@ -321,7 +321,7 @@ new vault.
 #### Scenario: Created vault is versioned
 
 - **WHEN** a vault is created
-- **THEN** `afanes.yaml` exists at its root with `schema_version: 1`
+- **THEN** `afanes.yaml` exists at its root with `schema_version: 2`
 
 #### Scenario: Cards land in templates
 
@@ -337,3 +337,28 @@ new vault.
 
 - **WHEN** a vault is created
 - **THEN** `templates/daily.md` exists and declares `type: log`
+
+### Requirement: Starter content contains no reminders
+
+Bundled starter content MUST NOT declare a `reminder` key. Applying any template SHALL leave the
+Review count at zero, including reminders, and MUST NOT create a due reminder.
+
+#### Scenario: A template with a reminder is refused
+
+- **WHEN** a bundled note declares a `reminder`
+- **THEN** the template is refused and creation writes nothing
+
+#### Scenario: A created vault has no reminders
+
+- **WHEN** a vault is created from any bundled template
+- **THEN** no written note declares a `reminder`
+
+#### Scenario: The guide and cards carry no reminder
+
+- **WHEN** the guide or a template card is written
+- **THEN** it declares no `reminder`
+
+#### Scenario: The new vault reports zero pending reminders
+
+- **WHEN** a vault is created from any bundled template
+- **THEN** no reminder is due
