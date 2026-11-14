@@ -45,16 +45,16 @@ Remove `CONTENT_MAX_WIDTH`, the fixed `page_column` width, and the `fit_width` r
 
 Alternative considered: keep the 720 px cap in read mode and widen only edit mode. Rejected because the owner asked for fully adaptive content and the extra mode-dependent column would add state without a user-visible benefit.
 
-### 3. Adaptive label flow with equal row shares
+### 3. Adaptive label flow with flex rows
 
-Add a `FieldFlow` component under `src/afanes/ui/components/`. It owns one `ft.ResponsiveRow` with 12 virtual columns and lays out its visible children from the measured pane width:
+Add a `FieldFlow` component under `src/afanes/ui/components/`. It owns one `ft.Column` of `ft.Row` runs and lays out its visible children from the measured pane width:
 
 1. Compute the row capacity from the field minimum width token and the gap: `capacity = max(1, floor((width + gap) / (FIELD_MIN_WIDTH + gap)))`.
 2. Split the visible controls into chunks of that capacity, capped by the number of controls.
-3. For each chunk of `n` controls, assign integer column spans of `12 // n` plus one extra column to the first `12 % n` controls, so each row sums to 12 and fills the width.
-4. Re-run the layout when the pane width changes or when visibility changes; hidden controls take no span.
+3. Set `expand=True` on every visible control and append one `ft.Row` per chunk. Each row divides its width equally between its children.
+4. Re-run the layout when the pane width changes or when visibility changes; hidden controls are left out of the rows.
 
-Integer spans can differ by one column within a row, which is visually negligible and guarantees no unused gutter. Alternative considered: fixed-width controls with `Row(wrap=True)`. It cannot stretch children, so it keeps the reported dead space. A custom row builder with `expand` children would require reparenting controls on every resize; `ResponsiveRow` avoids that.
+`FieldFlow` exposes the configured `controls` order and the rendered `column`. Rebuilding the rows moves the same controls between runs; Flet serializes the new tree, so no control is duplicated. This differs from the original grid plan: `ResponsiveRow` allocated a twelve-column cell, but a Dropdown kept its intrinsic width inside that cell, which produced the visible gap between Type and Date. Flex rows force every child to fill its share. Alternative considered: fixed-width controls with `Row(wrap=True)`. It cannot stretch children, so it keeps the reported dead space.
 
 `PageView` passes its label controls to the component in this order: Type, Category, Status, Date, Starter, Due date, Owner, Asked by. The page card keeps its `on_size_change` event and forwards the rendered width to `FieldFlow.layout(width)`; type changes and starter visibility call the same method after the existing refresh logic. The body field stays below the flow and keeps `expand=True`.
 
@@ -76,7 +76,8 @@ No new sticky positioning is added. The existing fixed headers and detail toolba
 
 - [Very wide read-mode lines] → The owner accepted uncapped content; the detail still receives about 65% of the workspace after the navigation, and the change can add a reading preference later if needed.
 - [The browser minimum collides with the detail minimum near 1100 px] → The browser width is clamped to `available - PAGE_MIN_WIDTH`; the breakpoint already collapses the navigation at 1024 px, and the layout is tested at 1024, 1100, and very wide sizes.
-- [ResponsiveRow span math leaves an uneven one-column difference] → Each row still sums to 12; no gutter remains, and the difference is smaller than one control gap.
+- [Dropdowns keep their intrinsic width inside a grid cell] → Use flex rows where every visible control sets `expand=True`; keep a regression test and the three-width visual check.
+- [Rebuilding rows on each resize moves controls between parents] → The new tree is serialized whole and tests plus the visual check cover repeated width changes.
 - [Visibility changes do not reflow the flow] → Every type change, starter change, and refresh calls the flow layout method; tests cover the log and project label sets.
 - [Removing `fit_width` breaks callers] → It is a public method used only by the page card's size-change handler; remove the handler with the method and update the width tests together.
 - [Conformance baseline changes] → Use named tokens for the share, minimum field width, and gaps; run the conformance gate and only shrink baseline entries that no longer occur.
@@ -91,4 +92,4 @@ The desktop app was run against a temporary vault with a new log draft open in t
 
 - At 1024, the Log controls share one row, Type and Date share the first label row, Starter wraps below them because three fields no longer fit, the body fills the card, and no region clips.
 - At 1100, the browser and detail fill the window, the two-row label flow remains, and no region clips.
-- At 1800, Today's Entry, Entries, and Everything stay in one row; Type, Date, and Starter share one label row and stretch across the card; the body fills the remaining width and height with no clipping.
+- At 1800, Today's Entry, Entries, and Everything stay in one row; Type, Date, and Starter share one label row with equal widths, the body fills the remaining width and height, and no region clips.

@@ -20,10 +20,11 @@
 
 ## 4. Adaptive label flow and Starter
 
-- [x] 4.1 Add a `FieldFlow` component under `src/afanes/ui/components/` that assigns 12-column spans from the measured width and the field minimum, filters hidden controls, and reflows on width or visibility changes; verify new component tests cover wide, narrow, odd-count, and hidden-control layouts
+- [x] 4.1 Add a `FieldFlow` component under `src/afanes/ui/components/` that groups visible controls into flex rows from the measured width and the field minimum, filters hidden controls, and reflows on width or visibility changes; verify new component tests cover wide, narrow, odd-count, and hidden-control layouts
 - [x] 4.2 Integrate `FieldFlow` into the page editor with visible controls in Type, Category, Status, Date, Starter, Due date, Owner, Asked by order, and place the Starter dropdown inside the flow while its description and warning stay in the panel below; verify `tests/ui/test_page_view.py` covers a wide log draft with Type, Date, and Starter on one row and a wrapped narrow pane
 - [x] 4.3 Update `tests/ui/test_page_view.py` expectations for the form control order, the expanding body field, the hidden Starter dropdown, and the reflow after a type or starter change; verify `hatch test tests/ui/test_page_view.py`
 - [x] 4.4 Update `docs/guide/pages-and-editing.md` for the adaptive label flow and the Starter position; verify `hatch run docs:build`
+- [x] 4.5 Replace the responsive grid with flex rows so every visible field fills its run, add a regression test for the Type-to-Date gap, and re-run the 1024, 1100, and 1800 visual check; verify `tests/ui/test_field_flow.py` and `tests/ui/test_page_view.py`
 
 ## 5. Integration checks
 

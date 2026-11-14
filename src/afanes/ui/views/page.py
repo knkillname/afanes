@@ -440,7 +440,7 @@ class PageView:
         self.edit_form = ft.Column(
             controls=[
                 self.identity_text,
-                self.form_fields.row,
+                self.form_fields.column,
                 self.name_suggestions,
                 self.category_error,
                 self.date_error,
@@ -666,7 +666,7 @@ class PageView:
         self._field_flow_width = width
         self.form_fields.layout(width)
         try:
-            self.form_fields.row.update()
+            self.form_fields.column.update()
         except RuntimeError:
             return
 

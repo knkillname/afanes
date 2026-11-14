@@ -32,7 +32,8 @@ TWO_CANDIDATES = 2
 FOUR_SUBSECTIONS = 4
 STARTER_OPTION_COUNT = 2
 PAGE_MENU_ITEM_COUNT = 4
-HALF_ROW = 6
+THREE_ROWS = 3
+ONE_CONTROL = 1
 
 
 @pytest.fixture(autouse=True)
@@ -338,8 +339,8 @@ class TestEditMode:
         assert view.date_field.height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
         assert view.owner_field.height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
         assert view.edit_form.spacing == afanes.ui.theme.SECTION_GAP
-        assert view.form_fields.row.columns == afanes.ui.theme.FIELD_FLOW_COLUMNS
-        assert view.form_fields.row.controls == [
+        assert view.form_fields.column.spacing == afanes.ui.theme.ITEM_GAP
+        assert view.form_fields.controls == [
             view.type_dropdown,
             view.category_field,
             view.status_dropdown,
@@ -2099,16 +2100,16 @@ class TestLogStarter:
 
         assert view.log_starter_panel.visible is True
         assert view.log_starter_picker.dropdown.visible is True
-        assert view.log_starter_picker.dropdown in view.form_fields.row.controls
+        assert view.log_starter_picker.dropdown in view.form_fields.controls
         assert view.log_starter_picker.dropdown.value == "empty"
         assert view.log_starter_picker.dropdown.options[-1].text == afanes.ui.strings.LOG_CARD_EMPTY
 
     def test_the_starter_control_sits_in_the_label_flow(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _state, _card, view = self._open(tmp_path, monkeypatch)
 
-        assert view.log_starter_picker.dropdown in view.form_fields.row.controls
+        assert view.log_starter_picker.dropdown in view.form_fields.controls
         assert view.log_starter_picker.dropdown not in view.log_starter_panel.controls
-        flow_index = view.edit_form.controls.index(view.form_fields.row)
+        flow_index = view.edit_form.controls.index(view.form_fields.column)
         panel_index = view.edit_form.controls.index(view.log_starter_panel)
         body_index = view.edit_form.controls.index(view.body_field)
         assert flow_index < panel_index < body_index
@@ -2117,19 +2118,24 @@ class TestLogStarter:
         _state, _card, view = self._open(tmp_path, monkeypatch)
 
         view.form_fields.layout(1200)
+        rows = typing.cast("list[ft.Row]", view.form_fields.column.controls)
 
-        assert [view.type_dropdown.col, view.date_field.col, view.log_starter_picker.dropdown.col] == [4, 4, 4]
+        assert len(rows) == 1
+        assert rows[0].controls == [
+            view.type_dropdown,
+            view.date_field,
+            view.log_starter_picker.dropdown,
+        ]
+        assert all(control.expand is True for control in rows[0].controls)
 
     def test_a_narrow_log_draft_stacks_the_label_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _state, _card, view = self._open(tmp_path, monkeypatch)
 
         view.form_fields.layout(300)
+        rows = typing.cast("list[ft.Row]", view.form_fields.column.controls)
 
-        assert [view.type_dropdown.col, view.date_field.col, view.log_starter_picker.dropdown.col] == [
-            12,
-            12,
-            12,
-        ]
+        assert len(rows) == THREE_ROWS
+        assert all(len(row.controls) == ONE_CONTROL for row in rows)
 
     def test_selecting_a_card_fills_the_body(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         state, _card, view = self._open(tmp_path, monkeypatch)
@@ -2162,8 +2168,10 @@ class TestLogStarter:
 
         assert view.log_starter_panel.visible is False
         assert view.log_starter_picker.dropdown.visible is False
-        assert view.type_dropdown.col == HALF_ROW
-        assert view.date_field.col == HALF_ROW
+        rows = typing.cast("list[ft.Row]", view.form_fields.column.controls)
+        assert len(rows) == 1
+        assert rows[0].controls == [view.type_dropdown, view.date_field]
+        assert all(control.expand is True for control in rows[0].controls)
 
     def test_invalid_cards_are_named_beside_the_starter(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         issue = afanes.core.template_cards.TemplateCardIssue(relative_path=Path("broken.md"), message="bad")

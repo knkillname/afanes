@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Adaptive multi-column flow for label controls.
 
-The component owns a single responsive row and distributes visible controls
-over the available width. Each run of controls fills all twelve virtual
-columns, so the fields stretch to the pane instead of leaving a gutter.
+The component owns a column of flex rows and distributes visible controls over
+the available width. Every visible control expands inside its row, so the
+fields stretch to the pane instead of leaving a gutter.
 """
 
 from collections.abc import Sequence
@@ -26,62 +26,57 @@ class FieldFlow:
 
     Attributes
     ----------
-    row : flet.ResponsiveRow
-        Row that hosts the controls and receives the computed column spans.
+    controls : list[flet.Control]
+        Label controls in their configured display order, including hidden
+        controls.
+    column : flet.Column
+        Column that hosts the computed rows. Each row holds one visible run.
     """
 
     def __init__(self, controls: Sequence[ft.Control]) -> None:
-        """Build the responsive row for the supplied controls.
+        """Build the row container for the supplied controls.
 
         Parameters
         ----------
         controls : Sequence[flet.Control]
             Label controls in display order.
         """
-        self._controls = list(controls)
-        self.row = ft.ResponsiveRow(
-            controls=self._controls,
-            columns=afanes.ui.theme.FIELD_FLOW_COLUMNS,
+        self.controls = list(controls)
+        self.column = ft.Column(
+            controls=[],
             spacing=afanes.ui.theme.ITEM_GAP,
-            run_spacing=afanes.ui.theme.ITEM_GAP,
         )
 
     def layout(self, width: float) -> None:
-        """Assign column spans from the available width.
+        """Rebuild the rows from the available width.
 
         Parameters
         ----------
         width : float
-            Width available to the row in logical pixels.
+            Width available to the flow in logical pixels.
 
         Notes
         -----
-        A non-positive width leaves the current spans untouched. Hidden
-        controls take no span, and each visible run sums to the full column
-        count so no lateral gutter remains.
+        A non-positive width leaves the current rows untouched. Hidden
+        controls are left out, and every visible control expands to fill its
+        share of the row.
         """
         if width <= 0:
             return
-        visible = [control for control in self._controls if control.visible]
+        visible = [control for control in self.controls if control.visible]
         if not visible:
+            self.column.controls = []
             return
         gap = afanes.ui.theme.ITEM_GAP
         capacity = int((width + gap) // (afanes.ui.theme.FIELD_MIN_WIDTH + gap))
-        capacity = max(1, min(capacity, len(visible), afanes.ui.theme.FIELD_FLOW_COLUMNS))
-        self._assign_spans(visible, capacity)
-
-    def _assign_spans(self, visible: Sequence[ft.Control], capacity: int) -> None:
-        """Fill each visible run with the full column count.
-
-        Parameters
-        ----------
-        visible : Sequence[flet.Control]
-            Controls that currently take part in the flow.
-        capacity : int
-            Maximum number of controls in one run.
-        """
-        for start in range(0, len(visible), capacity):
-            run = visible[start : start + capacity]
-            base, extra = divmod(afanes.ui.theme.FIELD_FLOW_COLUMNS, len(run))
-            for index, control in enumerate(run):
-                control.col = base + (1 if index < extra else 0)
+        capacity = max(1, min(capacity, len(visible)))
+        for control in visible:
+            control.expand = True
+        self.column.controls = [
+            ft.Row(
+                controls=visible[start : start + capacity],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+            )
+            for start in range(0, len(visible), capacity)
+        ]
