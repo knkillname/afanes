@@ -60,10 +60,10 @@
 
 ## 9. Release metadata and documentation pass
 
-- [ ] 9.1 Update `README.md` with the reminder feature and schema `2` behavior; verify the landing page names the capability without overpromising OS notifications.
-- [ ] 9.2 Add an `Unreleased` changelog entry for the reminder capability, schema `2`, time zones, dependencies, and compatibility behavior; verify the entry follows Keep a Changelog.
-- [ ] 9.3 Update the `RELEASE.md` reminder row with six recurrence kinds, stored zones, live count, automated evidence, and the revised Linux manual check; verify the row no longer claims four kinds or “dismiss without changing the note” without the metadata exception.
-- [ ] 9.4 Update `docs/index.md` and any affected guide navigation for the reminder documentation; verify `hatch run docs:build` passes with warnings as errors.
+- [x] 9.1 Update `README.md` with the reminder feature and schema `2` behavior; verify the landing page names the capability without overpromising OS notifications.
+- [x] 9.2 Add an `Unreleased` changelog entry for the reminder capability, schema `2`, time zones, dependencies, and compatibility behavior; verify the entry follows Keep a Changelog.
+- [x] 9.3 Update the `RELEASE.md` reminder row with six recurrence kinds, stored zones, live count, automated evidence, and the revised Linux manual check; verify the row no longer claims four kinds or “dismiss without changing the note” without the metadata exception.
+- [x] 9.4 Update `docs/index.md` and any affected guide navigation for the reminder documentation; verify `hatch run docs:build` passes with warnings as errors.
 
 ## 10. Integration gates
 

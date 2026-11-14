@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- **Note reminders and vault schema `2`.** References, projects, and log entries can carry one
+  optional `reminder` frontmatter mapping with a stored IANA time zone, one recurrence or one local
+  one-shot, and an optional absolute `handled` instant. Recurrences support daily, selected weekdays,
+  day of month, nth weekday, last day, and last weekday, each with one or more 24-hour times. Due
+  reminders lead Review, most overdue first, show the latest missed occurrence as one catch-up entry,
+  and contribute to the pending count and launch digest. **Open Page**, **Dismiss**, and **Skip** are
+  the card actions; Dismiss writes only `handled`, never the body, status, or schedule. Reminders pause
+  in Trash or for `done`, `cancelled`, `archived`, and `later` statuses. The read-mode summary and the
+  separate editor offer a searchable zone picker, one-shot deadline shortcuts, short-month and
+  fifth-weekday warnings, and removal with Undo. The Review count refreshes every five seconds while
+  the application is open; there are no operating-system notifications. This implements the
+  `note-reminders` OpenSpec change. **BREAKING:** the vault schema is now `2`; older applications
+  refuse it. A writable schema `1` vault is upgraded by rewriting only `afanes.yaml` when it opens,
+  and a read-only one opens for browsing with reminders off and a persistent notice. New runtime
+  dependencies: `tzdata` and `tzlocal`, both offline. Resolved runtime dependencies: `flet==1.1.2`,
+  `markdown-it-py==4.3.0`, `PyYAML==6.0.3`, `tzdata==2026.6`, `tzlocal==5.4.5`. README: updated.
+  Docs: updated.
+
 ## [0.10.0] - 2026-11-14
 
 ### Added

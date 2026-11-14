@@ -19,9 +19,11 @@ a review queue for due work. Nothing leaves your machine.
 ## 🧭 Start here
 
 The documentation follows the user journey: run Afanes from a source checkout, open a vault, capture a
-thought, clarify it, and review what is due. The interface language is chosen from the
-[workspace language control](guide/workspace.md#language); English and Spanish ship with the
-application.
+thought, clarify it, and review what is due. References, projects, and log entries can also carry a
+reminder with a stored time zone; due reminders lead the review queue and are explained in
+[Pages and editing](guide/pages-and-editing.md#reminders) and [Review](guide/review.md#due-reminders).
+The interface language is chosen from the [workspace language control](guide/workspace.md#language);
+English and Spanish ship with the application.
 
 ```{toctree}
 :maxdepth: 2

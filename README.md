@@ -63,8 +63,15 @@ and applies on the next launch. See
 3. **Clarify it.** Select the capture and choose **Process** to make it a project, a reference, or a
    discarded note.
 4. **Work the project.** Add task-list steps and tick them as you go.
-5. **Review.** The Review entry shows pending captures, due steps, waiting steps, and projects without
-   a next step.
+5. **Review.** The Review entry shows due reminders, pending captures, due steps, waiting steps, and
+   projects without a next step. Due reminders come first and can be opened or dismissed.
+
+A reference, project, or log entry can carry one reminder. Choose a daily, weekday, monthly, or
+one-shot schedule with one or more times and a stored IANA time zone; the Review count refreshes while
+the application is open. Dismissing records the occurrence without changing the note body or status.
+Afanes never sends operating-system notifications or contacts a server. The vault format is schema
+`2`; a writable schema `1` vault is upgraded when it opens, and a read-only one opens for browsing
+with reminders off.
 
 Discarded notes move to **Trash**, where each entry keeps its title and birthplace and stays
 recoverable for 30 days. Restore returns it to where it was; an occupied birthplace asks before it is
@@ -80,6 +87,8 @@ The full walkthrough is in
 - [Workspace and browser](https://github.com/knkillname/afanes/blob/main/docs/guide/workspace.md)
 - [Inbox](https://github.com/knkillname/afanes/blob/main/docs/guide/inbox.md) and
   [projects](https://github.com/knkillname/afanes/blob/main/docs/guide/projects-and-steps.md)
+- [Pages, editing, and reminders](https://github.com/knkillname/afanes/blob/main/docs/guide/pages-and-editing.md)
+- [Review](https://github.com/knkillname/afanes/blob/main/docs/guide/review.md)
 - [Log](https://github.com/knkillname/afanes/blob/main/docs/guide/log.md)
 - [Vault format](https://github.com/knkillname/afanes/blob/main/docs/reference/vault-format.md)
 - [Command line](https://github.com/knkillname/afanes/blob/main/docs/guide/command-line.md)
