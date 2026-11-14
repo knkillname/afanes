@@ -8,9 +8,9 @@
 
 ## 2. Shared Log date-control row
 
-- [ ] 2.1 Replace the two Log control rows with one wrapping row containing Today's Entry, Entries, and Everything in that order; verify `tests/ui/test_workspace_view.py` finds all three controls in the same row and finds no second control row
-- [ ] 2.2 Add narrow-browser coverage for the wrapping Log row and keep the existing search-hides-controls test green; verify `hatch test tests/ui/test_workspace_view.py`
-- [ ] 2.3 Update `docs/guide/workspace.md` and `docs/guide/log.md` for the shared row; verify `hatch run docs:build`
+- [x] 2.1 Replace the two Log control rows with one wrapping row containing Today's Entry, Entries, and Everything in that order; verify `tests/ui/test_workspace_view.py` finds all three controls in the same row and finds no second control row
+- [x] 2.2 Add narrow-browser coverage for the wrapping Log row and keep the existing search-hides-controls test green; verify `hatch test tests/ui/test_workspace_view.py`
+- [x] 2.3 Update `docs/guide/workspace.md` and `docs/guide/log.md` for the shared row; verify `hatch run docs:build`
 
 ## 3. Full-width page content
 

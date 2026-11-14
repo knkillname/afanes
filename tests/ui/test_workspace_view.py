@@ -1417,6 +1417,28 @@ class TestLogSection:
 
         assert requested == [NoteDate.from_date(_today())]
 
+    def test_the_log_controls_share_one_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = self._open_log(tmp_path, monkeypatch)
+
+        row = typing.cast("ft.Row", view.browser_list.controls[0])
+
+        assert isinstance(row, ft.Row)
+        assert row.wrap is True
+        assert row.controls == [view.log_today_button, view.log_entries_button, view.log_everything_button]
+
+    def test_the_log_controls_keep_the_wrap_rule_on_a_narrow_browser(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view = self._open_log(tmp_path, monkeypatch)
+
+        view.resize(afanes.ui.theme.SHELL_MEDIUM_MIN - 1)
+        view.refresh()
+        row = typing.cast("ft.Row", view.browser_list.controls[0])
+
+        assert isinstance(row, ft.Row)
+        assert row.wrap is True
+        assert row.run_spacing == afanes.ui.theme.ITEM_GAP
+
     def test_mode_switch_changes_the_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         versioned(vault)

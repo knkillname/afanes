@@ -1329,12 +1329,10 @@ class WorkspaceView:
         calendar_month = timeline.calendar(year, month)
         return [
             ft.Row(
-                controls=[self.log_today_button],
+                controls=[self.log_today_button, self.log_entries_button, self.log_everything_button],
                 spacing=afanes.ui.theme.ITEM_GAP,
-            ),
-            ft.Row(
-                controls=[self.log_entries_button, self.log_everything_button],
-                spacing=0,
+                run_spacing=afanes.ui.theme.ITEM_GAP,
+                wrap=True,
             ),
             ft.Container(
                 padding=afanes.ui.theme.ITEM_GAP,

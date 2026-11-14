@@ -45,7 +45,8 @@ read-only vault; maintenance failures appear in a persistent banner.
 
 The **Log** section offers a calendar and a collapsed date tree instead of a flat list. **Entries** shows
 only log notes; **Everything** is a date lens over every parsed note. **Today’s Entry** opens today's
-entry in read mode, or an unsaved draft when the day is free. The calendar and tree controls follow the
+entry in read mode, or an unsaved draft when the day is free. The three controls share one row above
+the calendar and wrap only when the browser is too narrow. The calendar and tree controls follow the
 same rule for a chosen day, month, or year. See
 [Log](log.md) for the calendar marks, date rules, and linking.
 

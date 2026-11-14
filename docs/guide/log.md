@@ -14,6 +14,8 @@ collapsed year tree show the archive; the detail region is the reading and writi
 ## 🗓️ The calendar
 
 Open **Log** in the navigation region. The browser region shows a month calendar and a collapsed date tree.
+**Today’s Entry**, **Entries**, and **Everything** share one row above the calendar; they wrap only
+when the browser cannot fit them.
 
 - A day with entries has a tinted cell and a dot.
 - A month with a whole-month entry has a dot on its header.
