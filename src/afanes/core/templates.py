@@ -667,6 +667,11 @@ class TemplateCatalog:
                 self._refuse(
                     subject, f"note {relative.as_posix()!r} is a capture; bundles hold references and projects"
                 )
+            if "reminder" in note.document.raw:
+                self._refuse(
+                    subject,
+                    f"note {relative.as_posix()!r} declares a reminder; starter content must not schedule work",
+                )
             first = relative.parts[0].casefold()
             if first in {INBOX_DIRECTORY.name.casefold(), TRASH_DIRECTORY.name.casefold()}:
                 self._refuse(subject, f"note {relative.as_posix()!r} is stored under {relative.parts[0]}/")

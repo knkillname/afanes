@@ -262,6 +262,51 @@ class TestBundledTreeValidation:
 
         assert "declares no type" in str(info.value)
 
+    def test_a_bundled_reminder_is_refused(self, tmp_path: Path) -> None:
+        root = tmp_path / "templates"
+        _catalog(root)
+        _write(
+            root,
+            Path("personal/en/reference/person/Sam.md"),
+            "---\n"
+            "type: reference\n"
+            "category: person\n"
+            "reminder:\n"
+            "  zone: UTC\n"
+            "  recurrence:\n"
+            "    kind: daily\n"
+            '    times: ["09:00"]\n'
+            "---\n\n# Sam\n",
+        )
+        catalog = afanes.core.templates.TemplateCatalog.from_root(root)
+
+        with pytest.raises(TemplateContentError) as info:
+            catalog.bundle("personal")
+
+        assert "declares a reminder" in str(info.value)
+
+    def test_a_guide_reminder_is_refused(self, tmp_path: Path) -> None:
+        root = tmp_path / "templates"
+        _catalog(root)
+        _write(
+            root,
+            Path("_guide/en/reference/Getting started.md"),
+            "---\n"
+            "type: reference\n"
+            "reminder:\n"
+            "  zone: UTC\n"
+            "  recurrence:\n"
+            "    kind: daily\n"
+            '    times: ["09:00"]\n'
+            "---\n\n# Getting started\n",
+        )
+        catalog = afanes.core.templates.TemplateCatalog.from_root(root)
+
+        with pytest.raises(TemplateContentError) as info:
+            catalog.bundle(None)
+
+        assert "declares a reminder" in str(info.value)
+
     def test_unsafe_filename_is_refused(self, tmp_path: Path) -> None:
         root = tmp_path / "templates"
         _catalog(root)
@@ -517,6 +562,7 @@ class TestBundledContent:
 
         planner = afanes.core.search.ReviewPlanner(snapshot, today=fixed_today)
         assert snapshot.failures == ()
+        assert all(note.reminder is None for note in snapshot.notes)
         assert planner.pending_count() == 0
 
     @pytest.mark.parametrize("identifier", ["personal", "work", "study"])

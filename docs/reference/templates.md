@@ -61,6 +61,13 @@ Template notes may contain `{{date:+Nd}}` or `{{date:-Nd}}` placeholders. They r
 creation date, so examples stay current. An unknown brace expression is a typo and refuses the
 creation instead of writing an unresolved placeholder.
 
+## ⏰ No reminders in starter content
+
+Bundled starter content must not declare a `reminder`. A template or guide note that schedules work
+would make the Review count nonzero the moment the vault is created, so Afanes refuses the template
+and writes nothing. A created vault therefore has no due reminders; add reminders to its pages after
+creation. This rule applies to the guide, the template cards, and every bundled note.
+
 ## 🧭 See also
 
 - [Create or open your first vault](../getting-started/first-vault.md)

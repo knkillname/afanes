@@ -55,8 +55,8 @@
 
 ## 8. Starter content and templates
 
-- [ ] 8.1 Reject a bundled template or guide that declares `reminder`; verify a template with a reminder is refused and a created vault has zero due reminders.
-- [ ] 8.2 Update `docs/reference/templates.md` with the no-reminder starter rule; verify the page builds and the rule is visible to template authors.
+- [x] 8.1 Reject a bundled template or guide that declares `reminder`; verify a template with a reminder is refused and a created vault has zero due reminders.
+- [x] 8.2 Update `docs/reference/templates.md` with the no-reminder starter rule; verify the page builds and the rule is visible to template authors.
 
 ## 9. Release metadata and documentation pass
 
