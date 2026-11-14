@@ -57,7 +57,9 @@ preserved. Renaming a note also rewrites every resolving body reference and ever
 that uses it: a project's `owner` and `asked_by` values and a step's `owners`. When a rewrite cannot
 update every note, the report names the updated notes and the skipped or failed ones with the reason,
 using vault-relative paths. Moving a note to `trash/` makes its inbound references unresolved without
-rewriting the referring notes, including role names. Moving the note back restores them.
+rewriting the referring notes, including role names. Restoring it to its birthplace resolves them again.
+An occupied birthplace is never overwritten without a confirmation; after confirmation the restored
+note replaces the occupant and the links resolve to it.
 
 If a reference name was unsafe as a filename, the first save offers to rewrite the references that still
 use it, including role names. If the safe name already belongs to a page in the same scheme, that page

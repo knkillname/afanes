@@ -27,7 +27,7 @@ from afanes.models.note import NoteDate
 from tests.support import constant, ensure_vault, versioned
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
-SECTION_COUNT = 5
+SECTION_COUNT = 6
 PRIMARY_MENU_ITEM_COUNT = 4
 OWNED_BANNER_COUNT = 3
 TWO_ENTRIES = 2
@@ -1489,3 +1489,185 @@ class TestLogSection:
         assert scrolls == [0, 0]
         assert afanes.ui.state.app_state.pages.page is not None
         assert afanes.ui.state.app_state.pages.page.path == first
+
+
+class TestTrashSection:
+    def _entry(
+        self,
+        root: Path,
+        name: str,
+        *,
+        birthplace: str = "notes/Ada.md",
+        body: str = "# Ada\n",
+        day: datetime.date | None = None,
+    ) -> Path:
+        lines = ["---", "type: note", f"trashed_from: {birthplace}"]
+        if day is not None:
+            lines.append(f"trashed_on: {day.isoformat()}")
+        lines.extend(["---", "", body])
+        path = root / "trash" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(lines), encoding="utf-8")
+        return path
+
+    def test_navigation_shows_trash_with_its_count(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._entry(tmp_path / "vault", "entry.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+        section = afanes.ui.state.browser.WorkspaceSection.TRASH
+
+        assert view.section_tiles[section].title == afanes.ui.strings.TRASH_TITLE
+        assert view.section_counts[section].value == "1"
+
+    def test_trash_rows_show_title_and_birthplace(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._entry(tmp_path / "vault", "entry.md", birthplace="projects/Build shed.md", body="# Timber frame\n")
+        view = _open_workspace(tmp_path, monkeypatch)
+        section = afanes.ui.state.browser.WorkspaceSection.TRASH
+
+        asyncio.run(_handler(view.section_tiles[section])())
+
+        rows = [control for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        assert len(rows) == 1
+        assert rows[0].title == "Timber frame"
+        assert rows[0].subtitle == afanes.ui.strings.TRASH_ROW_FROM.format(path="projects/Build shed.md")
+        assert view.empty_trash_button.visible is True
+
+    def test_an_empty_trash_explains_the_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        section = afanes.ui.state.browser.WorkspaceSection.TRASH
+
+        asyncio.run(_handler(view.section_tiles[section])())
+
+        assert view.empty_trash_button.visible is False
+        assert any(
+            isinstance(control, ft.Container)
+            and isinstance(control.content, ft.Text)
+            and control.content.value == afanes.ui.strings.TRASH_EMPTY
+            for control in view.browser_list.controls
+        )
+
+    def test_selecting_a_trash_row_opens_the_read_only_page(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._entry(tmp_path / "vault", "entry.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+        section = afanes.ui.state.browser.WorkspaceSection.TRASH
+        asyncio.run(_handler(view.section_tiles[section])())
+        row = next(control for control in view.browser_list.controls if isinstance(control, ft.ListTile))
+
+        asyncio.run(_handler(row)())
+
+        assert afanes.ui.state.app_state.pages.trash_entry is not None
+        assert view.page_view.restore_button.visible is True
+        assert view.page_view.edit_button.visible is False
+        assert view.page_view.trash_item.visible is False
+        assert view.page_view.delete_item.visible is True
+
+    def test_refresh_keeps_the_open_trash_row_selected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._entry(tmp_path / "vault", "entry.md")
+        view = _open_workspace(tmp_path, monkeypatch)
+        section = afanes.ui.state.browser.WorkspaceSection.TRASH
+        asyncio.run(_handler(view.section_tiles[section])())
+        row = next(control for control in view.browser_list.controls if isinstance(control, ft.ListTile))
+        asyncio.run(_handler(row)())
+
+        view.refresh()
+
+        refreshed = next(control for control in view.browser_list.controls if isinstance(control, ft.ListTile))
+        assert refreshed.selected is True
+
+    def test_global_search_adds_a_trash_group(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._entry(tmp_path / "vault", "entry.md", body="# Cedar shed\n")
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        view.search_field.value = "cedar"
+        asyncio.run(_change_handler(view.search_field)())
+
+        headings = [
+            control.content.value
+            for control in view.browser_list.controls
+            if isinstance(control, ft.Container) and isinstance(control.content, ft.Text)
+        ]
+        assert afanes.ui.strings.TRASH_TITLE + " (1)" in headings
+        rows = [control for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        assert rows[0].title == "Cedar shed"
+
+    def test_empty_trash_requires_cancel_or_confirmation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        managed = self._entry(tmp_path / "vault", "entry.md")
+        legacy = tmp_path / "vault" / "trash" / "legacy.md"
+        legacy.write_text("---\ntype: note\n---\n\n# Legacy\n", encoding="utf-8")
+        view = _open_workspace(tmp_path, monkeypatch)
+        section = afanes.ui.state.browser.WorkspaceSection.TRASH
+        asyncio.run(_handler(view.section_tiles[section])())
+
+        asyncio.run(_handler(view.empty_trash_button)())
+        assert view.empty_trash_confirm_panel.visible is True
+        assert view.empty_trash_confirm.actions.controls == [
+            view.empty_trash_confirm.cancel,
+            view.empty_trash_confirm.confirm,
+        ]
+        asyncio.run(_handler(view.empty_trash_confirm.cancel)())
+        assert managed.is_file()
+        assert not view.empty_trash_confirm_panel.visible
+
+        asyncio.run(_handler(view.empty_trash_button)())
+        asyncio.run(_handler(view.empty_trash_confirm.confirm)())
+
+        assert not managed.exists()
+        assert legacy.is_file()
+        assert afanes.ui.state.app_state.session.trash_count == 0
+
+
+class TestTrashPageNavigation:
+    def _entry(self, root: Path) -> Path:
+        path = root / "trash" / "entry.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "---\ntype: note\ntrashed_from: notes/Ada.md\n---\n\n# Ada\n",
+            encoding="utf-8",
+        )
+        return path
+
+    def test_back_from_a_trashed_page_returns_to_the_trash_browser(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._entry(tmp_path / "vault")
+        view = _open_workspace(tmp_path, monkeypatch)
+        section = afanes.ui.state.browser.WorkspaceSection.TRASH
+        asyncio.run(_handler(view.section_tiles[section])())
+        row = next(control for control in view.browser_list.controls if isinstance(control, ft.ListTile))
+        asyncio.run(_handler(row)())
+
+        asyncio.run(view.page_view.go_back())
+
+        assert afanes.ui.state.app_state.pages.trash_entry is None
+        assert afanes.ui.state.app_state.browser.active_section is section
+        assert afanes.ui.state.app_state.navigation.history == ()
+
+    def test_search_keeps_active_and_trashed_matches_apart(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_note(
+            tmp_path / "vault" / "reference" / "Active cedar.md",
+            note_type="reference",
+            body="# Active cedar\n",
+        )
+        path = tmp_path / "vault" / "trash" / "entry.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "---\ntype: note\ntrashed_from: notes/Trashed cedar.md\n---\n\n# Trashed cedar\n",
+            encoding="utf-8",
+        )
+        view = _open_workspace(tmp_path, monkeypatch)
+
+        view.search_field.value = "cedar"
+        asyncio.run(_change_handler(view.search_field)())
+
+        headings = [
+            control.content.value
+            for control in view.browser_list.controls
+            if isinstance(control, ft.Container) and isinstance(control.content, ft.Text)
+        ]
+        assert afanes.ui.strings.WORKSPACE_SECTION_LABELS["references"] + " (1)" in headings
+        assert afanes.ui.strings.TRASH_TITLE + " (1)" in headings
+        titles = [control.title for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        assert titles == ["Active cedar", "Trashed cedar"]

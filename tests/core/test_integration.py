@@ -14,6 +14,8 @@ import afanes.core.vault.pages
 import afanes.core.vault.processing
 import afanes.core.vault.service
 import afanes.core.vault.steps
+import afanes.core.vault.trash
+import afanes.core.vault.trash_catalog
 import afanes.ui.state
 from afanes.core.editing import PageDraftFactory
 from afanes.core.errors import ProcessingError
@@ -102,12 +104,13 @@ class TestVaultLayoutAndTrash:
 
         assert preview.reference_count == 1
         assert not ada.exists()
-        assert (root / "trash" / "Ada.md").is_file()
+        assert preview.trash_path.is_file()
         assert vault.scan().catalog.resolve(reference).outcome is ResolutionOutcome.UNRESOLVED
 
-        restored = root / "reference" / "person" / "Ada.md"
-        (root / "trash" / "Ada.md").replace(restored)
+        entry = afanes.core.vault.trash_catalog.TrashCatalog(vault).load().entries[0]
+        restored = afanes.core.vault.trash.TrashService(vault).restore_entry(entry, confirm=True)
 
+        assert restored == root / "reference" / "person" / "Ada.md"
         assert vault.scan().catalog.resolve(reference).targets == (restored,)
         assert referring.exists()
 
@@ -194,7 +197,9 @@ class TestProcessingLifecycle:
         assert "- [ ] Call the plumber" in document.body
         assert "Ask about the boiler" in document.body
         assert not capture.exists()
-        assert (root / "trash" / "Call the plumber.md").exists()
+        entries = afanes.core.vault.trash_catalog.TrashCatalog(vault).load()
+        assert entries.count == 1
+        assert entries.entries[0].birthplace == Path("inbox") / capture.name
 
     def test_capture_to_trash_and_restore(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -207,9 +212,10 @@ class TestProcessingLifecycle:
         )
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
-        assert target == root / "trash" / "Obsolete.md"
+        assert target.parent == root / "trash"
         assert not capture.exists()
-        target.replace(root / "inbox" / "Obsolete.md")
+        entry = afanes.core.vault.trash_catalog.TrashCatalog(vault).load().entries[0]
+        afanes.core.vault.trash.TrashService(vault).restore_entry(entry, confirm=True)
         assert len(vault.scan().inbox_notes()) == 1
 
 

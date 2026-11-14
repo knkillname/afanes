@@ -26,6 +26,10 @@ Unknown keys are preserved when Afanes rewrites a note. A null `status` or `due_
 absent on every note type, including notes and log entries where the key is otherwise forbidden. The
 other recognized keys do not accept null. A due date is a date, not a timestamp.
 
+A note under `trash/` adds `trashed_from` (its vault-relative birthplace) and `trashed_on` (the local
+calendar day it was trashed). These two keys are trash metadata, not editable labels; restoring the
+note removes them. See [Vault format](vault-format.md).
+
 ## 🏷️ Type
 
 - `note` is an unclarified capture. It belongs in `inbox/` and means "not clarified yet".

@@ -9,6 +9,7 @@ other's behavior.
 """
 
 import dataclasses
+import datetime
 from pathlib import Path
 
 from afanes.core.vault.snapshot import ReferenceSite
@@ -168,12 +169,20 @@ class TrashPreview:
         Number of references that point to the note.
     affected_notes : tuple[Path, ...]
         Notes containing at least one inbound reference.
+    trashed_on : datetime.date | None
+        Local calendar day recorded in the note frontmatter, or ``None`` for a
+        preview that was not applied.
+    source_hash : str | None
+        SHA-256 digest of the note captured at planning time, or ``None`` for
+        a preview built without a scan.
     """
 
     note_path: Path
     trash_path: Path
     reference_count: int
     affected_notes: tuple[Path, ...]
+    trashed_on: datetime.date | None = None
+    source_hash: str | None = None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

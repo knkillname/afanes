@@ -152,6 +152,13 @@ class PageView:
             visible=False,
             key="page-done-action",
         )
+        self.restore_button = ft.FilledButton(
+            content=afanes.ui.strings.TRASH_RESTORE,
+            icon=ft.Icons.RESTORE_OUTLINED,
+            on_click=self.restore_trash,
+            visible=False,
+            key="trash-restore-action",
+        )
         self.edit_item = ft.PopupMenuItem(
             content=afanes.ui.strings.PAGE_EDIT,
             on_click=self.start_edit,
@@ -169,10 +176,16 @@ class PageView:
             on_click=self.trash_page,
             key="page-trash",
         )
+        self.delete_item = ft.PopupMenuItem(
+            content=afanes.ui.strings.TRASH_DELETE_PERMANENTLY,
+            icon=ft.Icons.DELETE_FOREVER_OUTLINED,
+            on_click=self.begin_delete_trash,
+            key="page-delete-permanently",
+        )
         self.menu_button = ft.PopupMenuButton(
             icon=ft.Icons.MORE_VERT_OUTLINED,
             tooltip=afanes.ui.strings.PAGE_ACTIONS,
-            items=[self.edit_item, self.rename_item, self.trash_item],
+            items=[self.edit_item, self.rename_item, self.trash_item, self.delete_item],
             key="page-menu",
         )
         self.header = ft.Row(
@@ -183,6 +196,7 @@ class PageView:
                 self.process_button,
                 self.edit_button,
                 self.done_button,
+                self.restore_button,
                 self.menu_button,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
@@ -512,6 +526,16 @@ class PageView:
         self.rename_confirm_button = self.rename.confirm
         self.rename_cancel_button = self.rename.cancel
         self.rename_panel = self.rename.panel
+        self.overwrite_trash = afanes.ui.components.page_panels.DestructiveConfirmPanel(
+            self.confirm_trash_overwrite,
+            self.cancel_trash_overwrite,
+        )
+        self.overwrite_trash_panel = self.overwrite_trash.panel
+        self.delete_trash = afanes.ui.components.page_panels.DestructiveConfirmPanel(
+            self.confirm_trash_delete,
+            self.cancel_trash_delete,
+        )
+        self.delete_trash_panel = self.delete_trash.panel
         self.dialogs = ft.Column(
             controls=[
                 self.conflict_panel,
@@ -520,6 +544,8 @@ class PageView:
                 self.type_change_panel,
                 self.category_move_panel,
                 self.rename_panel,
+                self.overwrite_trash_panel,
+                self.delete_trash_panel,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,
         )
@@ -538,6 +564,12 @@ class PageView:
             fit=ft.StackFit.EXPAND,
             key="page-mode-host",
         )
+        self.trash_info = ft.Text(
+            "",
+            style=afanes.ui.theme.TEXT_ROLES["caption"],
+            selectable=True,
+            visible=False,
+        )
         self.body_header = ft.Row(
             controls=[self.path, self.status_text],
             spacing=afanes.ui.theme.ITEM_GAP,
@@ -546,6 +578,7 @@ class PageView:
         self.page_content = ft.Column(
             controls=[
                 self.body_header,
+                self.trash_info,
                 self.meta_row,
                 self.banners,
                 self.dialogs,
@@ -756,6 +789,7 @@ class PageView:
         self._refresh_type_change()
         self._refresh_category_move()
         self._refresh_rename()
+        self._refresh_trash_decisions()
 
     def _refresh_header(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the header, mode buttons, and write status."""
@@ -763,16 +797,19 @@ class PageView:
         self.title.value = state.pages.page_title if page is not None else ""
         self.path.value = state.pages.page_path_label
         self.back_button.disabled = page is None and not state.navigation.history
+        trashed = state.pages.trash_entry is not None
         normal = page is not None and not editing and self._state.pages.page_mode is DraftMode.NORMAL
-        process_visible = page is not None and normal and self._is_inbox_page(page)
+        process_visible = page is not None and normal and not trashed and self._is_inbox_page(page)
         self.process_button.visible = process_visible
-        self.edit_button.visible = normal and not process_visible
-        self.done_button.visible = page is not None and editing
+        self.edit_button.visible = normal and not process_visible and not trashed
+        self.restore_button.visible = trashed and not editing
+        self.done_button.visible = page is not None and editing and not trashed
         labels = self._state.pages.page_labels if page is not None else None
         is_log = labels is not None and labels.note_type is NoteType.LOG
-        self.edit_item.visible = normal and process_visible
-        self.rename_item.visible = normal and not is_log
-        self.trash_item.visible = page is not None and not editing
+        self.edit_item.visible = normal and process_visible and not trashed
+        self.rename_item.visible = normal and not is_log and not trashed
+        self.trash_item.visible = page is not None and not editing and not trashed
+        self.delete_item.visible = trashed and not editing
         self.menu_button.visible = page is not None and not editing
         self.progress.visible = state.status.busy or state.pages.saving
         if state.pages.saving:
@@ -786,13 +823,28 @@ class PageView:
         """Refresh the rendered read mode or the step-aware project body."""
         state = self._state
         labels = state.pages.page_labels if page is not None else None
-        is_project = labels is not None and labels.note_type is NoteType.PROJECT
+        is_project = labels is not None and labels.note_type is NoteType.PROJECT and state.pages.trash_entry is None
         visible = page is not None and not editing
         self.empty_text.visible = page is None
         self.read_body.visible = visible and not is_project
         self.project_body.refresh()
         if visible and page is not None and not is_project:
-            self.read_body.value = state.pages.page_read_text
+            self.read_body.value = (
+                state.pages.page_raw_text
+                if page.mode is DraftMode.RAW and state.pages.trash_entry is not None
+                else state.pages.page_read_text
+            )
+        entry = state.pages.trash_entry
+        self.trash_info.visible = entry is not None and visible
+        if entry is not None:
+            self.trash_info.value = (
+                afanes.ui.strings.TRASH_INFO.format(
+                    path=entry.birthplace_text,
+                    date=entry.trashed_on.isoformat(),
+                )
+                if entry.trashed_on is not None
+                else afanes.ui.strings.TRASH_INFO_NO_DATE.format(path=entry.birthplace_text)
+            )
 
     def _refresh_connections(self, page: PageDraft | None, *, editing: bool) -> None:
         """Refresh the read-only Connections section after the rendered body."""
@@ -809,6 +861,7 @@ class PageView:
             and not editing
             and page.mode is DraftMode.NORMAL
             and labels is not None
+            and state.pages.trash_entry is None
         )
         connections = state.session.connections if parsed else None
         result = connections.for_note(path) if connections is not None and path is not None else None
@@ -922,7 +975,7 @@ class PageView:
         """Refresh the note date and the project status and due-date row."""
         state = self._state
         labels = state.pages.page_labels if page is not None else None
-        visible = page is not None and not editing and labels is not None
+        visible = page is not None and not editing and labels is not None and state.pages.trash_entry is None
         self.meta_row.visible = visible
         if not visible or labels is None:
             self.meta_owner.visible = False
@@ -1034,7 +1087,7 @@ class PageView:
     def _refresh_raw(self, page: PageDraft | None) -> None:
         """Refresh raw rescue mode."""
         state = self._state
-        visible = page is not None and state.pages.page_mode is DraftMode.RAW
+        visible = page is not None and state.pages.page_mode is DraftMode.RAW and state.pages.trash_entry is None
         self.raw_panel.visible = visible
         if visible and page is not None and self.raw_field.value != state.pages.page_raw_text:
             self.raw_field.value = state.pages.page_raw_text
@@ -1133,6 +1186,24 @@ class PageView:
         self.category_move_text.value = afanes.ui.strings.PAGE_CATEGORY_MOVE_BODY.format(
             path=preview.target_path,
         )
+
+    def _refresh_trash_decisions(self) -> None:
+        """Refresh the overwrite and permanent-delete confirmations."""
+        pending = self._state.dialogs.trash_dialogs
+        overwrite = pending.overwrite_entry
+        self.overwrite_trash_panel.visible = overwrite is not None
+        if overwrite is not None:
+            self.overwrite_trash.title.value = afanes.ui.strings.TRASH_OVERWRITE_TITLE
+            self.overwrite_trash.body.value = afanes.ui.strings.TRASH_OVERWRITE_BODY.format(
+                path=overwrite.birthplace_text,
+            )
+            self.overwrite_trash.confirm.content = afanes.ui.strings.TRASH_OVERWRITE_CONFIRM
+        delete = pending.delete_entry
+        self.delete_trash_panel.visible = delete is not None
+        if delete is not None:
+            self.delete_trash.title.value = afanes.ui.strings.TRASH_DELETE_TITLE
+            self.delete_trash.body.value = afanes.ui.strings.TRASH_DELETE_BODY
+            self.delete_trash.confirm.content = afanes.ui.strings.TRASH_DELETE_CONFIRM
 
     def _is_inbox_page(self, page: PageDraft) -> bool:
         """Return whether the open page is an Inbox capture."""
@@ -1562,5 +1633,41 @@ class PageView:
     async def trash_page(self) -> None:
         """Move the open page to trash and offer its undo."""
         await self._state.dialogs.trash_page()
+        self.refresh()
+        self._update()
+
+    async def restore_trash(self) -> None:
+        """Restore the open read-only trashed note."""
+        await self._state.dialogs.trash_dialogs.restore()
+        self.refresh()
+        self._update()
+
+    async def begin_delete_trash(self) -> None:
+        """Open the permanent-delete confirmation for the trashed note."""
+        await self._state.dialogs.trash_dialogs.begin_delete()
+        self.refresh()
+        self._update()
+
+    async def confirm_trash_overwrite(self) -> None:
+        """Restore the waiting entry and replace the occupied birthplace."""
+        await self._state.dialogs.trash_dialogs.confirm_overwrite()
+        self.refresh()
+        self._update()
+
+    async def cancel_trash_overwrite(self) -> None:
+        """Dismiss the overwrite confirmation without writing."""
+        await self._state.dialogs.trash_dialogs.cancel_overwrite()
+        self.refresh()
+        self._update()
+
+    async def confirm_trash_delete(self) -> None:
+        """Permanently delete the trashed note after confirmation."""
+        await self._state.dialogs.trash_dialogs.confirm_delete()
+        self.refresh()
+        self._update()
+
+    async def cancel_trash_delete(self) -> None:
+        """Dismiss the permanent-delete confirmation without deleting."""
+        await self._state.dialogs.trash_dialogs.cancel_delete()
         self.refresh()
         self._update()

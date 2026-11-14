@@ -19,10 +19,12 @@ import flet as ft
 
 import afanes.core.log
 import afanes.core.search
+import afanes.core.vault.trash_catalog
 import afanes.ui.components.calendar
 import afanes.ui.components.capture_bar
 import afanes.ui.components.frozen
 import afanes.ui.components.log_tree
+import afanes.ui.components.page_panels
 import afanes.ui.state
 import afanes.ui.state.browser
 import afanes.ui.state.status
@@ -45,6 +47,7 @@ _SECTION_ICONS = {
     afanes.ui.state.browser.WorkspaceSection.REFERENCES: ft.Icons.BOOK_OUTLINED,
     afanes.ui.state.browser.WorkspaceSection.LOG: ft.Icons.CALENDAR_MONTH_OUTLINED,
     afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION: ft.Icons.WARNING_AMBER_OUTLINED,
+    afanes.ui.state.browser.WorkspaceSection.TRASH: ft.Icons.DELETE_OUTLINED,
 }
 
 
@@ -319,6 +322,13 @@ class WorkspaceView:
             expand=True,
         )
         self.browser_actions = ft.Row(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
+        self.empty_trash_button = ft.OutlinedButton(
+            content=afanes.ui.strings.TRASH_EMPTY_ACTION,
+            on_click=self._begin_empty_trash,
+            visible=False,
+            style=afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE,
+            key="trash-empty-action",
+        )
         self.browser_header = ft.Container(
             height=afanes.ui.theme.HEADER_HEIGHT,
             content=ft.Row(
@@ -333,9 +343,15 @@ class WorkspaceView:
             ),
             key="browser-header",
         )
+        self.empty_trash_confirm = afanes.ui.components.page_panels.DestructiveConfirmPanel(
+            self._confirm_empty_trash,
+            self._cancel_empty_trash,
+        )
+        self.empty_trash_confirm_panel = self.empty_trash_confirm.panel
         self.browser_body = ft.Column(
             controls=[
                 self.capture_section,
+                self.empty_trash_confirm_panel,
                 ft.Container(content=self.browser_list, expand=True),
                 self.failures_column,
             ],
@@ -793,6 +809,7 @@ class WorkspaceView:
         self.change_button.disabled = working
         self.new_reference_button.disabled = working
         self.new_capture_button.disabled = working
+        self.empty_trash_button.disabled = working
         self.nav_toggle.disabled = working
         self.capture_field.read_only = working
         if self.log_today_button is not None:
@@ -847,6 +864,7 @@ class WorkspaceView:
         self.browser_list.controls = self._browser_controls(listing)
         self._refresh_failures()
         self._refresh_banners()
+        self._refresh_empty_trash_confirmation()
         self._consume_notice()
         self._refresh_main()
         self.progress.visible = state.status.busy
@@ -868,8 +886,15 @@ class WorkspaceView:
             title = afanes.ui.strings.WORKSPACE_SECTION_LABELS[section.value]
         self.browser_title.value = title
         references = section is afanes.ui.state.browser.WorkspaceSection.REFERENCES and not searching
+        trash = section is afanes.ui.state.browser.WorkspaceSection.TRASH and not searching
         self.new_reference_button.visible = references
-        self.browser_actions.controls = [self.new_reference_button] if references else []
+        self.empty_trash_button.visible = trash and bool(state.browser.trash_entries())
+        if references:
+            self.browser_actions.controls = [self.new_reference_button]
+        elif trash:
+            self.browser_actions.controls = [self.empty_trash_button]
+        else:
+            self.browser_actions.controls = []
 
     def _browser_controls(
         self,
@@ -888,6 +913,8 @@ class WorkspaceView:
             return [self._projects_view.root]
         if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.LOG:
             return self._log_controls()
+        if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.TRASH:
+            return self._trash_controls()
         return self._section_controls(state.browser.active_section, listing)
 
     def _section_controls(
@@ -976,6 +1003,16 @@ class WorkspaceView:
                     )
                 )
                 controls.extend(self._note_row(note) for note in misplaced)
+        trashed = state.browser.session.trash_search(state.browser.query)
+        if trashed:
+            matched = True
+            controls.append(
+                self._heading(
+                    afanes.ui.strings.WORKSPACE_SECTION_LABELS[afanes.ui.state.browser.WorkspaceSection.TRASH.value],
+                    len(trashed),
+                )
+            )
+            controls.extend(self._trash_row(entry) for entry in trashed)
         if not matched:
             return [
                 self._empty_message(afanes.ui.strings.BROWSER_NO_MATCH_QUERY.format(query=state.browser.query.strip()))
@@ -992,6 +1029,83 @@ class WorkspaceView:
                 style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
             ),
         )
+
+    def _trash_controls(self) -> list[ft.Control]:
+        """Build the managed-entry rows for the Trash destination."""
+        entries = self._state.browser.trash_entries()
+        if not entries:
+            return [self._empty_message(afanes.ui.strings.TRASH_EMPTY)]
+        return [self._trash_row(entry) for entry in entries]
+
+    def _trash_row(self, entry: afanes.core.vault.trash_catalog.TrashEntry) -> ft.Control:
+        """Build one managed Trash entry with its title and birthplace."""
+        page = self._state.pages.trash_entry
+        selected = page is not None and page.path == entry.path
+        return ft.ListTile(
+            title=entry.title,
+            subtitle=afanes.ui.strings.TRASH_ROW_FROM.format(path=entry.birthplace_text),
+            leading=ft.Icons.DESCRIPTION_OUTLINED,
+            selected=selected,
+            on_click=self._trash_select_handler(entry),
+            key=f"trash-row-{entry.entry_id}",
+        )
+
+    def _trash_select_handler(
+        self,
+        entry: afanes.core.vault.trash_catalog.TrashEntry,
+    ) -> Callable[[], Awaitable[None]]:
+        """Bind a no-argument async handler to one Trash entry."""
+
+        async def handle() -> None:
+            await self._select_trash(entry)
+
+        return handle
+
+    async def _select_trash(self, entry: afanes.core.vault.trash_catalog.TrashEntry) -> None:
+        """Open one managed Trash entry read-only and show the Trash browser."""
+        self._set_working(working=True)
+        try:
+            await self._state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+            await self._state.navigation.open_trash(entry)
+        finally:
+            self._set_working(working=False)
+        self._show_detail = True
+        self._render_shell()
+        self._refresh_dynamic()
+        self._update()
+        await self.page_view.scroll_to_top()
+
+    def _refresh_empty_trash_confirmation(self) -> None:
+        """Refresh the Empty Trash confirmation panel."""
+        active = self._state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.TRASH
+        pending = self._state.dialogs.trash_dialogs.empty_open and active
+        self.empty_trash_confirm_panel.visible = pending
+        if not pending:
+            return
+        count = self._state.session.trash_count
+        self.empty_trash_confirm.title.value = afanes.ui.strings.TRASH_EMPTY_TITLE
+        self.empty_trash_confirm.body.value = afanes.ui.strings.TRASH_EMPTY_BODY.format(
+            count=afanes.ui.strings.CopyFormatter.trash_entry_count(count),
+        )
+        self.empty_trash_confirm.confirm.content = afanes.ui.strings.TRASH_EMPTY_CONFIRM
+
+    async def _begin_empty_trash(self) -> None:
+        """Open the Empty Trash confirmation."""
+        await self._state.dialogs.trash_dialogs.begin_empty()
+        self._refresh_dynamic()
+        self._update()
+
+    async def _cancel_empty_trash(self) -> None:
+        """Dismiss the Empty Trash confirmation without deleting."""
+        await self._state.dialogs.trash_dialogs.cancel_empty()
+        self._refresh_dynamic()
+        self._update()
+
+    async def _confirm_empty_trash(self) -> None:
+        """Permanently delete every managed Trash entry."""
+        await self._state.dialogs.trash_dialogs.confirm_empty()
+        self._refresh_dynamic()
+        self._update()
 
     def _review_queue_controls(self) -> list[ft.Control]:
         """Build the selectable snapshot queue for the active review session."""
@@ -1385,6 +1499,7 @@ class WorkspaceView:
         messages = (
             self._state.workspace.banner,
             self._state.session.banner,
+            self._state.session.trash_banner,
             self._state.processing.banner,
         )
         banners = [Banner(message).build() for message in messages if message is not None]

@@ -9,7 +9,10 @@ import flet as ft
 import pytest
 
 import afanes.core.settings
+import afanes.core.vault.service
+import afanes.core.vault.trash_catalog
 import afanes.ui.state
+import afanes.ui.state.browser
 import afanes.ui.state.status
 import afanes.ui.strings
 import afanes.ui.theme
@@ -25,7 +28,7 @@ from tests.ui.test_conformance import HEADER_ACTION_KEYS
 
 TWO_CANDIDATES = 2
 FOUR_SUBSECTIONS = 4
-PAGE_MENU_ITEM_COUNT = 3
+PAGE_MENU_ITEM_COUNT = 4
 
 
 @pytest.fixture(autouse=True)
@@ -967,7 +970,9 @@ class TestPanels:
         asyncio.run(scenario())
 
         assert not note.exists()
-        assert (vault / "trash" / "Ada.md").exists()
+        trashed = afanes.core.vault.trash_catalog.TrashCatalog(afanes.core.vault.service.Vault(vault)).load()
+        assert trashed.count == 1
+        assert trashed.entries[0].birthplace == Path("notes/Ada.md")
         assert state.pages.page is None
         notice = state.status.take_notice()
         assert notice is not None
@@ -2181,3 +2186,144 @@ class TestToolbarActions:
         keys = {control.key for control in view.header.controls if getattr(control, "key", None) in HEADER_ACTION_KEYS}
 
         assert keys == HEADER_ACTION_KEYS
+
+
+class TestTrashPage:
+    def _open_trashed(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> tuple[PageView, afanes.ui.state.app_state.__class__, Path]:
+        vault = tmp_path / "vault"
+        source = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(PageActions(update=lambda: None))
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(source)
+            assert await state.dialogs.trash_page() is True
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+            entry = state.browser.trash_entries()[0]
+            assert await state.navigation.open_trash(entry) is True
+
+        asyncio.run(scenario())
+        view.refresh()
+        return view, state, source
+
+    def test_the_trashed_page_shows_origin_and_read_only_actions(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view, state, _source = self._open_trashed(tmp_path, monkeypatch)
+
+        assert state.pages.trash_entry is not None
+        assert view.trash_info.visible is True
+        assert afanes.ui.strings.TRASH_INFO.format(
+            path="notes/Ada.md",
+            date=state.pages.trash_entry.trashed_on.isoformat() if state.pages.trash_entry.trashed_on else "",
+        ) in (view.trash_info.value or "")
+        assert view.restore_button.visible is True
+        assert view.edit_button.visible is False
+        assert view.done_button.visible is False
+        assert view.rename_item.visible is False
+        assert view.trash_item.visible is False
+        assert view.delete_item.visible is True
+        assert view.edit_form.visible is False
+        assert view.meta_row.visible is False
+        assert view.raw_panel.visible is False
+
+    def test_the_trashed_page_never_shows_its_storage_name(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view, state, _source = self._open_trashed(tmp_path, monkeypatch)
+        entry = state.pages.trash_entry
+        assert entry is not None
+
+        assert entry.entry_id not in (view.path.value or "")
+        assert entry.entry_id not in (view.trash_info.value or "")
+        assert state.pages.page_path_label == "notes/Ada.md"
+
+    def test_restore_returns_the_note_to_its_active_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view, state, source = self._open_trashed(tmp_path, monkeypatch)
+
+        asyncio.run(typing.cast("typing.Any", view.restore_button.on_click)())
+
+        assert source.is_file()
+        assert state.pages.trash_entry is None
+        assert view.restore_button.visible is False
+        assert view.edit_button.visible is True
+
+    def test_an_occupied_birthplace_shows_the_overwrite_panel(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view, state, source = self._open_trashed(tmp_path, monkeypatch)
+        source.write_text(_note_text("# Occupant\n"), encoding="utf-8")
+
+        asyncio.run(typing.cast("typing.Any", view.restore_button.on_click)())
+
+        assert view.overwrite_trash_panel.visible is True
+        assert view.overwrite_trash.title.value == afanes.ui.strings.TRASH_OVERWRITE_TITLE
+        assert "notes/Ada.md" in (view.overwrite_trash.body.value or "")
+        asyncio.run(typing.cast("typing.Any", view.overwrite_trash.cancel.on_click)())
+        assert not view.overwrite_trash_panel.visible
+        assert source.read_text(encoding="utf-8") == _note_text("# Occupant\n")
+        assert state.session.trash_count == 1
+
+        asyncio.run(typing.cast("typing.Any", view.restore_button.on_click)())
+        asyncio.run(typing.cast("typing.Any", view.overwrite_trash.confirm.on_click)())
+
+        assert source.read_text(encoding="utf-8") == _note_text("# Ada\n\nBody\n")
+        assert view.overwrite_trash_panel.visible is False
+        assert state.session.trash_count == 0
+
+    def test_permanent_delete_shows_a_confirmation_without_the_uuid(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view, state, _source = self._open_trashed(tmp_path, monkeypatch)
+        entry = state.pages.trash_entry
+        assert entry is not None
+
+        asyncio.run(view.begin_delete_trash())
+
+        assert view.delete_trash_panel.visible is True
+        assert view.delete_trash.title.value == afanes.ui.strings.TRASH_DELETE_TITLE
+        assert entry.entry_id not in (view.delete_trash.body.value or "")
+        asyncio.run(typing.cast("typing.Any", view.delete_trash.cancel.on_click)())
+        assert state.session.trash_count == 1
+
+        asyncio.run(view.begin_delete_trash())
+        asyncio.run(typing.cast("typing.Any", view.delete_trash.confirm.on_click)())
+
+        assert state.session.trash_count == 0
+        assert state.pages.trash_entry is None
+
+
+class TestTrashedProjectPage:
+    def test_a_trashed_project_renders_markdown_without_step_controls(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        source = _write_note(
+            vault / "projects" / "Build shed.md",
+            _typed_note("project", "# Build shed\n\n- [ ] Buy timber\n"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        view = PageView(PageActions(update=lambda: None))
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(source)
+            assert await state.dialogs.trash_page() is True
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+            entry = state.browser.trash_entries()[0]
+            assert await state.navigation.open_trash(entry) is True
+
+        asyncio.run(scenario())
+        view.refresh()
+
+        assert view.read_body.visible is True
+        assert "Buy timber" in (view.read_body.value or "")
+        assert view.project_body.root.visible is False
+        assert view.edit_form.visible is False

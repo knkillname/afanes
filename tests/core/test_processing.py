@@ -15,6 +15,7 @@ import afanes.core.vault.pages
 import afanes.core.vault.processing
 import afanes.core.vault.service
 import afanes.core.vault.snapshot
+import afanes.core.vault.trash_metadata
 from afanes.core.errors import NameCollisionError, ProcessingError, VaultError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan, ProcessingTarget
@@ -719,7 +720,9 @@ class TestPlanProcessing:
         )
 
         assert isinstance(plan, ProcessingPlan)
-        assert plan.target_path == root / "trash" / source.name
+        assert plan.target_path.parent == root / "trash"
+        assert plan.target_path.suffix == ".md"
+        assert plan.target_path != root / "trash" / source.name
 
     def test_reports_a_scheme_change(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -1012,11 +1015,10 @@ class TestApplyProcessing:
         assert steps[0].checked is True
         assert steps[0].actual == TODAY
 
-    def test_trash_moves_the_file_without_rewriting_it(self, tmp_path: Path) -> None:
+    def test_trash_moves_the_file_and_records_metadata(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         root.mkdir()
         source = _capture(root)
-        before = source.read_bytes()
         vault = afanes.core.vault.service.Vault(root)
         plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
             _request(source, ProcessingOutcome.TRASH)
@@ -1024,8 +1026,12 @@ class TestApplyProcessing:
 
         target = afanes.core.vault.processing.VaultProcessing(vault).apply_processing(plan, confirm=True)
 
-        assert target == root / "trash" / source.name
-        assert target.read_bytes() == before
+        document = afanes.core.vault.trash_metadata.TrashDocument.from_text(target.read_text(encoding="utf-8"))
+        assert target.parent == root / "trash"
+        assert not source.exists()
+        assert document.metadata is not None
+        assert document.metadata.birthplace == Path("inbox") / source.name
+        assert document.body == "# Call Ada"
 
     def test_applies_a_reference(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -1109,7 +1115,13 @@ class TestApplyAppend:
         assert [step.text for step in steps] == ["Call the plumber"]
         assert "Ask about the boiler" in document.body
         assert not source.exists()
-        assert (root / "trash" / source.name).exists()
+        trashed = list((root / "trash").glob("*.md"))
+        assert len(trashed) == 1
+        trashed_document = afanes.core.vault.trash_metadata.TrashDocument.from_text(
+            trashed[0].read_text(encoding="utf-8")
+        )
+        assert trashed_document.metadata is not None
+        assert trashed_document.metadata.birthplace == Path("inbox") / source.name
 
     def test_changed_target_aborts_and_keeps_the_capture(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

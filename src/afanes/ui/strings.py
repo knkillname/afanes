@@ -139,6 +139,7 @@ WORKSPACE_SECTION_LABELS = MappingProxyType(
         "references": "References",
         "log": "Log",
         "needs_attention": "Needs Attention",
+        "trash": "Trash",
     }
 )
 BROWSER_SEARCH_HINT = "Search all notes"
@@ -205,9 +206,11 @@ PROCESSING_CONFIRM_ACTION = "Confirm"
 PROCESSING_CANCEL_ACTION = "Cancel"
 PROCESSING_DONE_ACTION = "Done"
 PROCESSING_DESTINATION = "Destination: {path}"
+PROCESSING_DESTINATION_TRASH = "Destination: Trash"
 PROCESSING_PLAN_TITLE = "Ready to Apply"
 PROCESSING_SUCCESS_TITLE = "Capture Processed"
 PROCESSING_SUCCESS_BODY = "The note was moved to {path}"
+PROCESSING_SUCCESS_TRASH = "The note was moved to Trash"
 PROCESSING_UNRESOLVED = "Unresolved references: {names}"
 PROCESSING_SCHEME_WARNING = "{count} inbound references will become unresolved because the note changes scheme"
 PROCESSING_REFERENCE_WARNING = "{count} inbound references point to this capture and will become unresolved"
@@ -380,6 +383,35 @@ PAGE_TRASH_FAILED = "Could not move this page to trash: {detail}"
 PAGE_TRASH_MOVED = "Moved to Trash"
 PAGE_TRASH_RESTORED = "Restored from Trash"
 PAGE_TRASH_RESTORE_FAILED = "Could not restore this page: {detail}"
+
+TRASH_TITLE = "Trash"
+TRASH_EMPTY = "Trash is empty"
+TRASH_ROW_FROM = "From {path}"
+TRASH_RESTORE = "Restore"
+TRASH_DELETE_PERMANENTLY = "Delete Permanently…"
+TRASH_DELETE_TITLE = "Delete This Note Permanently?"
+TRASH_DELETE_BODY = "The note will be deleted permanently. This cannot be undone"
+TRASH_DELETE_CONFIRM = "Delete Permanently"
+TRASH_DELETED = "Trash Entry Deleted"
+TRASH_EMPTY_ACTION = "Empty Trash…"
+TRASH_EMPTY_TITLE = "Empty Trash?"
+TRASH_EMPTY_BODY = "All {count} will be deleted permanently. This cannot be undone"
+TRASH_EMPTY_CONFIRM = "Empty Trash"
+TRASH_EMPTY_DONE = "Trash Emptied"
+TRASH_EMPTY_FAILED = "Some trashed notes could not be deleted: {detail}"
+TRASH_OVERWRITE_TITLE = "Overwrite the Existing Note?"
+TRASH_OVERWRITE_BODY = "A note already exists at {path}. Restoring will permanently replace it"
+TRASH_OVERWRITE_CONFIRM = "Restore and Overwrite"
+TRASH_INFO = "Trashed from {path} on {date}"
+TRASH_INFO_NO_DATE = "Trashed from {path}"
+TRASH_OPEN_FAILED = "Could not open this trashed note: {detail}"
+TRASH_RESTORE_FAILED = "Could not restore this note: {detail}"
+TRASH_DELETE_FAILED = "Could not delete this note: {detail}"
+TRASH_MAINTENANCE_FAILED = "Trash maintenance could not finish. Some entries may not have been removed"
+TRASH_PAGE_GONE = "This note is no longer in Trash"
+TRASH_CONFIRM_LEAVE = "Confirm or cancel the Trash action before leaving this page"
+TRASH_ENTRY_ONE = "1 trashed note"
+TRASH_ENTRY_MANY = "{count} trashed notes"
 PAGE_CANCEL = "Cancel"
 PAGE_RAW_UPGRADED = "The page now parses; labels are available"
 PAGE_TYPE_CHANGE_LEAVE = "Confirm or cancel the type change before leaving this page"
@@ -512,6 +544,22 @@ class CopyFormatter:
         reference_label = "reference" if count == 1 else "references"
         note_label = "note" if notes == 1 else "notes"
         return f"{count} {reference_label} in {notes} {note_label}"
+
+    @classmethod
+    def trash_entry_count(cls, count: int) -> str:
+        """Return the trashed-note count used by the Empty Trash confirmation.
+
+        Parameters
+        ----------
+        count : int
+            Number of managed entries that will be deleted.
+
+        Returns
+        -------
+        str
+            Singular or plural phrase such as ``3 trashed notes``.
+        """
+        return TRASH_ENTRY_ONE if count == 1 else TRASH_ENTRY_MANY.format(count=count)
 
     @classmethod
     def note_count(cls, count: int) -> str:

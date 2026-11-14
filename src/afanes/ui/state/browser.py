@@ -15,7 +15,9 @@ import afanes.core.templates
 import afanes.core.vault.naming
 import afanes.core.vault.pages
 import afanes.core.vault.processing
+import afanes.core.vault.service
 import afanes.core.vault.steps
+import afanes.core.vault.trash_catalog
 import afanes.ui.strings
 from afanes.core.log import LogMode, LogTimeline
 from afanes.core.search import (
@@ -47,6 +49,8 @@ class WorkspaceSection(StrEnum):
         Dated log entries and the Everything date lens.
     NEEDS_ATTENTION : str
         Unclarified notes found outside the inbox.
+    TRASH : str
+        Managed trashed notes with their birthplace.
     """
 
     REVIEW = "review"
@@ -55,6 +59,7 @@ class WorkspaceSection(StrEnum):
     REFERENCES = "references"
     LOG = "log"
     NEEDS_ATTENTION = "needs_attention"
+    TRASH = "trash"
 
     @property
     def browser_section(self) -> BrowserSection | None:
@@ -63,10 +68,10 @@ class WorkspaceSection(StrEnum):
         Returns
         -------
         BrowserSection | None
-            Section used to select browser entries. Review and Log have no flat
-            browser section because they change the lower sidebar area.
+            Section used to select browser entries. Review, Log, and Trash have
+            no flat browser section because they own custom areas.
         """
-        if self in (WorkspaceSection.REVIEW, WorkspaceSection.LOG):
+        if self in (WorkspaceSection.REVIEW, WorkspaceSection.LOG, WorkspaceSection.TRASH):
             return None
         return BrowserSection(self.value)
 
@@ -121,6 +126,10 @@ class BrowserState:
         async with self.command_lock:
             self.active_section = section
             self.query = ""
+            if section is WorkspaceSection.TRASH:
+                vault = self.session.vault
+                if vault is not None:
+                    await self.session.maintain_trash(vault.today())
 
     async def set_query(self, query: str) -> None:
         """Filter browser entries by display title or identity.
@@ -168,12 +177,27 @@ class BrowserState:
             if section is WorkspaceSection.LOG:
                 counts[section] = len(LogTimeline(snapshot, self.log_mode, "").entries())
                 continue
+            if section is WorkspaceSection.TRASH:
+                counts[section] = self.session.trash_count
+                continue
             browser_section = section.browser_section
             if browser_section is None:
                 counts[section] = 0
             else:
                 counts[section] = sum(len(group.notes) for group in listing.groups_for(browser_section))
         return counts
+
+    def trash_entries(self) -> tuple[afanes.core.vault.trash_catalog.TrashEntry, ...]:
+        """Return the managed trash entries shown by the Trash destination.
+
+        Returns
+        -------
+        tuple[afanes.core.vault.trash_catalog.TrashEntry, ...]
+            Managed entries in display order, or an empty tuple when no
+            catalog is loaded.
+        """
+        snapshot = self.session.trash_snapshot
+        return () if snapshot is None else snapshot.entries
 
     def reference_categories(self) -> tuple[CategoryLabel, ...]:
         """Return every category label used by a reference note.

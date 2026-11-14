@@ -46,6 +46,9 @@ class ProcessingState:
     banner : str | None
         Persistent post-apply refresh failure shown after the wizard closes,
         or ``None`` when the last apply refreshed the scan.
+    last_outcome : afanes.core.processing.ProcessingOutcome | None
+        Outcome applied by the last successful confirmation, or ``None`` before
+        an apply. The success surface uses it to avoid naming a trash UUID.
     """
 
     session: VaultSession
@@ -58,6 +61,7 @@ class ProcessingState:
     cards: tuple[TemplateCard, ...] = ()
     card_issues: tuple[TemplateCardIssue, ...] = ()
     banner: str | None = None
+    last_outcome: afanes.core.processing.ProcessingOutcome | None = None
 
     def reset(self) -> None:
         """Clear the wizard session."""
@@ -68,6 +72,7 @@ class ProcessingState:
         self.cards = ()
         self.card_issues = ()
         self.banner = None
+        self.last_outcome = None
 
     async def begin(self, path: Path) -> bool:
         """Open the Processing Wizard for an Inbox capture.
@@ -138,6 +143,7 @@ class ProcessingState:
         self.body = body
         self.plan = None
         self.result = None
+        self.last_outcome = None
         self.cards = listing.cards
         self.card_issues = listing.issues
         self.session.selected = path
@@ -227,11 +233,13 @@ class ProcessingState:
                     refresh_failure = afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail=str(exc))
                 else:
                     self.session.apply_snapshot(snapshot)
+                outcome = plan.outcome if isinstance(plan, ProcessingPlan) else None
                 self.clear()
                 self.banner = refresh_failure
                 self.session.selected = None
                 self.session.preview_body = None
                 self.result = target
+                self.last_outcome = outcome
                 return target
             finally:
                 self.status.set_busy(busy=False)
@@ -253,6 +261,7 @@ class ProcessingState:
         self.cards = ()
         self.card_issues = ()
         self.banner = None
+        self.last_outcome = None
 
     @staticmethod
     def _load_cards(vault: afanes.core.vault.service.Vault) -> TemplateCardListing:

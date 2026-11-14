@@ -136,11 +136,11 @@ Strict NumPy-style docstrings are mandatory for every public module, class, enum
 
 - All vault writes go through `afanes.core.vault.service.Vault`. UI and CLI never call `open(..., "w")` on a vault file.
 - Resolve the root once; every candidate path must satisfy `is_relative_to(root)`. Reject traversal and symlinks that escape the vault.
-- Write with `afanes.core.atomic.write_text_atomic` (same-directory temp file, fsync, `os.replace`).
+- Write with `afanes.core.atomic.write_text_atomic` (same-directory temp file, fsync, `os.replace`). A restore to a free birthplace uses `write_text_exclusive` so a race can never overwrite an occupant.
 - Preserve body, unknown frontmatter keys, and existing newline style. New files are UTF-8 without BOM, LF.
 - Compare content before overwriting; if another program changed the file, stop and ask.
-- Confirm rename and move. Trash is immediate and undoable: it moves to `trash/` and offers Undo in a toast; an irreversible action requires a confirmation. No recursive or permanent deletes, never follow symlinks, never touch paths outside the vault.
-- Startup and scanning are read-only: opening or scanning a vault must not create files or folders. A valid read-only vault still opens for browsing.
+- Confirm rename and move. Trash is immediate and undoable: it moves to `trash/` and offers Undo in a toast. A user-invoked irreversible action requires a confirmation with Cancel first; that includes a confirmed restore over an occupied birthplace, Delete Permanently, and Empty Trash. Scheduled 30-day retention MAY delete expired managed trash entries without confirmation after opening validation and scanning. No recursive deletes; a permanent delete removes one verified regular file per confirmed action or retention pass. Never follow symlinks, never touch paths outside the vault.
+- Opening validation and scanning are read-only: validating the schema, opening, or scanning a vault must not create or modify any vault file. After validation and scanning, scheduled trash retention MAY delete expired managed trash entries and stamp a missing `trashed_on`. A valid read-only vault still opens for browsing.
 - A vault root contains `afanes.yaml` with `schema_version: 1`. Opening requires it and never creates it. Creating a vault writes it before the default folders and starter content; adoption of an older folder writes only that file.
 - One writer per vault; serialize writes.
 
@@ -157,7 +157,7 @@ Strict NumPy-style docstrings are mandatory for every public module, class, enum
 - Copy follows the GNOME writing style: header capitalization for headings and short control labels, sentence capitalization for field labels and prose, no final period, ellipses only on actions that open further input or a confirmation, neutral tone without first- or second-person pronouns, and typographic apostrophes (`’`) and ellipsis (`…`). `tests/ui/test_copy.py` enforces these rules on both catalogs with no baseline; classify every new copy constant in its header-case or sentence-case set and run `hatch test tests/ui/test_copy.py` after a copy change. A new exception requires a standard change.
 - Read `page.web` once in the shell; views must not branch on presentation.
 - Feedback follows the lifetime of the event: a transient toast for a one-time result or undo, a banner owned by the state for a condition that remains true, inline text for a field or form problem, and an inline panel or dialog for a decision. A background refresh never clears an owned banner or a waiting notice.
-- Show concise, actionable feedback, never tracebacks. A destructive action requires a confirmation or a visible undo path; trash moves immediately and offers Undo. Support light/dark, keyboard access, visible focus, and no color-only status.
+- Show concise, actionable feedback, never tracebacks. A user-invoked destructive action requires a confirmation or a visible undo path; trash moves immediately and offers Undo. A confirmed restore over an occupied birthplace, Delete Permanently, and Empty Trash require a confirmation with Cancel first. Scheduled trash retention is silent because no user action invokes it. Support light/dark, keyboard access, visible focus, and no color-only status.
 - Persist only UI preferences such as window size and last view; never persist vault data in UI state.
 - Cancel timers/tasks/subscriptions on dispose. Allow one active web session; a second must neither scan nor write.
 

@@ -2,6 +2,7 @@
 
 import asyncio
 import dataclasses
+import datetime
 import logging
 from pathlib import Path
 
@@ -16,6 +17,8 @@ import afanes.core.vault.naming
 import afanes.core.vault.pages
 import afanes.core.vault.processing
 import afanes.core.vault.steps
+import afanes.core.vault.trash
+import afanes.core.vault.trash_catalog
 import afanes.ui.strings
 from afanes.core.errors import (
     AfanesError,
@@ -35,6 +38,7 @@ from afanes.core.vault.snapshot import (
     VaultNote,
     VaultSnapshot,
 )
+from afanes.core.vault.trash_catalog import TrashCatalog, TrashEntry, TrashMaintenanceReport, TrashSnapshot
 from afanes.models.link import ReferenceScheme
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.status import UiStatus
@@ -173,6 +177,15 @@ class VaultSession:
     banner : str | None
         Persistent scan or refresh failure shown until the next successful
         scan, or ``None`` when no failure is active.
+    trash_snapshot : TrashSnapshot | None
+        Managed trashed notes from the last catalog load, or ``None`` when the
+        trash folder has not been read.
+    trash_fingerprint : tuple[tuple[str, int, int], ...] | None
+        Fingerprint taken with the last applied trash catalog, used by the
+        background refresh to notice external trash changes.
+    trash_banner : str | None
+        Persistent trash maintenance failure shown until a later pass
+        succeeds, or ``None`` when no failure is active.
     """
 
     status: UiStatus
@@ -186,6 +199,9 @@ class VaultSession:
     fingerprint: tuple[tuple[str, int, int], ...] | None = None
     adoption_target: Path | None = None
     banner: str | None = None
+    trash_snapshot: TrashSnapshot | None = None
+    trash_fingerprint: tuple[tuple[str, int, int], ...] | None = None
+    trash_banner: str | None = None
     _connections: afanes.core.connections.Connections | None = dataclasses.field(default=None, repr=False)
     _connections_snapshot: VaultSnapshot | None = dataclasses.field(default=None, repr=False)
 
@@ -236,6 +252,9 @@ class VaultSession:
         self.fingerprint = None
         self.adoption_target = None
         self.banner = None
+        self.trash_snapshot = None
+        self.trash_fingerprint = None
+        self.trash_banner = None
         self._connections = None
         self._connections_snapshot = None
 
@@ -358,6 +377,138 @@ class VaultSession:
         if self.selected is not None and all(note.path != self.selected for note in self.notes):
             self.selected = None
             self.preview_body = None
+
+    @property
+    def trash_count(self) -> int:
+        """Return the number of managed entries in Trash.
+
+        Returns
+        -------
+        int
+            Managed entry count, or zero when no catalog has been loaded.
+        """
+        return 0 if self.trash_snapshot is None else self.trash_snapshot.count
+
+    def trash_search(self, query: str) -> tuple[TrashEntry, ...]:
+        """Return managed trashed notes matching a global query.
+
+        Parameters
+        ----------
+        query : str
+            Text typed into the browser search field.
+
+        Returns
+        -------
+        tuple[TrashEntry, ...]
+            Matching entries in display order, or an empty tuple when no trash
+            catalog is loaded.
+        """
+        if self.trash_snapshot is None:
+            return ()
+        return self.trash_snapshot.search(query)
+
+    def apply_trash_snapshot(self, snapshot: TrashSnapshot) -> None:
+        """Replace the trash catalog and its fingerprint.
+
+        Parameters
+        ----------
+        snapshot : TrashSnapshot
+            Catalog loaded from the active vault.
+        """
+        self.trash_snapshot = snapshot
+        self.trash_fingerprint = snapshot.fingerprint
+
+    async def refresh_trash(self) -> TrashSnapshot | None:
+        """Read the trash folder without blocking the interface.
+
+        Returns
+        -------
+        TrashSnapshot | None
+            Applied catalog, or ``None`` when no vault is open or the read
+            failed.
+
+        Notes
+        -----
+        A failure sets :attr:`trash_banner` and leaves the previous catalog in
+        place. A successful read never clears a maintenance failure by itself.
+        """
+        vault = self.vault
+        if vault is None:
+            return None
+        try:
+            snapshot = await asyncio.to_thread(TrashCatalog(vault).load)
+        except (VaultError, OSError):
+            logger.debug("Trash catalog refresh failed", exc_info=True)
+            self.trash_banner = afanes.ui.strings.TRASH_MAINTENANCE_FAILED
+            return None
+        self.apply_trash_snapshot(snapshot)
+        return snapshot
+
+    async def refresh_trash_if_changed(self) -> TrashSnapshot | None:
+        """Reload the trash catalog only when its fingerprint moved.
+
+        Returns
+        -------
+        TrashSnapshot | None
+            Applied catalog when the trash folder changed, or ``None`` when it
+            matches the last applied catalog or no vault is open.
+
+        Notes
+        -----
+        Only filesystem metadata is read before a reload. A failed fingerprint
+        walk leaves the previous catalog and reports nothing, because a
+        background refresh must not interrupt the user.
+        """
+        vault = self.vault
+        if vault is None:
+            return None
+        try:
+            fingerprint = await asyncio.to_thread(TrashCatalog(vault).fingerprint)
+        except (VaultError, OSError):
+            logger.debug("Trash fingerprint could not be read", exc_info=True)
+            return None
+        if fingerprint == self.trash_fingerprint:
+            return None
+        return await self.refresh_trash()
+
+    async def maintain_trash(self, today: datetime.date) -> TrashMaintenanceReport | None:
+        """Stamp missing days, delete expired entries, and reload the catalog.
+
+        Parameters
+        ----------
+        today : datetime.date
+            Current local calendar day supplied by the caller.
+
+        Returns
+        -------
+        TrashMaintenanceReport | None
+            Outcome of the pass, or ``None`` when no vault is open or the pass
+            could not run.
+
+        Notes
+        -----
+        A failure becomes the persistent :attr:`trash_banner`; a later pass
+        without failures clears it. The catalog is reloaded after the pass so
+        the destination and count reflect the new state.
+        """
+        vault = self.vault
+        if vault is None:
+            return None
+        try:
+            report = await asyncio.to_thread(
+                afanes.core.vault.trash.TrashService(vault).maintain,
+                today,
+            )
+        except (VaultError, OSError):
+            logger.debug("Trash maintenance failed", exc_info=True)
+            self.trash_banner = afanes.ui.strings.TRASH_MAINTENANCE_FAILED
+            report = None
+        snapshot = await self.refresh_trash()
+        if report is not None:
+            self.trash_banner = (
+                None if not report.failed and snapshot is not None else afanes.ui.strings.TRASH_MAINTENANCE_FAILED
+            )
+        return report
 
     async def template_summaries(self) -> tuple[TemplateSummary, ...] | None:
         """Read the bundled template catalog without blocking the interface.

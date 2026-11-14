@@ -24,6 +24,9 @@ import afanes.core.vault.processing
 import afanes.core.vault.schema
 import afanes.core.vault.service
 import afanes.core.vault.snapshot
+import afanes.core.vault.trash
+import afanes.core.vault.trash_catalog
+import afanes.core.vault.trash_metadata
 import afanes.ui.state
 import afanes.ui.state.browser
 import afanes.ui.state.controller
@@ -3004,7 +3007,9 @@ class TestPageLinks:
         asyncio.run(scenario())
 
         assert not (vault / "reference" / "Q1 Planning.md").exists()
-        assert (vault / "trash" / "Q1 Planning.md").exists()
+        trashed = afanes.core.vault.trash_catalog.TrashCatalog(afanes.core.vault.service.Vault(vault)).load()
+        assert trashed.count == 1
+        assert trashed.entries[0].birthplace == Path("reference/Q1 Planning.md")
         assert state.pages.page is not None
         assert state.pages.page.is_new
         assert state.pages.page.is_dirty
@@ -3271,7 +3276,9 @@ class TestPageRenameTrash:
         asyncio.run(scenario())
 
         assert not second.exists()
-        assert (vault / "trash" / "Second.md").exists()
+        trashed = afanes.core.vault.trash_catalog.TrashCatalog(afanes.core.vault.service.Vault(vault)).load()
+        assert trashed.count == 1
+        assert trashed.entries[0].birthplace == Path("notes/Second.md")
         assert state.pages.page is not None
         assert state.pages.page.path == first.resolve()
         assert state.navigation.history == ()
@@ -3296,7 +3303,7 @@ class TestPageRenameTrash:
 
         assert restored is True
         assert note.is_file()
-        assert not (vault / "trash" / "Ada.md").exists()
+        assert afanes.core.vault.trash_catalog.TrashCatalog(afanes.core.vault.service.Vault(vault)).load().count == 0
         assert state.dialogs.trash_undo is None
         notice = state.status.take_notice()
         assert notice == afanes.ui.state.status.Notice(message=afanes.ui.strings.PAGE_TRASH_RESTORED)
@@ -3320,7 +3327,7 @@ class TestPageRenameTrash:
 
         assert restored is False
         assert note.read_text(encoding="utf-8") == _note_text("# Replacement\n")
-        assert (vault / "trash" / "Ada.md").is_file()
+        assert afanes.core.vault.trash_catalog.TrashCatalog(afanes.core.vault.service.Vault(vault)).load().count == 1
         assert state.dialogs.trash_undo is not None
         notice = state.status.take_notice()
         assert notice is not None
@@ -3364,7 +3371,7 @@ class TestPageRenameTrash:
 
         assert restored is False
         assert state.dialogs.trash_undo is None
-        assert (vault / "trash" / "Ada.md").is_file()
+        assert afanes.core.vault.trash_catalog.TrashCatalog(afanes.core.vault.service.Vault(vault)).load().count == 1
         assert not note.exists()
 
 
@@ -3507,7 +3514,9 @@ class TestPageRecoveryLifecycle:
         asyncio.run(scenario())
 
         assert not broken.exists()
-        assert (vault / "trash" / "Recovered page.md").exists()
+        trashed = afanes.core.vault.trash_catalog.TrashCatalog(afanes.core.vault.service.Vault(vault)).load()
+        assert trashed.count == 1
+        assert trashed.entries[0].birthplace == Path("reference/Recovered page.md")
         assert state.pages.page is not None
         assert state.pages.page.path == note.resolve()
 
@@ -4956,3 +4965,309 @@ class TestOwnedBanners:
         assert state.pages.banner is None
         state.processing.banner = None
         assert state.processing.banner is None
+
+
+class TestTrashDestination:
+    def _trashed(
+        self,
+        root: Path,
+        name: str,
+        *,
+        birthplace: str = "notes/Ada.md",
+        day: datetime.date | None = None,
+        body: str = "# Ada\n",
+    ) -> Path:
+        lines = ["---", "type: note", f"trashed_from: {birthplace}"]
+        if day is not None:
+            lines.append(f"trashed_on: {day.isoformat()}")
+        lines.extend(["---", "", body])
+        path = root / "trash" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(lines), encoding="utf-8")
+        return path
+
+    def test_a_managed_entry_is_counted_and_listed(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        self._trashed(vault, "entry.md")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+
+        asyncio.run(scenario())
+
+        assert state.browser.counts()[afanes.ui.state.browser.WorkspaceSection.TRASH] == 1
+        assert state.browser.trash_entries()[0].title == "Ada"
+        assert state.browser.trash_entries()[0].birthplace_text == "notes/Ada.md"
+
+    def test_selecting_trash_runs_retention(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+        self._trashed(vault, "old.md", day=today - datetime.timedelta(days=30))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+
+        asyncio.run(scenario())
+
+        assert state.session.trash_count == 0
+        assert state.session.trash_banner is None
+
+    def test_opening_the_vault_runs_retention(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+        self._trashed(vault, "old.md", day=today - datetime.timedelta(days=31))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.choose_vault(vault))
+
+        assert state.session.trash_count == 0
+
+    def test_a_missing_day_is_stamped_when_the_vault_opens(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        path = self._trashed(vault, "entry.md")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.choose_vault(vault))
+
+        document = afanes.core.vault.trash_metadata.TrashDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.metadata is not None
+        assert document.metadata.trashed_on == datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+
+    def test_a_trashed_page_is_read_only(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        source = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(source)
+            assert await state.dialogs.trash_page() is True
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+            entry = state.browser.trash_entries()[0]
+            assert await state.navigation.open_trash(entry) is True
+            assert state.pages.edit_page() is False
+            state.pages.editing = True
+            assert await state.pages.set_page_body("# Changed\n") is None
+            return await state.pages.autosave(force=True)
+
+        assert asyncio.run(scenario()) is False
+        assert state.pages.trash_entry is not None
+        assert state.pages.page_path_label == "notes/Ada.md"
+        assert state.pages.page_title == "Ada"
+
+    def test_restore_returns_the_note_from_trash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        source = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(source)
+            assert await state.dialogs.trash_page() is True
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+            entry = state.browser.trash_entries()[0]
+            assert await state.navigation.open_trash(entry) is True
+            return await state.dialogs.trash_dialogs.restore()
+
+        assert asyncio.run(scenario()) is True
+        assert source.is_file()
+        assert state.pages.trash_entry is None
+        assert state.pages.page_path_label == "notes/Ada.md"
+        assert state.session.trash_count == 0
+        notice = state.status.take_notice()
+        assert notice == afanes.ui.state.status.Notice(message=afanes.ui.strings.PAGE_TRASH_RESTORED)
+
+    def test_an_occupied_birthplace_opens_the_overwrite_confirmation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        source = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[bool, bool]:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(source)
+            assert await state.dialogs.trash_page() is True
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+            entry = state.browser.trash_entries()[0]
+            await state.navigation.open_trash(entry)
+            source.write_text(_note_text("# Occupant\n"), encoding="utf-8")
+            restored = await state.dialogs.trash_dialogs.restore()
+            pending = state.dialogs.trash_dialogs.overwrite_open
+            assert await state.dialogs.trash_dialogs.cancel_overwrite() is None
+            return restored, pending
+
+        restored, pending = asyncio.run(scenario())
+
+        assert restored is False
+        assert pending is True
+        assert source.read_text(encoding="utf-8") == _note_text("# Occupant\n")
+        assert state.dialogs.trash_dialogs.overwrite_open is False
+        assert state.session.trash_count == 1
+
+    def test_confirmed_overwrite_replaces_the_occupant(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        source = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n\nBody\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(source)
+            assert await state.dialogs.trash_page() is True
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+            entry = state.browser.trash_entries()[0]
+            await state.navigation.open_trash(entry)
+            source.write_text(_note_text("# Occupant\n"), encoding="utf-8")
+            assert await state.dialogs.trash_dialogs.restore() is False
+            return await state.dialogs.trash_dialogs.confirm_overwrite()
+
+        assert asyncio.run(scenario()) is True
+        assert source.read_text(encoding="utf-8") == _note_text("# Ada\n\nBody\n")
+        assert state.pages.trash_entry is None
+        assert state.session.trash_count == 0
+
+    def test_permanent_delete_requires_confirmation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        source = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[bool, int]:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(source)
+            assert await state.dialogs.trash_page() is True
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+            entry = state.browser.trash_entries()[0]
+            await state.navigation.open_trash(entry)
+            assert await state.dialogs.trash_dialogs.begin_delete() is True
+            assert await state.dialogs.trash_dialogs.cancel_delete() is None
+            kept = state.session.trash_count
+            assert await state.dialogs.trash_dialogs.begin_delete() is True
+            deleted = await state.dialogs.trash_dialogs.confirm_delete()
+            return deleted, kept
+
+        deleted, kept = asyncio.run(scenario())
+
+        assert deleted is True
+        assert kept == 1
+        assert state.session.trash_count == 0
+        assert state.pages.trash_entry is None
+
+    def test_empty_trash_removes_managed_entries_only(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        managed = self._trashed(vault, "managed.md")
+        legacy = vault / "trash" / "legacy.md"
+        legacy.write_text("---\ntype: note\n---\n\n# Legacy\n", encoding="utf-8")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[bool, int]:
+            await state.workspace.choose_vault(vault)
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+            assert await state.dialogs.trash_dialogs.begin_empty() is True
+            assert await state.dialogs.trash_dialogs.cancel_empty() is None
+            kept = state.session.trash_count
+            assert await state.dialogs.trash_dialogs.begin_empty() is True
+            emptied = await state.dialogs.trash_dialogs.confirm_empty()
+            return emptied, kept
+
+        emptied, kept = asyncio.run(scenario())
+
+        assert emptied is True
+        assert kept == 1
+        assert not managed.exists()
+        assert legacy.is_file()
+        assert state.session.trash_count == 0
+        assert state.session.trash_banner is None
+
+    def test_search_includes_managed_notes_only(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        self._trashed(vault, "managed.md", body="# Cedar shed\n")
+        unmanaged = vault / "trash" / "unmanaged.md"
+        unmanaged.write_text("---\ntype: note\n---\n\n# Cedar legacy\n", encoding="utf-8")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        asyncio.run(state.workspace.choose_vault(vault))
+
+        assert [entry.title for entry in state.session.trash_search("cedar")] == ["Cedar shed"]
+        assert state.session.trash_search("missing") == ()
+
+    def test_a_vanished_trash_entry_closes_the_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        source = _write_note(vault / "notes" / "Ada.md", _note_text("# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(source)
+            assert await state.dialogs.trash_page() is True
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.TRASH)
+            entry = state.browser.trash_entries()[0]
+            assert await state.navigation.open_trash(entry) is True
+            entry.path.unlink()
+            return await state.workspace.refresh_workspace()
+
+        assert asyncio.run(scenario()) is True
+        assert state.pages.trash_entry is None
+        notice = state.status.take_notice()
+        assert notice == afanes.ui.state.status.Notice(message=afanes.ui.strings.TRASH_PAGE_GONE)
+
+    def test_a_maintenance_failure_is_reported_and_a_later_pass_clears_it(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        original = afanes.core.vault.trash.TrashService.maintain
+        failures: list[datetime.date] = []
+
+        message = "read only"
+
+        def fail_once(
+            self: afanes.core.vault.trash.TrashService,
+            today: datetime.date,
+        ) -> afanes.core.vault.trash_catalog.TrashMaintenanceReport:
+            if not failures:
+                failures.append(today)
+                raise VaultError(message)
+            return original(self, today)
+
+        monkeypatch.setattr(afanes.core.vault.trash.TrashService, "maintain", fail_once)
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            assert state.session.trash_banner == afanes.ui.strings.TRASH_MAINTENANCE_FAILED
+            await state.session.maintain_trash(datetime.datetime.now(tz=datetime.UTC).astimezone().date())
+
+        asyncio.run(scenario())
+
+        assert state.session.trash_banner is None

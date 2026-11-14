@@ -61,6 +61,11 @@ assets, and allows one session at a time; see the
 5. **Review.** The Review entry shows pending captures, due steps, waiting steps, and projects without
    a next step.
 
+Discarded notes move to **Trash**, where each entry keeps its title and birthplace and stays
+recoverable for 30 days. Restore returns it to where it was; an occupied birthplace asks before it is
+replaced. Managed entries can also be deleted permanently or emptied together, and global search finds
+them in a separate Trash group.
+
 The full walkthrough is in
 [Your first five minutes](https://github.com/knkillname/afanes/blob/main/docs/getting-started/capture-clarify-review.md).
 

@@ -109,7 +109,13 @@ class ProjectBodyView:
         page = state.pages.page
         labels = state.pages.page_labels
         editing = state.pages.editing or state.pages.page_mode is DraftMode.RAW
-        visible = page is not None and not editing and labels is not None and labels.note_type is NoteType.PROJECT
+        visible = (
+            page is not None
+            and not editing
+            and labels is not None
+            and labels.note_type is NoteType.PROJECT
+            and state.pages.trash_entry is None
+        )
         self.root.visible = visible
         if not visible:
             self.root.controls = []

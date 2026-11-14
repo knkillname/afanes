@@ -58,6 +58,27 @@ rechecks containment and preserves the note bytes it did not intend to change.
    :members:
 ```
 
+### 🧩 afanes.core.vault.trash
+
+```{eval-rst}
+.. automodule:: afanes.core.vault.trash
+   :members:
+```
+
+### 🧩 afanes.core.vault.trash_catalog
+
+```{eval-rst}
+.. automodule:: afanes.core.vault.trash_catalog
+   :members:
+```
+
+### 🧩 afanes.core.vault.trash_metadata
+
+```{eval-rst}
+.. automodule:: afanes.core.vault.trash_metadata
+   :members:
+```
+
 ### 🧩 afanes.core.vault.processing
 
 ```{eval-rst}

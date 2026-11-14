@@ -14,6 +14,7 @@ import afanes.ui.strings
 from afanes.core.errors import AfanesError, InvalidReferenceError, VaultError
 from afanes.core.links import DestinationKind, ReferenceParser
 from afanes.core.vault.snapshot import LinkOutcome, VaultSnapshot
+from afanes.core.vault.trash_catalog import TrashEntry
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType
 from afanes.ui.state.lock import CommandLock
@@ -110,6 +111,40 @@ class PageNavigator:
                     return False
                 self.ambiguous = ()
                 self._push_history(previous)
+                return True
+            finally:
+                self.status.set_busy(busy=False)
+
+    async def open_trash(self, entry: TrashEntry) -> bool:
+        """Open one managed trash entry read-only.
+
+        Parameters
+        ----------
+        entry : afanes.core.vault.trash_catalog.TrashEntry
+            Managed entry selected in the Trash destination or in search.
+
+        Returns
+        -------
+        bool
+            ``True`` when the trashed page was read and shown.
+
+        Notes
+        -----
+        The current active draft is committed first. The history is cleared so
+        Back closes the read-only page back to the Trash browser instead of
+        returning to a UUID path. No catalog entry is added to the active scan.
+        """
+        async with self.command_lock:
+            if self.session.vault is None:
+                return False
+            self.status.set_busy(busy=True)
+            try:
+                if not await self.pages.commit():
+                    return False
+                if not await self.pages.load_trash(entry):
+                    return False
+                self.history = ()
+                self.ambiguous = ()
                 return True
             finally:
                 self.status.set_busy(busy=False)

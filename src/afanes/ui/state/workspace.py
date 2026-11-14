@@ -111,7 +111,7 @@ class WorkspaceController:
                     logger.debug("Saved vault could not be opened", exc_info=True)
                     self._show_welcome(str(exc))
                     return
-                self._enter_vault(vault, snapshot, settings.log_mode_for(vault.root))
+                await self._enter_vault(vault, snapshot, settings.log_mode_for(vault.root))
             finally:
                 self.status.set_busy(busy=False)
 
@@ -244,7 +244,7 @@ class WorkspaceController:
                     logger.debug("Vault selection could not be saved", exc_info=True)
                     self.banner = afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail=str(exc))
                     return
-            self._enter_vault(
+            await self._enter_vault(
                 vault,
                 snapshot,
                 existing.log_mode_for(vault.root) if existing is not None else "entries",
@@ -389,7 +389,7 @@ class WorkspaceController:
             except ConfigurationError as exc:
                 logger.debug("Adopted vault could not be remembered", exc_info=True)
                 remember_failure = afanes.ui.strings.VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED.format(detail=str(exc))
-            self._enter_vault(
+            await self._enter_vault(
                 vault,
                 snapshot,
                 existing.log_mode_for(vault.root) if existing is not None else "entries",
@@ -424,7 +424,7 @@ class WorkspaceController:
             except ConfigurationError as exc:
                 logger.debug("New vault could not be remembered", exc_info=True)
                 remember_failure = afanes.ui.strings.VAULT_CREATED_NOT_REMEMBERED.format(detail=str(exc))
-            self._enter_vault(
+            await self._enter_vault(
                 creation.vault,
                 snapshot,
                 existing.log_mode_for(creation.vault.root) if existing is not None else "entries",
@@ -502,13 +502,27 @@ class WorkspaceController:
             return Settings(vault=vault)
         return dataclasses.replace(existing, vault=vault)
 
-    def _enter_vault(self, vault: Vault, snapshot: VaultSnapshot, log_mode: str = "entries") -> None:
-        """Reset per-vault state and apply a freshly scanned snapshot."""
+    async def _enter_vault(self, vault: Vault, snapshot: VaultSnapshot, log_mode: str = "entries") -> None:
+        """Reset per-vault state, apply a snapshot, and run trash retention.
+
+        Parameters
+        ----------
+        vault : Vault
+            Vault that was just opened.
+        snapshot : VaultSnapshot
+            Scan result for the opened vault.
+        log_mode : str
+            Remembered Log mode for this vault.
+
+        Notes
+        -----
+        Retention runs after schema validation and after the active scan, but
+        before the workspace is shown. A failure becomes the persistent trash
+        banner and never blocks the open.
+        """
         self.banner = None
+        self.session.reset()
         self.session.vault = vault
-        self.session.adoption_target = None
-        self.session.selected = None
-        self.session.preview_body = None
         self.processing.clear()
         self.browser.reset()
         try:
@@ -520,6 +534,7 @@ class WorkspaceController:
         self.dialogs.clear()
         self.pages.clear()
         self.session.apply_snapshot(snapshot)
+        await self.session.maintain_trash(vault.today())
 
     async def change_vault(self, path: Path) -> None:
         """Switch to a different vault without restarting the application.
@@ -558,8 +573,20 @@ class WorkspaceController:
                     self.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
                     return
                 self.session.apply_snapshot(snapshot)
+                await self.session.refresh_trash()
+                if (
+                    self.pages.trash_entry is not None
+                    and self.session.trash_snapshot is not None
+                    and not await self.pages.follow_trash_change(self.session.trash_snapshot)
+                ):
+                    self.status.show_notice(afanes.ui.strings.TRASH_PAGE_GONE)
                 page = self.pages.page
-                if page is not None and page.path is not None and not self.pages.editing:
+                if (
+                    page is not None
+                    and page.path is not None
+                    and not self.pages.editing
+                    and self.pages.trash_entry is None
+                ):
                     try:
                         content = await asyncio.to_thread(vault.read_page, page.path)
                         self.pages.page = PageDraftFactory.from_page(content, page.reference)
@@ -604,10 +631,18 @@ class WorkspaceController:
             return False
         async with self.command_lock:
             snapshot = await self.session.refresh_if_changed()
-            if snapshot is None:
+            trash_snapshot = await self.session.refresh_trash_if_changed()
+            if snapshot is None and trash_snapshot is None:
                 return False
-            if self.processing.note is None and self.processing.result is None and self.review.review_session is None:
+            focused = (
+                self.processing.note is None and self.processing.result is None and self.review.review_session is None
+            )
+            if focused and snapshot is not None:
                 await self.pages.follow_external_change(snapshot)
+            if focused and self.pages.trash_entry is not None:
+                current = self.session.trash_snapshot
+                if current is not None and not await self.pages.follow_trash_change(current):
+                    self.status.show_notice(afanes.ui.strings.TRASH_PAGE_GONE)
             return True
 
     def _show_welcome(self, message: str | None) -> None:

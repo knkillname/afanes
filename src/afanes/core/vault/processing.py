@@ -471,6 +471,17 @@ class VaultProcessing:
             message = f"Capture no longer exists: {plan.source_path}"
             raise ProcessingError(message)
 
+        if plan.outcome is ProcessingOutcome.TRASH:
+            try:
+                preview = VaultNaming(self.vault).trash(
+                    source,
+                    confirm=True,
+                    expected_hash=plan.source_hash,
+                )
+            except (AfanesError, OSError) as exc:
+                message = f"Could not move the capture to Trash: {exc}"
+                raise ProcessingError(message) from exc
+            return preview.trash_path
         target = self._processing_destination(plan)
         self._write_processing(plan, source)
         moved = self._move_processing(source, target)

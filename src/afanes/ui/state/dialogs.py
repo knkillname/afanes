@@ -27,6 +27,7 @@ from afanes.ui.state.navigation import PageNavigator
 from afanes.ui.state.pages import PageEditorState
 from afanes.ui.state.session import VaultSession
 from afanes.ui.state.status import NoticeAction, UiStatus
+from afanes.ui.state.trash import TrashDialogs
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,8 @@ class PageDialogState:
     trash_undo : TrashPreview | None
         Note moved to trash by the current session, waiting for undo, or
         ``None`` when no undo is available.
+    trash_dialogs : afanes.ui.state.trash.TrashDialogs
+        Restore, overwrite, delete, and empty-trash decisions.
     """
 
     session: VaultSession
@@ -71,6 +74,16 @@ class PageDialogState:
     category_move: CategoryMovePreview | None = None
     rename_preview: RenamePreview | None = None
     trash_undo: TrashPreview | None = None
+    trash_dialogs: TrashDialogs = dataclasses.field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Create the Trash decision state shared with this controller."""
+        self.trash_dialogs = TrashDialogs(
+            session=self.session,
+            pages=self.pages,
+            status=self.status,
+            command_lock=self.command_lock,
+        )
 
     def reset(self) -> None:
         """Clear every pending dialog, its leave guard, and trash undo."""
@@ -79,6 +92,7 @@ class PageDialogState:
         self.category_move = None
         self.rename_preview = None
         self.trash_undo = None
+        self.trash_dialogs.reset()
         self.pages.blocking_message = None
 
     async def set_page_type(self, note_type: NoteType) -> bool:
@@ -752,6 +766,7 @@ class PageDialogState:
                 )
                 self.pages.clear()
                 await self.session.refresh_snapshot()
+                await self.session.refresh_trash()
                 self.status.show_notice(
                     afanes.ui.strings.PAGE_TRASH_MOVED,
                     action=NoticeAction.UNDO_TRASH,
@@ -797,6 +812,7 @@ class PageDialogState:
                     return False
                 self.trash_undo = None
                 await self.session.refresh_snapshot()
+                await self.session.refresh_trash()
                 self.status.show_notice(afanes.ui.strings.PAGE_TRASH_RESTORED)
                 return True
             finally:
@@ -862,6 +878,7 @@ class PageDialogState:
         self.pages.repair_preview = None
         self.rename_preview = None
         self.trash_undo = None
+        self.trash_dialogs.reset()
         self.pages.blocking_message = None
 
     async def reload_page(self) -> bool:

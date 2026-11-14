@@ -49,7 +49,14 @@ LAYOUT_KEYWORDS = frozenset(
 )
 LABEL_KEYWORDS = frozenset({"content", "text", "label"})
 BUTTON_NAMES = frozenset({"FilledButton", "TextButton", "OutlinedButton", "ElevatedButton"})
-HEADER_ACTION_KEYS = frozenset({"page-edit-action", "page-done-action", "process-note"})
+HEADER_ACTION_KEYS = frozenset(
+    {
+        "page-edit-action",
+        "page-done-action",
+        "process-note",
+        "trash-restore-action",
+    }
+)
 TEXT_CONTROL_NAMES = frozenset({"Text", "TextSpan", "TextStyle"})
 FONT_SUFFIXES = frozenset({".ttf", ".otf", ".ttc", ".woff", ".woff2"})
 ICON_SUFFIXES = frozenset({".svg"})
@@ -79,6 +86,7 @@ BASELINE: dict[str, dict[str, int]] = {
         "components/capture_bar.py::CaptureBar": 1,
         "components/page_panels.py::CategoryMovePanel": 1,
         "components/page_panels.py::ConflictPanel": 1,
+        "components/page_panels.py::DestructiveConfirmPanel": 1,
         "components/page_panels.py::RenamePanel": 1,
         "components/page_panels.py::RepairPanel": 1,
         "components/page_panels.py::TypeChangePanel": 1,
@@ -86,9 +94,10 @@ BASELINE: dict[str, dict[str, int]] = {
         "components/role_reference.py::RoleReferenceDialog": 1,
         "views/inbox.py::SessionNotice": 1,
         "views/inbox.py::WelcomeView": 2,
-        "views/page.py::PageView": 3,
+        "views/page.py::PageView": 4,
         "views/processing.py::ProcessingView": 3,
         "views/review.py::ReviewView": 7,
+        "views/workspace.py::WorkspaceView": 1,
     },
     "icon_and_label_buttons": {},
     "dense_rows": {},

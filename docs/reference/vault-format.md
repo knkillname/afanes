@@ -173,9 +173,21 @@ trailing comment format.
 
 ## 🗑️ Trash
 
-Moving a note to `trash/` makes its inbound references unresolved without rewriting the referring
-notes. Moving the note back restores it and resolves those references again. Trash is a folder
-convention, not a hidden database state.
+Moving a note to Trash stores it under `trash/` with a UUID filename and writes two keys into its
+frontmatter:
+
+- `trashed_from`: the vault-relative path the note occupied before it was trashed.
+- `trashed_on`: the local calendar day it was moved.
+
+The body, unknown keys, key order, and newline style are preserved. The UUID is storage identity only;
+the interface identifies the entry by its title and birthplace. A managed entry is permanently
+deleted after 30 days. A file under `trash/` without a safe `trashed_from`, including every trash file
+written by an older release, is unmanaged: it stays on disk, is hidden from the interface, and is
+never restored, expired, or deleted by Afanes.
+
+Moving a note to Trash makes its inbound references unresolved without rewriting the referring notes.
+Restoring it to its birthplace resolves those references again. Trash is a folder convention, not a
+hidden database state. See [Workspace and browser](../guide/workspace.md) for the Trash destination.
 
 ## 🧭 See also
 

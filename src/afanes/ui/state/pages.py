@@ -21,6 +21,7 @@ from afanes.core.labels import PageLabels
 from afanes.core.vault.naming_reports import ReferenceRepairPreview
 from afanes.core.vault.service import Vault
 from afanes.core.vault.snapshot import VaultSnapshot
+from afanes.core.vault.trash_catalog import TrashEntry, TrashSnapshot
 from afanes.models.link import NoteReference
 from afanes.models.note import NoteType
 from afanes.models.step import StepEdit, StepEditKind
@@ -63,6 +64,8 @@ class PageEditorState:
     report : str | None
         Persistent partial-rewrite report shown with the page, or ``None``
         when the last rewrite completed without a problem.
+    trash_entry : afanes.core.vault.trash_catalog.TrashEntry | None
+        Managed trashed note shown read-only, or ``None`` for an active page.
     """
 
     session: VaultSession
@@ -76,6 +79,7 @@ class PageEditorState:
     blocking_message: str | None = None
     repair_preview: ReferenceRepairPreview | None = None
     report: str | None = None
+    trash_entry: TrashEntry | None = None
 
     @property
     def banner(self) -> str | None:
@@ -115,7 +119,7 @@ class PageEditorState:
         """
         vault = self.session.vault
         page = self.page
-        if vault is None or page is None or page.path is None:
+        if vault is None or page is None or page.path is None or self.trash_entry is not None:
             return
         note = snapshot.find_note(page.path)
         if note is None:
@@ -162,6 +166,8 @@ class PageEditorState:
             Title derived from the draft body, or an empty string when no page
             is open.
         """
+        if self.trash_entry is not None:
+            return self.trash_entry.title
         return "" if self.page is None else self.page.display_title
 
     @property
@@ -269,6 +275,8 @@ class PageEditorState:
             Vault-relative path, ``New page`` for an unwritten draft, or an
             empty string when no page is open.
         """
+        if self.trash_entry is not None:
+            return self.trash_entry.birthplace_text
         page = self.page
         if page is None:
             return ""
@@ -290,7 +298,7 @@ class PageEditorState:
         bool
             ``True`` when a page is open.
         """
-        if self.page is None:
+        if self.page is None or self.trash_entry is not None:
             return False
         self.editing = True
         self.report = None
@@ -345,7 +353,7 @@ class PageEditorState:
         """
         async with self.command_lock:
             page = self.page
-            if page is None or self.conflict is not None:
+            if page is None or self.conflict is not None or self.trash_entry is not None:
                 return False
             if not force and not self.editing:
                 return False
@@ -363,7 +371,7 @@ class PageEditorState:
         """
         async with self.command_lock:
             page = self.page
-            if isinstance(page, NormalDraft):
+            if isinstance(page, NormalDraft) and self.trash_entry is None:
                 self.page = page.with_body(body)
 
     async def set_page_owner(self, text: str, *, save: bool = False) -> bool:
@@ -391,7 +399,7 @@ class PageEditorState:
         """
         async with self.command_lock:
             page = self.page
-            if not isinstance(page, NormalDraft):
+            if not isinstance(page, NormalDraft) or self.trash_entry is not None:
                 return False
             previous = page
             self.page = page.with_labels(page.labels.with_owner_text(text))
@@ -426,7 +434,7 @@ class PageEditorState:
         async with self.command_lock:
             page = self.page
             vault = self.session.vault
-            if page is None or page.path is None or vault is None:
+            if page is None or page.path is None or vault is None or self.trash_entry is not None:
                 return False
             self.status.set_busy(busy=True)
             try:
@@ -476,7 +484,7 @@ class PageEditorState:
         async with self.command_lock:
             page = self.page
             vault = self.session.vault
-            if page is None or page.path is None or vault is None:
+            if page is None or page.path is None or vault is None or self.trash_entry is not None:
                 return False
             self.status.set_busy(busy=True)
             try:
@@ -518,13 +526,13 @@ class PageEditorState:
         """
         async with self.command_lock:
             page = self.page
-            if isinstance(page, RawDraft):
+            if isinstance(page, RawDraft) and self.trash_entry is None:
                 self.page = page.with_raw_text(text)
 
     async def commit(self) -> bool:
         """Write or discard the current draft before a page change."""
         page = self.page
-        if page is None:
+        if page is None or self.trash_entry is not None:
             return True
         if not self._commit_allowed(check_conflict=False):
             return False
@@ -552,7 +560,7 @@ class PageEditorState:
         """Write the current draft, creating a new page when needed."""
         page = self.page
         vault = self.session.vault
-        if page is None or vault is None:
+        if page is None or vault is None or self.trash_entry is not None:
             return False
         if isinstance(page, RawDraft):
             return await self._save_raw_page(page, vault)
@@ -703,6 +711,75 @@ class PageEditorState:
         if preview.sites:
             self.repair_preview = preview
 
+    async def load_trash(self, entry: TrashEntry) -> bool:
+        """Read one managed trash entry into the page pane read-only.
+
+        Parameters
+        ----------
+        entry : afanes.core.vault.trash_catalog.TrashEntry
+            Managed entry selected in the Trash destination or in search.
+
+        Returns
+        -------
+        bool
+            ``True`` when the page was read and shown.
+
+        Notes
+        -----
+        The draft is created from the trashed file but the editor stays out of
+        edit mode, and every write command refuses while
+        :attr:`trash_entry` is set. Blocking file I/O runs in a worker thread.
+        """
+        vault = self.session.vault
+        if vault is None:
+            return False
+        try:
+            content = await asyncio.to_thread(vault.read_page, entry.path)
+            draft = PageDraftFactory.from_page(content)
+        except (AfanesError, OSError, UnicodeError) as exc:
+            logger.debug("Trashed note could not be read", exc_info=True)
+            self.status.show_notice(afanes.ui.strings.TRASH_OPEN_FAILED.format(detail=str(exc)))
+            return False
+        self.page = draft
+        self.trash_entry = entry
+        self.editing = False
+        self.conflict = None
+        self.blocking_message = None
+        self.repair_preview = None
+        self.report = None
+        return True
+
+    async def follow_trash_change(self, snapshot: TrashSnapshot) -> bool:
+        """Reconcile the open trashed page after a trash catalog refresh.
+
+        Parameters
+        ----------
+        snapshot : afanes.core.vault.trash_catalog.TrashSnapshot
+            Catalog that was just applied.
+
+        Returns
+        -------
+        bool
+            ``True`` when the entry still exists and the page is usable.
+            ``False`` when the entry disappeared and the page was closed.
+
+        Notes
+        -----
+        A changed content hash reloads the read-only page. A vanished entry
+        closes it so a deleted or expired note is never shown stale.
+        """
+        entry = self.trash_entry
+        if entry is None:
+            return True
+        found = snapshot.find(entry.path)
+        if found is None:
+            self.clear()
+            return False
+        if found.content_hash != entry.content_hash:
+            return await self.load_trash(found)
+        self.trash_entry = found
+        return True
+
     async def load(self, path: Path, *, editing: bool = False) -> bool:
         """Read a note into the page pane.
 
@@ -735,6 +812,7 @@ class PageEditorState:
             self.status.show_notice(afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc)))
             return False
         self.page = draft
+        self.trash_entry = None
         self.editing = editing or draft.mode is DraftMode.RAW
         self.conflict = None
         self.blocking_message = None
@@ -755,6 +833,7 @@ class PageEditorState:
     def clear(self) -> None:
         """Clear the page and its persistent conditions."""
         self.page = None
+        self.trash_entry = None
         self.editing = False
         self.conflict = None
         self.saving = False
@@ -771,6 +850,7 @@ class PageEditorState:
             Reference the new page will satisfy.
         """
         self.page = NormalDraft.new(reference)
+        self.trash_entry = None
         self.editing = True
         self.conflict = None
         self.blocking_message = None
@@ -782,6 +862,7 @@ class PageEditorState:
             self.autosave_task.cancel()
             self.autosave_task = None
         self.page = None
+        self.trash_entry = None
         self.editing = False
         self.conflict = None
         self.saving = False

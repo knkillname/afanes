@@ -849,3 +849,32 @@ class TestPreviewAvailability:
         view.project.value = "Launch"
         _trigger(view.project.on_change)
         assert not view.preview_button.disabled
+
+
+class TestTrashProcessingCopy:
+    def test_plan_preview_hides_the_trash_uuid(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        versioned(root)
+        vault = afanes.core.vault.service.Vault(root)
+        capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
+        plan = afanes.core.vault.processing.VaultProcessing(vault).plan_processing(
+            _plan_request(capture, ProcessingOutcome.TRASH)
+        )
+        assert isinstance(plan, ProcessingPlan)
+        state = _open_capture()
+
+        state.processing.plan = plan
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+
+        assert view.plan_destination.value == afanes.ui.strings.PROCESSING_DESTINATION_TRASH
+        assert plan.target_path.stem not in (view.plan_destination.value or "")
+
+    def test_success_message_hides_the_trash_uuid(self) -> None:
+        state = _open_capture()
+        state.processing.result = Path("/vault/trash/7e1f9c2a-0000-4000-8000-000000000000.md")
+        state.processing.last_outcome = ProcessingOutcome.TRASH
+
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+
+        assert view.success_text.value == afanes.ui.strings.PROCESSING_SUCCESS_TRASH
+        assert "7e1f9c2a" not in (view.success_text.value or "")

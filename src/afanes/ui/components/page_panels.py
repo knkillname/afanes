@@ -203,6 +203,60 @@ class CategoryMovePanel:
         self.panel.visible = False
 
 
+class DestructiveConfirmPanel:
+    """Confirm one irreversible action with Cancel before the affirmative.
+
+    Parameters
+    ----------
+    on_confirm : collections.abc.Callable[[], collections.abc.Awaitable[None]]
+        Apply the destructive action.
+    on_cancel : collections.abc.Callable[[], collections.abc.Awaitable[None]]
+        Dismiss the panel without writing.
+    """
+
+    def __init__(
+        self,
+        on_confirm: Callable[[], Awaitable[None]],
+        on_cancel: Callable[[], Awaitable[None]],
+    ) -> None:
+        """Build a reusable destructive confirmation panel.
+
+        Parameters
+        ----------
+        on_confirm : collections.abc.Callable[[], collections.abc.Awaitable[None]]
+            Apply the destructive action.
+        on_cancel : collections.abc.Callable[[], collections.abc.Awaitable[None]]
+            Dismiss the panel without writing.
+        """
+        self.title = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["title-4"])
+        self.body = ft.Text("", selectable=True)
+        self.confirm = ft.FilledButton(
+            content="",
+            on_click=on_confirm,
+            style=afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE,
+        )
+        self.cancel = ft.TextButton(
+            content=afanes.ui.strings.PAGE_CANCEL,
+            on_click=on_cancel,
+        )
+        self.actions = ft.Row(
+            controls=[self.cancel, self.confirm],
+            spacing=afanes.ui.theme.ITEM_GAP,
+            wrap=True,
+        )
+        self.panel = ft.Container(
+            bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
+            border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
+            border_radius=afanes.ui.theme.SURFACE_RADIUS,
+            padding=afanes.ui.theme.ITEM_GAP,
+            visible=False,
+            content=ft.Column(
+                controls=[self.title, self.body, self.actions],
+                spacing=afanes.ui.theme.ITEM_GAP,
+            ),
+        )
+
+
 class RenamePanel:
     """Preview and confirm a page rename."""
 

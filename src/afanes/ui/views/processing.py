@@ -526,7 +526,11 @@ class ProcessingView:
         self.cancel_button.visible = not success
         self.done_button.visible = success
         if state.processing.result is not None:
-            self.success_text.value = afanes.ui.strings.PROCESSING_SUCCESS_BODY.format(path=state.processing.result)
+            self.success_text.value = (
+                afanes.ui.strings.PROCESSING_SUCCESS_TRASH
+                if state.processing.last_outcome is ProcessingOutcome.TRASH
+                else afanes.ui.strings.PROCESSING_SUCCESS_BODY.format(path=state.processing.result)
+            )
 
         plan = state.processing.plan
         show_plan = plan is not None and not self._plan_hidden and not success
@@ -551,7 +555,11 @@ class ProcessingView:
             self.plan_warnings.controls = []
             self.plan_warnings.visible = False
             return
-        self.plan_destination.value = afanes.ui.strings.PROCESSING_DESTINATION.format(path=plan.target_path)
+        self.plan_destination.value = (
+            afanes.ui.strings.PROCESSING_DESTINATION_TRASH
+            if plan.outcome is ProcessingOutcome.TRASH
+            else afanes.ui.strings.PROCESSING_DESTINATION.format(path=plan.target_path)
+        )
         details = [afanes.ui.strings.PROCESSING_OUTCOME_LABELS[plan.outcome.value]]
         if plan.target_status is not None:
             details.append(f"Status: {plan.target_status.value}")

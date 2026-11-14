@@ -8,6 +8,7 @@ Path containment and atomic writes stay on
 """
 
 import dataclasses
+import datetime
 import hashlib
 from pathlib import Path
 
@@ -661,6 +662,7 @@ class VaultNaming:
         note_path: Path,
         *,
         snapshot: VaultSnapshot | None = None,
+        today: datetime.date | None = None,
     ) -> TrashPreview:
         """Report inbound references and the trash destination without writing.
 
@@ -670,18 +672,25 @@ class VaultNaming:
             Existing note path, relative or absolute.
         snapshot : VaultSnapshot | None
             Pre-built scan to avoid rescanning, or ``None`` to scan the vault.
+        today : datetime.date | None
+            Local calendar day to record, or ``None`` to use the vault's
+            creation time source.
 
         Returns
         -------
         TrashPreview
-            Destination inside ``trash/`` and its inbound-reference report.
+            UUID destination inside ``trash/`` and its inbound-reference report.
 
         Raises
         ------
         VaultError
             If the note is not part of the vault snapshot.
         """
-        return afanes.core.vault.trash.TrashService(self.vault).plan_trash(note_path, snapshot=snapshot)
+        return afanes.core.vault.trash.TrashService(self.vault).plan_trash(
+            note_path,
+            snapshot=snapshot,
+            today=today,
+        )
 
     def trash(
         self,
@@ -689,6 +698,8 @@ class VaultNaming:
         *,
         confirm: bool = False,
         snapshot: VaultSnapshot | None = None,
+        expected_hash: str | None = None,
+        today: datetime.date | None = None,
     ) -> TrashPreview:
         """Move a note to ``trash/`` after confirmation without rewriting references.
 
@@ -700,6 +711,12 @@ class VaultNaming:
             Explicit confirmation gate.
         snapshot : VaultSnapshot | None
             Pre-built scan used to report inbound references.
+        expected_hash : str | None
+            Content hash captured by an earlier plan, or ``None`` to compare
+            only against the supplied snapshot.
+        today : datetime.date | None
+            Local calendar day to record, or ``None`` to use the vault's
+            creation time source.
 
         Returns
         -------
@@ -711,16 +728,18 @@ class VaultNaming:
         VaultError
             If confirmation is missing, the note is not part of the vault, or
             the move fails.
-        NameCollisionError
-            If the trash destination appears after planning.
+        ContentChangedError
+            If the note changed after planning.
         """
         return afanes.core.vault.trash.TrashService(self.vault).trash(
             note_path,
             confirm=confirm,
             snapshot=snapshot,
+            expected_hash=expected_hash,
+            today=today,
         )
 
-    def restore_from_trash(self, preview: TrashPreview, *, confirm: bool = False) -> Path:
+    def restore_from_trash(self, preview: TrashPreview, *, confirm: bool = False, overwrite: bool = False) -> Path:
         """Restore a trashed note to its original path.
 
         Parameters
@@ -729,6 +748,8 @@ class VaultNaming:
             Preview returned by :meth:`trash` or :meth:`plan_trash`.
         confirm : bool
             Explicit confirmation gate.
+        overwrite : bool
+            Whether an occupied birthplace may be replaced permanently.
 
         Returns
         -------
@@ -741,9 +762,13 @@ class VaultNaming:
             If confirmation is missing, the trash file is gone, or a path
             escapes the vault.
         NameCollisionError
-            If the original path is occupied.
+            If the original path is occupied and ``overwrite`` is ``False``.
         """
-        return afanes.core.vault.trash.TrashService(self.vault).restore(preview, confirm=confirm)
+        return afanes.core.vault.trash.TrashService(self.vault).restore(
+            preview,
+            confirm=confirm,
+            overwrite=overwrite,
+        )
 
     @staticmethod
     def _rewrite_note(

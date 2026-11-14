@@ -43,8 +43,8 @@ See [Frontmatter](frontmatter.md) and [Migration](migration.md).
 ## 🧷 A link is unresolved
 
 No page with that name exists in the reference's scheme. The note may have been renamed, moved to
-`trash/`, or deleted by another program. Restore the file or create a page with that name; Afanes does
-not retarget the link automatically.
+Trash, or deleted by another program. Open **Trash** and use **Restore**, or create a page with that
+name; Afanes does not retarget the link automatically.
 
 Use the [Names and links](names-and-links.md) rules to check the scheme and matching behavior.
 
@@ -65,6 +65,14 @@ Notes under `trash/` are excluded from scans, name uniqueness, and reference res
 `inbox/` appears only under **Inbox**; a `type: note` outside `inbox/` appears under **Needs Attention**.
 Unreadable Notes appear only in their own group. Folders are conventions, so a note is still in the
 vault even when its folder is unusual.
+
+## 🗑️ A note is missing from Trash
+
+Only managed entries appear. A file under `trash/` without a safe `trashed_from` is unmanaged, including
+every file written by an older release; it remains on disk and is never restored, expired, or deleted
+by Afanes. A managed entry also disappears after 30 days, when **Delete Permanently…** or **Empty
+Trash…** was confirmed, or when **Undo** restored it. A read-only vault cannot stamp missing days or run
+retention; the Trash list still opens and a persistent banner reports the maintenance failure.
 
 ## ⚙️ A folder is refused as a vault
 

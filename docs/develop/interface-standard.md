@@ -38,7 +38,9 @@ The standard has seven levels, in the order a reviewer should check them:
    need further input; tone stays neutral; apostrophes and ellipses are typographic.
 7. **Feedback.** The feedback surface follows the lifetime of the event: a toast for a one-time
    result or undo, an owned banner for a condition that remains true, inline text for a field or form
-   problem, and a panel or dialog for a decision. Trash is immediate and offers Undo.
+   problem, and a panel or dialog for a decision. Trash is immediate and offers Undo. A confirmed
+   restore over an occupied birthplace and every permanent-delete action use an irreversible
+   confirmation; the scheduled 30-day retention pass is silent because no user action invokes it.
 
 ## 🎨 Palette roles
 
@@ -118,7 +120,8 @@ flow title, at most one suggested action, and a secondary menu.
 Search is a browser filter, never a navigation location: the navigation keeps its destinations and
 counts without a Search row. While a query is active, the browser title reads **Search Results** and
 the destination-specific controls (Inbox composer, References action, Log date controls, Review
-queue) are hidden so one origin-independent result list fills the browser.
+queue, Empty Trash) are hidden so one origin-independent result list fills the browser. A Trash result
+appears in its own result group and opens read-only.
 
 The primary menu sits above the navigation list, as required when a window has a sidebar. The
 navigation is a bordered panel with the reference surface radius: structural in the wide layout, and
@@ -138,8 +141,11 @@ of the row; the value step is the selection cue.
 
 Destructive actions use Red 3 in light mode and Red 4 in dark mode. An irreversible confirmation
 carries the destructive style. Trash is reversible: it moves immediately and offers Undo in a toast,
-so it does not use a destructive confirmation. The accent is never used to distinguish one browser
-section from another; log marks use the accent.
+so it does not use a destructive confirmation. Restoring over an occupied birthplace, deleting one
+entry permanently, and emptying the Trash are user-invoked and irreversible, so each uses a
+confirmation with Cancel first. Scheduled retention is the non-user-invoked exception and has no
+confirmation surface. The accent is never used to distinguish one browser section from another; log
+marks use the accent.
 
 ## 🎚️ Control states
 
@@ -160,7 +166,7 @@ Feedback is chosen by the lifetime of the event, not by severity:
 | Toast | A one-time result, failure, or undo | Capture failed, page moved to trash, undo restored a page |
 | Owned banner | A condition that remains true | Page conflict, refresh failure, unresolved leave guard |
 | Inline text | A field or form problem | Invalid category, blank rename, form write failure |
-| Panel or dialog | A decision or consequence preview | Rename preview, category move, type change, repair |
+| Panel or dialog | A decision or consequence preview | Rename preview, category move, type change, repair, Trash overwrite, Empty Trash |
 
 A toast appears at the bottom center, stays dismissible, disappears on its own, and carries at most
 one action. The action names the operation it reverses. A success toast appears only when the result
@@ -173,7 +179,10 @@ an owned banner or a waiting notice.
 
 Trash moves a page immediately and offers **Undo** in a toast. Undo restores the note to its original
 path when that path is free; an occupied path is reported and never overwritten. The undo opportunity
-belongs to the current session and ends when the toast is dismissed or replaced.
+belongs to the current session and ends when the toast is dismissed or replaced. The **Trash**
+destination identifies an entry by its title and `From` birthplace, never by its UUID storage name. Its
+read-only page suggests **Restore** and keeps **Delete Permanently…** in the secondary menu. A trashed
+note's success, failure, and retention surfaces never display the UUID.
 
 Dialogs put initial focus on the first control, close on Esc, keep Cancel before an irreversible
 affirmative action, and never make a destructive action the default. Menus and popovers stay small,

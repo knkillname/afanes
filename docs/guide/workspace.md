@@ -10,7 +10,8 @@ while a page is open.
 :class: note
 
 The browser has one group per kind of note. A note appears in exactly one group, and anything under
-`trash/` or `templates/` is absent. Search filters the whole vault, not only the active destination.
+`trash/` or `templates/` is absent from those groups. **Trash** is its own destination for managed
+discarded notes. Search filters the whole vault, not only the active destination.
 :::
 
 ```{image} ../_static/screenshots/workspace.png
@@ -28,11 +29,19 @@ The browser has one group per kind of note. A note appears in exactly one group,
 | **Log** | Dated diary entries, with a month calendar and a collapsed year/month/day tree |
 | **Needs Attention** | Parsed `type: note` notes found outside `inbox/` |
 | **Unreadable Notes** | Files that could not be parsed; selecting one opens raw rescue mode |
+| **Trash** | Managed discarded notes, with the title and **From** birthplace on each row |
 
 A capture under `inbox/` appears only under **Inbox**. A log entry appears under **Log**. A note under
-`trash/` appears nowhere, and a file under `templates/` is a template card rather than a note. Selecting
-an entry opens it in the detail region without changing the browser destination. In the **Review**
-destination, the browser shows the snapshot queue instead of the note groups.
+`trash/` appears in no active-note group; only a managed entry appears under **Trash**. A file under
+`templates/` is a template card rather than a note. Selecting an entry opens it in the detail region
+without changing the browser destination. In the **Review** destination, the browser shows the snapshot
+queue instead of the note groups.
+
+**Trash** lists one row per managed entry. Selecting a row opens the note read-only with its birthplace
+and trashed day. **Restore** returns it to the birthplace, and **Delete Permanently…** sits in the
+secondary menu. When managed entries exist, **Empty Trash…** appears in the browser header. Both delete
+actions ask for confirmation and place Cancel first. The Trash destination remains usable in a
+read-only vault; maintenance failures appear in a persistent banner.
 
 The **Log** section offers a calendar and a collapsed date tree instead of a flat list. **Entries** shows
 only log notes; **Everything** is a date lens over every parsed note. **Today’s Entry** opens or creates
@@ -61,8 +70,9 @@ from a note to the browser. The window cannot shrink below 1024x600.
 The search field sits in its own full-width row beneath the browser header, so it is available from
 every destination without becoming a destination itself. It filters the whole vault by display title,
 identity, prose body text, step text, and role names: a project's `owner`, its `asked_by`, and the
-owners of its steps. Results are grouped by destination, and the active destination does not limit
-them. The navigation counts stay at each destination's total. Matching ignores case, Unicode form, and
+owners of its steps. Results are grouped by destination, including a separate **Trash** group for
+managed discarded notes; the active destination does not limit them. Selecting a Trash result opens
+the note read-only. The navigation counts stay at each destination's total. Matching ignores case, Unicode form, and
 repeated whitespace. Other step metadata and unknown frontmatter keys are excluded, so a plan date or
 tag inside a comment is not a search result.
 
@@ -88,9 +98,10 @@ from any other destination.
 ## 🧱 Detail toolbar
 
 The detail toolbar shows **Back**, the page title, one primary action, and a secondary menu. **Process…**
-is primary for an unclarified capture, **Edit** for a readable note, and **Done** while editing. Rename
-and Move to Trash live in the secondary menu. The page path, metadata, and save status sit below the
-toolbar with the page content, and long-form text stays within a comfortable reading width on large
+is primary for an unclarified capture, **Edit** for a readable note, **Done** while editing, and
+**Restore** for a trashed note. Rename and Move to Trash live in the secondary menu of an active note;
+Delete Permanently lives there for a trashed note. The page path, metadata, and save status sit below
+the toolbar with the page content, and long-form text stays within a comfortable reading width on large
 windows.
 
 ## 🎨 Appearance
@@ -106,8 +117,12 @@ One blue accent marks suggested actions, links, keyboard focus, and log entries.
 neutral row shade, not the accent, matching the GNOME navigation sidebar. Section icons are
 monochrome; the label, icon, and neutral fill identify the active destination without relying on color.
 Move to Trash is immediate: a toast offers **Undo**, and the page returns to its original path while
-that path is free. One-time results and failures use a transient toast; a persistent condition such as
-a page conflict or refresh failure uses a banner owned by the page or session. Field and form problems
+that path is free. Restoring from Trash over an occupied birthplace warns that the existing note will
+be permanently replaced; the warning places Cancel first. **Delete Permanently…** and **Empty Trash…**
+also require confirmation. The 30-day retention pass is the deliberate exception: it runs silently
+when the vault opens or Trash is selected. One-time results and failures use a transient toast; a
+persistent condition such as a page conflict or refresh failure uses a banner owned by the page or
+session. Field and form problems
 stay inline with the control that caused them. Due-work notices use a warm attention surface.
 Typography uses the platform font family and the GNOME standard styles: title-1 for the rendered page
 heading, title-3 in the detail toolbar, title-2 for a step headline, heading for compact headings, body
