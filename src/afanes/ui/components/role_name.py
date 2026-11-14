@@ -11,7 +11,7 @@ from collections.abc import Awaitable, Callable, Sequence
 
 import flet as ft
 
-import afanes.ui.strings
+import afanes.i18n.ui
 import afanes.ui.theme
 
 
@@ -33,13 +33,15 @@ class RoleNameDialog:
         Command that closes the dialog without writing.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         title: str,
         current: str | None,
         names: Sequence[str],
         on_save: Callable[[str], Awaitable[None]],
         on_cancel: Callable[[], Awaitable[None]],
+        *,
+        copy: afanes.i18n.ui.UiCopy | None = None,
     ) -> None:
         """Build the name field, suggestions, and dialog actions.
 
@@ -56,6 +58,7 @@ class RoleNameDialog:
         on_cancel : Callable[[], Awaitable[None]]
             Command that closes the dialog without writing.
         """
+        self._copy = afanes.i18n.ui.UiCopy.english() if copy is None else copy
         self._on_save = on_save
         self._on_cancel = on_cancel
         self._typed_name: str | None = None
@@ -64,8 +67,8 @@ class RoleNameDialog:
         if current:
             values.add(current)
         self.name_field = ft.Dropdown(
-            label=afanes.ui.strings.ROLE_NAME_LABEL,
-            hint_text=afanes.ui.strings.ROLE_NAME_HINT,
+            label=self._copy.ROLE_NAME_LABEL,
+            hint_text=self._copy.ROLE_NAME_HINT,
             options=[ft.dropdown.Option(key=name, text=name) for name in sorted(values, key=str.casefold)],
             value=current or "",
             editable=True,
@@ -76,17 +79,17 @@ class RoleNameDialog:
             key="role-name-field",
         )
         self.cancel_button = ft.TextButton(
-            content=afanes.ui.strings.CANCEL_ACTION,
+            content=self._copy.CANCEL_ACTION,
             on_click=self.cancel,
             key="role-name-cancel",
         )
         self.clear_button = ft.TextButton(
-            content=afanes.ui.strings.ROLE_NAME_CLEAR,
+            content=self._copy.ROLE_NAME_CLEAR,
             on_click=self.clear,
             key="role-name-clear",
         )
         self.save_button = ft.FilledButton(
-            content=afanes.ui.strings.ROLE_NAME_SAVE,
+            content=self._copy.ROLE_NAME_SAVE,
             on_click=self.save,
             key="role-name-save",
         )
@@ -94,7 +97,7 @@ class RoleNameDialog:
             title=ft.Text(title),
             content=ft.Column(
                 controls=[
-                    ft.Text(afanes.ui.strings.ROLE_NAME_BODY),
+                    ft.Text(self._copy.ROLE_NAME_BODY),
                     self.name_field,
                 ],
                 tight=True,

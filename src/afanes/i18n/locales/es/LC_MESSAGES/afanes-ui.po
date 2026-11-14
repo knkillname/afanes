@@ -1,0 +1,2098 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: afanes 0.9.0\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/afanes/i18n/ui/en.py APP_TITLE
+msgctxt "APP_TITLE"
+msgid "Afanes"
+msgstr "Afanes"
+
+#: src/afanes/i18n/ui/en.py WELCOME_TITLE
+msgctxt "WELCOME_TITLE"
+msgid "Welcome to Afanes"
+msgstr "Bienvenido a Afanes"
+
+#: src/afanes/i18n/ui/en.py WELCOME_BODY
+msgctxt "WELCOME_BODY"
+msgid "Afanes works on a folder of Markdown files called a vault. Open an existing folder, or create a new vault"
+msgstr "Afanes trabaja sobre una carpeta de archivos Markdown llamada bóveda. Abre una carpeta existente o crea una bóveda nueva"
+
+#: src/afanes/i18n/ui/en.py WELCOME_CHOOSE
+msgctxt "WELCOME_CHOOSE"
+msgid "Choose Vault…"
+msgstr "Elegir bóveda…"
+
+#: src/afanes/i18n/ui/en.py WELCOME_PICKER_TITLE
+msgctxt "WELCOME_PICKER_TITLE"
+msgid "Choose Vault"
+msgstr "Elegir bóveda"
+
+#: src/afanes/i18n/ui/en.py WELCOME_NOTE
+msgctxt "WELCOME_NOTE"
+msgid "The vault can be changed later"
+msgstr "La bóveda se puede cambiar más adelante"
+
+#: src/afanes/i18n/ui/en.py WELCOME_PATH_LABEL
+msgctxt "WELCOME_PATH_LABEL"
+msgid "Vault folder path"
+msgstr "Ruta de la carpeta de la bóveda"
+
+#: src/afanes/i18n/ui/en.py WELCOME_PATH_HINT
+msgctxt "WELCOME_PATH_HINT"
+msgid "Absolute path to a folder of Markdown files"
+msgstr "Ruta absoluta a una carpeta de archivos Markdown"
+
+#: src/afanes/i18n/ui/en.py WELCOME_OPEN
+msgctxt "WELCOME_OPEN"
+msgid "Open"
+msgstr "Abrir"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_ACTION
+msgctxt "NEW_VAULT_ACTION"
+msgid "New Vault…"
+msgstr "Bóveda nueva…"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_PICKER_TITLE
+msgctxt "NEW_VAULT_PICKER_TITLE"
+msgid "New Vault"
+msgstr "Bóveda nueva"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_DIALOG_TITLE
+msgctxt "NEW_VAULT_DIALOG_TITLE"
+msgid "New Vault"
+msgstr "Bóveda nueva"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_DIALOG_BODY
+msgctxt "NEW_VAULT_DIALOG_BODY"
+msgid "Choose the folder for the new vault and its starter content. Missing folders in the path are created"
+msgstr "Elige la carpeta para la bóveda nueva y su contenido inicial. Las carpetas faltantes de la ruta se crean"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_PATH_LABEL
+msgctxt "NEW_VAULT_PATH_LABEL"
+msgid "New vault folder path"
+msgstr "Ruta de la carpeta de la bóveda nueva"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_BROWSE
+msgctxt "NEW_VAULT_BROWSE"
+msgid "Choose Folder…"
+msgstr "Elegir carpeta…"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_TEMPLATE_LABEL
+msgctxt "NEW_VAULT_TEMPLATE_LABEL"
+msgid "Starter content"
+msgstr "Contenido inicial"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_TEMPLATE_NONE
+msgctxt "NEW_VAULT_TEMPLATE_NONE"
+msgid "No Starter Content"
+msgstr "Sin contenido inicial"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_TEMPLATE_OPTION
+msgctxt "NEW_VAULT_TEMPLATE_OPTION"
+msgid "{label} - {description}"
+msgstr "{label} - {description}"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_TEMPLATE_UNAVAILABLE
+msgctxt "NEW_VAULT_TEMPLATE_UNAVAILABLE"
+msgid "Starter content could not be read. A vault can still be created without it"
+msgstr "No se pudo leer el contenido inicial. La bóveda se puede crear sin él"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_TEMPLATE_FAILED
+msgctxt "NEW_VAULT_TEMPLATE_FAILED"
+msgid "Could not write the starter content: {detail}"
+msgstr "No se pudo escribir el contenido inicial: {detail}"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_PREVIEW_GUIDE
+msgctxt "NEW_VAULT_PREVIEW_GUIDE"
+msgid "Creates: {folders} and afanes.yaml. Writes the guide note"
+msgstr "Crea: {folders} y afanes.yaml. Escribe la nota guía"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_PREVIEW_TEMPLATE
+msgctxt "NEW_VAULT_PREVIEW_TEMPLATE"
+msgid "Creates: {folders} and afanes.yaml. Writes {notes} and the guide note"
+msgstr "Crea: {folders} y afanes.yaml. Escribe {notes} y la nota guía"
+
+#: src/afanes/i18n/ui/en.py NEW_VAULT_CREATE
+msgctxt "NEW_VAULT_CREATE"
+msgid "Create"
+msgstr "Crear"
+
+#: src/afanes/i18n/ui/en.py CANCEL_ACTION
+msgctxt "CANCEL_ACTION"
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: src/afanes/i18n/ui/en.py CLOSE_ACTION
+msgctxt "CLOSE_ACTION"
+msgid "Close"
+msgstr "Cerrar"
+
+#: src/afanes/i18n/ui/en.py UNDO_ACTION
+msgctxt "UNDO_ACTION"
+msgid "Undo"
+msgstr "Deshacer"
+
+#: src/afanes/i18n/ui/en.py SESSION_ACTIVE_TITLE
+msgctxt "SESSION_ACTIVE_TITLE"
+msgid "Afanes Is Open in Another Window"
+msgstr "Afanes está abierto en otra ventana"
+
+#: src/afanes/i18n/ui/en.py SESSION_ACTIVE_BODY
+msgctxt "SESSION_ACTIVE_BODY"
+msgid "Only one window can use the vault at a time. Close the other window and try again"
+msgstr "Solo una ventana puede usar la bóveda a la vez. Cierra la otra ventana para continuar"
+
+#: src/afanes/i18n/ui/en.py SESSION_RETRY
+msgctxt "SESSION_RETRY"
+msgid "Try Again"
+msgstr "Reintentar"
+
+#: src/afanes/i18n/ui/en.py CHANGE_VAULT_DIALOG_TITLE
+msgctxt "CHANGE_VAULT_DIALOG_TITLE"
+msgid "Change Vault"
+msgstr "Cambiar de bóveda"
+
+#: src/afanes/i18n/ui/en.py CHANGE_VAULT_DIALOG_BODY
+msgctxt "CHANGE_VAULT_DIALOG_BODY"
+msgid "Enter the folder path for the vault to open"
+msgstr "Introduce la ruta de la carpeta de la bóveda que se va a abrir"
+
+#: src/afanes/i18n/ui/en.py CHANGE_VAULT_OPEN
+msgctxt "CHANGE_VAULT_OPEN"
+msgid "Open Another Vault…"
+msgstr "Abrir otra bóveda…"
+
+#: src/afanes/i18n/ui/en.py CHANGE_VAULT_CREATE
+msgctxt "CHANGE_VAULT_CREATE"
+msgid "Create a New Vault…"
+msgstr "Crear una bóveda nueva…"
+
+#: src/afanes/i18n/ui/en.py CLOSE_VAULT_ACTION
+msgctxt "CLOSE_VAULT_ACTION"
+msgid "Close Vault"
+msgstr "Cerrar bóveda"
+
+#: src/afanes/i18n/ui/en.py MAIN_MENU
+msgctxt "MAIN_MENU"
+msgid "Main Menu"
+msgstr "Menú principal"
+
+#: src/afanes/i18n/ui/en.py WORKSPACE_NAVIGATION
+msgctxt "WORKSPACE_NAVIGATION"
+msgid "Navigation"
+msgstr "Navegación"
+
+#: src/afanes/i18n/ui/en.py CLOSE_NAVIGATION
+msgctxt "CLOSE_NAVIGATION"
+msgid "Close Navigation"
+msgstr "Cerrar navegación"
+
+#: src/afanes/i18n/ui/en.py ABOUT_ACTION
+msgctxt "ABOUT_ACTION"
+msgid "About Afanes"
+msgstr "Acerca de Afanes"
+
+#: src/afanes/i18n/ui/en.py ABOUT_TITLE
+msgctxt "ABOUT_TITLE"
+msgid "About Afanes"
+msgstr "Acerca de Afanes"
+
+#: src/afanes/i18n/ui/en.py ABOUT_VERSION
+msgctxt "ABOUT_VERSION"
+msgid "Version {version}"
+msgstr "Versión {version}"
+
+#: src/afanes/i18n/ui/en.py ABOUT_LICENSE
+msgctxt "ABOUT_LICENSE"
+msgid "Licensed under the GNU Affero General Public License, version 3 or later"
+msgstr "Con licencia GNU Affero General Public License, versión 3 o posterior"
+
+#: src/afanes/i18n/ui/en.py VAULT_CLOSE_NOT_FORGOTTEN
+msgctxt "VAULT_CLOSE_NOT_FORGOTTEN"
+msgid "The vault was closed, but it could not be forgotten and may reopen next launch: {detail}"
+msgstr "La bóveda se cerró, pero no se pudo olvidar y puede volver a abrirse en el próximo inicio: {detail}"
+
+#: src/afanes/i18n/ui/en.py VAULT_SCHEMA_ADOPT_TITLE
+msgctxt "VAULT_SCHEMA_ADOPT_TITLE"
+msgid "This Folder Can Be Adopted"
+msgstr "Esta carpeta se puede adoptar"
+
+#: src/afanes/i18n/ui/en.py VAULT_SCHEMA_ADOPT_BODY
+msgctxt "VAULT_SCHEMA_ADOPT_BODY"
+msgid "Afanes found no afanes.yaml settings file in {path}. Creating it will not change any note, folder, guide, or template card"
+msgstr "Afanes no encontró un archivo de configuración afanes.yaml en {path}. Crearlo no cambiará ninguna nota, carpeta, guía ni tarjeta de plantilla"
+
+#: src/afanes/i18n/ui/en.py VAULT_SCHEMA_ADOPT_ACTION
+msgctxt "VAULT_SCHEMA_ADOPT_ACTION"
+msgid "Create afanes.yaml and Open"
+msgstr "Crear afanes.yaml y abrir"
+
+#: src/afanes/i18n/ui/en.py VAULT_SCHEMA_ADOPT_MESSAGE
+msgctxt "VAULT_SCHEMA_ADOPT_MESSAGE"
+msgid "This folder needs an afanes.yaml settings file before Afanes can open it"
+msgstr "Esta carpeta necesita un archivo de configuración afanes.yaml antes de que Afanes pueda abrirla"
+
+#: src/afanes/i18n/ui/en.py VAULT_SCHEMA_UNAVAILABLE
+msgctxt "VAULT_SCHEMA_UNAVAILABLE"
+msgid "This folder is not an Afanes vault. To adopt it, the folder needs an afanes.yaml settings file, the five default folders, and write access"
+msgstr "Esta carpeta no es una bóveda de Afanes. Para adoptarla, la carpeta necesita un archivo de configuración afanes.yaml, las cinco carpetas predeterminadas y permiso de escritura"
+
+#: src/afanes/i18n/ui/en.py VAULT_SCHEMA_NOT_ADOPTABLE
+msgctxt "VAULT_SCHEMA_NOT_ADOPTABLE"
+msgid "The folder cannot be adopted: {detail}"
+msgstr "La carpeta no se puede adoptar: {detail}"
+
+#: src/afanes/i18n/ui/en.py VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED
+msgctxt "VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED"
+msgid "The vault was adopted but could not be remembered: {detail}"
+msgstr "La bóveda se adoptó, pero no se pudo recordar: {detail}"
+
+#: src/afanes/i18n/ui/en.py INBOX_TITLE
+msgctxt "INBOX_TITLE"
+msgid "Inbox"
+msgstr "Bandeja de entrada"
+
+#: src/afanes/i18n/ui/en.py REVIEW_TITLE
+msgctxt "REVIEW_TITLE"
+msgid "Review"
+msgstr "Revisión"
+
+#: src/afanes/i18n/ui/en.py REVIEW_PENDING_ONE
+msgctxt "REVIEW_PENDING_ONE"
+msgid "1 Pending"
+msgstr "1 pendiente"
+
+#: src/afanes/i18n/ui/en.py REVIEW_PENDING_MANY
+msgctxt "REVIEW_PENDING_MANY"
+msgid "{count} Pending"
+msgstr "{count} pendientes"
+
+#: src/afanes/i18n/ui/en.py REVIEW_ZERO_TITLE
+msgctxt "REVIEW_ZERO_TITLE"
+msgid "Nothing Needs Review"
+msgstr "Nada requiere revisión"
+
+#: src/afanes/i18n/ui/en.py REVIEW_ZERO_BODY
+msgctxt "REVIEW_ZERO_BODY"
+msgid "No inbox captures or projects are waiting for a next step"
+msgstr "No hay capturas de la bandeja de entrada ni proyectos esperando un próximo paso"
+
+#: src/afanes/i18n/ui/en.py REVIEW_START_ACTION
+msgctxt "REVIEW_START_ACTION"
+msgid "Start Review"
+msgstr "Iniciar revisión"
+
+#: src/afanes/i18n/ui/en.py REVIEW_COMPLETE_TITLE
+msgctxt "REVIEW_COMPLETE_TITLE"
+msgid "Review Complete"
+msgstr "Revisión completada"
+
+#: src/afanes/i18n/ui/en.py REVIEW_COMPLETE_BODY
+msgctxt "REVIEW_COMPLETE_BODY"
+msgid "Reviewed {reviewed} and skipped {skipped}"
+msgstr "Revisadas {reviewed} y omitidas {skipped}"
+
+#: src/afanes/i18n/ui/en.py REVIEW_BACK_TO_BROWSER
+msgctxt "REVIEW_BACK_TO_BROWSER"
+msgid "Back to Browser"
+msgstr "Volver al explorador"
+
+#: src/afanes/i18n/ui/en.py REVIEW_CAPTURE_TITLE
+msgctxt "REVIEW_CAPTURE_TITLE"
+msgid "Capture"
+msgstr "Captura"
+
+#: src/afanes/i18n/ui/en.py REVIEW_PROCESS_ACTION
+msgctxt "REVIEW_PROCESS_ACTION"
+msgid "Process Capture…"
+msgstr "Procesar captura…"
+
+#: src/afanes/i18n/ui/en.py REVIEW_NEXT
+msgctxt "REVIEW_NEXT"
+msgid "Next"
+msgstr "Siguiente"
+
+#: src/afanes/i18n/ui/en.py REVIEW_SKIP
+msgctxt "REVIEW_SKIP"
+msgid "Skip"
+msgstr "Omitir"
+
+#: src/afanes/i18n/ui/en.py REVIEW_OPEN_PROJECT
+msgctxt "REVIEW_OPEN_PROJECT"
+msgid "Open Project"
+msgstr "Abrir proyecto"
+
+#: src/afanes/i18n/ui/en.py REVIEW_OPEN_ACTION
+msgctxt "REVIEW_OPEN_ACTION"
+msgid "Open"
+msgstr "Abrir"
+
+#: src/afanes/i18n/ui/en.py REVIEW_NEXT_STEP
+msgctxt "REVIEW_NEXT_STEP"
+msgid "Next Step"
+msgstr "Próximo paso"
+
+#: src/afanes/i18n/ui/en.py REVIEW_NO_NEXT_STEP
+msgctxt "REVIEW_NO_NEXT_STEP"
+msgid "This project has no next step yet"
+msgstr "Este proyecto aún no tiene un próximo paso"
+
+#: src/afanes/i18n/ui/en.py REVIEW_OTHER_STEPS
+msgctxt "REVIEW_OTHER_STEPS"
+msgid "Other Open Steps"
+msgstr "Otros pasos abiertos"
+
+#: src/afanes/i18n/ui/en.py REVIEW_CREATE_STEP
+msgctxt "REVIEW_CREATE_STEP"
+msgid "Add Next Step…"
+msgstr "Añadir próximo paso…"
+
+#: src/afanes/i18n/ui/en.py REVIEW_STEP_TITLE_LABEL
+msgctxt "REVIEW_STEP_TITLE_LABEL"
+msgid "Next step"
+msgstr "Próximo paso"
+
+#: src/afanes/i18n/ui/en.py REVIEW_STEP_TITLE_HINT
+msgctxt "REVIEW_STEP_TITLE_HINT"
+msgid "What is the next step?"
+msgstr "¿Cuál es el próximo paso?"
+
+#: src/afanes/i18n/ui/en.py REVIEW_STEP_CONFIRM
+msgctxt "REVIEW_STEP_CONFIRM"
+msgid "Add Step"
+msgstr "Añadir paso"
+
+#: src/afanes/i18n/ui/en.py REVIEW_STEP_CANCEL
+msgctxt "REVIEW_STEP_CANCEL"
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: src/afanes/i18n/ui/en.py REVIEW_TITLE_REQUIRED
+msgctxt "REVIEW_TITLE_REQUIRED"
+msgid "Enter text for the next step"
+msgstr "Introduce texto para el próximo paso"
+
+#: src/afanes/i18n/ui/en.py REVIEW_MARK_DONE
+msgctxt "REVIEW_MARK_DONE"
+msgid "Mark Project Done…"
+msgstr "Marcar proyecto como terminado…"
+
+#: src/afanes/i18n/ui/en.py REVIEW_DEFER
+msgctxt "REVIEW_DEFER"
+msgid "Defer to Later…"
+msgstr "Aplazar para más tarde…"
+
+#: src/afanes/i18n/ui/en.py REVIEW_CONFIRM_DONE
+msgctxt "REVIEW_CONFIRM_DONE"
+msgid "Confirm Done"
+msgstr "Confirmar terminado"
+
+#: src/afanes/i18n/ui/en.py REVIEW_CONFIRM_DEFER
+msgctxt "REVIEW_CONFIRM_DEFER"
+msgid "Confirm Later"
+msgstr "Confirmar más tarde"
+
+#: src/afanes/i18n/ui/en.py REVIEW_CANCEL
+msgctxt "REVIEW_CANCEL"
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: src/afanes/i18n/ui/en.py REVIEW_STEP_CREATED
+msgctxt "REVIEW_STEP_CREATED"
+msgid "Next step added to {path}"
+msgstr "Próximo paso añadido a {path}"
+
+#: src/afanes/i18n/ui/en.py REVIEW_STEP_FAILED
+msgctxt "REVIEW_STEP_FAILED"
+msgid "Could not update this step: {detail}"
+msgstr "No se pudo actualizar este paso: {detail}"
+
+#: src/afanes/i18n/ui/en.py REVIEW_PROJECT_FAILED
+msgctxt "REVIEW_PROJECT_FAILED"
+msgid "Could not update this project: {detail}"
+msgstr "No se pudo actualizar este proyecto: {detail}"
+
+#: src/afanes/i18n/ui/en.py REVIEW_CAPTURE_READ_FAILED
+msgctxt "REVIEW_CAPTURE_READ_FAILED"
+msgid "Could not read this capture: {detail}"
+msgstr "No se pudo leer esta captura: {detail}"
+
+#: src/afanes/i18n/ui/en.py REVIEW_DUE
+msgctxt "REVIEW_DUE"
+msgid "Due {date}"
+msgstr "Vence {date}"
+
+#: src/afanes/i18n/ui/en.py REVIEW_CURRENT
+msgctxt "REVIEW_CURRENT"
+msgid "Current"
+msgstr "Actual"
+
+#: src/afanes/i18n/ui/en.py BROWSER_SEARCH_HINT
+msgctxt "BROWSER_SEARCH_HINT"
+msgid "Search all notes"
+msgstr "Buscar en todas las notas"
+
+#: src/afanes/i18n/ui/en.py BROWSER_SEARCH_TITLE
+msgctxt "BROWSER_SEARCH_TITLE"
+msgid "Search Results"
+msgstr "Resultados de búsqueda"
+
+#: src/afanes/i18n/ui/en.py BROWSER_SEARCH_CLEAR
+msgctxt "BROWSER_SEARCH_CLEAR"
+msgid "Clear Search"
+msgstr "Borrar búsqueda"
+
+#: src/afanes/i18n/ui/en.py BROWSER_EMPTY
+msgctxt "BROWSER_EMPTY"
+msgid "No notes in this section"
+msgstr "No hay notas en esta sección"
+
+#: src/afanes/i18n/ui/en.py BROWSER_NO_MATCH
+msgctxt "BROWSER_NO_MATCH"
+msgid "No notes match this search"
+msgstr "Ninguna nota coincide con esta búsqueda"
+
+#: src/afanes/i18n/ui/en.py BROWSER_NO_MATCH_QUERY
+msgctxt "BROWSER_NO_MATCH_QUERY"
+msgid "No notes match “{query}”"
+msgstr "Ninguna nota coincide con “{query}”"
+
+#: src/afanes/i18n/ui/en.py BROWSER_FAILURES
+msgctxt "BROWSER_FAILURES"
+msgid "Unreadable Notes"
+msgstr "Notas ilegibles"
+
+#: src/afanes/i18n/ui/en.py NEW_CAPTURE_ACTION
+msgctxt "NEW_CAPTURE_ACTION"
+msgid "New Capture"
+msgstr "Nueva captura"
+
+#: src/afanes/i18n/ui/en.py BROWSER_NEW_REFERENCE
+msgctxt "BROWSER_NEW_REFERENCE"
+msgid "New Reference…"
+msgstr "Nueva referencia…"
+
+#: src/afanes/i18n/ui/en.py BROWSER_NEW_REFERENCE_TITLE
+msgctxt "BROWSER_NEW_REFERENCE_TITLE"
+msgid "New Reference"
+msgstr "Nueva referencia"
+
+#: src/afanes/i18n/ui/en.py BROWSER_NEW_REFERENCE_BODY
+msgctxt "BROWSER_NEW_REFERENCE_BODY"
+msgid "Give the reference a name and choose a template card, or Empty"
+msgstr "Asigna un nombre a la referencia y elige una tarjeta de plantilla, o vacía"
+
+#: src/afanes/i18n/ui/en.py BROWSER_NAME_LABEL
+msgctxt "BROWSER_NAME_LABEL"
+msgid "Name"
+msgstr "Nombre"
+
+#: src/afanes/i18n/ui/en.py BROWSER_NAME_REQUIRED
+msgctxt "BROWSER_NAME_REQUIRED"
+msgid "Enter a name for the reference"
+msgstr "Introduce un nombre para la referencia"
+
+#: src/afanes/i18n/ui/en.py BROWSER_CREATE_ACTION
+msgctxt "BROWSER_CREATE_ACTION"
+msgid "Create"
+msgstr "Crear"
+
+#: src/afanes/i18n/ui/en.py BROWSER_CREATE_FAILED
+msgctxt "BROWSER_CREATE_FAILED"
+msgid "Could not create this reference: {detail}"
+msgstr "No se pudo crear esta referencia: {detail}"
+
+#: src/afanes/i18n/ui/en.py BROWSER_TEMPLATE_LABEL
+msgctxt "BROWSER_TEMPLATE_LABEL"
+msgid "Template"
+msgstr "Plantilla"
+
+#: src/afanes/i18n/ui/en.py BROWSER_TEMPLATE_EMPTY
+msgctxt "BROWSER_TEMPLATE_EMPTY"
+msgid "Empty - General Category, No Starter Body"
+msgstr "Vacía - categoría general, sin cuerpo inicial"
+
+#: src/afanes/i18n/ui/en.py BROWSER_TEMPLATE_OPTION
+msgctxt "BROWSER_TEMPLATE_OPTION"
+msgid "{title} - {description}"
+msgstr "{title} - {description}"
+
+#: src/afanes/i18n/ui/en.py BROWSER_TEMPLATE_OPTION_PLAIN
+msgctxt "BROWSER_TEMPLATE_OPTION_PLAIN"
+msgid "{title}"
+msgstr "{title}"
+
+#: src/afanes/i18n/ui/en.py BROWSER_TEMPLATE_OPTION_DUPLICATE
+msgctxt "BROWSER_TEMPLATE_OPTION_DUPLICATE"
+msgid "{title} - {description} ({path})"
+msgstr "{title} - {description} ({path})"
+
+#: src/afanes/i18n/ui/en.py BROWSER_TEMPLATE_OPTION_DUPLICATE_PLAIN
+msgctxt "BROWSER_TEMPLATE_OPTION_DUPLICATE_PLAIN"
+msgid "{title} ({path})"
+msgstr "{title} ({path})"
+
+#: src/afanes/i18n/ui/en.py BROWSER_TEMPLATE_DESCRIPTION_EMPTY
+msgctxt "BROWSER_TEMPLATE_DESCRIPTION_EMPTY"
+msgid "Empty creates a reference in the general category with no starter body"
+msgstr "Vacía crea una referencia en la categoría general sin cuerpo inicial"
+
+#: src/afanes/i18n/ui/en.py BROWSER_TEMPLATE_NO_DESCRIPTION
+msgctxt "BROWSER_TEMPLATE_NO_DESCRIPTION"
+msgid "No description"
+msgstr "Sin descripción"
+
+#: src/afanes/i18n/ui/en.py BROWSER_TEMPLATE_INVALID
+msgctxt "BROWSER_TEMPLATE_INVALID"
+msgid "Some template cards could not be read and will be skipped: {paths}"
+msgstr "No se pudieron leer algunas tarjetas de plantilla y se omitirán: {paths}"
+
+#: src/afanes/i18n/ui/en.py PROJECT_OPEN_STEPS_ONE
+msgctxt "PROJECT_OPEN_STEPS_ONE"
+msgid "1 open step"
+msgstr "1 paso abierto"
+
+#: src/afanes/i18n/ui/en.py PROJECT_OPEN_STEPS_MANY
+msgctxt "PROJECT_OPEN_STEPS_MANY"
+msgid "{count} open steps"
+msgstr "{count} pasos abiertos"
+
+#: src/afanes/i18n/ui/en.py PROJECT_NEXT_STEP
+msgctxt "PROJECT_NEXT_STEP"
+msgid "Next: {title}"
+msgstr "Siguiente: {title}"
+
+#: src/afanes/i18n/ui/en.py PROJECT_NO_NEXT_STEP
+msgctxt "PROJECT_NO_NEXT_STEP"
+msgid "No next step"
+msgstr "Sin próximo paso"
+
+#: src/afanes/i18n/ui/en.py PROJECT_DUE
+msgctxt "PROJECT_DUE"
+msgid "Due {date}"
+msgstr "Vence {date}"
+
+#: src/afanes/i18n/ui/en.py PROJECT_STATUS
+msgctxt "PROJECT_STATUS"
+msgid "Status: {status}"
+msgstr "Estado: {status}"
+
+#: src/afanes/i18n/ui/en.py PROJECT_META_SEPARATOR
+msgctxt "PROJECT_META_SEPARATOR"
+msgid " · "
+msgstr " · "
+
+#: src/afanes/i18n/ui/en.py PROCESS_ACTION
+msgctxt "PROCESS_ACTION"
+msgid "Process…"
+msgstr "Procesar…"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_TITLE
+msgctxt "PROCESSING_TITLE"
+msgid "Process Capture"
+msgstr "Procesar captura"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_CAPTURE
+msgctxt "PROCESSING_CAPTURE"
+msgid "Capture"
+msgstr "Captura"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_OUTCOME_LABEL
+msgctxt "PROCESSING_OUTCOME_LABEL"
+msgid "Outcome"
+msgstr "Resultado"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_STATUS_LABEL
+msgctxt "PROCESSING_STATUS_LABEL"
+msgid "Status"
+msgstr "Estado"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_DUE_DATE_LABEL
+msgctxt "PROCESSING_DUE_DATE_LABEL"
+msgid "Due date (YYYY-MM-DD)"
+msgstr "Fecha de vencimiento (YYYY-MM-DD)"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_PROJECT_LABEL
+msgctxt "PROCESSING_PROJECT_LABEL"
+msgid "Project"
+msgstr "Proyecto"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_PROJECT_HINT
+msgctxt "PROCESSING_PROJECT_HINT"
+msgid "Launch"
+msgstr "Lanzar"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_TEMPLATE_LABEL
+msgctxt "PROCESSING_TEMPLATE_LABEL"
+msgid "Template"
+msgstr "Plantilla"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_TEMPLATE_EMPTY
+msgctxt "PROCESSING_TEMPLATE_EMPTY"
+msgid "Empty - General Category, No Starter Body"
+msgstr "Vacía - categoría general, sin cuerpo inicial"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_TEMPLATE_OPTION
+msgctxt "PROCESSING_TEMPLATE_OPTION"
+msgid "{title} - {description}"
+msgstr "{title} - {description}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_TEMPLATE_OPTION_PLAIN
+msgctxt "PROCESSING_TEMPLATE_OPTION_PLAIN"
+msgid "{title}"
+msgstr "{title}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_TEMPLATE_OPTION_DUPLICATE
+msgctxt "PROCESSING_TEMPLATE_OPTION_DUPLICATE"
+msgid "{title} - {description} ({path})"
+msgstr "{title} - {description} ({path})"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_TEMPLATE_OPTION_DUPLICATE_PLAIN
+msgctxt "PROCESSING_TEMPLATE_OPTION_DUPLICATE_PLAIN"
+msgid "{title} ({path})"
+msgstr "{title} ({path})"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_TEMPLATE_DESCRIPTION_EMPTY
+msgctxt "PROCESSING_TEMPLATE_DESCRIPTION_EMPTY"
+msgid "Empty creates a reference in the general category with no starter body"
+msgstr "Vacía crea una referencia en la categoría general sin cuerpo inicial"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_TEMPLATE_NO_DESCRIPTION
+msgctxt "PROCESSING_TEMPLATE_NO_DESCRIPTION"
+msgid "No description"
+msgstr "Sin descripción"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_TEMPLATE_INVALID
+msgctxt "PROCESSING_TEMPLATE_INVALID"
+msgid "Some template cards could not be read and will be skipped: {paths}"
+msgstr "No se pudieron leer algunas tarjetas de plantilla y se omitirán: {paths}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_PLAN_STEP
+msgctxt "PROCESSING_PLAN_STEP"
+msgid "Step: {text}"
+msgstr "Paso: {text}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_PLAN_CATEGORY
+msgctxt "PROCESSING_PLAN_CATEGORY"
+msgid "Category: {category}"
+msgstr "Categoría: {category}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_PLAN_OWNER
+msgctxt "PROCESSING_PLAN_OWNER"
+msgid "Owner: {name}"
+msgstr "Responsable: {name}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_PLAN_ASKED_BY
+msgctxt "PROCESSING_PLAN_ASKED_BY"
+msgid "Asked by: {name}"
+msgstr "Solicitado por: {name}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_PLAN_SCAFFOLD
+msgctxt "PROCESSING_PLAN_SCAFFOLD"
+msgid "A starter body will be added"
+msgstr "Se añadirá un cuerpo inicial"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_PREVIEW_ACTION
+msgctxt "PROCESSING_PREVIEW_ACTION"
+msgid "Preview"
+msgstr "Vista previa"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_CONFIRM_ACTION
+msgctxt "PROCESSING_CONFIRM_ACTION"
+msgid "Confirm"
+msgstr "Confirmar"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_CANCEL_ACTION
+msgctxt "PROCESSING_CANCEL_ACTION"
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_DONE_ACTION
+msgctxt "PROCESSING_DONE_ACTION"
+msgid "Done"
+msgstr "Listo"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_DESTINATION
+msgctxt "PROCESSING_DESTINATION"
+msgid "Destination: {path}"
+msgstr "Destino: {path}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_DESTINATION_TRASH
+msgctxt "PROCESSING_DESTINATION_TRASH"
+msgid "Destination: Trash"
+msgstr "Destino: papelera"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_PLAN_TITLE
+msgctxt "PROCESSING_PLAN_TITLE"
+msgid "Ready to Apply"
+msgstr "Listo para aplicar"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_SUCCESS_TITLE
+msgctxt "PROCESSING_SUCCESS_TITLE"
+msgid "Capture Processed"
+msgstr "Captura procesada"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_SUCCESS_BODY
+msgctxt "PROCESSING_SUCCESS_BODY"
+msgid "The note was moved to {path}"
+msgstr "La nota se movió a {path}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_SUCCESS_TRASH
+msgctxt "PROCESSING_SUCCESS_TRASH"
+msgid "The note was moved to Trash"
+msgstr "La nota se movió a la papelera"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_UNRESOLVED
+msgctxt "PROCESSING_UNRESOLVED"
+msgid "Unresolved references: {names}"
+msgstr "Referencias sin resolver: {names}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_SCHEME_WARNING
+msgctxt "PROCESSING_SCHEME_WARNING"
+msgid "{count} inbound references will become unresolved because the note changes scheme"
+msgstr "{count} referencias entrantes quedarán sin resolver porque la nota cambia de esquema"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_REFERENCE_WARNING
+msgctxt "PROCESSING_REFERENCE_WARNING"
+msgid "{count} inbound references point to this capture and will become unresolved"
+msgstr "{count} referencias entrantes apuntan a esta captura y quedarán sin resolver"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_EMPTY_OUTCOME
+msgctxt "PROCESSING_EMPTY_OUTCOME"
+msgid "Choose an outcome before previewing"
+msgstr "Elige un resultado antes de la vista previa"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_INVALID_DATE
+msgctxt "PROCESSING_INVALID_DATE"
+msgid "Enter a due date as YYYY-MM-DD or leave it empty"
+msgstr "Introduce una fecha de vencimiento como YYYY-MM-DD o deja el campo vacío"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_READ_FAILED
+msgctxt "PROCESSING_READ_FAILED"
+msgid "Could not read this capture: {detail}"
+msgstr "No se pudo leer esta captura: {detail}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_PLAN_FAILED
+msgctxt "PROCESSING_PLAN_FAILED"
+msgid "Could not prepare the processing preview: {detail}"
+msgstr "No se pudo preparar la vista previa del procesamiento: {detail}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_FAILED
+msgctxt "PROCESSING_FAILED"
+msgid "Could not process the capture: {detail}"
+msgstr "No se pudo procesar la captura: {detail}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_REFRESH_FAILED
+msgctxt "PROCESSING_REFRESH_FAILED"
+msgid "The capture was processed, but the Inbox could not be refreshed: {detail}"
+msgstr "La captura se procesó, pero no se pudo actualizar la bandeja de entrada: {detail}"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_MISSING
+msgctxt "PROCESSING_MISSING"
+msgid "This capture is no longer in the Inbox"
+msgstr "Esta captura ya no está en la bandeja de entrada"
+
+#: src/afanes/i18n/ui/en.py NOTE_COUNT_ONE
+msgctxt "NOTE_COUNT_ONE"
+msgid "1 note"
+msgstr "1 nota"
+
+#: src/afanes/i18n/ui/en.py NOTE_COUNT_MANY
+msgctxt "NOTE_COUNT_MANY"
+msgid "{count} notes"
+msgstr "{count} notas"
+
+#: src/afanes/i18n/ui/en.py COMPOSER_LABEL
+msgctxt "COMPOSER_LABEL"
+msgid "Capture a Thought"
+msgstr "Capturar una idea"
+
+#: src/afanes/i18n/ui/en.py COMPOSER_HINT
+msgctxt "COMPOSER_HINT"
+msgid "The first line becomes the title"
+msgstr "La primera línea se convierte en el título"
+
+#: src/afanes/i18n/ui/en.py CAPTURE_ACTION
+msgctxt "CAPTURE_ACTION"
+msgid "Capture"
+msgstr "Capturar"
+
+#: src/afanes/i18n/ui/en.py REFRESH_ACTION
+msgctxt "REFRESH_ACTION"
+msgid "Refresh"
+msgstr "Actualizar"
+
+#: src/afanes/i18n/ui/en.py EMPTY_TITLE
+msgctxt "EMPTY_TITLE"
+msgid "Nothing Captured Yet"
+msgstr "Aún no hay capturas"
+
+#: src/afanes/i18n/ui/en.py EMPTY_BODY
+msgctxt "EMPTY_BODY"
+msgid "Write a thought above. The first line becomes the title"
+msgstr "Escribe una idea arriba. La primera línea se convierte en el título"
+
+#: src/afanes/i18n/ui/en.py PREVIEW_TITLE
+msgctxt "PREVIEW_TITLE"
+msgid "Preview"
+msgstr "Vista previa"
+
+#: src/afanes/i18n/ui/en.py PREVIEW_EMPTY
+msgctxt "PREVIEW_EMPTY"
+msgid "Select a note to read it"
+msgstr "Selecciona una nota para leerla"
+
+#: src/afanes/i18n/ui/en.py WORKING
+msgctxt "WORKING"
+msgid "Working"
+msgstr "Trabajando"
+
+#: src/afanes/i18n/ui/en.py CAPTURE_EMPTY
+msgctxt "CAPTURE_EMPTY"
+msgid "Write a thought before capturing"
+msgstr "Escribe una idea antes de capturar"
+
+#: src/afanes/i18n/ui/en.py CAPTURE_FAILED
+msgctxt "CAPTURE_FAILED"
+msgid "Could not capture the thought: {detail}"
+msgstr "No se pudo capturar la idea: {detail}"
+
+#: src/afanes/i18n/ui/en.py VAULT_SELECTION_FAILED
+msgctxt "VAULT_SELECTION_FAILED"
+msgid "Could not save the vault selection: {detail}"
+msgstr "No se pudo guardar la selección de bóveda: {detail}"
+
+#: src/afanes/i18n/ui/en.py REFRESH_FAILED
+msgctxt "REFRESH_FAILED"
+msgid "Could not refresh the inbox: {detail}"
+msgstr "No se pudo actualizar la bandeja de entrada: {detail}"
+
+#: src/afanes/i18n/ui/en.py PREVIEW_FAILED
+msgctxt "PREVIEW_FAILED"
+msgid "Could not read this note: {detail}"
+msgstr "No se pudo leer esta nota: {detail}"
+
+#: src/afanes/i18n/ui/en.py SETTINGS_UNREADABLE
+msgctxt "SETTINGS_UNREADABLE"
+msgid "Saved preferences could not be read. Choose a vault to continue"
+msgstr "No se pudieron leer las preferencias guardadas. Elige una bóveda para continuar"
+
+#: src/afanes/i18n/ui/en.py VAULT_MISSING
+msgctxt "VAULT_MISSING"
+msgid "That folder does not exist. Choose a vault to continue"
+msgstr "Esa carpeta no existe. Elige una bóveda para continuar"
+
+#: src/afanes/i18n/ui/en.py VAULT_NOT_DIRECTORY
+msgctxt "VAULT_NOT_DIRECTORY"
+msgid "That path is not a folder. Choose a vault to continue"
+msgstr "Esa ruta no es una carpeta. Elige una bóveda para continuar"
+
+#: src/afanes/i18n/ui/en.py VAULT_UNREADABLE
+msgctxt "VAULT_UNREADABLE"
+msgid "That folder cannot be read. Choose a vault to continue"
+msgstr "Esa carpeta no se puede leer. Elige una bóveda para continuar"
+
+#: src/afanes/i18n/ui/en.py VAULT_NOT_EMPTY
+msgctxt "VAULT_NOT_EMPTY"
+msgid "That folder is not empty. Choose an empty folder or an existing vault"
+msgstr "Esa carpeta no está vacía. Elige una carpeta vacía o una bóveda existente"
+
+#: src/afanes/i18n/ui/en.py VAULT_CREATED_NOT_REMEMBERED
+msgctxt "VAULT_CREATED_NOT_REMEMBERED"
+msgid "The vault was created, but it could not be remembered: {detail}"
+msgstr "La bóveda se creó, pero no se pudo recordar: {detail}"
+
+#: src/afanes/i18n/ui/en.py LOG_MODE_NOT_REMEMBERED
+msgctxt "LOG_MODE_NOT_REMEMBERED"
+msgid "The Log view was changed, but the preference could not be saved: {detail}"
+msgstr "La vista de registro cambió, pero no se pudo guardar la preferencia: {detail}"
+
+#: src/afanes/i18n/ui/en.py LOG_PLACEHOLDER
+msgctxt "LOG_PLACEHOLDER"
+msgid "The Log calendar and date tree appear here"
+msgstr "El calendario y el árbol de fechas del registro aparecen aquí"
+
+#: src/afanes/i18n/ui/en.py LOG_MONTH_ENTRY_MARK
+msgctxt "LOG_MONTH_ENTRY_MARK"
+msgid "This month has an entry"
+msgstr "Este mes tiene una entrada"
+
+#: src/afanes/i18n/ui/en.py LOG_YEAR_ENTRY_MARK
+msgctxt "LOG_YEAR_ENTRY_MARK"
+msgid "This year has an entry"
+msgstr "Este año tiene una entrada"
+
+#: src/afanes/i18n/ui/en.py LOG_PREVIOUS_MONTH
+msgctxt "LOG_PREVIOUS_MONTH"
+msgid "Previous Month"
+msgstr "Mes anterior"
+
+#: src/afanes/i18n/ui/en.py LOG_NEXT_MONTH
+msgctxt "LOG_NEXT_MONTH"
+msgid "Next Month"
+msgstr "Mes siguiente"
+
+#: src/afanes/i18n/ui/en.py LOG_EMPTY
+msgctxt "LOG_EMPTY"
+msgid "No entries yet"
+msgstr "Aún no hay entradas"
+
+#: src/afanes/i18n/ui/en.py LOG_UNDATED
+msgctxt "LOG_UNDATED"
+msgid "Undated"
+msgstr "Sin fecha"
+
+#: src/afanes/i18n/ui/en.py LOG_NEW_MONTH_ENTRY
+msgctxt "LOG_NEW_MONTH_ENTRY"
+msgid "Write an entry for {period}"
+msgstr "Escribe una entrada para {period}"
+
+#: src/afanes/i18n/ui/en.py LOG_NEW_YEAR_ENTRY
+msgctxt "LOG_NEW_YEAR_ENTRY"
+msgid "Write an entry for {year}"
+msgstr "Escribe una entrada para {year}"
+
+#: src/afanes/i18n/ui/en.py LOG_OPEN_MONTH_ENTRY
+msgctxt "LOG_OPEN_MONTH_ENTRY"
+msgid "Open the {period} entry"
+msgstr "Abrir la entrada de {period}"
+
+#: src/afanes/i18n/ui/en.py LOG_OPEN_YEAR_ENTRY
+msgctxt "LOG_OPEN_YEAR_ENTRY"
+msgid "Open the {year} entry"
+msgstr "Abrir la entrada de {year}"
+
+#: src/afanes/i18n/ui/en.py LOG_WRITE_FAILED
+msgctxt "LOG_WRITE_FAILED"
+msgid "The log entry could not be written: {detail}"
+msgstr "No se pudo escribir la entrada del registro: {detail}"
+
+#: src/afanes/i18n/ui/en.py LOG_CARD_LABEL
+msgctxt "LOG_CARD_LABEL"
+msgid "Starter"
+msgstr "Inicial"
+
+#: src/afanes/i18n/ui/en.py LOG_CARD_EMPTY
+msgctxt "LOG_CARD_EMPTY"
+msgid "Empty - No Starter Body"
+msgstr "Vacía - sin cuerpo inicial"
+
+#: src/afanes/i18n/ui/en.py LOG_CARD_DESCRIPTION_EMPTY
+msgctxt "LOG_CARD_DESCRIPTION_EMPTY"
+msgid "No starter body"
+msgstr "Sin cuerpo inicial"
+
+#: src/afanes/i18n/ui/en.py LOG_TODAY_ENTRY
+msgctxt "LOG_TODAY_ENTRY"
+msgid "Today’s Entry"
+msgstr "Entrada de hoy"
+
+#: src/afanes/i18n/ui/en.py LOG_MODE_ENTRIES
+msgctxt "LOG_MODE_ENTRIES"
+msgid "Entries"
+msgstr "Entradas"
+
+#: src/afanes/i18n/ui/en.py LOG_MODE_EVERYTHING
+msgctxt "LOG_MODE_EVERYTHING"
+msgid "Everything"
+msgstr "Todo"
+
+#: src/afanes/i18n/ui/en.py VAULT_PATH_REQUIRED
+msgctxt "VAULT_PATH_REQUIRED"
+msgid "Enter the folder path for the vault"
+msgstr "Introduce la ruta de la carpeta de la bóveda"
+
+#: src/afanes/i18n/ui/en.py PAGE_BACK
+msgctxt "PAGE_BACK"
+msgid "Back"
+msgstr "Atrás"
+
+#: src/afanes/i18n/ui/en.py PAGE_EDIT
+msgctxt "PAGE_EDIT"
+msgid "Edit"
+msgstr "Editar"
+
+#: src/afanes/i18n/ui/en.py PAGE_DONE
+msgctxt "PAGE_DONE"
+msgid "Done"
+msgstr "Listo"
+
+#: src/afanes/i18n/ui/en.py PAGE_ACTIONS
+msgctxt "PAGE_ACTIONS"
+msgid "Page Actions"
+msgstr "Acciones de la página"
+
+#: src/afanes/i18n/ui/en.py PAGE_RENAME
+msgctxt "PAGE_RENAME"
+msgid "Rename…"
+msgstr "Renombrar…"
+
+#: src/afanes/i18n/ui/en.py PAGE_TRASH
+msgctxt "PAGE_TRASH"
+msgid "Move to Trash"
+msgstr "Mover a la papelera"
+
+#: src/afanes/i18n/ui/en.py PAGE_EMPTY
+msgctxt "PAGE_EMPTY"
+msgid "Select a note to open it"
+msgstr "Selecciona una nota para abrirla"
+
+#: src/afanes/i18n/ui/en.py PAGE_IDENTITY_LABEL
+msgctxt "PAGE_IDENTITY_LABEL"
+msgid "Identity"
+msgstr "Identidad"
+
+#: src/afanes/i18n/ui/en.py PAGE_PATH_LABEL
+msgctxt "PAGE_PATH_LABEL"
+msgid "Path"
+msgstr "Ruta"
+
+#: src/afanes/i18n/ui/en.py PAGE_BODY_LABEL
+msgctxt "PAGE_BODY_LABEL"
+msgid "Body (Markdown)"
+msgstr "Cuerpo (Markdown)"
+
+#: src/afanes/i18n/ui/en.py PAGE_TYPE_LABEL
+msgctxt "PAGE_TYPE_LABEL"
+msgid "Type"
+msgstr "Tipo"
+
+#: src/afanes/i18n/ui/en.py PAGE_CATEGORY_LABEL
+msgctxt "PAGE_CATEGORY_LABEL"
+msgid "Category"
+msgstr "Categoría"
+
+#: src/afanes/i18n/ui/en.py PAGE_STATUS_LABEL
+msgctxt "PAGE_STATUS_LABEL"
+msgid "Status"
+msgstr "Estado"
+
+#: src/afanes/i18n/ui/en.py PAGE_DUE_DATE_LABEL
+msgctxt "PAGE_DUE_DATE_LABEL"
+msgid "Due date"
+msgstr "Fecha de vencimiento"
+
+#: src/afanes/i18n/ui/en.py PAGE_DATE_LABEL
+msgctxt "PAGE_DATE_LABEL"
+msgid "Date"
+msgstr "Fecha"
+
+#: src/afanes/i18n/ui/en.py PAGE_DATE
+msgctxt "PAGE_DATE"
+msgid "Date: {date}"
+msgstr "Fecha: {date}"
+
+#: src/afanes/i18n/ui/en.py PAGE_NO_DATE
+msgctxt "PAGE_NO_DATE"
+msgid "No date"
+msgstr "Sin fecha"
+
+#: src/afanes/i18n/ui/en.py PAGE_LOG_DATE_REQUIRED
+msgctxt "PAGE_LOG_DATE_REQUIRED"
+msgid "A log entry needs a date"
+msgstr "Una entrada de registro necesita una fecha"
+
+#: src/afanes/i18n/ui/en.py PAGE_DATE_CHANGE_FAILED
+msgctxt "PAGE_DATE_CHANGE_FAILED"
+msgid "The date could not be changed: {detail}"
+msgstr "No se pudo cambiar la fecha: {detail}"
+
+#: src/afanes/i18n/ui/en.py PAGE_DATE_CHANGE_PARTIAL
+msgctxt "PAGE_DATE_CHANGE_PARTIAL"
+msgid "The date changed. {report}"
+msgstr "La fecha cambió. {report}"
+
+#: src/afanes/i18n/ui/en.py PAGE_TYPE_CHANGE_FAILED
+msgctxt "PAGE_TYPE_CHANGE_FAILED"
+msgid "The note type could not be changed: {detail}"
+msgstr "No se pudo cambiar el tipo de nota: {detail}"
+
+#: src/afanes/i18n/ui/en.py PAGE_TYPE_CHANGE_PARTIAL
+msgctxt "PAGE_TYPE_CHANGE_PARTIAL"
+msgid "The note type changed. {report}"
+msgstr "El tipo de nota cambió. {report}"
+
+#: src/afanes/i18n/ui/en.py PAGE_REWRITE_UPDATED
+msgctxt "PAGE_REWRITE_UPDATED"
+msgid "Updated: {paths}"
+msgstr "Actualizadas: {paths}"
+
+#: src/afanes/i18n/ui/en.py PAGE_REWRITE_NOT_UPDATED
+msgctxt "PAGE_REWRITE_NOT_UPDATED"
+msgid "Not updated: {paths}"
+msgstr "No actualizadas: {paths}"
+
+#: src/afanes/i18n/ui/en.py PAGE_REWRITE_NONE
+msgctxt "PAGE_REWRITE_NONE"
+msgid "none"
+msgstr "ninguna"
+
+#: src/afanes/i18n/ui/en.py PAGE_REWRITE_CHANGED_ON_DISK
+msgctxt "PAGE_REWRITE_CHANGED_ON_DISK"
+msgid "Changed on disk after planning"
+msgstr "Cambió en el disco después de la planificación"
+
+#: src/afanes/i18n/ui/en.py PAGE_REWRITE_PROBLEM
+msgctxt "PAGE_REWRITE_PROBLEM"
+msgid "{path} ({reason})"
+msgstr "{path} ({reason})"
+
+#: src/afanes/i18n/ui/en.py PAGE_ASKED_BY_LABEL
+msgctxt "PAGE_ASKED_BY_LABEL"
+msgid "Asked by"
+msgstr "Solicitado por"
+
+#: src/afanes/i18n/ui/en.py PAGE_ASKED_BY_HINT
+msgctxt "PAGE_ASKED_BY_HINT"
+msgid "Person or group that requested it"
+msgstr "Persona o grupo que lo solicitó"
+
+#: src/afanes/i18n/ui/en.py PAGE_OWNER_LABEL
+msgctxt "PAGE_OWNER_LABEL"
+msgid "Owner"
+msgstr "Responsable"
+
+#: src/afanes/i18n/ui/en.py PAGE_OWNER_HINT
+msgctxt "PAGE_OWNER_HINT"
+msgid "Person or team accountable for it"
+msgstr "Persona o equipo responsable"
+
+#: src/afanes/i18n/ui/en.py ROLE_REFERENCE_TITLE
+msgctxt "ROLE_REFERENCE_TITLE"
+msgid "Create Reference"
+msgstr "Crear referencia"
+
+#: src/afanes/i18n/ui/en.py ROLE_REFERENCE_BODY
+msgctxt "ROLE_REFERENCE_BODY"
+msgid "Create a reference for {name}. Choose a category, or no category"
+msgstr "Crea una referencia para {name}. Elige una categoría o ninguna categoría"
+
+#: src/afanes/i18n/ui/en.py ROLE_REFERENCE_CATEGORY_LABEL
+msgctxt "ROLE_REFERENCE_CATEGORY_LABEL"
+msgid "Category"
+msgstr "Categoría"
+
+#: src/afanes/i18n/ui/en.py ROLE_REFERENCE_CATEGORY_HINT
+msgctxt "ROLE_REFERENCE_CATEGORY_HINT"
+msgid "Existing category or a new one"
+msgstr "Categoría existente o una nueva"
+
+#: src/afanes/i18n/ui/en.py ROLE_REFERENCE_NO_CATEGORY
+msgctxt "ROLE_REFERENCE_NO_CATEGORY"
+msgid "No Category"
+msgstr "Sin categoría"
+
+#: src/afanes/i18n/ui/en.py ROLE_REFERENCE_CREATE
+msgctxt "ROLE_REFERENCE_CREATE"
+msgid "Create Reference"
+msgstr "Crear referencia"
+
+#: src/afanes/i18n/ui/en.py ROLE_NAME_OWNER_TITLE
+msgctxt "ROLE_NAME_OWNER_TITLE"
+msgid "Set Owner"
+msgstr "Establecer responsable"
+
+#: src/afanes/i18n/ui/en.py ROLE_NAME_ASKED_BY_TITLE
+msgctxt "ROLE_NAME_ASKED_BY_TITLE"
+msgid "Set Asked By"
+msgstr "Establecer solicitante"
+
+#: src/afanes/i18n/ui/en.py ROLE_NAME_BODY
+msgctxt "ROLE_NAME_BODY"
+msgid "Enter a name, or pick one from this vault"
+msgstr "Introduce un nombre o elige uno de esta bóveda"
+
+#: src/afanes/i18n/ui/en.py ROLE_NAME_LABEL
+msgctxt "ROLE_NAME_LABEL"
+msgid "Name"
+msgstr "Nombre"
+
+#: src/afanes/i18n/ui/en.py ROLE_NAME_HINT
+msgctxt "ROLE_NAME_HINT"
+msgid "Note name"
+msgstr "Nombre de la nota"
+
+#: src/afanes/i18n/ui/en.py ROLE_NAME_CLEAR
+msgctxt "ROLE_NAME_CLEAR"
+msgid "Clear"
+msgstr "Borrar"
+
+#: src/afanes/i18n/ui/en.py ROLE_NAME_SAVE
+msgctxt "ROLE_NAME_SAVE"
+msgid "Save"
+msgstr "Guardar"
+
+#: src/afanes/i18n/ui/en.py PAGE_OWNER_SET
+msgctxt "PAGE_OWNER_SET"
+msgid "Set Owner…"
+msgstr "Establecer responsable…"
+
+#: src/afanes/i18n/ui/en.py PAGE_ASKED_BY_SET
+msgctxt "PAGE_ASKED_BY_SET"
+msgid "Set Asked By…"
+msgstr "Establecer solicitante…"
+
+#: src/afanes/i18n/ui/en.py ROLE_LINK_MISSING
+msgctxt "ROLE_LINK_MISSING"
+msgid "No page matches this name. Create one"
+msgstr "Ninguna página coincide con este nombre. Crea una"
+
+#: src/afanes/i18n/ui/en.py ROLE_LINK_AMBIGUOUS
+msgctxt "ROLE_LINK_AMBIGUOUS"
+msgid "More than one page matches this name. Choose one"
+msgstr "Más de una página coincide con este nombre. Elige una"
+
+#: src/afanes/i18n/ui/en.py PAGE_RAW_WARNING
+msgctxt "PAGE_RAW_WARNING"
+msgid "This page’s metadata cannot be read. Edit the text directly; labels return once it parses"
+msgstr "Los metadatos de esta página no se pueden leer. Edita el texto directamente; las etiquetas vuelven cuando se analiza correctamente"
+
+#: src/afanes/i18n/ui/en.py PAGE_RAW_SAVE
+msgctxt "PAGE_RAW_SAVE"
+msgid "Save Text"
+msgstr "Guardar texto"
+
+#: src/afanes/i18n/ui/en.py PAGE_SAVING
+msgctxt "PAGE_SAVING"
+msgid "Saving"
+msgstr "Guardando"
+
+#: src/afanes/i18n/ui/en.py PAGE_SAVED
+msgctxt "PAGE_SAVED"
+msgid "Saved"
+msgstr "Guardado"
+
+#: src/afanes/i18n/ui/en.py PAGE_UNSAVED
+msgctxt "PAGE_UNSAVED"
+msgid "Unsaved Changes"
+msgstr "Cambios sin guardar"
+
+#: src/afanes/i18n/ui/en.py PAGE_OPEN_FAILED
+msgctxt "PAGE_OPEN_FAILED"
+msgid "Could not open this page: {detail}"
+msgstr "No se pudo abrir esta página: {detail}"
+
+#: src/afanes/i18n/ui/en.py PAGE_SAVE_FAILED
+msgctxt "PAGE_SAVE_FAILED"
+msgid "Could not save this page: {detail}"
+msgstr "No se pudo guardar esta página: {detail}"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONFLICT_CHANGED
+msgctxt "PAGE_CONFLICT_CHANGED"
+msgid "This page changed on disk. Reload it or overwrite it with the draft"
+msgstr "Esta página cambió en el disco. Recárgala o sobrescríbela con el borrador"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONFLICT_MISSING
+msgctxt "PAGE_CONFLICT_MISSING"
+msgid "This page no longer exists at its path. Recreate it or discard the draft"
+msgstr "Esta página ya no existe en su ruta. Vuelve a crearla o descarta el borrador"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONFLICT_LEAVE
+msgctxt "PAGE_CONFLICT_LEAVE"
+msgid "Resolve the disk conflict before leaving this page"
+msgstr "Resuelve el conflicto de disco antes de salir de esta página"
+
+#: src/afanes/i18n/ui/en.py PAGE_PENDING_DIALOG
+msgctxt "PAGE_PENDING_DIALOG"
+msgid "Confirm or cancel the open page action before leaving this page"
+msgstr "Confirma o cancela la acción de página abierta antes de salir de esta página"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONFLICT_TITLE
+msgctxt "PAGE_CONFLICT_TITLE"
+msgid "This Page Changed on Disk"
+msgstr "Esta página cambió en el disco"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONFLICT_RELOAD
+msgctxt "PAGE_CONFLICT_RELOAD"
+msgid "Reload from Disk"
+msgstr "Recargar desde el disco"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONFLICT_OVERWRITE
+msgctxt "PAGE_CONFLICT_OVERWRITE"
+msgid "Overwrite with Draft"
+msgstr "Sobrescribir con el borrador"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONFLICT_RECREATE
+msgctxt "PAGE_CONFLICT_RECREATE"
+msgid "Recreate Page"
+msgstr "Volver a crear la página"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONFLICT_DISCARD
+msgctxt "PAGE_CONFLICT_DISCARD"
+msgid "Discard Draft"
+msgstr "Descartar borrador"
+
+#: src/afanes/i18n/ui/en.py PAGE_AMBIGUOUS_TITLE
+msgctxt "PAGE_AMBIGUOUS_TITLE"
+msgid "Choose a Page"
+msgstr "Elegir una página"
+
+#: src/afanes/i18n/ui/en.py PAGE_AMBIGUOUS_BODY
+msgctxt "PAGE_AMBIGUOUS_BODY"
+msgid "More than one page matches this reference"
+msgstr "Más de una página coincide con esta referencia"
+
+#: src/afanes/i18n/ui/en.py PAGE_REPAIR_PENDING
+msgctxt "PAGE_REPAIR_PENDING"
+msgid "Choose how to handle the old link names before leaving this page"
+msgstr "Elige cómo tratar los nombres de enlace antiguos antes de salir de esta página"
+
+#: src/afanes/i18n/ui/en.py PAGE_REPAIR_TITLE
+msgctxt "PAGE_REPAIR_TITLE"
+msgid "Repair Link Names"
+msgstr "Reparar nombres de enlace"
+
+#: src/afanes/i18n/ui/en.py PAGE_REPAIR_BODY
+msgctxt "PAGE_REPAIR_BODY"
+msgid "The name “{old}” cannot be a filename. The page was created as “{new}”"
+msgstr "El nombre “{old}” no puede ser un nombre de archivo. La página se creó como “{new}”"
+
+#: src/afanes/i18n/ui/en.py PAGE_REPAIR_COUNT
+msgctxt "PAGE_REPAIR_COUNT"
+msgid "{detail} still use the old name"
+msgstr "{detail} todavía usan el nombre antiguo"
+
+#: src/afanes/i18n/ui/en.py PAGE_REPAIR_REWRITE
+msgctxt "PAGE_REPAIR_REWRITE"
+msgid "Rewrite Links"
+msgstr "Reescribir enlaces"
+
+#: src/afanes/i18n/ui/en.py PAGE_REPAIR_KEEP
+msgctxt "PAGE_REPAIR_KEEP"
+msgid "Keep Old Links"
+msgstr "Mantener enlaces antiguos"
+
+#: src/afanes/i18n/ui/en.py PAGE_REPAIR_CANCEL
+msgctxt "PAGE_REPAIR_CANCEL"
+msgid "Cancel Creation"
+msgstr "Cancelar creación"
+
+#: src/afanes/i18n/ui/en.py PAGE_REPAIR_FAILED
+msgctxt "PAGE_REPAIR_FAILED"
+msgid "Some links could not be repaired: {detail}"
+msgstr "No se pudieron reparar algunos enlaces: {detail}"
+
+#: src/afanes/i18n/ui/en.py PAGE_REPAIR_PARTIAL
+msgctxt "PAGE_REPAIR_PARTIAL"
+msgid "The links were repaired. {report}"
+msgstr "Los enlaces se repararon. {report}"
+
+#: src/afanes/i18n/ui/en.py PAGE_TYPE_CHANGE_TITLE
+msgctxt "PAGE_TYPE_CHANGE_TITLE"
+msgid "Change Page Type?"
+msgstr "¿Cambiar el tipo de página?"
+
+#: src/afanes/i18n/ui/en.py PAGE_TYPE_CHANGE_BODY
+msgctxt "PAGE_TYPE_CHANGE_BODY"
+msgid "{detail} will become unresolved"
+msgstr "{detail} quedarán sin resolver"
+
+#: src/afanes/i18n/ui/en.py PAGE_TYPE_CHANGE_CONFIRM
+msgctxt "PAGE_TYPE_CHANGE_CONFIRM"
+msgid "Change Type"
+msgstr "Cambiar tipo"
+
+#: src/afanes/i18n/ui/en.py PAGE_RENAME_TITLE
+msgctxt "PAGE_RENAME_TITLE"
+msgid "Rename Page"
+msgstr "Renombrar página"
+
+#: src/afanes/i18n/ui/en.py PAGE_RENAME_LABEL
+msgctxt "PAGE_RENAME_LABEL"
+msgid "New name"
+msgstr "Nombre nuevo"
+
+#: src/afanes/i18n/ui/en.py PAGE_RENAME_PREVIEW
+msgctxt "PAGE_RENAME_PREVIEW"
+msgid "{detail} will be updated"
+msgstr "{detail} se actualizará"
+
+#: src/afanes/i18n/ui/en.py PAGE_RENAME_PREVIEW_ACTION
+msgctxt "PAGE_RENAME_PREVIEW_ACTION"
+msgid "Preview"
+msgstr "Vista previa"
+
+#: src/afanes/i18n/ui/en.py PAGE_RENAME_CONFIRM
+msgctxt "PAGE_RENAME_CONFIRM"
+msgid "Rename"
+msgstr "Renombrar"
+
+#: src/afanes/i18n/ui/en.py PAGE_RENAME_FAILED
+msgctxt "PAGE_RENAME_FAILED"
+msgid "Could not rename this page: {detail}"
+msgstr "No se pudo renombrar esta página: {detail}"
+
+#: src/afanes/i18n/ui/en.py PAGE_RENAME_PARTIAL
+msgctxt "PAGE_RENAME_PARTIAL"
+msgid "The page was renamed. {report}"
+msgstr "La página se renombró. {report}"
+
+#: src/afanes/i18n/ui/en.py PAGE_TRASH_FAILED
+msgctxt "PAGE_TRASH_FAILED"
+msgid "Could not move this page to trash: {detail}"
+msgstr "No se pudo mover esta página a la papelera: {detail}"
+
+#: src/afanes/i18n/ui/en.py PAGE_TRASH_MOVED
+msgctxt "PAGE_TRASH_MOVED"
+msgid "Moved to Trash"
+msgstr "Movida a la papelera"
+
+#: src/afanes/i18n/ui/en.py PAGE_TRASH_RESTORED
+msgctxt "PAGE_TRASH_RESTORED"
+msgid "Restored from Trash"
+msgstr "Restaurada desde la papelera"
+
+#: src/afanes/i18n/ui/en.py PAGE_TRASH_RESTORE_FAILED
+msgctxt "PAGE_TRASH_RESTORE_FAILED"
+msgid "Could not restore this page: {detail}"
+msgstr "No se pudo restaurar esta página: {detail}"
+
+#: src/afanes/i18n/ui/en.py TRASH_TITLE
+msgctxt "TRASH_TITLE"
+msgid "Trash"
+msgstr "Papelera"
+
+#: src/afanes/i18n/ui/en.py TRASH_EMPTY
+msgctxt "TRASH_EMPTY"
+msgid "Trash is empty"
+msgstr "La papelera está vacía"
+
+#: src/afanes/i18n/ui/en.py TRASH_ROW_FROM
+msgctxt "TRASH_ROW_FROM"
+msgid "From {path}"
+msgstr "Desde {path}"
+
+#: src/afanes/i18n/ui/en.py TRASH_RESTORE
+msgctxt "TRASH_RESTORE"
+msgid "Restore"
+msgstr "Restaurar"
+
+#: src/afanes/i18n/ui/en.py TRASH_DELETE_PERMANENTLY
+msgctxt "TRASH_DELETE_PERMANENTLY"
+msgid "Delete Permanently…"
+msgstr "Eliminar permanentemente…"
+
+#: src/afanes/i18n/ui/en.py TRASH_DELETE_TITLE
+msgctxt "TRASH_DELETE_TITLE"
+msgid "Delete This Note Permanently?"
+msgstr "¿Eliminar esta nota permanentemente?"
+
+#: src/afanes/i18n/ui/en.py TRASH_DELETE_BODY
+msgctxt "TRASH_DELETE_BODY"
+msgid "The note will be deleted permanently. This cannot be undone"
+msgstr "La nota se eliminará permanentemente. Esta acción no se puede deshacer"
+
+#: src/afanes/i18n/ui/en.py TRASH_DELETE_CONFIRM
+msgctxt "TRASH_DELETE_CONFIRM"
+msgid "Delete Permanently"
+msgstr "Eliminar permanentemente"
+
+#: src/afanes/i18n/ui/en.py TRASH_DELETED
+msgctxt "TRASH_DELETED"
+msgid "Trash Entry Deleted"
+msgstr "Entrada de papelera eliminada"
+
+#: src/afanes/i18n/ui/en.py TRASH_EMPTY_ACTION
+msgctxt "TRASH_EMPTY_ACTION"
+msgid "Empty Trash…"
+msgstr "Vaciar papelera…"
+
+#: src/afanes/i18n/ui/en.py TRASH_EMPTY_TITLE
+msgctxt "TRASH_EMPTY_TITLE"
+msgid "Empty Trash?"
+msgstr "¿Vaciar la papelera?"
+
+#: src/afanes/i18n/ui/en.py TRASH_EMPTY_BODY
+msgctxt "TRASH_EMPTY_BODY"
+msgid "All {count} will be deleted permanently. This cannot be undone"
+msgstr "Las {count} se eliminarán permanentemente. Esta acción no se puede deshacer"
+
+#: src/afanes/i18n/ui/en.py TRASH_EMPTY_CONFIRM
+msgctxt "TRASH_EMPTY_CONFIRM"
+msgid "Empty Trash"
+msgstr "Vaciar papelera"
+
+#: src/afanes/i18n/ui/en.py TRASH_EMPTY_DONE
+msgctxt "TRASH_EMPTY_DONE"
+msgid "Trash Emptied"
+msgstr "Papelera vaciada"
+
+#: src/afanes/i18n/ui/en.py TRASH_EMPTY_FAILED
+msgctxt "TRASH_EMPTY_FAILED"
+msgid "Some trashed notes could not be deleted: {detail}"
+msgstr "No se pudieron eliminar algunas notas de la papelera: {detail}"
+
+#: src/afanes/i18n/ui/en.py TRASH_OVERWRITE_TITLE
+msgctxt "TRASH_OVERWRITE_TITLE"
+msgid "Overwrite the Existing Note?"
+msgstr "¿Sobrescribir la nota existente?"
+
+#: src/afanes/i18n/ui/en.py TRASH_OVERWRITE_BODY
+msgctxt "TRASH_OVERWRITE_BODY"
+msgid "A note already exists at {path}. Restoring will permanently replace it"
+msgstr "Ya existe una nota en {path}. Restaurar la reemplazará permanentemente"
+
+#: src/afanes/i18n/ui/en.py TRASH_OVERWRITE_CONFIRM
+msgctxt "TRASH_OVERWRITE_CONFIRM"
+msgid "Restore and Overwrite"
+msgstr "Restaurar y sobrescribir"
+
+#: src/afanes/i18n/ui/en.py TRASH_INFO
+msgctxt "TRASH_INFO"
+msgid "Trashed from {path} on {date}"
+msgstr "Movida a la papelera desde {path} el {date}"
+
+#: src/afanes/i18n/ui/en.py TRASH_INFO_NO_DATE
+msgctxt "TRASH_INFO_NO_DATE"
+msgid "Trashed from {path}"
+msgstr "Movida a la papelera desde {path}"
+
+#: src/afanes/i18n/ui/en.py TRASH_OPEN_FAILED
+msgctxt "TRASH_OPEN_FAILED"
+msgid "Could not open this trashed note: {detail}"
+msgstr "No se pudo abrir esta nota de la papelera: {detail}"
+
+#: src/afanes/i18n/ui/en.py TRASH_RESTORE_FAILED
+msgctxt "TRASH_RESTORE_FAILED"
+msgid "Could not restore this note: {detail}"
+msgstr "No se pudo restaurar esta nota: {detail}"
+
+#: src/afanes/i18n/ui/en.py TRASH_DELETE_FAILED
+msgctxt "TRASH_DELETE_FAILED"
+msgid "Could not delete this note: {detail}"
+msgstr "No se pudo eliminar esta nota: {detail}"
+
+#: src/afanes/i18n/ui/en.py TRASH_MAINTENANCE_FAILED
+msgctxt "TRASH_MAINTENANCE_FAILED"
+msgid "Trash maintenance could not finish. Some entries may not have been removed"
+msgstr "El mantenimiento de la papelera no pudo terminar. Es posible que algunas entradas no se hayan eliminado"
+
+#: src/afanes/i18n/ui/en.py TRASH_PAGE_GONE
+msgctxt "TRASH_PAGE_GONE"
+msgid "This note is no longer in Trash"
+msgstr "Esta nota ya no está en la papelera"
+
+#: src/afanes/i18n/ui/en.py TRASH_CONFIRM_LEAVE
+msgctxt "TRASH_CONFIRM_LEAVE"
+msgid "Confirm or cancel the Trash action before leaving this page"
+msgstr "Confirma o cancela la acción de la papelera antes de salir de esta página"
+
+#: src/afanes/i18n/ui/en.py TRASH_ENTRY_ONE
+msgctxt "TRASH_ENTRY_ONE"
+msgid "1 trashed note"
+msgstr "1 nota en la papelera"
+
+#: src/afanes/i18n/ui/en.py TRASH_ENTRY_MANY
+msgctxt "TRASH_ENTRY_MANY"
+msgid "{count} trashed notes"
+msgstr "{count} notas en la papelera"
+
+#: src/afanes/i18n/ui/en.py PAGE_CANCEL
+msgctxt "PAGE_CANCEL"
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: src/afanes/i18n/ui/en.py PAGE_RAW_UPGRADED
+msgctxt "PAGE_RAW_UPGRADED"
+msgid "The page now parses; labels are available"
+msgstr "La página ya se analiza; las etiquetas están disponibles"
+
+#: src/afanes/i18n/ui/en.py PAGE_TYPE_CHANGE_LEAVE
+msgctxt "PAGE_TYPE_CHANGE_LEAVE"
+msgid "Confirm or cancel the type change before leaving this page"
+msgstr "Confirma o cancela el cambio de tipo antes de salir de esta página"
+
+#: src/afanes/i18n/ui/en.py PAGE_NONE
+msgctxt "PAGE_NONE"
+msgid "None"
+msgstr "Ninguno"
+
+#: src/afanes/i18n/ui/en.py PAGE_NEW
+msgctxt "PAGE_NEW"
+msgid "New Page"
+msgstr "Página nueva"
+
+#: src/afanes/i18n/ui/en.py PAGE_CATEGORY_HINT
+msgctxt "PAGE_CATEGORY_HINT"
+msgid "Any label, such as person or place"
+msgstr "Cualquier etiqueta, como persona o lugar"
+
+#: src/afanes/i18n/ui/en.py PAGE_CATEGORY_INVALID
+msgctxt "PAGE_CATEGORY_INVALID"
+msgid "A category must be one non-empty folder name without path separators"
+msgstr "Una categoría debe ser un nombre de carpeta no vacío sin separadores de ruta"
+
+#: src/afanes/i18n/ui/en.py PAGE_CATEGORY_MOVE_TITLE
+msgctxt "PAGE_CATEGORY_MOVE_TITLE"
+msgid "Move This Page?"
+msgstr "¿Mover esta página?"
+
+#: src/afanes/i18n/ui/en.py PAGE_CATEGORY_MOVE_BODY
+msgctxt "PAGE_CATEGORY_MOVE_BODY"
+msgid "The page will move to {path}. Its name and references stay the same"
+msgstr "La página se moverá a {path}. Su nombre y sus referencias no cambian"
+
+#: src/afanes/i18n/ui/en.py PAGE_CATEGORY_MOVE_CONFIRM
+msgctxt "PAGE_CATEGORY_MOVE_CONFIRM"
+msgid "Move Page"
+msgstr "Mover página"
+
+#: src/afanes/i18n/ui/en.py PAGE_CATEGORY_MOVE_FAILED
+msgctxt "PAGE_CATEGORY_MOVE_FAILED"
+msgid "Could not move this page to its category folder: {detail}"
+msgstr "No se pudo mover esta página a su carpeta de categoría: {detail}"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_TICK
+msgctxt "PAGE_STEP_TICK"
+msgid "Mark Complete"
+msgstr "Marcar como completado"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_UNTICK
+msgctxt "PAGE_STEP_UNTICK"
+msgid "Reopen"
+msgstr "Reabrir"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_OWNERS
+msgctxt "PAGE_STEP_OWNERS"
+msgid "Owners: {owners}"
+msgstr "Responsables: {owners}"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_OWNERS_LABEL
+msgctxt "PAGE_STEP_OWNERS_LABEL"
+msgid "Owners: "
+msgstr "Responsables: "
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_PLAN
+msgctxt "PAGE_STEP_PLAN"
+msgid "Plan: {date}"
+msgstr "Plan: {date}"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_ACTUAL
+msgctxt "PAGE_STEP_ACTUAL"
+msgid "Done: {date}"
+msgstr "Terminado: {date}"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_TAGS
+msgctxt "PAGE_STEP_TAGS"
+msgid "Tags: {tags}"
+msgstr "Etiquetas: {tags}"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_WAITING
+msgctxt "PAGE_STEP_WAITING"
+msgid "Waiting"
+msgstr "En espera"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_FAILED
+msgctxt "PAGE_STEP_FAILED"
+msgid "Could not update this step: {detail}"
+msgstr "No se pudo actualizar este paso: {detail}"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_PLAN_ACTION
+msgctxt "PAGE_STEP_PLAN_ACTION"
+msgid "Set Plan Date…"
+msgstr "Establecer fecha de plan…"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_CLEAR_PLAN
+msgctxt "PAGE_STEP_CLEAR_PLAN"
+msgid "Clear Plan Date"
+msgstr "Borrar fecha de plan"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_OWNER_ACTION
+msgctxt "PAGE_STEP_OWNER_ACTION"
+msgid "Edit Owners…"
+msgstr "Editar responsables…"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_OWNER_TITLE
+msgctxt "PAGE_STEP_OWNER_TITLE"
+msgid "Owners"
+msgstr "Responsables"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_OWNER_ADD
+msgctxt "PAGE_STEP_OWNER_ADD"
+msgid "Add Owner"
+msgstr "Añadir responsable"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_OWNER_HINT
+msgctxt "PAGE_STEP_OWNER_HINT"
+msgid "Note name"
+msgstr "Nombre de la nota"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_OWNER_DUPLICATE
+msgctxt "PAGE_STEP_OWNER_DUPLICATE"
+msgid "{owner} is already an owner"
+msgstr "{owner} ya es responsable"
+
+#: src/afanes/i18n/ui/en.py PAGE_STEP_OWNER_REMOVE
+msgctxt "PAGE_STEP_OWNER_REMOVE"
+msgid "Remove {owner}"
+msgstr "Quitar a {owner}"
+
+#: src/afanes/i18n/ui/en.py PAGE_PROJECT_NO_STATUS
+msgctxt "PAGE_PROJECT_NO_STATUS"
+msgid "No status"
+msgstr "Sin estado"
+
+#: src/afanes/i18n/ui/en.py PAGE_PROJECT_DUE_ADD
+msgctxt "PAGE_PROJECT_DUE_ADD"
+msgid "Add Due Date…"
+msgstr "Añadir fecha de vencimiento…"
+
+#: src/afanes/i18n/ui/en.py PAGE_PROJECT_DUE_CLEAR
+msgctxt "PAGE_PROJECT_DUE_CLEAR"
+msgid "Clear Due Date"
+msgstr "Borrar fecha de vencimiento"
+
+#: src/afanes/i18n/ui/en.py PAGE_PROJECT_NO_DUE
+msgctxt "PAGE_PROJECT_NO_DUE"
+msgid "No due date"
+msgstr "Sin fecha de vencimiento"
+
+#: src/afanes/i18n/ui/en.py PAGE_PROJECT_EMPTY_BODY
+msgctxt "PAGE_PROJECT_EMPTY_BODY"
+msgid "This project has no body yet"
+msgstr "Este proyecto aún no tiene cuerpo"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONNECTIONS_TITLE
+msgctxt "PAGE_CONNECTIONS_TITLE"
+msgid "Connections"
+msgstr "Conexiones"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONNECTIONS_LINKED_FROM
+msgctxt "PAGE_CONNECTIONS_LINKED_FROM"
+msgid "Linked From"
+msgstr "Enlazado desde"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONNECTIONS_OWNED_PROJECTS
+msgctxt "PAGE_CONNECTIONS_OWNED_PROJECTS"
+msgid "Owned Projects"
+msgstr "Proyectos propios"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONNECTIONS_OWNED_STEPS
+msgctxt "PAGE_CONNECTIONS_OWNED_STEPS"
+msgid "Owned Steps"
+msgstr "Pasos propios"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONNECTIONS_REQUESTED_PROJECTS
+msgctxt "PAGE_CONNECTIONS_REQUESTED_PROJECTS"
+msgid "Requested Projects"
+msgstr "Proyectos solicitados"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONNECTIONS_SHOW_COMPLETED_STEPS
+msgctxt "PAGE_CONNECTIONS_SHOW_COMPLETED_STEPS"
+msgid "Show Completed Steps"
+msgstr "Mostrar pasos completados"
+
+#: src/afanes/i18n/ui/en.py PAGE_CONNECTIONS_SHOW_FINISHED_PROJECTS
+msgctxt "PAGE_CONNECTIONS_SHOW_FINISHED_PROJECTS"
+msgid "Show Finished Projects"
+msgstr "Mostrar proyectos terminados"
+
+#: src/afanes/i18n/ui/en.py REVIEW_DUE_STEP_TITLE
+msgctxt "REVIEW_DUE_STEP_TITLE"
+msgid "Due Step"
+msgstr "Paso vencido"
+
+#: src/afanes/i18n/ui/en.py REVIEW_WAITING_STEP_TITLE
+msgctxt "REVIEW_WAITING_STEP_TITLE"
+msgid "Waiting Step"
+msgstr "Paso en espera"
+
+#: src/afanes/i18n/ui/en.py REVIEW_DO_NOW
+msgctxt "REVIEW_DO_NOW"
+msgid "Do It Now"
+msgstr "Hacer ahora"
+
+#: src/afanes/i18n/ui/en.py REVIEW_POSTPONE
+msgctxt "REVIEW_POSTPONE"
+msgid "Postpone…"
+msgstr "Posponer…"
+
+#: src/afanes/i18n/ui/en.py REVIEW_DELEGATE
+msgctxt "REVIEW_DELEGATE"
+msgid "Delegate…"
+msgstr "Delegar…"
+
+#: src/afanes/i18n/ui/en.py REVIEW_REASSIGN
+msgctxt "REVIEW_REASSIGN"
+msgid "Reassign…"
+msgstr "Reasignar…"
+
+#: src/afanes/i18n/ui/en.py REVIEW_OWNER_LABEL
+msgctxt "REVIEW_OWNER_LABEL"
+msgid "Owner"
+msgstr "Responsable"
+
+#: src/afanes/i18n/ui/en.py REVIEW_OWNER_REQUIRED
+msgctxt "REVIEW_OWNER_REQUIRED"
+msgid "Enter an owner before confirming"
+msgstr "Introduce un responsable antes de confirmar"
+
+#: src/afanes/i18n/ui/en.py REVIEW_POSTPONE_LABEL
+msgctxt "REVIEW_POSTPONE_LABEL"
+msgid "New plan date (YYYY-MM-DD)"
+msgstr "Nueva fecha de plan (YYYY-MM-DD)"
+
+#: src/afanes/i18n/ui/en.py REVIEW_INVALID_DATE
+msgctxt "REVIEW_INVALID_DATE"
+msgid "Enter the plan date as YYYY-MM-DD"
+msgstr "Introduce la fecha de plan como YYYY-MM-DD"
+
+#: src/afanes/i18n/ui/en.py REVIEW_CONFIRM
+msgctxt "REVIEW_CONFIRM"
+msgid "Confirm"
+msgstr "Confirmar"
+
+#: src/afanes/i18n/ui/en.py REVIEW_STEP_OWNERS
+msgctxt "REVIEW_STEP_OWNERS"
+msgid "Owners: {owners}"
+msgstr "Responsables: {owners}"
+
+#: src/afanes/i18n/ui/en.py REVIEW_LAUNCH_DIGEST_ONE
+msgctxt "REVIEW_LAUNCH_DIGEST_ONE"
+msgid "1 due step needs attention"
+msgstr "1 paso vencido requiere atención"
+
+#: src/afanes/i18n/ui/en.py REVIEW_LAUNCH_DIGEST_MANY
+msgctxt "REVIEW_LAUNCH_DIGEST_MANY"
+msgid "{count} due steps need attention"
+msgstr "{count} pasos vencidos requieren atención"
+
+#: src/afanes/i18n/ui/en.py REVIEW_LAUNCH_DIGEST_ACTION
+msgctxt "REVIEW_LAUNCH_DIGEST_ACTION"
+msgid "Start Review"
+msgstr "Iniciar revisión"
+
+#: src/afanes/i18n/ui/en.py LOG_DAY_TOOLTIP_NONE
+msgctxt "LOG_DAY_TOOLTIP_NONE"
+msgid "{day}: no entries"
+msgstr "{day}: sin entradas"
+
+#: src/afanes/i18n/ui/en.py LOG_DAY_TOOLTIP_ONE
+msgctxt "LOG_DAY_TOOLTIP_ONE"
+msgid "{day}: 1 entry"
+msgstr "{day}: 1 entrada"
+
+#: src/afanes/i18n/ui/en.py LOG_DAY_TOOLTIP_MANY
+msgctxt "LOG_DAY_TOOLTIP_MANY"
+msgid "{day}: {count} entries"
+msgstr "{day}: {count} entradas"
+
+#: src/afanes/i18n/ui/en.py REFERENCE_WORD_ONE
+msgctxt "REFERENCE_WORD_ONE"
+msgid "reference"
+msgstr "referencia"
+
+#: src/afanes/i18n/ui/en.py REFERENCE_WORD_MANY
+msgctxt "REFERENCE_WORD_MANY"
+msgid "references"
+msgstr "referencias"
+
+#: src/afanes/i18n/ui/en.py NOTE_WORD_ONE
+msgctxt "NOTE_WORD_ONE"
+msgid "note"
+msgstr "nota"
+
+#: src/afanes/i18n/ui/en.py NOTE_WORD_MANY
+msgctxt "NOTE_WORD_MANY"
+msgid "notes"
+msgstr "notas"
+
+#: src/afanes/i18n/ui/en.py REFERENCE_COUNT
+msgctxt "REFERENCE_COUNT"
+msgid "{references} {reference_word} in {notes} {note_word}"
+msgstr "{references} {reference_word} en {notes} {note_word}"
+
+#: src/afanes/i18n/ui/en.py LANGUAGE_ENGLISH
+msgctxt "LANGUAGE_ENGLISH"
+msgid "English"
+msgstr "English"
+
+#: src/afanes/i18n/ui/en.py LANGUAGE_SPANISH
+msgctxt "LANGUAGE_SPANISH"
+msgid "Español"
+msgstr "Español"
+
+#: src/afanes/i18n/ui/en.py LANGUAGE_SYSTEM
+msgctxt "LANGUAGE_SYSTEM"
+msgid "System Language"
+msgstr "Idioma del sistema"
+
+#: src/afanes/i18n/ui/en.py LANGUAGE_MENU
+msgctxt "LANGUAGE_MENU"
+msgid "Language…"
+msgstr "Idioma…"
+
+#: src/afanes/i18n/ui/en.py LANGUAGE_MENU_TITLE
+msgctxt "LANGUAGE_MENU_TITLE"
+msgid "Language"
+msgstr "Idioma"
+
+#: src/afanes/i18n/ui/en.py LANGUAGE_RESTART
+msgctxt "LANGUAGE_RESTART"
+msgid "The language change applies after a restart"
+msgstr "El cambio de idioma se aplica después de reiniciar"
+
+#: src/afanes/i18n/ui/en.py PREFERENCES_CORRUPT
+msgctxt "PREFERENCES_CORRUPT"
+msgid "Saved language preferences could not be read. The system language is used"
+msgstr "No se pudieron leer las preferencias de idioma guardadas. Se usa el idioma del sistema"
+
+#: src/afanes/i18n/ui/en.py REVIEW_KIND_LABELS.inbox
+msgctxt "REVIEW_KIND_LABELS.inbox"
+msgid "Capture"
+msgstr "Captura"
+
+#: src/afanes/i18n/ui/en.py REVIEW_KIND_LABELS.due_step
+msgctxt "REVIEW_KIND_LABELS.due_step"
+msgid "Due Step"
+msgstr "Paso vencido"
+
+#: src/afanes/i18n/ui/en.py REVIEW_KIND_LABELS.waiting_step
+msgctxt "REVIEW_KIND_LABELS.waiting_step"
+msgid "Waiting Step"
+msgstr "Paso en espera"
+
+#: src/afanes/i18n/ui/en.py REVIEW_KIND_LABELS.project
+msgctxt "REVIEW_KIND_LABELS.project"
+msgid "Project"
+msgstr "Proyecto"
+
+#: src/afanes/i18n/ui/en.py WORKSPACE_SECTION_LABELS.inbox
+msgctxt "WORKSPACE_SECTION_LABELS.inbox"
+msgid "Inbox"
+msgstr "Bandeja de entrada"
+
+#: src/afanes/i18n/ui/en.py WORKSPACE_SECTION_LABELS.projects
+msgctxt "WORKSPACE_SECTION_LABELS.projects"
+msgid "Projects"
+msgstr "Proyectos"
+
+#: src/afanes/i18n/ui/en.py WORKSPACE_SECTION_LABELS.references
+msgctxt "WORKSPACE_SECTION_LABELS.references"
+msgid "References"
+msgstr "Referencias"
+
+#: src/afanes/i18n/ui/en.py WORKSPACE_SECTION_LABELS.log
+msgctxt "WORKSPACE_SECTION_LABELS.log"
+msgid "Log"
+msgstr "Registro"
+
+#: src/afanes/i18n/ui/en.py WORKSPACE_SECTION_LABELS.needs_attention
+msgctxt "WORKSPACE_SECTION_LABELS.needs_attention"
+msgid "Needs Attention"
+msgstr "Requiere atención"
+
+#: src/afanes/i18n/ui/en.py WORKSPACE_SECTION_LABELS.trash
+msgctxt "WORKSPACE_SECTION_LABELS.trash"
+msgid "Trash"
+msgstr "Papelera"
+
+#: src/afanes/i18n/ui/en.py PROJECT_GROUP_LABELS.active
+msgctxt "PROJECT_GROUP_LABELS.active"
+msgid "Active"
+msgstr "Activos"
+
+#: src/afanes/i18n/ui/en.py PROJECT_GROUP_LABELS.waiting
+msgctxt "PROJECT_GROUP_LABELS.waiting"
+msgid "Waiting"
+msgstr "En espera"
+
+#: src/afanes/i18n/ui/en.py PROJECT_GROUP_LABELS.later
+msgctxt "PROJECT_GROUP_LABELS.later"
+msgid "Later"
+msgstr "Más tarde"
+
+#: src/afanes/i18n/ui/en.py PROJECT_GROUP_LABELS.closed
+msgctxt "PROJECT_GROUP_LABELS.closed"
+msgid "Closed"
+msgstr "Cerrados"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_OUTCOME_LABELS.trash
+msgctxt "PROCESSING_OUTCOME_LABELS.trash"
+msgid "Trash"
+msgstr "Papelera"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_OUTCOME_LABELS.later
+msgctxt "PROCESSING_OUTCOME_LABELS.later"
+msgid "Later"
+msgstr "Más tarde"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_OUTCOME_LABELS.reference
+msgctxt "PROCESSING_OUTCOME_LABELS.reference"
+msgid "Reference"
+msgstr "Referencia"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_OUTCOME_LABELS.project
+msgctxt "PROCESSING_OUTCOME_LABELS.project"
+msgid "Project"
+msgstr "Proyecto"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_OUTCOME_LABELS.log
+msgctxt "PROCESSING_OUTCOME_LABELS.log"
+msgid "Log Entry"
+msgstr "Entrada de registro"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_OUTCOME_LABELS.append_step
+msgctxt "PROCESSING_OUTCOME_LABELS.append_step"
+msgid "Append Step"
+msgstr "Añadir paso"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_OUTCOME_LABELS.done_now
+msgctxt "PROCESSING_OUTCOME_LABELS.done_now"
+msgid "Done Now"
+msgstr "Hacer ahora"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_STATUS_LABELS.active
+msgctxt "PROCESSING_STATUS_LABELS.active"
+msgid "Active"
+msgstr "Activo"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_STATUS_LABELS.waiting
+msgctxt "PROCESSING_STATUS_LABELS.waiting"
+msgid "Waiting"
+msgstr "En espera"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_STATUS_LABELS.done
+msgctxt "PROCESSING_STATUS_LABELS.done"
+msgid "Done"
+msgstr "Terminado"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_STATUS_LABELS.cancelled
+msgctxt "PROCESSING_STATUS_LABELS.cancelled"
+msgid "Cancelled"
+msgstr "Cancelado"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_STATUS_LABELS.archived
+msgctxt "PROCESSING_STATUS_LABELS.archived"
+msgid "Archived"
+msgstr "Archivado"
+
+#: src/afanes/i18n/ui/en.py PROCESSING_STATUS_LABELS.later
+msgctxt "PROCESSING_STATUS_LABELS.later"
+msgid "Later"
+msgstr "Más tarde"
+
+#: src/afanes/i18n/ui/en.py PAGE_TYPE_LABELS.note
+msgctxt "PAGE_TYPE_LABELS.note"
+msgid "Note"
+msgstr "Nota"
+
+#: src/afanes/i18n/ui/en.py PAGE_TYPE_LABELS.project
+msgctxt "PAGE_TYPE_LABELS.project"
+msgid "Project"
+msgstr "Proyecto"
+
+#: src/afanes/i18n/ui/en.py PAGE_TYPE_LABELS.reference
+msgctxt "PAGE_TYPE_LABELS.reference"
+msgid "Reference"
+msgstr "Referencia"
+
+#: src/afanes/i18n/ui/en.py PAGE_TYPE_LABELS.log
+msgctxt "PAGE_TYPE_LABELS.log"
+msgid "Log"
+msgstr "Registro"

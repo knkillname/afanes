@@ -11,7 +11,7 @@ import afanes.core.settings
 import afanes.core.vault.naming
 import afanes.ui.state
 from afanes.core.editing import DraftMode, NormalDraft, PageDraftFactory, RawDraft
-from afanes.core.errors import InvalidReferenceError, NoteParseError, VaultError
+from afanes.core.errors import DomainMessage, InvalidReferenceError, MessageCode, NoteParseError, VaultError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.labels import DueDateText
 from afanes.core.vault.service import Vault
@@ -59,9 +59,12 @@ def _page(text: str, *, path: Path = Path("/vault/reference/Ada.md")) -> PageCon
     try:
         parsed = NoteDocument.from_text(text)
     except (NoteParseError, InvalidReferenceError) as exc:
-        return UnparsedPage(file=file, failure=str(exc))
+        return UnparsedPage(
+            file=file,
+            failure=exc.domain_message or DomainMessage.of(MessageCode.NOTE_PARSE_FAILED, detail=str(exc)),
+        )
     if parsed.note_type is None:
-        return UnparsedPage(file=file, failure="Note has no type")
+        return UnparsedPage(file=file, failure=DomainMessage.of(MessageCode.NOTE_HAS_NO_TYPE))
     return ParsedPage(file=file, document=parsed)
 
 

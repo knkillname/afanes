@@ -8,15 +8,18 @@ from pathlib import Path
 import flet as ft
 import pytest
 
+import afanes.core.errors
+import afanes.core.localization
 import afanes.core.settings
 import afanes.core.template_cards
 import afanes.core.vault.service
 import afanes.core.vault.trash_catalog
+import afanes.i18n.ui
+import afanes.i18n.ui.en
 import afanes.ui.state
 import afanes.ui.state.browser
 import afanes.ui.state.controller
 import afanes.ui.state.status
-import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.editing import DraftMode
 from afanes.core.frontmatter import NoteDocument
@@ -204,7 +207,7 @@ class TestReadMode:
         asyncio.run(scenario())
 
         assert view.category_error.visible is True
-        assert view.category_error.value == afanes.ui.strings.PAGE_CATEGORY_INVALID
+        assert view.category_error.value == afanes.i18n.ui.en.PAGE_CATEGORY_INVALID
         assert state.status.notice is None
 
     def test_blank_rename_shows_inline_without_a_notice(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -226,7 +229,7 @@ class TestReadMode:
         asyncio.run(scenario())
 
         assert view.rename_error.visible is True
-        assert view.rename_error.value == afanes.ui.strings.PAGE_RENAME_LABEL
+        assert view.rename_error.value == afanes.i18n.ui.en.PAGE_RENAME_LABEL
         assert state.status.notice is None
 
     def test_category_combobox_suggests_existing_labels(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -790,7 +793,7 @@ class TestPanels:
         view = PageView(PageActions(update=lambda: None))
 
         assert len(view.menu_button.items) == PAGE_MENU_ITEM_COUNT
-        assert all(item.content not in (afanes.ui.strings.CLOSE_ACTION, "Done") for item in view.menu_button.items)
+        assert all(item.content not in (afanes.i18n.ui.en.CLOSE_ACTION, "Done") for item in view.menu_button.items)
 
     def test_inline_confirmation_panels_remain_inline(self) -> None:
         view = PageView(PageActions(update=lambda: None))
@@ -815,7 +818,7 @@ class TestPanels:
     def test_trash_is_available_from_the_page_menu(self) -> None:
         view = PageView(PageActions(update=lambda: None))
 
-        assert view.trash_item.content == afanes.ui.strings.PAGE_TRASH
+        assert view.trash_item.content == afanes.i18n.ui.en.PAGE_TRASH
         assert view.trash_item.key == "page-trash"
         assert view.menu_button.icon == ft.Icons.MORE_VERT_OUTLINED
 
@@ -982,7 +985,7 @@ class TestPanels:
         assert state.pages.page is None
         notice = state.status.take_notice()
         assert notice is not None
-        assert notice.message == afanes.ui.strings.PAGE_TRASH_MOVED
+        assert notice.message == afanes.i18n.ui.en.PAGE_TRASH_MOVED
         assert notice.action is afanes.ui.state.status.NoticeAction.UNDO_TRASH
 
     def test_log_page_hides_rename_and_keeps_trash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1038,11 +1041,11 @@ class TestSteps:
         assert view.project_body.root.visible is True
         assert view.read_body.visible is False
         assert "Call" in texts
-        assert afanes.ui.strings.PAGE_STEP_OWNERS_LABEL in texts
+        assert afanes.i18n.ui.en.PAGE_STEP_OWNERS_LABEL in texts
         assert "Ada" in texts
-        assert afanes.ui.strings.PAGE_STEP_PLAN.format(date="2026-11-20") in texts
-        assert afanes.ui.strings.PAGE_STEP_ACTUAL.format(date="2026-11-14") in texts
-        assert afanes.ui.strings.PAGE_STEP_TAGS.format(tags="phone") in texts
+        assert afanes.i18n.ui.en.PAGE_STEP_PLAN.format(date="Nov 20, 2026") in texts
+        assert afanes.i18n.ui.en.PAGE_STEP_ACTUAL.format(date="Nov 14, 2026") in texts
+        assert afanes.i18n.ui.en.PAGE_STEP_TAGS.format(tags="phone") in texts
         assert "<!--" not in " ".join(texts)
 
     def test_ticking_a_step_rewrites_only_its_line(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1123,8 +1126,8 @@ class TestProjectMeta:
         view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_row.visible is True
-        assert view.meta_status.value == afanes.ui.strings.PROJECT_STATUS.format(status="Waiting")
-        assert view.meta_due.value == afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01")
+        assert view.meta_status.value == afanes.i18n.ui.en.PROJECT_STATUS.format(status="Waiting")
+        assert view.meta_due.value == afanes.i18n.ui.en.PROJECT_DUE.format(date="Dec 1, 2026")
         assert view.meta_due_clear.visible is True
         assert view.edit_form.visible is False
 
@@ -1134,7 +1137,7 @@ class TestProjectMeta:
         view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_row.visible is True
-        assert view.meta_due.value == afanes.ui.strings.PAGE_PROJECT_NO_DUE
+        assert view.meta_due.value == afanes.i18n.ui.en.PAGE_PROJECT_NO_DUE
         assert view.meta_due_clear.visible is False
 
     def test_project_meta_row_shows_the_requester(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1288,7 +1291,7 @@ class TestProjectMeta:
         name_span = (view.meta_owner.spans or [])[1]
 
         assert name_span.style is afanes.ui.theme.ROLE_BROKEN_TEXT_STYLE
-        assert name_span.tooltip == afanes.ui.strings.ROLE_LINK_MISSING
+        assert name_span.tooltip == afanes.i18n.ui.en.ROLE_LINK_MISSING
 
         asyncio.run(typing.cast("typing.Any", name_span.on_click)())
 
@@ -1317,7 +1320,7 @@ class TestProjectMeta:
         view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_row.visible is True
-        assert view.meta_date.value == afanes.ui.strings.PAGE_NO_DATE
+        assert view.meta_date.value == afanes.i18n.ui.en.PAGE_NO_DATE
         assert view.meta_status.visible is False
         assert view.meta_due.visible is False
         assert view.meta_due_button.visible is False
@@ -1506,10 +1509,10 @@ class TestConnections:
 
         assert view.connections_panel.visible is True
         assert len(subsections) == FOUR_SUBSECTIONS
-        assert afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM in _texts(subsections[0])
-        assert afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS in _texts(subsections[1])
-        assert afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS in _texts(subsections[2])
-        assert afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS in _texts(subsections[3])
+        assert afanes.i18n.ui.en.PAGE_CONNECTIONS_LINKED_FROM in _texts(subsections[0])
+        assert afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_PROJECTS in _texts(subsections[1])
+        assert afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_STEPS in _texts(subsections[2])
+        assert afanes.i18n.ui.en.PAGE_CONNECTIONS_REQUESTED_PROJECTS in _texts(subsections[3])
 
     def test_only_sections_with_visible_rows_are_rendered(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1532,15 +1535,15 @@ class TestConnections:
         headings = [
             title
             for title in (
-                afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM,
-                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS,
-                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS,
-                afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_LINKED_FROM,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_PROJECTS,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_STEPS,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
             )
             if any(title in _texts(control) for control in view.connections_body.controls)
         ]
 
-        assert headings == [afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM]
+        assert headings == [afanes.i18n.ui.en.PAGE_CONNECTIONS_LINKED_FROM]
         assert view.connections_steps_toggle.visible is False
         assert view.connections_projects_toggle.visible is False
 
@@ -1566,17 +1569,17 @@ class TestConnections:
         headings = [
             title
             for title in (
-                afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM,
-                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS,
-                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS,
-                afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_LINKED_FROM,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_PROJECTS,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_STEPS,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
             )
             if any(title in _texts(control) for control in view.connections_body.controls)
         ]
 
         assert headings == [
-            afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM,
-            afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS,
+            afanes.i18n.ui.en.PAGE_CONNECTIONS_LINKED_FROM,
+            afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_PROJECTS,
         ]
 
     def test_owned_project_alone_renders_the_section(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1598,16 +1601,16 @@ class TestConnections:
         headings = [
             title
             for title in (
-                afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM,
-                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS,
-                afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS,
-                afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_LINKED_FROM,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_PROJECTS,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_STEPS,
+                afanes.i18n.ui.en.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
             )
             if any(title in _texts(control) for control in view.connections_body.controls)
         ]
 
-        assert headings == [afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS]
-        assert "Home" in _texts(_connection_section(view, afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS))
+        assert headings == [afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_PROJECTS]
+        assert "Home" in _texts(_connection_section(view, afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_PROJECTS))
 
     def test_finished_owned_project_keeps_the_footer_control_available(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1640,7 +1643,7 @@ class TestConnections:
         view.connections_projects_toggle.value = True
         asyncio.run(view.toggle_finished_projects(ft.Event(name="change", control=view.connections_projects_toggle)))
 
-        assert "Old" in _texts(_connection_section(view, afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS))
+        assert "Old" in _texts(_connection_section(view, afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_PROJECTS))
 
     def test_completed_owned_step_keeps_the_footer_control_available(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1673,7 +1676,7 @@ class TestConnections:
         view.connections_steps_toggle.value = True
         asyncio.run(view.toggle_completed_steps(ft.Event(name="change", control=view.connections_steps_toggle)))
 
-        assert "Done" in _texts(_connection_section(view, afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS))
+        assert "Done" in _texts(_connection_section(view, afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_STEPS))
 
     def test_linked_from_rows_use_display_titles(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
@@ -1894,7 +1897,7 @@ class TestConnections:
 
         asyncio.run(scenario())
         view = PageView(PageActions(update=lambda: None))
-        texts = _texts(_connection_section(view, afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS))
+        texts = _texts(_connection_section(view, afanes.i18n.ui.en.PAGE_CONNECTIONS_OWNED_STEPS))
 
         assert (
             texts.index("Alpha")
@@ -1974,7 +1977,7 @@ class TestPageDates:
         view = PageView(PageActions(update=lambda: None))
 
         assert view.meta_row.visible is True
-        assert view.meta_date.value == afanes.ui.strings.PAGE_DATE.format(date="2025-10")
+        assert view.meta_date.value == afanes.i18n.ui.en.PAGE_DATE.format(date="Oct 2025")
         assert view.meta_status.visible is False
 
     def test_project_shows_both_dates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1986,8 +1989,8 @@ class TestPageDates:
         self._open(tmp_path, monkeypatch, path)
         view = PageView(PageActions(update=lambda: None))
 
-        assert afanes.ui.strings.PAGE_DATE.format(date="2025-10") == view.meta_date.value
-        assert view.meta_due.value == afanes.ui.strings.PAGE_PROJECT_NO_DUE
+        assert afanes.i18n.ui.en.PAGE_DATE.format(date="Oct 2025") == view.meta_date.value
+        assert view.meta_due.value == afanes.i18n.ui.en.PAGE_PROJECT_NO_DUE
 
     def test_log_form_hides_workflow_fields(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -2102,7 +2105,7 @@ class TestLogStarter:
         assert view.log_starter_picker.dropdown.visible is True
         assert view.log_starter_picker.dropdown in view.form_fields.controls
         assert view.log_starter_picker.dropdown.value == "empty"
-        assert view.log_starter_picker.dropdown.options[-1].text == afanes.ui.strings.LOG_CARD_EMPTY
+        assert view.log_starter_picker.dropdown.options[-1].text == afanes.i18n.ui.en.LOG_CARD_EMPTY
 
     def test_the_starter_control_sits_in_the_label_flow(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _state, _card, view = self._open(tmp_path, monkeypatch)
@@ -2174,7 +2177,14 @@ class TestLogStarter:
         assert all(control.expand is True for control in rows[0].controls)
 
     def test_invalid_cards_are_named_beside_the_starter(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        issue = afanes.core.template_cards.TemplateCardIssue(relative_path=Path("broken.md"), message="bad")
+        issue = afanes.core.template_cards.TemplateCardIssue(
+            relative_path=Path("broken.md"),
+            message=afanes.core.errors.DomainMessage.of(
+                afanes.core.errors.MessageCode.CARD_READ_FAILED,
+                path="broken.md",
+                detail="bad",
+            ),
+        )
         _state, _card, view = self._open(tmp_path, monkeypatch, issues=(issue,))
 
         assert view.log_starter_picker.warning.visible is True
@@ -2291,34 +2301,34 @@ class TestConfirmationOrder:
         view = PageView(PageActions(update=lambda: None))
 
         assert _action_labels(view.type_change_panel) == [
-            afanes.ui.strings.PAGE_CANCEL,
-            afanes.ui.strings.PAGE_TYPE_CHANGE_CONFIRM,
+            afanes.i18n.ui.en.PAGE_CANCEL,
+            afanes.i18n.ui.en.PAGE_TYPE_CHANGE_CONFIRM,
         ]
 
     def test_category_move_puts_cancel_first(self) -> None:
         view = PageView(PageActions(update=lambda: None))
 
         assert _action_labels(view.category_move_panel) == [
-            afanes.ui.strings.PAGE_CANCEL,
-            afanes.ui.strings.PAGE_CATEGORY_MOVE_CONFIRM,
+            afanes.i18n.ui.en.PAGE_CANCEL,
+            afanes.i18n.ui.en.PAGE_CATEGORY_MOVE_CONFIRM,
         ]
 
     def test_rename_puts_cancel_first(self) -> None:
         view = PageView(PageActions(update=lambda: None))
 
         assert _action_labels(view.rename_panel) == [
-            afanes.ui.strings.PAGE_CANCEL,
-            afanes.ui.strings.PAGE_RENAME_PREVIEW_ACTION,
-            afanes.ui.strings.PAGE_RENAME_CONFIRM,
+            afanes.i18n.ui.en.PAGE_CANCEL,
+            afanes.i18n.ui.en.PAGE_RENAME_PREVIEW_ACTION,
+            afanes.i18n.ui.en.PAGE_RENAME_CONFIRM,
         ]
 
     def test_repair_puts_cancel_first(self) -> None:
         view = PageView(PageActions(update=lambda: None))
 
         assert _action_labels(view.repair_panel) == [
-            afanes.ui.strings.PAGE_REPAIR_CANCEL,
-            afanes.ui.strings.PAGE_REPAIR_KEEP,
-            afanes.ui.strings.PAGE_REPAIR_REWRITE,
+            afanes.i18n.ui.en.PAGE_REPAIR_CANCEL,
+            afanes.i18n.ui.en.PAGE_REPAIR_KEEP,
+            afanes.i18n.ui.en.PAGE_REPAIR_REWRITE,
         ]
 
 
@@ -2389,9 +2399,9 @@ class TestTrashPage:
 
         assert state.pages.trash_entry is not None
         assert view.trash_info.visible is True
-        assert afanes.ui.strings.TRASH_INFO.format(
+        assert afanes.i18n.ui.en.TRASH_INFO.format(
             path="notes/Ada.md",
-            date=state.pages.trash_entry.trashed_on.isoformat() if state.pages.trash_entry.trashed_on else "",
+            date="Nov 14, 2026",
         ) in (view.trash_info.value or "")
         assert view.restore_button.visible is True
         assert view.edit_button.visible is False
@@ -2433,7 +2443,7 @@ class TestTrashPage:
         asyncio.run(typing.cast("typing.Any", view.restore_button.on_click)())
 
         assert view.overwrite_trash_panel.visible is True
-        assert view.overwrite_trash.title.value == afanes.ui.strings.TRASH_OVERWRITE_TITLE
+        assert view.overwrite_trash.title.value == afanes.i18n.ui.en.TRASH_OVERWRITE_TITLE
         assert "notes/Ada.md" in (view.overwrite_trash.body.value or "")
         asyncio.run(typing.cast("typing.Any", view.overwrite_trash.cancel.on_click)())
         assert not view.overwrite_trash_panel.visible
@@ -2457,7 +2467,7 @@ class TestTrashPage:
         asyncio.run(view.begin_delete_trash())
 
         assert view.delete_trash_panel.visible is True
-        assert view.delete_trash.title.value == afanes.ui.strings.TRASH_DELETE_TITLE
+        assert view.delete_trash.title.value == afanes.i18n.ui.en.TRASH_DELETE_TITLE
         assert entry.entry_id not in (view.delete_trash.body.value or "")
         asyncio.run(typing.cast("typing.Any", view.delete_trash.cancel.on_click)())
         assert state.session.trash_count == 1
@@ -2497,3 +2507,43 @@ class TestTrashedProjectPage:
         assert "Buy timber" in (view.read_body.value or "")
         assert view.project_body.root.visible is False
         assert view.edit_form.visible is False
+
+
+class TestSpanishPage:
+    def test_empty_page_renders_spanish(self) -> None:
+        state = afanes.ui.state.app_state
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        state.status.set_copy(copy)
+
+        view = PageView(PageActions(update=lambda: None))
+
+        assert view.empty_text.value == copy.PAGE_EMPTY
+        assert view.edit_button.content == copy.PAGE_EDIT
+        assert view.empty_text.value != afanes.i18n.ui.en.PAGE_EMPTY
+
+    def test_meta_dates_render_spanish_while_editable_values_stay_iso(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        state = afanes.ui.state.app_state
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        state.status.set_copy(copy)
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            _typed_note("log", "# Tuesday\n", extra="date: 2025-10-12"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(versioned(vault))
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
+        view = PageView(PageActions(update=lambda: None))
+
+        assert view.meta_date.value == copy.PAGE_DATE.format(date="12 oct 2025")
+
+        asyncio.run(view.start_edit())
+
+        assert view.date_field.value == "2025-10-12"
+        assert view.date_field.hint_text == "2025-10-12"

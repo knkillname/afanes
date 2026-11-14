@@ -108,6 +108,23 @@ Delete Permanently lives there for a trashed note. The page path, metadata, and 
 the toolbar with the page content, and long-form text stays within a comfortable reading width on large
 windows.
 
+## 🌍 Language
+
+The interface ships in English and Spanish. The language control is available from the welcome state
+and from the workspace primary menu. It lists **English**, **Español**, and **System Language**; each
+language name stays in its own language so the choice is recognizable even when the current interface
+is in the other language.
+
+The choice is stored in `preferences.json` in the platform configuration directory, beside
+`settings.json` and outside every vault. It survives opening another vault and closing the current
+one. The change applies on the next launch; the running session keeps its current language. Choosing
+**System Language** clears the override and resolves the operating system locale again.
+
+When no preference is saved, Afanes uses the system locale: `es-*` selects Spanish, `en-*` selects
+English, and an unknown or unavailable locale selects English. If a Spanish catalog entry is missing,
+that entry falls back to its English source, so the interface never shows a blank string. A corrupt
+preferences file is reported in a banner, the system locale is used, and the file is left untouched.
+
 ## 🎨 Appearance
 
 The interface follows the operating system's light or dark appearance and has no separate in-app

@@ -26,8 +26,8 @@ matrix.
 ## 🧱 Layout and conventions
 
 Tests mirror `src/` under `tests/`: `tests/core/vault/test_service.py` mirrors
-`src/afanes/core/vault/service.py`. There is no shared `tests/conftest.py`; fixtures are local or
-autouse.
+`src/afanes/core/vault/service.py`. Fixtures are local or autouse; the shared `tests/conftest.py`
+only compiles the generated gettext catalogs before the suite runs.
 
 - Use `Test<Behavior>` classes and names that describe behavior.
 - One behavior per test; arrange, act, assert.

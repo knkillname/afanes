@@ -9,8 +9,8 @@ from collections.abc import Awaitable, Callable
 import flet as ft
 
 import afanes.core.vault.processing
+import afanes.models.note
 import afanes.ui.state
-import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
 from afanes.core.vault.snapshot import VaultNote
@@ -61,10 +61,10 @@ class ProcessingView:
             width=16,
             height=16,
             visible=False,
-            semantics_label=afanes.ui.strings.WORKING,
+            semantics_label=self._state.status.copy.WORKING,
         )
         self.title = ft.Text(
-            afanes.ui.strings.PROCESSING_TITLE,
+            self._state.status.copy.PROCESSING_TITLE,
             style=afanes.ui.theme.TEXT_ROLES["title-2"],
         )
         self.capture_title = ft.Text(
@@ -105,11 +105,11 @@ class ProcessingView:
             ProcessingOutcome.TRASH,
         )
         self.outcome = ft.Dropdown(
-            label=afanes.ui.strings.PROCESSING_OUTCOME_LABEL,
+            label=self._state.status.copy.PROCESSING_OUTCOME_LABEL,
             options=[
                 ft.dropdown.Option(
                     key=outcome.value,
-                    text=afanes.ui.strings.PROCESSING_OUTCOME_LABELS[outcome.value],
+                    text=self._state.status.copy.PROCESSING_OUTCOME_LABELS[outcome.value],
                 )
                 for outcome in outcome_order
             ],
@@ -117,16 +117,16 @@ class ProcessingView:
             width=280,
         )
         self.status = ft.Dropdown(
-            label=afanes.ui.strings.PROCESSING_STATUS_LABEL,
+            label=self._state.status.copy.PROCESSING_STATUS_LABEL,
             options=[
                 ft.dropdown.Option(key=status.value, text=label)
                 for status, label in (
-                    (Status.ACTIVE, afanes.ui.strings.PROCESSING_STATUS_LABELS["active"]),
-                    (Status.WAITING, afanes.ui.strings.PROCESSING_STATUS_LABELS["waiting"]),
-                    (Status.DONE, afanes.ui.strings.PROCESSING_STATUS_LABELS["done"]),
-                    (Status.CANCELLED, afanes.ui.strings.PROCESSING_STATUS_LABELS["cancelled"]),
-                    (Status.ARCHIVED, afanes.ui.strings.PROCESSING_STATUS_LABELS["archived"]),
-                    (Status.LATER, afanes.ui.strings.PROCESSING_STATUS_LABELS["later"]),
+                    (Status.ACTIVE, self._state.status.copy.PROCESSING_STATUS_LABELS["active"]),
+                    (Status.WAITING, self._state.status.copy.PROCESSING_STATUS_LABELS["waiting"]),
+                    (Status.DONE, self._state.status.copy.PROCESSING_STATUS_LABELS["done"]),
+                    (Status.CANCELLED, self._state.status.copy.PROCESSING_STATUS_LABELS["cancelled"]),
+                    (Status.ARCHIVED, self._state.status.copy.PROCESSING_STATUS_LABELS["archived"]),
+                    (Status.LATER, self._state.status.copy.PROCESSING_STATUS_LABELS["later"]),
                 )
             ],
             value=Status.ACTIVE.value,
@@ -135,22 +135,22 @@ class ProcessingView:
             visible=False,
         )
         self.due_date = ft.TextField(
-            label=afanes.ui.strings.PROCESSING_DUE_DATE_LABEL,
+            label=self._state.status.copy.PROCESSING_DUE_DATE_LABEL,
             hint_text="2026-11-20",
             on_change=self._invalidate_plan,
             width=260,
             visible=False,
         )
         self.owner = ft.TextField(
-            label=afanes.ui.strings.PAGE_OWNER_LABEL,
-            hint_text=afanes.ui.strings.PAGE_OWNER_HINT,
+            label=self._state.status.copy.PAGE_OWNER_LABEL,
+            hint_text=self._state.status.copy.PAGE_OWNER_HINT,
             on_change=self._change_owner_query,
             width=260,
             visible=False,
         )
         self.asked_by = ft.TextField(
-            label=afanes.ui.strings.PAGE_ASKED_BY_LABEL,
-            hint_text=afanes.ui.strings.PAGE_ASKED_BY_HINT,
+            label=self._state.status.copy.PAGE_ASKED_BY_LABEL,
+            hint_text=self._state.status.copy.PAGE_ASKED_BY_HINT,
             on_change=self._change_asked_by_query,
             width=260,
             visible=False,
@@ -158,8 +158,8 @@ class ProcessingView:
         self.role_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self._role_suggestion_field: str | None = None
         self.project = ft.TextField(
-            label=afanes.ui.strings.PROCESSING_PROJECT_LABEL,
-            hint_text="Launch",
+            label=self._state.status.copy.PROCESSING_PROJECT_LABEL,
+            hint_text=self._state.status.copy.PROCESSING_PROJECT_HINT,
             on_change=self._invalidate_plan,
             width=420,
             visible=False,
@@ -168,6 +168,7 @@ class ProcessingView:
             TemplateCardContext.PROCESSING,
             "processing",
             on_change=self._invalidate_plan,
+            copy=self._state.status.copy,
         )
         self.template = self._template_picker.dropdown
         self.template.width = afanes.ui.theme.TEMPLATE_PICKER_WIDTH
@@ -176,19 +177,19 @@ class ProcessingView:
         self.template_warning = self._template_picker.warning
         self.project_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.preview_button = ft.FilledButton(
-            content=afanes.ui.strings.PROCESSING_PREVIEW_ACTION,
+            content=self._state.status.copy.PROCESSING_PREVIEW_ACTION,
             on_click=self._preview,
             disabled=True,
         )
         self.cancel_button = ft.TextButton(
-            content=afanes.ui.strings.PROCESSING_CANCEL_ACTION,
+            content=self._state.status.copy.PROCESSING_CANCEL_ACTION,
             on_click=self._cancel,
             key="processing-cancel",
         )
         self.form = ft.Column(
             controls=[
                 ft.Text(
-                    afanes.ui.strings.PROCESSING_OUTCOME_LABEL,
+                    self._state.status.copy.PROCESSING_OUTCOME_LABEL,
                     style=afanes.ui.theme.TEXT_ROLES["title-4"],
                 ),
                 ft.Row(
@@ -221,7 +222,7 @@ class ProcessingView:
         self.plan_details = ft.Text("", selectable=True)
         self.plan_warnings = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
         self.confirm_button = ft.FilledButton(
-            content=afanes.ui.strings.PROCESSING_CONFIRM_ACTION,
+            content=self._state.status.copy.PROCESSING_CONFIRM_ACTION,
             on_click=self._confirm,
         )
         self.plan_panel = ft.Container(
@@ -233,7 +234,7 @@ class ProcessingView:
             content=ft.Column(
                 controls=[
                     ft.Text(
-                        afanes.ui.strings.PROCESSING_PLAN_TITLE,
+                        self._state.status.copy.PROCESSING_PLAN_TITLE,
                         style=afanes.ui.theme.TEXT_ROLES["title-4"],
                     ),
                     self.plan_destination,
@@ -246,12 +247,12 @@ class ProcessingView:
         )
 
         self.success_title = ft.Text(
-            afanes.ui.strings.PROCESSING_SUCCESS_TITLE,
+            self._state.status.copy.PROCESSING_SUCCESS_TITLE,
             style=afanes.ui.theme.TEXT_ROLES["title-3"],
         )
         self.success_text = ft.Text("", selectable=True)
         self.done_button = ft.FilledButton(
-            content=afanes.ui.strings.PROCESSING_DONE_ACTION,
+            content=self._state.status.copy.PROCESSING_DONE_ACTION,
             on_click=self._done,
             key="processing-done",
         )
@@ -402,7 +403,7 @@ class ProcessingView:
         """Build a processing plan from the form values."""
         outcome = self._selected_outcome()
         if outcome is None:
-            self._show_form_error(afanes.ui.strings.PROCESSING_EMPTY_OUTCOME)
+            self._show_form_error(self._state.status.copy.PROCESSING_EMPTY_OUTCOME)
             return
 
         status: Status | None = None
@@ -424,7 +425,7 @@ class ProcessingView:
                 try:
                     due_date = datetime.date.fromisoformat(due_text)
                 except ValueError:
-                    self._show_form_error(afanes.ui.strings.PROCESSING_INVALID_DATE)
+                    self._show_form_error(self._state.status.copy.PROCESSING_INVALID_DATE)
                     return
             owner = (self.owner.value or "").strip() or None
             asked_by = (self.asked_by.value or "").strip() or None
@@ -527,9 +528,9 @@ class ProcessingView:
         self.done_button.visible = success
         if state.processing.result is not None:
             self.success_text.value = (
-                afanes.ui.strings.PROCESSING_SUCCESS_TRASH
+                self._state.status.copy.PROCESSING_SUCCESS_TRASH
                 if state.processing.last_outcome is ProcessingOutcome.TRASH
-                else afanes.ui.strings.PROCESSING_SUCCESS_BODY.format(path=state.processing.result)
+                else self._state.status.copy.PROCESSING_SUCCESS_BODY.format(path=state.processing.result)
             )
 
         plan = state.processing.plan
@@ -545,41 +546,51 @@ class ProcessingView:
     def _populate_plan(self, plan: ProcessingPlan | AppendStepPlan) -> None:
         """Fill the preview panel from a validated plan."""
         if isinstance(plan, AppendStepPlan):
-            self.plan_destination.value = afanes.ui.strings.PROCESSING_DESTINATION.format(path=plan.project_path)
+            self.plan_destination.value = self._state.status.copy.PROCESSING_DESTINATION.format(path=plan.project_path)
             self.plan_details.value = "\n".join(
                 [
-                    afanes.ui.strings.PROCESSING_OUTCOME_LABELS[ProcessingOutcome.APPEND_STEP.value],
-                    f"Step: {plan.step_text}",
+                    self._state.status.copy.PROCESSING_OUTCOME_LABELS[ProcessingOutcome.APPEND_STEP.value],
+                    self._state.status.copy.PROCESSING_PLAN_STEP.format(text=plan.step_text),
                 ]
             )
             self.plan_warnings.controls = []
             self.plan_warnings.visible = False
             return
         self.plan_destination.value = (
-            afanes.ui.strings.PROCESSING_DESTINATION_TRASH
+            self._state.status.copy.PROCESSING_DESTINATION_TRASH
             if plan.outcome is ProcessingOutcome.TRASH
-            else afanes.ui.strings.PROCESSING_DESTINATION.format(path=plan.target_path)
+            else self._state.status.copy.PROCESSING_DESTINATION.format(path=plan.target_path)
         )
-        details = [afanes.ui.strings.PROCESSING_OUTCOME_LABELS[plan.outcome.value]]
+        details = [self._state.status.copy.PROCESSING_OUTCOME_LABELS[plan.outcome.value]]
         if plan.target_status is not None:
-            details.append(f"Status: {plan.target_status.value}")
+            details.append(
+                self._state.status.copy.PROJECT_STATUS.format(
+                    status=self._state.status.copy.PROCESSING_STATUS_LABELS[plan.target_status.value]
+                )
+            )
         if plan.due_date is not None:
-            details.append(f"Due: {plan.due_date.isoformat()}")
+            details.append(
+                self._state.status.copy.PROJECT_DUE.format(
+                    date=self._state.status.copy.locale_format.short_date(
+                        afanes.models.note.NoteDate.from_date(plan.due_date)
+                    )
+                )
+            )
         if plan.owner is not None:
-            details.append(afanes.ui.strings.PROCESSING_PLAN_OWNER.format(name=plan.owner))
+            details.append(self._state.status.copy.PROCESSING_PLAN_OWNER.format(name=plan.owner))
         if plan.asked_by is not None:
-            details.append(afanes.ui.strings.PROCESSING_PLAN_ASKED_BY.format(name=plan.asked_by))
+            details.append(self._state.status.copy.PROCESSING_PLAN_ASKED_BY.format(name=plan.asked_by))
         if plan.category is not None:
-            details.append(afanes.ui.strings.PROCESSING_PLAN_CATEGORY.format(category=plan.category.value))
+            details.append(self._state.status.copy.PROCESSING_PLAN_CATEGORY.format(category=plan.category.value))
         if plan.scaffold is not None:
-            details.append(afanes.ui.strings.PROCESSING_PLAN_SCAFFOLD)
+            details.append(self._state.status.copy.PROCESSING_PLAN_SCAFFOLD)
         self.plan_details.value = "\n".join(details)
 
         warnings: list[ft.Control] = []
         if plan.outcome is ProcessingOutcome.TRASH and plan.reference_count:
             warnings.append(
                 ft.Text(
-                    afanes.ui.strings.PROCESSING_REFERENCE_WARNING.format(count=plan.reference_count),
+                    self._state.status.copy.PROCESSING_REFERENCE_WARNING.format(count=plan.reference_count),
                     color=afanes.ui.theme.ERROR_TEXT_COLOR,
                     selectable=True,
                 )
@@ -587,7 +598,7 @@ class ProcessingView:
         elif plan.changes_scheme and plan.reference_count:
             warnings.append(
                 ft.Text(
-                    afanes.ui.strings.PROCESSING_SCHEME_WARNING.format(count=plan.reference_count),
+                    self._state.status.copy.PROCESSING_SCHEME_WARNING.format(count=plan.reference_count),
                     color=afanes.ui.theme.ERROR_TEXT_COLOR,
                     selectable=True,
                 )

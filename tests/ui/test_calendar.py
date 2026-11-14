@@ -4,7 +4,9 @@ import typing
 
 import flet as ft
 
+import afanes.core.localization
 import afanes.core.log
+import afanes.i18n.ui
 import afanes.ui.components.calendar as calendar_component
 import afanes.ui.theme
 
@@ -96,3 +98,29 @@ class TestLogCalendar:
         typing.cast("typing.Callable[[], None]", upcoming)()
 
         assert calls == ["previous", "next"]
+
+
+class TestSpanishCalendar:
+    def test_month_and_weekday_labels_are_spanish(self) -> None:
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        calendar = calendar_component.LogCalendar(
+            lambda _day: None,
+            lambda: None,
+            lambda: None,
+            copy=copy,
+        )
+
+        calendar.build(_month())
+
+        assert calendar.title.value == "octubre de 2025"
+        weekday_texts = [control.value for control in calendar.weekdays.controls if isinstance(control, ft.Text)]
+        assert weekday_texts == ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"]
+
+    def test_english_month_and_weekday_labels_remain_english(self) -> None:
+        calendar = calendar_component.LogCalendar(lambda _day: None, lambda: None, lambda: None)
+
+        calendar.build(_month())
+
+        assert calendar.title.value == "October 2025"
+        weekday_texts = [control.value for control in calendar.weekdays.controls if isinstance(control, ft.Text)]
+        assert weekday_texts == ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]

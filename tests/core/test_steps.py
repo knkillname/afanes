@@ -208,7 +208,7 @@ class TestRewriting:
     def test_double_dash_in_a_value_is_rejected(self) -> None:
         document = StepDocument("- [ ] Call\n")
 
-        with pytest.raises(StepMetadataError, match="--"):
+        with pytest.raises(StepMetadataError, match="step-value-double-dash"):
             document.with_owners(document.steps[0], ("Ada--Grace",))
 
     def test_stale_step_line_raises(self) -> None:

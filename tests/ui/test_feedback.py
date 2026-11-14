@@ -6,10 +6,11 @@ import typing
 import flet as ft
 import pytest
 
+import afanes.i18n.ui
+import afanes.i18n.ui.en
 import afanes.ui.components.toast
 import afanes.ui.state
 import afanes.ui.state.status
-import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.workspace
 
@@ -60,7 +61,7 @@ class TestToastPresenter:
         assert snackbar.content.color == afanes.ui.theme.TOAST_TEXT_COLOR
         action = snackbar.action
         assert isinstance(action, ft.SnackBarAction)
-        assert action.label == afanes.ui.strings.UNDO_ACTION
+        assert action.label == afanes.i18n.ui.en.UNDO_ACTION
         assert action.text_color == afanes.ui.theme.TOAST_ACTION_COLOR
         assert page.dialogs == [snackbar]
         assert page.pops == 0
@@ -215,33 +216,33 @@ class TestOwnedBanners:
     def test_each_owner_keeps_its_own_banner(self) -> None:
         state = afanes.ui.state.app_state
 
-        state.workspace.banner = afanes.ui.strings.VAULT_MISSING
-        state.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail="disk full")
+        state.workspace.banner = afanes.i18n.ui.en.VAULT_MISSING
+        state.session.banner = afanes.i18n.ui.en.REFRESH_FAILED.format(detail="disk full")
         state.pages.conflict = "changed"
-        state.processing.banner = afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail="disk full")
+        state.processing.banner = afanes.i18n.ui.en.PROCESSING_REFRESH_FAILED.format(detail="disk full")
 
-        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
-        assert state.session.banner == afanes.ui.strings.REFRESH_FAILED.format(detail="disk full")
-        assert state.pages.banner == afanes.ui.strings.PAGE_CONFLICT_CHANGED
-        assert state.processing.banner == afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail="disk full")
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_MISSING
+        assert state.session.banner == afanes.i18n.ui.en.REFRESH_FAILED.format(detail="disk full")
+        assert state.pages.banner == afanes.i18n.ui.en.PAGE_CONFLICT_CHANGED
+        assert state.processing.banner == afanes.i18n.ui.en.PROCESSING_REFRESH_FAILED.format(detail="disk full")
 
     def test_clearing_one_owner_does_not_clear_another(self) -> None:
         state = afanes.ui.state.app_state
-        state.workspace.banner = afanes.ui.strings.VAULT_MISSING
-        state.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail="disk full")
+        state.workspace.banner = afanes.i18n.ui.en.VAULT_MISSING
+        state.session.banner = afanes.i18n.ui.en.REFRESH_FAILED.format(detail="disk full")
 
         state.workspace.banner = None
 
         assert state.workspace.banner is None
-        assert state.session.banner == afanes.ui.strings.REFRESH_FAILED.format(detail="disk full")
+        assert state.session.banner == afanes.i18n.ui.en.REFRESH_FAILED.format(detail="disk full")
 
     def test_the_page_banner_prefers_its_conflict(self) -> None:
         state = afanes.ui.state.app_state
-        state.pages.blocking_message = afanes.ui.strings.PAGE_PENDING_DIALOG
+        state.pages.blocking_message = afanes.i18n.ui.en.PAGE_PENDING_DIALOG
         state.pages.conflict = "missing"
 
-        assert state.pages.banner == afanes.ui.strings.PAGE_CONFLICT_MISSING
+        assert state.pages.banner == afanes.i18n.ui.en.PAGE_CONFLICT_MISSING
 
         state.pages.conflict = None
 
-        assert state.pages.banner == afanes.ui.strings.PAGE_PENDING_DIALOG
+        assert state.pages.banner == afanes.i18n.ui.en.PAGE_PENDING_DIALOG

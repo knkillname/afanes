@@ -11,23 +11,27 @@ import flet as ft
 import pytest
 
 import afanes.__about__
+import afanes.core.localization
+import afanes.core.preferences
 import afanes.core.settings
 import afanes.core.templates
 import afanes.core.vault.pages
 import afanes.core.vault.schema
 import afanes.core.vault.service
 import afanes.core.vault.snapshot
+import afanes.i18n.ui
+import afanes.i18n.ui.en
 import afanes.ui.app
 import afanes.ui.state
-import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.page
 import afanes.ui.views.workspace
 from afanes.core.errors import TemplateContentError
 from afanes.core.frontmatter import NoteDocument
+from afanes.core.preferences import Preferences, PreferencesStore
 from afanes.core.settings import Settings
 from afanes.models.note import CategoryLabel
-from tests.support import constant, versioned
+from tests.support import constant, simulated_message, versioned
 
 Handler = Callable[[], Awaitable[None]]
 WINDOW_WIDTH = 1100
@@ -87,7 +91,10 @@ class FakePicker:
 
 
 @pytest.fixture(autouse=True)
-def _reset_state() -> None:
+def _reset_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LANG", "en_US.UTF-8")
+    monkeypatch.delenv("LC_ALL", raising=False)
+    monkeypatch.delenv("LC_MESSAGES", raising=False)
     afanes.ui.state.app_state.reset()
 
 
@@ -277,6 +284,131 @@ class TestAppShell:
         assert _find_by_key(page.controls[0], "process-note") is not None
 
 
+class TestLocaleStartup:
+    def test_a_saved_spanish_preference_renders_spanish(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        PreferencesStore(tmp_path / "preferences.json").save(Preferences(language="es"))
+        page = FakePage()
+
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
+
+        assert (
+            _welcome_button(page.controls[0]).content
+            == afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es")).WELCOME_CHOOSE
+        )
+        assert afanes.ui.state.app_state.status.copy.locale.language == "es"
+
+    def test_corrupt_preferences_use_the_system_locale_and_preserve_the_file(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("LANG", "es_ES.UTF-8")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        path = tmp_path / "preferences.json"
+        path.write_text("{not json", encoding="utf-8")
+        page = FakePage(web=True)
+
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
+
+        assert afanes.ui.state.app_state.status.copy.locale.language == "es"
+        expected = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es")).PREFERENCES_CORRUPT
+        assert afanes.ui.state.app_state.workspace.banner == expected
+        assert path.read_text(encoding="utf-8") == "{not json"
+
+    def test_the_welcome_offers_the_language_control(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        page = FakePage()
+
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
+
+        menu = _typed(_find_by_key(page.controls[0], "welcome-language"), ft.PopupMenuButton)
+        keys = [item.key for item in menu.items if isinstance(item, ft.PopupMenuItem)]
+        assert keys == ["welcome-language-en", "welcome-language-es", "welcome-language-system"]
+
+    def test_the_workspace_offers_the_language_control(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        afanes.core.settings.SettingsStore(tmp_path / "settings.json").save(Settings(vault=vault))
+        page = FakePage()
+
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
+
+        menu = _typed(_find_by_key(page.controls[0], "workspace-change"), ft.PopupMenuButton)
+        keys = [item.key for item in menu.items if isinstance(item, ft.PopupMenuItem)]
+        assert "workspace-language-en" in keys
+        assert "workspace-language-es" in keys
+        assert "workspace-language-system" in keys
+
+    def test_spanish_starter_labels_are_localized(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        PreferencesStore(tmp_path / "preferences.json").save(Preferences(language="es"))
+        page = FakePage(web=True)
+
+        async def scenario() -> None:
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+
+        asyncio.run(scenario())
+        selector = _typed(_find_by_key(page.dialogs[0], "create-vault-template"), ft.Dropdown)
+        texts = [option.text or "" for option in selector.options]
+        assert any("Personal - Administración de la vida doméstica" in text for text in texts)
+        assert any("Trabajo - Resultados compartidos" in text for text in texts)
+        assert all("Life administration" not in text for text in texts)
+
+    def test_choosing_spanish_saves_the_preference_and_keeps_the_session(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        page = FakePage()
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
+            menu = _typed(_find_by_key(page.controls[0], "welcome-language"), ft.PopupMenuButton)
+            spanish = next(
+                item for item in menu.items if isinstance(item, ft.PopupMenuItem) and item.key == "welcome-language-es"
+            )
+            await typing.cast("Handler", spanish.on_click)()
+
+        asyncio.run(scenario())
+
+        assert PreferencesStore(tmp_path / "preferences.json").load().preferences == Preferences(language="es")
+        assert state.status.copy.locale.language == "en"
+        snackbar = page.dialogs[-1]
+        assert isinstance(snackbar, ft.SnackBar)
+        content = typing.cast("ft.Text", snackbar.content)
+        assert content.value == afanes.i18n.ui.en.LANGUAGE_RESTART
+
+    def test_the_date_picker_receives_the_active_locale(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        page = FakePage()
+        state = afanes.ui.state.app_state
+        state.status.set_copy(afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es")))
+        shell = afanes.ui.app.AppShell(typing.cast("ft.Page", page), None)
+        shown: list[ft.DatePicker] = []
+
+        def show_dialog(dialog: ft.DatePicker) -> None:
+            shown.append(dialog)
+            dismiss = typing.cast("typing.Callable[[], None] | None", dialog.on_dismiss)
+            assert dismiss is not None
+            dismiss()
+
+        monkeypatch.setattr(page, "show_dialog", show_dialog)
+
+        result = asyncio.run(shell.pick_date(None))
+
+        assert result is None
+        assert shown[0].locale is not None
+        assert shown[0].locale.language_code == "es"
+
+
 class TestLogEntryDirectDraft:
     def test_today_opens_an_unsaved_draft_without_a_dialog(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -348,11 +480,11 @@ class TestAdoptionPanel:
 
         panel = _find_by_key(page.controls[0], "adoption-panel")
         assert isinstance(panel, ft.Container)
-        assert afanes.ui.strings.VAULT_SCHEMA_ADOPT_TITLE in _all_texts(panel)
+        assert afanes.i18n.ui.en.VAULT_SCHEMA_ADOPT_TITLE in _all_texts(panel)
         confirm = _typed(_find_by_key(panel, "adoption-confirm"), ft.FilledButton)
         cancel = _typed(_find_by_key(panel, "adoption-cancel"), ft.TextButton)
-        assert confirm.content == afanes.ui.strings.VAULT_SCHEMA_ADOPT_ACTION
-        assert cancel.content == afanes.ui.strings.CANCEL_ACTION
+        assert confirm.content == afanes.i18n.ui.en.VAULT_SCHEMA_ADOPT_ACTION
+        assert cancel.content == afanes.i18n.ui.en.CANCEL_ACTION
         assert state.session.vault_root is None
         assert state.session.adoption_target == vault.resolve()
         assert not (vault / "afanes.yaml").exists()
@@ -428,9 +560,9 @@ class TestDesktopPresentation:
         asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
         assert _find_by_key(page.controls[0], "welcome-path") is None
-        assert _welcome_button(page.controls[0]).content == afanes.ui.strings.WELCOME_CHOOSE
+        assert _welcome_button(page.controls[0]).content == afanes.i18n.ui.en.WELCOME_CHOOSE
         create = _welcome_button(page.controls[0], "welcome-create")
-        assert create.content == afanes.ui.strings.NEW_VAULT_ACTION
+        assert create.content == afanes.i18n.ui.en.NEW_VAULT_ACTION
 
 
 class TestWebPresentation:
@@ -451,9 +583,9 @@ class TestWebPresentation:
         asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
         field = _typed(_find_by_key(page.controls[0], "welcome-path"), ft.TextField)
-        assert field.label == afanes.ui.strings.WELCOME_PATH_LABEL
-        assert _welcome_button(page.controls[0], "welcome-open").content == afanes.ui.strings.WELCOME_OPEN
-        assert _welcome_button(page.controls[0], "welcome-create").content == afanes.ui.strings.NEW_VAULT_ACTION
+        assert field.label == afanes.i18n.ui.en.WELCOME_PATH_LABEL
+        assert _welcome_button(page.controls[0], "welcome-open").content == afanes.i18n.ui.en.WELCOME_OPEN
+        assert _welcome_button(page.controls[0], "welcome-create").content == afanes.i18n.ui.en.NEW_VAULT_ACTION
 
     def test_entering_a_path_opens_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -496,7 +628,7 @@ class TestWebPresentation:
         asyncio.run(scenario())
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_MISSING
         assert isinstance(page.controls[0], ft.Container)
         assert not settings.exists()
 
@@ -802,7 +934,7 @@ class TestCreation:
 
         asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
-        assert _welcome_button(page.controls[0], "welcome-create").content == afanes.ui.strings.NEW_VAULT_ACTION
+        assert _welcome_button(page.controls[0], "welcome-create").content == afanes.i18n.ui.en.NEW_VAULT_ACTION
 
     def test_web_welcome_offers_creation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -810,7 +942,7 @@ class TestCreation:
 
         asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
 
-        assert _welcome_button(page.controls[0], "welcome-create").content == afanes.ui.strings.NEW_VAULT_ACTION
+        assert _welcome_button(page.controls[0], "welcome-create").content == afanes.i18n.ui.en.NEW_VAULT_ACTION
 
     def test_desktop_creation_shows_the_template_choice_first(
         self,
@@ -954,8 +1086,8 @@ class TestCreation:
         assert len(page.dialogs) == 1
         error = _typed(_find_by_key(page.dialogs[0], "create-vault-error"), ft.Text)
         assert error.visible is True
-        assert error.value == afanes.ui.strings.VAULT_NOT_EMPTY
-        assert error.value == afanes.ui.strings.VAULT_NOT_EMPTY
+        assert error.value == afanes.i18n.ui.en.VAULT_NOT_EMPTY
+        assert error.value == afanes.i18n.ui.en.VAULT_NOT_EMPTY
 
     def test_web_creation_dialog_previews_and_creates_the_vault(
         self,
@@ -978,7 +1110,7 @@ class TestCreation:
             assert "afanes.yaml" in (preview.value or "")
             assert "actions/" not in (preview.value or "")
             assert (
-                afanes.ui.strings.NEW_VAULT_PREVIEW_GUIDE.format(
+                afanes.i18n.ui.en.NEW_VAULT_PREVIEW_GUIDE.format(
                     folders="inbox/, trash/, reference/, projects/, log/",
                 )
                 == preview.value
@@ -1018,7 +1150,7 @@ class TestCreation:
         assert len(page.dialogs) == 1
         error = _typed(_find_by_key(page.dialogs[0], "create-vault-error"), ft.Text)
         assert error.visible is True
-        assert error.value == afanes.ui.strings.VAULT_NOT_EMPTY
+        assert error.value == afanes.i18n.ui.en.VAULT_NOT_EMPTY
         assert not settings.exists()
 
     def test_web_cancelling_creation_writes_nothing(
@@ -1085,7 +1217,9 @@ class TestCreation:
             _select_template(page, "personal")
             summary = next(
                 summary
-                for summary in afanes.core.templates.TemplateCatalog.bundled().summaries()
+                for summary in afanes.core.templates.TemplateCatalog.bundled().summaries(
+                    afanes.i18n.ui.UiCopy.english().template_labels()
+                )
                 if summary.identifier == "personal"
             )
             assert f"{summary.note_count} notes" in (preview.value or "")
@@ -1099,6 +1233,33 @@ class TestCreation:
         assert (target / "projects" / "Home insurance.md").is_file()
         assert (target / "reference" / "person" / "Sam Rivera.md").is_file()
 
+    def test_spanish_creation_seeds_spanish_guide_notes_and_cards(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        PreferencesStore(tmp_path / "preferences.json").save(Preferences(language="es"))
+        target = tmp_path / "vault"
+        page = FakePage(web=True)
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
+            create = _welcome_button(page.controls[0], "welcome-create")
+            await typing.cast("Handler", create.on_click)()
+            _select_template(page, "personal")
+            await _submit_creation(page, target)
+
+        asyncio.run(scenario())
+
+        assert state.session.vault_root == target.resolve()
+        assert (target / "reference" / "Primeros pasos.md").is_file()
+        assert not (target / "reference" / "Getting started.md").exists()
+        assert (target / "projects" / "Revisión del coche.md").is_file()
+        card = (target / "templates" / "person.md").read_text(encoding="utf-8")
+        assert "title: Persona" in card
+
     def test_unreadable_catalog_degrades_to_a_blank_vault(
         self,
         tmp_path: Path,
@@ -1109,9 +1270,8 @@ class TestCreation:
         page = FakePage(web=True)
         state = afanes.ui.state.app_state
 
-        def refuse(_cls: object) -> None:
-            message = "bundled content is broken"
-            raise TemplateContentError(message)
+        def refuse(_cls: object, _labels: object) -> None:
+            raise TemplateContentError(simulated_message("bundled content is broken"))
 
         monkeypatch.setattr(afanes.core.templates.TemplateCatalog, "summaries", refuse)
 
@@ -1290,7 +1450,7 @@ class TestRoleReferenceCreation:
             assert state.pages.editing is True
             assert (vault / "reference" / "person" / "Ghost.md").is_file()
 
-            done = _find_button_by_label(page.controls[0], afanes.ui.strings.PAGE_DONE)
+            done = _find_button_by_label(page.controls[0], afanes.i18n.ui.en.PAGE_DONE)
             assert done is not None
             await typing.cast("Handler", done.on_click)()
 
@@ -1382,7 +1542,7 @@ class TestBrowserReferenceCreation:
         assert len(page.dialogs) == 1
         error = _typed(_find_by_key(page.dialogs[-1], "new-reference-error"), ft.Text)
         assert error.visible is True
-        assert error.value == afanes.ui.strings.BROWSER_NAME_REQUIRED
+        assert error.value == afanes.i18n.ui.en.BROWSER_NAME_REQUIRED
         assert not (vault / "reference" / "general").exists()
 
     def test_a_collision_keeps_the_dialog_open(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1601,9 +1761,9 @@ class TestAboutDialog:
         content = _typed(dialog.content, ft.Column)
         version = _typed(content.controls[0], ft.Text)
         license_text = _typed(content.controls[1], ft.Text)
-        assert title.value == afanes.ui.strings.ABOUT_TITLE
+        assert title.value == afanes.i18n.ui.en.ABOUT_TITLE
         assert afanes.__about__.__version__ in (version.value or "")
-        assert license_text.value == afanes.ui.strings.ABOUT_LICENSE
+        assert license_text.value == afanes.i18n.ui.en.ABOUT_LICENSE
 
 
 class TestDialogAudit:
@@ -1646,5 +1806,5 @@ class TestDialogAudit:
         ):
             field = _typed(_find_by_key(dialog, key), ft.TextField)
             assert field.autofocus is True
-            assert getattr(dialog.actions[0], "content", None) == afanes.ui.strings.CANCEL_ACTION
-            assert getattr(dialog.actions[-1], "content", None) != afanes.ui.strings.CANCEL_ACTION
+            assert getattr(dialog.actions[0], "content", None) == afanes.i18n.ui.en.CANCEL_ACTION
+            assert getattr(dialog.actions[-1], "content", None) != afanes.i18n.ui.en.CANCEL_ACTION

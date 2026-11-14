@@ -47,6 +47,11 @@ Only Linux carries release evidence. The browser presentation binds loopback onl
 assets, and allows one session at a time; see the
 [browser mode guide](https://github.com/knkillname/afanes/blob/main/docs/guide/browser-mode.md).
 
+The interface, command line, dates, and starter content ship in English and Spanish. Choose the
+language from the welcome state or the workspace primary menu; the choice is saved outside the vault
+and applies on the next launch. See
+[Workspace and browser](https://github.com/knkillname/afanes/blob/main/docs/guide/workspace.md#language).
+
 ## 🚀 First five minutes
 
 1. **Open or create a vault.** A vault is a folder of Markdown files with an `afanes.yaml` settings

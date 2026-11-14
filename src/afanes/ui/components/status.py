@@ -4,7 +4,7 @@
 """Display label for one workflow status."""
 
 import afanes.core.search
-import afanes.ui.strings
+import afanes.i18n.ui
 from afanes.models.note import Status
 
 
@@ -17,7 +17,12 @@ class StatusLabel:
         Status to display, or ``None`` for an unstarted project.
     """
 
-    def __init__(self, status: Status | None) -> None:
+    def __init__(
+        self,
+        status: Status | None,
+        *,
+        copy: afanes.i18n.ui.UiCopy | None = None,
+    ) -> None:
         """Store the status this label displays.
 
         Parameters
@@ -25,6 +30,7 @@ class StatusLabel:
         status : Status | None
             Status to display, or ``None`` for an unstarted project.
         """
+        self._copy = afanes.i18n.ui.UiCopy.english() if copy is None else copy
         self._status = status
 
     @property
@@ -38,5 +44,5 @@ class StatusLabel:
             the status is absent.
         """
         if self._status is None:
-            return afanes.ui.strings.PROJECT_GROUP_LABELS[afanes.core.search.ProjectStage.ACTIVE.value]
-        return afanes.ui.strings.PROCESSING_STATUS_LABELS[self._status.value]
+            return self._copy.PROJECT_GROUP_LABELS[afanes.core.search.ProjectStage.ACTIVE.value]
+        return self._copy.PROCESSING_STATUS_LABELS[self._status.value]

@@ -18,7 +18,7 @@ import afanes.core.vault.trash
 import afanes.core.vault.trash_catalog
 import afanes.ui.state
 from afanes.core.editing import PageDraftFactory
-from afanes.core.errors import ProcessingError
+from afanes.core.errors import MessageCode, ProcessingError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import ResolutionOutcome
 from afanes.core.processing import ProcessingOutcome
@@ -372,7 +372,7 @@ class TestHardBreak:
         snapshot = Vault(root).scan()
 
         assert snapshot.notes == ()
-        assert "retired" in snapshot.failures[0].message
+        assert snapshot.failures[0].message.code is MessageCode.RETIRED_PERSON_SCHEME
         assert path.exists()
 
 

@@ -11,7 +11,9 @@ other's behavior.
 import dataclasses
 import datetime
 from pathlib import Path
+from typing import Self
 
+import afanes.core.errors
 from afanes.core.vault.snapshot import ReferenceSite
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType
@@ -103,12 +105,35 @@ class RewriteFailure:
     ----------
     path : Path
         Absolute path to the note.
-    message : str
-        Concise failure reason.
+    message : afanes.core.errors.DomainMessage
+        Structured failure reason rendered by the active catalog.
     """
 
     path: Path
-    message: str
+    message: afanes.core.errors.DomainMessage
+
+    @classmethod
+    def from_error(cls, path: Path, error: BaseException) -> Self:
+        """Build the structured report for one rewrite failure.
+
+        Parameters
+        ----------
+        path : Path
+            Note that could not be rewritten.
+        error : BaseException
+            Domain error or wrapped technical failure.
+
+        Returns
+        -------
+        RewriteFailure
+            Failure carrying the error's domain message or a technical detail.
+        """
+        if isinstance(error, afanes.core.errors.AfanesError):
+            return cls(path=path, message=error.domain_message)
+        message = afanes.core.errors.DomainMessage.of(
+            afanes.core.errors.MessageCode.TECHNICAL_FAILURE, detail=str(error)
+        )
+        return cls(path=path, message=message)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

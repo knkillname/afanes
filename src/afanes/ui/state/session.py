@@ -19,10 +19,12 @@ import afanes.core.vault.processing
 import afanes.core.vault.steps
 import afanes.core.vault.trash
 import afanes.core.vault.trash_catalog
-import afanes.ui.strings
+import afanes.i18n.ui
 from afanes.core.errors import (
     AfanesError,
+    DomainMessage,
     EmptyCaptureError,
+    MessageCode,
     TemplateError,
     VaultError,
     VaultMissingError,
@@ -98,20 +100,22 @@ class VaultOpener:
         try:
             return Vault.open(path)
         except VaultMissingError as exc:
-            raise VaultError(afanes.ui.strings.VAULT_MISSING) from exc
+            raise VaultError(DomainMessage.of(MessageCode.UI_VAULT_MISSING)) from exc
         except VaultNotDirectoryError as exc:
-            raise VaultError(afanes.ui.strings.VAULT_NOT_DIRECTORY) from exc
+            raise VaultError(DomainMessage.of(MessageCode.UI_VAULT_NOT_DIRECTORY)) from exc
         except VaultUnreadableError as exc:
-            raise VaultError(afanes.ui.strings.VAULT_UNREADABLE) from exc
+            raise VaultError(DomainMessage.of(MessageCode.UI_VAULT_UNREADABLE)) from exc
 
     @staticmethod
-    def create(path: Path, *, template: str | None = None) -> VaultCreation:
+    def create(path: Path, copy: afanes.i18n.ui.UiCopy, *, template: str | None = None) -> VaultCreation:
         """Create a new vault and translate refusals into interface messages.
 
         Parameters
         ----------
         path : pathlib.Path
             Directory to create or seed. It must be missing or empty.
+        copy : afanes.i18n.ui.UiCopy
+            Active interface catalog used for creation failures.
         template : str | None
             Bundled template identifier, or ``None`` to write only the guide
             note.
@@ -132,17 +136,19 @@ class VaultOpener:
             starter content is written in that case.
         """
         try:
-            return Vault.create_directory(path, template=template)
+            return Vault.create_directory(path, template=template, locale=copy.locale.language)
         except TemplateError as exc:
-            raise VaultError(afanes.ui.strings.NEW_VAULT_TEMPLATE_FAILED.format(detail=exc)) from exc
+            raise VaultError(
+                DomainMessage.of(MessageCode.UI_NEW_VAULT_TEMPLATE_FAILED, detail=copy.render_error(exc))
+            ) from exc
         except VaultNotEmptyError as exc:
-            raise VaultError(afanes.ui.strings.VAULT_NOT_EMPTY) from exc
+            raise VaultError(DomainMessage.of(MessageCode.UI_VAULT_NOT_EMPTY)) from exc
         except VaultNotDirectoryError as exc:
-            raise VaultError(afanes.ui.strings.VAULT_NOT_DIRECTORY) from exc
+            raise VaultError(DomainMessage.of(MessageCode.UI_VAULT_NOT_DIRECTORY)) from exc
         except VaultMissingError as exc:
-            raise VaultError(afanes.ui.strings.VAULT_MISSING) from exc
+            raise VaultError(DomainMessage.of(MessageCode.UI_VAULT_MISSING)) from exc
         except VaultUnreadableError as exc:
-            raise VaultError(afanes.ui.strings.VAULT_UNREADABLE) from exc
+            raise VaultError(DomainMessage.of(MessageCode.UI_VAULT_UNREADABLE)) from exc
 
 
 @dataclasses.dataclass(slots=True)
@@ -308,7 +314,7 @@ class VaultSession:
             snapshot = await asyncio.to_thread(vault.scan)
         except (VaultError, OSError) as exc:
             logger.debug("Snapshot refresh failed", exc_info=True)
-            self.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
+            self.banner = self.status.copy.REFRESH_FAILED.format(detail=self.status.copy.render_error(exc))
             return
         self.apply_snapshot(snapshot)
 
@@ -439,7 +445,7 @@ class VaultSession:
             snapshot = await asyncio.to_thread(TrashCatalog(vault).load)
         except (VaultError, OSError):
             logger.debug("Trash catalog refresh failed", exc_info=True)
-            self.trash_banner = afanes.ui.strings.TRASH_MAINTENANCE_FAILED
+            self.trash_banner = self.status.copy.TRASH_MAINTENANCE_FAILED
             return None
         self.apply_trash_snapshot(snapshot)
         return snapshot
@@ -501,12 +507,12 @@ class VaultSession:
             )
         except (VaultError, OSError):
             logger.debug("Trash maintenance failed", exc_info=True)
-            self.trash_banner = afanes.ui.strings.TRASH_MAINTENANCE_FAILED
+            self.trash_banner = self.status.copy.TRASH_MAINTENANCE_FAILED
             report = None
         snapshot = await self.refresh_trash()
         if report is not None:
             self.trash_banner = (
-                None if not report.failed and snapshot is not None else afanes.ui.strings.TRASH_MAINTENANCE_FAILED
+                None if not report.failed and snapshot is not None else self.status.copy.TRASH_MAINTENANCE_FAILED
             )
         return report
 
@@ -526,7 +532,8 @@ class VaultSession:
         package I/O in a worker thread and never writes.
         """
         try:
-            return await asyncio.to_thread(afanes.core.templates.TemplateCatalog.bundled().summaries)
+            labels = self.status.copy.template_labels()
+            return await asyncio.to_thread(afanes.core.templates.TemplateCatalog.bundled().summaries, labels)
         except (VaultError, OSError):
             logger.debug("Bundled starter content could not be read", exc_info=True)
             return None
@@ -552,7 +559,7 @@ class VaultSession:
             return await asyncio.to_thread(self._read_template_cards, vault)
         except (VaultError, OSError) as exc:
             logger.debug("Reference template cards could not be read", exc_info=True)
-            self.status.show_notice(afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc)))
+            self.status.show_notice(self.status.copy.REFRESH_FAILED.format(detail=self.status.copy.render_error(exc)))
             return None
 
     @staticmethod
@@ -595,7 +602,7 @@ class VaultSession:
         """
         async with self.command_lock:
             if not text.strip():
-                self.status.show_notice(afanes.ui.strings.CAPTURE_EMPTY)
+                self.status.show_notice(self.status.copy.CAPTURE_EMPTY)
                 return None
             vault = self.vault
             if vault is None:
@@ -605,17 +612,19 @@ class VaultSession:
                 try:
                     path = await asyncio.to_thread(afanes.core.vault.pages.VaultPages(vault).capture, text)
                 except EmptyCaptureError:
-                    self.status.show_notice(afanes.ui.strings.CAPTURE_EMPTY)
+                    self.status.show_notice(self.status.copy.CAPTURE_EMPTY)
                     return None
                 except (AfanesError, OSError) as exc:
                     logger.debug("Capture failed", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.CAPTURE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.CAPTURE_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return None
                 try:
                     snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Inbox refresh after capture failed", exc_info=True)
-                    self.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
+                    self.banner = self.status.copy.REFRESH_FAILED.format(detail=self.status.copy.render_error(exc))
                     return path
                 self.apply_snapshot(snapshot, focus=path)
                 return path
@@ -648,7 +657,9 @@ class VaultSession:
                     logger.debug("Note preview failed", exc_info=True)
                     self.selected = None
                     self.preview_body = None
-                    self.status.show_notice(afanes.ui.strings.PREVIEW_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.PREVIEW_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return
                 self.selected = path
                 self.preview_body = body

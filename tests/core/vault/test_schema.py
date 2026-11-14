@@ -50,7 +50,7 @@ class TestVaultSchemaFile:
         assert _store(tmp_path).load() is None
 
     def test_a_missing_file_is_refused(self, tmp_path: Path) -> None:
-        with pytest.raises(VaultSchemaMissingError, match=r"afanes\.yaml"):
+        with pytest.raises(VaultSchemaMissingError, match="schema-missing"):
             _store(tmp_path).require()
 
     def test_the_settings_path_is_exact(self, tmp_path: Path) -> None:
@@ -96,26 +96,26 @@ class TestVaultSchemaValidation:
     def test_rejects_invalid_utf8(self, tmp_path: Path) -> None:
         (tmp_path / "afanes.yaml").write_bytes(b"\xff\xfe")
 
-        with pytest.raises(VaultSchemaInvalidError, match="UTF-8"):
+        with pytest.raises(VaultSchemaInvalidError, match="schema-invalid-utf8"):
             _store(tmp_path).load()
 
     def test_rejects_an_oversized_file(self, tmp_path: Path) -> None:
         text = "schema_version: 1\n" + "#" * afanes.core.vault.schema.SCHEMA_MAX_BYTES
         _write_settings(tmp_path, text)
 
-        with pytest.raises(VaultSchemaInvalidError, match="too large"):
+        with pytest.raises(VaultSchemaInvalidError, match="schema-too-large"):
             _store(tmp_path).load()
 
     def test_a_newer_schema_is_unsupported(self, tmp_path: Path) -> None:
         _write_settings(tmp_path, "schema_version: 2\n")
 
-        with pytest.raises(VaultSchemaUnsupportedError, match="update Afanes"):
+        with pytest.raises(VaultSchemaUnsupportedError, match="schema-newer"):
             _store(tmp_path).load()
 
     def test_an_older_schema_is_unsupported_before_one_point_zero(self, tmp_path: Path) -> None:
         _write_settings(tmp_path, "schema_version: 0\n")
 
-        with pytest.raises(VaultSchemaUnsupportedError, match="does not migrate"):
+        with pytest.raises(VaultSchemaUnsupportedError, match="schema-older"):
             _store(tmp_path).load()
 
     def test_rejects_a_symlink(self, tmp_path: Path) -> None:
@@ -127,13 +127,13 @@ class TestVaultSchemaValidation:
         except OSError:
             pytest.skip("symlinks are unavailable on this platform")
 
-        with pytest.raises(VaultSchemaInvalidError, match="symbolic link"):
+        with pytest.raises(VaultSchemaInvalidError, match="schema-symlink"):
             _store(tmp_path).load()
 
     def test_rejects_a_directory(self, tmp_path: Path) -> None:
         (tmp_path / "afanes.yaml").mkdir()
 
-        with pytest.raises(VaultSchemaInvalidError, match="not a regular file"):
+        with pytest.raises(VaultSchemaInvalidError, match="schema-not-file"):
             _store(tmp_path).load()
 
     def test_rejects_an_unreadable_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -144,7 +144,7 @@ class TestVaultSchemaValidation:
             raise PermissionError(message)
 
         monkeypatch.setattr(Path, "read_bytes", fail_read)
-        with pytest.raises(VaultSchemaInvalidError, match="Could not read"):
+        with pytest.raises(VaultSchemaInvalidError, match="schema-read-failed"):
             _store(tmp_path).load()
 
     @pytest.mark.parametrize(
@@ -196,7 +196,7 @@ class TestVaultSchemaValidation:
             raise PermissionError(message)
 
         monkeypatch.setattr(Path, "lstat", fail_lstat)
-        with pytest.raises(VaultSchemaInvalidError, match="Could not inspect"):
+        with pytest.raises(VaultSchemaInvalidError, match="schema-inspect-failed"):
             _store(tmp_path).load()
 
 
@@ -262,7 +262,7 @@ class TestAdoptionEligibility:
         _make_adoptable(tmp_path)
         monkeypatch.setattr(afanes.core.vault.schema.os, "access", constant(False))
 
-        with pytest.raises(VaultSchemaNotAdoptableError, match="not writable"):
+        with pytest.raises(VaultSchemaNotAdoptableError, match="schema-not-writable"):
             _store(tmp_path).adopt()
 
         assert not (tmp_path / "afanes.yaml").exists()

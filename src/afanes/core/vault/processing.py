@@ -15,7 +15,13 @@ from pathlib import Path
 import afanes.core.atomic
 import afanes.core.steps
 import afanes.core.vault.snapshot
-from afanes.core.errors import AfanesError, NameCollisionError, ProcessingError
+from afanes.core.errors import (
+    AfanesError,
+    DomainMessage,
+    MessageCode,
+    NameCollisionError,
+    ProcessingError,
+)
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan, ProcessingTarget
 from afanes.core.template_cards import TemplateCard
@@ -154,24 +160,24 @@ class VaultProcessing:
             ProcessingOutcome.REFERENCE,
             ProcessingOutcome.LATER,
         ):
-            message = "Only Reference and Later accept a template card"
+            message = DomainMessage.of(MessageCode.PROCESSING_CARD_ONLY)
             raise ProcessingError(message)
         if request.card is not None and request.card.note_type is not NoteType.REFERENCE:
-            message = "Reference and Later need a reference card"
+            message = DomainMessage.of(MessageCode.PROCESSING_CARD_REQUIRED)
             raise ProcessingError(message)
 
     def _resolve_capture(self, request: ProcessingRequest) -> ProcessingContext:
         """Resolve the capture, scan the vault, and hash the source."""
         note_path = request.note_path
         if note_path is None:
-            message = "Processing needs an inbox capture path"
+            message = DomainMessage.of(MessageCode.PROCESSING_CAPTURE_REQUIRED)
             raise ProcessingError(message)
         source = self.vault.contained(note_path)
         self._require_inbox_note(source)
         vault = request.snapshot or self.vault.scan()
         note = vault.find_note(source)
         if note is None:
-            message = f"Note is not part of the vault: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_NOT_IN_VAULT, path=str(note_path))
             raise ProcessingError(message)
         source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
         return ProcessingContext(source=source, vault=vault, note=note, source_hash=source_hash)
@@ -191,7 +197,7 @@ class VaultProcessing:
         target_type = target.note_type
         target_status = target.status
         if due_date is not None and outcome not in (ProcessingOutcome.PROJECT, ProcessingOutcome.DONE_NOW):
-            message = "Only projects accept a due date"
+            message = DomainMessage.of(MessageCode.PROCESSING_DUE_ONLY_PROJECT)
             raise ProcessingError(message)
 
         category: CategoryLabel | None = None
@@ -216,10 +222,10 @@ class VaultProcessing:
         target_scheme = ReferenceScheme.for_note(target_type)
         existing = vault.catalog.candidates(target_scheme, target_name)
         if any(not VaultPath.same(path, source) for path in existing):
-            message = f"A {target_scheme.value} note named {target_name!r} already exists"
+            message = DomainMessage.of(MessageCode.NOTE_NAME_EXISTS, scheme=target_scheme.value, name=repr(target_name))
             raise NameCollisionError(message)
         if target_path.exists() and not VaultPath.same(target_path, source):
-            message = f"Destination already exists: {target_path}"
+            message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target_path))
             raise NameCollisionError(message)
 
         affected = vault.affected_sites(source)
@@ -276,7 +282,7 @@ class VaultProcessing:
             ProcessingOutcome.PROJECT,
             ProcessingOutcome.DONE_NOW,
         ):
-            message = "Only projects accept owner and requester names"
+            message = DomainMessage.of(MessageCode.PROCESSING_PROJECT_ASSIGNMENT)
             raise ProcessingError(message)
 
     @staticmethod
@@ -309,15 +315,15 @@ class VaultProcessing:
         outcome = request.outcome
         if outcome is ProcessingOutcome.APPEND_STEP:
             if request.status is not None or request.due_date is not None:
-                message = "Append step does not accept status or due date metadata"
+                message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="append-step-metadata")
                 raise ProcessingError(message)
             if request.project is None:
-                message = "Append step needs a target project"
+                message = DomainMessage.of(MessageCode.PROCESSING_PROJECT_REQUIRED)
                 raise ProcessingError(message)
             return self.plan_append_step(context.source, request.project, snapshot=context.vault)
         if outcome is ProcessingOutcome.TRASH:
             if request.status is not None or request.due_date is not None:
-                message = "Trash does not accept assignment metadata"
+                message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="trash-assignment")
                 raise ProcessingError(message)
             trash_preview = VaultNaming(self.vault).plan_trash(context.source, snapshot=context.vault)
             return ProcessingPlan(
@@ -390,18 +396,18 @@ class VaultProcessing:
         self._require_inbox_note(source)
         vault = snapshot or self.vault.scan()
         if vault.find_note(source) is None:
-            message = f"Note is not part of the vault: {capture_path}"
+            message = DomainMessage.of(MessageCode.NOTE_NOT_IN_VAULT, path=str(capture_path))
             raise ProcessingError(message)
         target_name = project_name.strip()
         if not target_name:
-            message = "Append step needs a target project"
+            message = DomainMessage.of(MessageCode.PROCESSING_PROJECT_REQUIRED)
             raise ProcessingError(message)
         candidates = vault.catalog.candidates(ReferenceScheme.PROJECT, target_name)
         if not candidates:
-            message = f"No project is named {target_name!r}"
+            message = DomainMessage.of(MessageCode.PROCESSING_PROJECT_UNKNOWN, name=repr(target_name))
             raise ProcessingError(message)
         if len(candidates) > 1:
-            message = f"More than one project is named {target_name!r}"
+            message = DomainMessage.of(MessageCode.PROCESSING_PROJECT_AMBIGUOUS, name=repr(target_name))
             raise NameCollisionError(message)
 
         project_path = candidates[0]
@@ -460,7 +466,7 @@ class VaultProcessing:
         move leaves the capture in ``inbox/`` and the same plan can be retried.
         """
         if not confirm:
-            message = "Processing requires explicit confirmation"
+            message = DomainMessage.of(MessageCode.PROCESSING_CONFIRMATION)
             raise ProcessingError(message)
         if isinstance(plan, AppendStepPlan):
             return self._apply_append_step(plan)
@@ -468,7 +474,7 @@ class VaultProcessing:
         source = self.vault.contained(plan.source_path)
         self._require_inbox_note(source)
         if not source.is_file():
-            message = f"Capture no longer exists: {plan.source_path}"
+            message = DomainMessage.of(MessageCode.PROCESSING_CAPTURE_GONE, path=str(plan.source_path))
             raise ProcessingError(message)
 
         if plan.outcome is ProcessingOutcome.TRASH:
@@ -479,7 +485,7 @@ class VaultProcessing:
                     expected_hash=plan.source_hash,
                 )
             except (AfanesError, OSError) as exc:
-                message = f"Could not move the capture to Trash: {exc}"
+                message = DomainMessage.of(MessageCode.PROCESSING_TRASH_FAILED, detail=str(exc))
                 raise ProcessingError(message) from exc
             return preview.trash_path
         target = self._processing_destination(plan)
@@ -495,14 +501,14 @@ class VaultProcessing:
         project = self.vault.contained(plan.project_path)
         self._require_inbox_note(capture)
         if not capture.is_file():
-            message = f"Capture no longer exists: {plan.capture_path}"
+            message = DomainMessage.of(MessageCode.PROCESSING_CAPTURE_GONE, path=str(plan.capture_path))
             raise ProcessingError(message)
         capture_data = capture.read_bytes()
         if hashlib.sha256(capture_data).hexdigest() != plan.capture_hash:
-            message = "Source note changed after planning"
+            message = DomainMessage.of(MessageCode.PROCESSING_SOURCE_CHANGED)
             raise ProcessingError(message)
         if not project.is_file():
-            message = f"Target project no longer exists: {plan.project_path}"
+            message = DomainMessage.of(MessageCode.PROCESSING_TARGET_GONE, path=str(plan.project_path))
             raise ProcessingError(message)
 
         project_data = project.read_bytes()
@@ -511,14 +517,14 @@ class VaultProcessing:
         already_present = any(step.text == plan.step_text for step in step_document.steps)
         if not already_present:
             if hashlib.sha256(project_data).hexdigest() != plan.project_hash:
-                message = "Target project changed after planning"
+                message = DomainMessage.of(MessageCode.PROCESSING_TARGET_CHANGED)
                 raise ProcessingError(message)
             body = step_document.append(plan.step_text, plan.detail)
             afanes.core.atomic.AtomicWriter.write_text_atomic(project, document.with_body(body).to_text())
         try:
             VaultNaming(self.vault).trash(capture, confirm=True)
         except (AfanesError, OSError) as exc:
-            message = "The step was written, but the capture could not be moved to trash; retry the same plan"
+            message = DomainMessage.of(MessageCode.PROCESSING_PARTIAL_TRASH)
             raise ProcessingError(message) from exc
         return project
 
@@ -550,7 +556,7 @@ class VaultProcessing:
         """Resolve and validate the destination path for a plan."""
         target = self.vault.contained(plan.target_path)
         if target.exists():
-            message = f"Destination already exists: {target}"
+            message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target))
             raise NameCollisionError(message)
         return target
 
@@ -560,32 +566,32 @@ class VaultProcessing:
         current_hash = hashlib.sha256(data).hexdigest()
         if plan.outcome is ProcessingOutcome.TRASH:
             if current_hash != plan.source_hash:
-                message = "Source note changed after planning"
+                message = DomainMessage.of(MessageCode.PROCESSING_SOURCE_CHANGED)
                 raise ProcessingError(message)
             return
         if current_hash == plan.processed_hash:
             return
         if current_hash != plan.source_hash:
-            message = "Source note changed after planning"
+            message = DomainMessage.of(MessageCode.PROCESSING_SOURCE_CHANGED)
             raise ProcessingError(message)
         document = NoteDocument.from_text(data.decode("utf-8"))
         text = plan.processed_text(document)
         processed_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
         if processed_hash != plan.processed_hash:
-            message = "Processed note does not match the plan"
+            message = DomainMessage.of(MessageCode.PROCESSING_NOTE_MISMATCH)
             raise ProcessingError(message)
         afanes.core.atomic.AtomicWriter.write_text_atomic(source, text)
 
     def _move_processing(self, source: Path, target: Path) -> Path:
         """Move a processed note to its destination."""
         if target.exists():
-            message = f"Destination already exists: {target}"
+            message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target))
             raise NameCollisionError(message)
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
             source.replace(target)
         except OSError as exc:
-            message = f"Could not move the note to its destination: {source}"
+            message = DomainMessage.of(MessageCode.PROCESSING_MOVE_FAILED, path=str(source))
             raise ProcessingError(message) from exc
         return target
 
@@ -622,5 +628,5 @@ class VaultProcessing:
             len(relative.parts) < afanes.core.vault.snapshot.MIN_INBOX_PART_COUNT
             or relative.parts[0].casefold() != afanes.core.vault.snapshot.INBOX_DIRECTORY.name.casefold()
         ):
-            message = "Only notes in the inbox can be processed"
+            message = DomainMessage.of(MessageCode.PROCESSING_INBOX_ONLY)
             raise ProcessingError(message)

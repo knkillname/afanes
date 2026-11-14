@@ -68,6 +68,22 @@ Use `--no-remember` to prepare a vault for someone else, or to create a second v
 your own next launch.
 :::
 
+## 🌍 Language
+
+Headless commands use the same language preference as the interface. The locale is resolved before the
+parser is built, so help, reports, usage errors, and operational failures share one language. The
+resolution order is the saved preference, `LC_ALL`, `LC_MESSAGES`, `LANG`, the operating-system
+locale, and English. `es-*` selects Spanish, `en-*` selects English, and an unknown or unavailable
+locale selects English.
+
+The preference lives in `preferences.json` outside every vault and applies to the next run. A corrupt
+preferences file is reported once on standard error, the system locale is used, and the file is left
+untouched. `afanes vault templates` localizes each label and description while keeping the identifiers
+`personal`, `work`, and `study` unchanged. Command names and option flags are never translated.
+
+The exit status does not depend on the language. A Spanish failure still exits `1`, and a Spanish
+usage error still exits `2`.
+
 ## 🚦 Exit codes and streams
 
 - `0` success.

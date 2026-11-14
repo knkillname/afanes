@@ -11,7 +11,7 @@ import dataclasses
 import datetime
 from typing import Self
 
-from afanes.core.errors import NoteParseError
+from afanes.core.errors import DomainMessage, MessageCode, NoteParseError
 from afanes.core.frontmatter import NoteDocument
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
@@ -27,14 +27,14 @@ class DueDateText:
         Text exactly as shown in the editor.
     date : datetime.date | None
         Parsed calendar date, or ``None`` when the text is blank or invalid.
-    error : str | None
+    error : DomainMessage | None
         Actionable validation message for an invalid non-blank value, or
         ``None`` when the text is valid or blank.
     """
 
     text: str
     date: datetime.date | None
-    error: str | None
+    error: DomainMessage | None
 
     @classmethod
     def from_text(cls, text: str) -> Self:
@@ -65,7 +65,7 @@ class DueDateText:
             return cls(
                 text=text,
                 date=None,
-                error="Enter the due date as YYYY-MM-DD or leave it empty",
+                error=DomainMessage.of(MessageCode.DUE_DATE_INPUT_INVALID),
             )
 
     @classmethod
@@ -149,7 +149,7 @@ class PageLabels:
             If the document has no declared type.
         """
         if document.note_type is None:
-            message = "Note has no type"
+            message = DomainMessage.of(MessageCode.NOTE_HAS_NO_TYPE)
             raise NoteParseError(message)
         due_date = document.raw.get("due_date")
         return cls(
@@ -204,12 +204,12 @@ class PageLabels:
             return None
 
     @property
-    def date_error(self) -> str | None:
+    def date_error(self) -> DomainMessage | None:
         """Return the date validation message, or ``None`` when valid.
 
         Returns
         -------
-        str | None
+        DomainMessage | None
             Actionable message for a malformed non-blank date.
         """
         text = self.date_text.strip()
@@ -217,8 +217,8 @@ class PageLabels:
             return None
         try:
             NoteDate.from_text(text)
-        except ValueError as exc:
-            return str(exc)
+        except ValueError:
+            return DomainMessage.of(MessageCode.INVALID_NOTE_DATE, value=repr(text))
         return None
 
     @property
@@ -244,12 +244,12 @@ class PageLabels:
         return DueDateText.from_text(self.due_date_text).date
 
     @property
-    def due_date_error(self) -> str | None:
+    def due_date_error(self) -> DomainMessage | None:
         """Return the due-date validation message, or ``None`` when valid.
 
         Returns
         -------
-        str | None
+        DomainMessage | None
             Actionable message for an invalid non-blank due date.
         """
         return DueDateText.from_text(self.due_date_text).error
@@ -394,7 +394,11 @@ class PageLabels:
             If the status is not valid for the current type.
         """
         if status is not None and status not in self.note_type.allowed_statuses:
-            message = f"Status {status.value!r} is not valid for a {self.note_type.value} note"
+            message = DomainMessage.of(
+                MessageCode.STATUS_INVALID_FOR_NOTE,
+                status=repr(status.value),
+                note_type=self.note_type.value,
+            )
             raise NoteParseError(message)
         return dataclasses.replace(self, status=status)
 

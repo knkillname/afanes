@@ -13,8 +13,8 @@ from pathlib import Path
 import flet as ft
 
 import afanes.core.search
+import afanes.models.note
 import afanes.ui.state
-import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.search import ProjectGroup, ProjectStage, ProjectSummary
 from afanes.ui.components.frozen import FrozenControlRecovery
@@ -104,7 +104,7 @@ class ProjectsView:
                 ft.Container(
                     padding=afanes.ui.theme.ITEM_GAP,
                     content=ft.Text(
-                        afanes.ui.strings.BROWSER_NO_MATCH,
+                        self._state.status.copy.BROWSER_NO_MATCH,
                         color=afanes.ui.theme.MUTED_TEXT_COLOR,
                         selectable=True,
                     ),
@@ -115,7 +115,7 @@ class ProjectsView:
 
     def _expansion(self, group: ProjectGroup, projects: tuple[ProjectSummary, ...]) -> ft.ExpansionTile:
         """Build one collapsible status group."""
-        label = afanes.ui.strings.PROJECT_GROUP_LABELS[group.stage.value]
+        label = self._state.status.copy.PROJECT_GROUP_LABELS[group.stage.value]
         rows = [self._project_row(summary) for summary in projects]
         controls: list[ft.Control] = []
         if rows:
@@ -140,22 +140,28 @@ class ProjectsView:
         note = summary.note
         if summary.next_step is None:
             next_step: ft.Control = ft.Text(
-                afanes.ui.strings.PROJECT_NO_NEXT_STEP,
+                self._state.status.copy.PROJECT_NO_NEXT_STEP,
                 style=afanes.ui.theme.TEXT_ROLES["caption"],
             )
         else:
             next_step = StepText(
-                afanes.ui.strings.PROJECT_NEXT_STEP.format(title=summary.next_step.text),
+                self._state.status.copy.PROJECT_NEXT_STEP.format(title=summary.next_step.text),
                 afanes.ui.theme.TEXT_ROLES["body"],
                 StepTextOptions(
                     on_tap_link=self._link_handler(note.path),
                     underline_links=False,
                 ),
             ).build()
-        meta: list[str] = [StatusLabel(note.status).text]
+        meta: list[str] = [StatusLabel(note.status, copy=self._state.status.copy).text]
         if note.due_date is not None:
-            meta.append(afanes.ui.strings.PROJECT_DUE.format(date=note.due_date.isoformat()))
-        meta.append(afanes.ui.strings.CopyFormatter.open_step_count(summary.open_count))
+            meta.append(
+                self._state.status.copy.PROJECT_DUE.format(
+                    date=self._state.status.copy.locale_format.short_date(
+                        afanes.models.note.NoteDate.from_date(note.due_date)
+                    )
+                )
+            )
+        meta.append(self._state.status.copy.formatter.open_step_count(summary.open_count))
         page = self._state.pages.page
         selected = page is not None and page.path == note.path
         row = ft.Container(
@@ -170,7 +176,7 @@ class ProjectsView:
                     ft.Text(note.title, style=afanes.ui.theme.TEXT_ROLES["heading"]),
                     next_step,
                     ft.Text(
-                        afanes.ui.strings.PROJECT_META_SEPARATOR.join(meta),
+                        self._state.status.copy.PROJECT_META_SEPARATOR.join(meta),
                         style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                 ],

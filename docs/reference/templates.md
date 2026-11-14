@@ -1,8 +1,9 @@
 # 🧰 Vault templates
 
 A new vault can start with one of three bundled templates: **Personal**, **Work**, or **Study**. Every
-new vault also receives the `Getting started` guide, including a blank vault created without a
-template.
+new vault also receives the getting-started guide, including a blank vault created without a
+template. The guide, template notes, cards, labels, and descriptions follow the active language; a
+Spanish vault receives Spanish content and an English vault receives English content.
 
 :::{admonition} tl;dr
 :class: note
@@ -13,18 +14,21 @@ creation, and never touch a vault that already exists.
 
 ## 📚 Catalog
 
-| Identifier | Label | Description |
+| Identifier | English label | Spanish label |
 | --- | --- | --- |
-| `personal` | Personal | Life administration for the home, the car, and the paperwork that arrives each year. |
-| `work` | Work | Shared outcomes, the groups that own them, and the processes that carry them. |
-| `study` | Study | Course and research work, with the topics and sources kept beside it. |
+| `personal` | Personal | Personal |
+| `work` | Work | Trabajo |
+| `study` | Study | Estudio |
+
+Identifiers never change with the language; interface copy and `afanes vault templates` show the
+localized label and description instead.
 
 ## 🌱 What every template includes
 
-A new vault is seeded with `inbox/`, `trash/`, `reference/`, and `projects/`, plus seven editable
-reference template cards under `templates/`. The `Getting started` guide is written to
-`reference/Getting started.md`. A chosen template adds its own reference and project notes on top of
-that guide.
+A new vault is seeded with `inbox/`, `trash/`, `reference/`, and `projects/`, plus eight editable
+template cards under `templates/`. The guide is written to `reference/Getting started.md` in English
+and `reference/Primeros pasos.md` in Spanish. A chosen template adds its own reference and project
+notes, with localized filenames and text, on top of that guide.
 
 The `templates/` folder is reserved for template cards, not notes. Its files are excluded from scans,
 the browser, name uniqueness, and reference resolution. An existing vault that used `templates/` for
@@ -38,7 +42,8 @@ not use. Opening a vault never restores a deleted card.
 ## 🧭 Creating from a template
 
 From the application, choose **New Vault…** and pick a starter-content option. The form shows a preview
-before anything is written.
+before anything is written. The active language selects the content. A template without a Spanish tree
+falls back to its English tree, so creation still succeeds.
 
 From the command line:
 

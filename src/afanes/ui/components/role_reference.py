@@ -12,7 +12,7 @@ from collections.abc import Awaitable, Callable, Sequence
 
 import flet as ft
 
-import afanes.ui.strings
+import afanes.i18n.ui
 import afanes.ui.theme
 from afanes.models.note import CategoryLabel
 
@@ -40,6 +40,8 @@ class RoleReferenceDialog:
         categories: Sequence[CategoryLabel],
         on_confirm: Callable[[CategoryLabel | None], Awaitable[None]],
         on_cancel: Callable[[], Awaitable[None]],
+        *,
+        copy: afanes.i18n.ui.UiCopy | None = None,
     ) -> None:
         """Build the category controls and the dialog.
 
@@ -54,16 +56,17 @@ class RoleReferenceDialog:
         on_cancel : Callable[[], Awaitable[None]]
             Command that closes the dialog without writing.
         """
+        self._copy = afanes.i18n.ui.UiCopy.english() if copy is None else copy
         self._on_confirm = on_confirm
         self._on_cancel = on_cancel
         self._typed_category: str | None = None
         self.name = name
         labels = sorted({"person", *(category.value for category in categories)}, key=str.casefold)
         self.category_field = ft.Dropdown(
-            label=afanes.ui.strings.ROLE_REFERENCE_CATEGORY_LABEL,
-            hint_text=afanes.ui.strings.ROLE_REFERENCE_CATEGORY_HINT,
+            label=self._copy.ROLE_REFERENCE_CATEGORY_LABEL,
+            hint_text=self._copy.ROLE_REFERENCE_CATEGORY_HINT,
             options=[
-                ft.dropdown.Option(key="", text=afanes.ui.strings.ROLE_REFERENCE_NO_CATEGORY),
+                ft.dropdown.Option(key="", text=self._copy.ROLE_REFERENCE_NO_CATEGORY),
                 *(ft.dropdown.Option(key=label, text=label) for label in labels),
             ],
             value="person",
@@ -81,20 +84,20 @@ class RoleReferenceDialog:
             key="role-reference-error",
         )
         self.cancel_button = ft.TextButton(
-            content=afanes.ui.strings.CANCEL_ACTION,
+            content=self._copy.CANCEL_ACTION,
             on_click=self.cancel,
             key="role-reference-cancel",
         )
         self.confirm_button = ft.FilledButton(
-            content=afanes.ui.strings.ROLE_REFERENCE_CREATE,
+            content=self._copy.ROLE_REFERENCE_CREATE,
             on_click=self.submit,
             key="role-reference-create",
         )
         self.dialog = ft.AlertDialog(
-            title=ft.Text(afanes.ui.strings.ROLE_REFERENCE_TITLE),
+            title=ft.Text(self._copy.ROLE_REFERENCE_TITLE),
             content=ft.Column(
                 controls=[
-                    ft.Text(afanes.ui.strings.ROLE_REFERENCE_BODY.format(name=name)),
+                    ft.Text(self._copy.ROLE_REFERENCE_BODY.format(name=name)),
                     self.category_field,
                     self.error,
                 ],
@@ -143,7 +146,7 @@ class RoleReferenceDialog:
         try:
             category = CategoryLabel(value) if value else None
         except ValueError:
-            self.error.value = afanes.ui.strings.PAGE_CATEGORY_INVALID
+            self.error.value = self._copy.PAGE_CATEGORY_INVALID
             self.error.visible = True
             return
         self.error.visible = False

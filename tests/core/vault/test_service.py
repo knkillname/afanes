@@ -34,7 +34,7 @@ from afanes.core.links import ResolutionOutcome
 from afanes.core.vault.snapshot import ParsedPage, UnparsedPage
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
-from tests.support import access_readable, constant
+from tests.support import access_readable, constant, simulated_message
 
 ONE = 1
 TWO = 2
@@ -295,7 +295,7 @@ class TestDirectoryFor:
         root = tmp_path / "vault"
         root.mkdir()
 
-        with pytest.raises(VaultError, match="log_directory"):
+        with pytest.raises(VaultError, match="log-directory-selected"):
             afanes.core.vault.service.Vault(root).directory_for(NoteType.LOG)
 
 
@@ -469,8 +469,7 @@ class TestVaultCreation:
         target = tmp_path / "vault"
 
         def fail_bundle(_self: object, _bundle: object) -> tuple[Path, ...]:
-            message = "starter content failed"
-            raise TemplateWriteError(message)
+            raise TemplateWriteError(simulated_message())
 
         monkeypatch.setattr(afanes.core.vault.service.Vault, "_write_bundle", fail_bundle)
         with pytest.raises(TemplateWriteError):
@@ -491,7 +490,7 @@ class TestVaultCreation:
             raise OSError(message)
 
         monkeypatch.setattr(afanes.core.vault.service.Vault, "_seed_layout", fail_layout)
-        with pytest.raises(VaultError, match="Could not seed"):
+        with pytest.raises(VaultError, match="vault-seed-failed"):
             afanes.core.vault.service.Vault.create_directory(target)
 
         assert (target / "afanes.yaml").read_text(encoding="utf-8") == "schema_version: 1\n"

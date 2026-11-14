@@ -74,6 +74,9 @@ docs = [
 [tool.hatch.version]
 path = "src/afanes/__about__.py"
 
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
 [tool.flet.app]
 path = "src"
 module = "main"
@@ -82,6 +85,13 @@ module = "main"
 path = ".venv"
 installer = "uv"
 dependency-groups = ["dev"]
+
+[tool.hatch.envs.default.scripts]
+i18n-compile = "python scripts/compile_catalogs.py"
+package = [
+  "python scripts/compile_catalogs.py",
+  "flet build {args}",
+]
 
 [tool.hatch.envs.docs]
 path = ".venv-docs"

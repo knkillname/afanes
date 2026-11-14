@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 
 import flet as ft
 
-import afanes.ui.strings
+import afanes.i18n.ui
 import afanes.ui.theme
 from afanes.ui.state.status import Notice, NoticeAction
 
@@ -34,6 +34,8 @@ class ToastPresenter:
         self,
         page: ft.Page,
         on_action: Callable[[NoticeAction], Awaitable[None]] | None = None,
+        *,
+        copy: afanes.i18n.ui.UiCopy | None = None,
     ) -> None:
         """Store the page and the optional action command.
 
@@ -44,6 +46,7 @@ class ToastPresenter:
         on_action : collections.abc.Callable[[NoticeAction], collections.abc.Awaitable[None]] | None
             Command run when the user selects the notice action.
         """
+        self._copy = afanes.i18n.ui.UiCopy.english() if copy is None else copy
         self._page = page
         self._on_action = on_action
         self.current: ft.SnackBar | None = None
@@ -81,7 +84,7 @@ class ToastPresenter:
         snackbar.on_dismiss = self._dismiss_handler(snackbar)
         if notice.action is not None:
             snackbar.action = ft.SnackBarAction(
-                label=afanes.ui.strings.UNDO_ACTION,
+                label=self._copy.UNDO_ACTION,
                 text_color=afanes.ui.theme.TOAST_ACTION_COLOR,
                 on_click=self._action_handler(snackbar, notice.action),
             )

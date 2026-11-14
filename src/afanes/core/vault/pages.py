@@ -17,7 +17,9 @@ import afanes.core.names
 import afanes.core.vault.snapshot
 from afanes.core.errors import (
     ContentChangedError,
+    DomainMessage,
     EmptyCaptureError,
+    MessageCode,
     NameCollisionError,
     NoteParseError,
     VaultError,
@@ -83,14 +85,14 @@ class VaultPages:
         try:
             data = source.read_bytes()
         except FileNotFoundError as exc:
-            message = f"Note does not exist: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_MISSING, path=str(note_path))
             raise VaultPathError(message) from exc
         except IsADirectoryError as exc:
-            message = f"Not a note file: {note_path}"
+            message = DomainMessage.of(MessageCode.NOT_A_NOTE_FILE, path=str(note_path))
             raise VaultPathError(message) from exc
 
         if hashlib.sha256(data).hexdigest() != expected_hash:
-            message = f"Note changed on disk: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_CHANGED_ON_DISK, path=str(note_path))
             raise ContentChangedError(message)
 
         afanes.core.atomic.AtomicWriter.write_text_atomic(source, text)
@@ -151,7 +153,7 @@ class VaultPages:
         directory is created and before any file is written.
         """
         if category is not None and note_type is not NoteType.REFERENCE:
-            message = "Only reference notes can declare a category"
+            message = DomainMessage.of(MessageCode.ONLY_REFERENCE_CATEGORIES)
             raise NoteParseError(message)
 
         content: str
@@ -166,7 +168,7 @@ class VaultPages:
         else:
             parsed = NoteDocument.from_text(text)
             if parsed.note_type is not note_type or parsed.category != category:
-                message = "Note text does not match the requested type and category"
+                message = DomainMessage.of(MessageCode.NOTE_TEXT_MISMATCH)
                 raise NoteParseError(message)
             if parsed.date is None and parsed.date_error is None:
                 labels = PageLabels.from_document(parsed).with_date_text(NoteDate.from_date(self.vault.today()).text)
@@ -176,14 +178,14 @@ class VaultPages:
 
         target_directory = self.vault.contained(self.vault.directory_for(note_type, category))
         if target_directory.exists() and not target_directory.is_dir():
-            message = f"Note directory is not a directory: {target_directory}"
+            message = DomainMessage.of(MessageCode.NOTE_DIRECTORY_NOT_DIRECTORY, path=str(target_directory))
             raise VaultError(message)
 
         name = afanes.core.names.NamePolicy.safe_filename(reference_name)
         scheme = ReferenceScheme.for_note(note_type)
         snapshot = self.vault.scan()
         if snapshot.catalog.candidates(scheme, name):
-            message = f"A {scheme.value} note named {name!r} already exists"
+            message = DomainMessage.of(MessageCode.NOTE_NAME_EXISTS, scheme=scheme.value, name=repr(name))
             raise NameCollisionError(message)
 
         target = target_directory / f"{name}{afanes.core.vault.snapshot.NOTE_SUFFIX}"
@@ -191,7 +193,7 @@ class VaultPages:
         if target_directory.is_dir() and any(
             child.name.casefold() == folded_name for child in target_directory.iterdir()
         ):
-            message = f"Destination already exists: {target}"
+            message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target))
             raise NameCollisionError(message)
 
         target_directory.mkdir(parents=True, exist_ok=True)
@@ -236,27 +238,27 @@ class VaultPages:
         """
         parsed = NoteDocument.from_text(text)
         if parsed.note_type is not NoteType.LOG:
-            message = "Log page text must declare type log"
+            message = DomainMessage.of(MessageCode.LOG_TEXT_TYPE)
             raise NoteParseError(message)
         if parsed.date != date:
-            message = f"Log page text must declare date {date.text}"
+            message = DomainMessage.of(MessageCode.LOG_TEXT_DATE, date=date.text)
             raise NoteParseError(message)
         if parsed.title is None:
-            message = "A log entry needs a title"
+            message = DomainMessage.of(MessageCode.LOG_TITLE_REQUIRED)
             raise NoteParseError(message)
 
         snapshot = self.vault.scan()
         if snapshot.log_entry(date) is not None:
-            message = f"A log entry already exists for {date.text}"
+            message = DomainMessage.of(MessageCode.LOG_ENTRY_EXISTS, date=date.text)
             raise NameCollisionError(message)
 
         target_directory = self.vault.contained(self.vault.log_directory(date))
         if target_directory.exists() and not target_directory.is_dir():
-            message = f"Note directory is not a directory: {target_directory}"
+            message = DomainMessage.of(MessageCode.NOTE_DIRECTORY_NOT_DIRECTORY, path=str(target_directory))
             raise VaultError(message)
         target = self.vault.contained(target_directory / f"{date.text}{afanes.core.vault.snapshot.NOTE_SUFFIX}")
         if target.exists():
-            message = f"Destination already exists: {target}"
+            message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target))
             raise NameCollisionError(message)
 
         target_directory.mkdir(parents=True, exist_ok=True)
@@ -309,21 +311,21 @@ class VaultPages:
         newline style are preserved, and the write is atomic.
         """
         if not confirm:
-            message = "Changing a status requires explicit confirmation"
+            message = DomainMessage.of(MessageCode.STATUS_CONFIRMATION_REQUIRED)
             raise VaultError(message)
 
         source = self.vault.contained(note_path)
         if not source.is_file() or source.suffix.casefold() != afanes.core.vault.snapshot.NOTE_SUFFIX:
-            message = f"Not a note file: {note_path}"
+            message = DomainMessage.of(MessageCode.NOT_A_NOTE_FILE, path=str(note_path))
             raise VaultPathError(message)
         vault = snapshot or self.vault.scan()
         note = vault.find_note(source)
         if note is None:
-            message = f"Note is not part of the vault: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_NOT_IN_VAULT, path=str(note_path))
             raise VaultError(message)
         data = source.read_bytes()
         if hashlib.sha256(data).hexdigest() != note.content_hash:
-            message = f"Note changed on disk: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_CHANGED_ON_DISK, path=str(note_path))
             raise ContentChangedError(message)
 
         document = NoteDocument.from_text(data.decode("utf-8"))
@@ -365,10 +367,10 @@ class VaultPages:
         """
         source = self.vault.contained(note_path)
         if source.exists():
-            message = f"Note already exists: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_ALREADY_EXISTS, path=str(note_path))
             raise ContentChangedError(message)
         if not source.parent.is_dir():
-            message = f"Destination directory does not exist: {source.parent}"
+            message = DomainMessage.of(MessageCode.DESTINATION_DIRECTORY_MISSING, path=str(source.parent))
             raise VaultError(message)
         afanes.core.atomic.AtomicWriter.write_text_atomic(source, text)
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -408,7 +410,7 @@ class VaultPages:
         lines = text.splitlines(keepends=True)
         first_index = next((index for index, line in enumerate(lines) if line.strip()), None)
         if first_index is None:
-            message = "A captured thought must contain text"
+            message = DomainMessage.of(MessageCode.CAPTURE_EMPTY)
             raise EmptyCaptureError(message)
         first_line = lines[first_index]
         body_lines = list(lines)

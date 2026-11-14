@@ -19,7 +19,7 @@ from markdown_it import MarkdownIt
 from markdown_it.token import Token
 from yaml import YAMLError
 
-from afanes.core.errors import NoteParseError, RetiredValueError
+from afanes.core.errors import DomainMessage, MessageCode, NoteParseError, RetiredValueError
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
 # Public canonical frontmatter delimiter.
@@ -82,7 +82,7 @@ class NoteDocument:
         ``None`` when absent.
     date : NoteDate | None
         ISO partial date, or ``None`` when absent or malformed.
-    date_error : str | None
+    date_error : DomainMessage | None
         Validation message for a malformed ``date``, or ``None`` when the value
         is absent or valid.
 
@@ -106,7 +106,7 @@ class NoteDocument:
     asked_by: str | None = None
     owner: str | None = None
     date: NoteDate | None = None
-    date_error: str | None = None
+    date_error: DomainMessage | None = None
 
     @classmethod
     def from_text(cls, text: str) -> Self:
@@ -257,7 +257,7 @@ class NoteDocument:
                 replacement += self.newline
             lines[start:end] = [replacement]
             return self.with_body("".join(lines))
-        message = "Note has no level-1 heading"
+        message = DomainMessage.of(MessageCode.NOTE_NO_TITLE)
         raise NoteParseError(message)
 
     @property
@@ -347,7 +347,7 @@ class NoteDocument:
             raw = NoteDocument._load_yaml(source)
             return FrontmatterSplit(raw=raw, body="".join(lines[index + 1 :]), has_frontmatter=True)
 
-        message = "Frontmatter opening fence is never closed"
+        message = DomainMessage.of(MessageCode.FRONTMATTER_UNCLOSED)
         raise NoteParseError(message)
 
     @staticmethod
@@ -361,19 +361,19 @@ class NoteDocument:
         try:
             loaded = yaml.safe_load(source)
         except YAMLError as exc:
-            message = "Frontmatter is not valid YAML"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_INVALID_YAML)
             raise NoteParseError(message) from exc
 
         if loaded is None:
             return {}
         if not isinstance(loaded, dict):
-            message = "Frontmatter must be a YAML mapping"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_NOT_MAPPING)
             raise NoteParseError(message)
 
         raw: dict[str, object] = {}
         for key, value in loaded.items():
             if not isinstance(key, str):
-                message = "Frontmatter keys must be strings"
+                message = DomainMessage.of(MessageCode.FRONTMATTER_KEYS_NOT_STRINGS)
                 raise NoteParseError(message)
             raw[key] = value
         return raw
@@ -382,17 +382,8 @@ class NoteDocument:
     def _reject_retired_keys(raw: dict[str, object]) -> None:
         """Reject the frontmatter keys retired by the three-type model."""
         for key in sorted(RETIRED_KEYS & raw.keys()):
-            if key == "people":
-                message = (
-                    "The 'people' key was retired; link people in the body with "
-                    "[Name](<note:Name>) or list them as step owners"
-                )
-            else:
-                message = (
-                    "The 'project' key was retired; move the work into the project body "
-                    "as a step or link it in the body"
-                )
-            raise RetiredValueError(message)
+            code = MessageCode.RETIRED_PEOPLE_KEY if key == "people" else MessageCode.RETIRED_PROJECT_KEY
+            raise RetiredValueError(DomainMessage.of(code))
 
     @staticmethod
     def _declared_note_type(raw: dict[str, object]) -> NoteType | None:
@@ -401,18 +392,15 @@ class NoteDocument:
             return None
         value = raw["type"]
         if not isinstance(value, str):
-            message = "Frontmatter type must be a string"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_TYPE_NOT_STRING)
             raise NoteParseError(message)
         if value in RETIRED_NOTE_TYPES:
-            if value == "action":
-                message = "The 'action' note type was retired; make a one-step project instead"
-            else:
-                message = "The 'person' note type was retired; create a reference with a category label instead"
-            raise RetiredValueError(message)
+            code = MessageCode.RETIRED_ACTION_TYPE if value == "action" else MessageCode.RETIRED_PERSON_TYPE
+            raise RetiredValueError(DomainMessage.of(code))
         try:
             return NoteType(value)
         except ValueError as exc:
-            message = f"Unknown note type: {value!r}"
+            message = DomainMessage.of(MessageCode.UNKNOWN_NOTE_TYPE, value=repr(value))
             raise NoteParseError(message) from exc
 
     @staticmethod
@@ -425,15 +413,15 @@ class NoteDocument:
             return None
         value = raw["category"]
         if not isinstance(value, str) or not value.strip():
-            message = "Frontmatter category must be a non-empty string"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_CATEGORY_NOT_STRING)
             raise NoteParseError(message)
         if note_type is not NoteType.REFERENCE:
-            message = "Frontmatter category is only valid on reference notes"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_CATEGORY_ONLY_REFERENCE)
             raise NoteParseError(message)
         try:
             category = CategoryLabel(value.strip())
         except ValueError as exc:
-            message = f"Invalid reference category: {value!r}"
+            message = DomainMessage.of(MessageCode.INVALID_CATEGORY, value=repr(value))
             raise NoteParseError(message) from exc
         raw["category"] = category.value
         return category
@@ -450,18 +438,20 @@ class NoteDocument:
         if value is None:
             return None
         if not isinstance(value, str):
-            message = "Frontmatter status must be a string"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_STATUS_NOT_STRING)
             raise NoteParseError(message)
         try:
             status = Status(value)
         except ValueError as exc:
-            message = f"Unknown note status: {value!r}"
+            message = DomainMessage.of(MessageCode.UNKNOWN_NOTE_STATUS, value=repr(value))
             raise NoteParseError(message) from exc
         if note_type is None:
-            message = "Frontmatter status requires a note type"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_STATUS_WITHOUT_TYPE)
             raise NoteParseError(message)
         if status not in note_type.allowed_statuses:
-            message = f"Status {value!r} is not valid for {note_type.value} notes"
+            message = DomainMessage.of(
+                MessageCode.STATUS_INVALID_FOR_TYPE, status=repr(value), note_type=note_type.value
+            )
             raise NoteParseError(message)
         raw["status"] = status.value
         return status
@@ -478,7 +468,7 @@ class NoteDocument:
         if value is None:
             return None
         if note_type is not NoteType.PROJECT:
-            message = "Frontmatter due_date is only valid on project notes"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_DUE_ONLY_PROJECT)
             raise NoteParseError(message)
         due_date = NoteDocument._calendar_date(value)
         raw["due_date"] = due_date
@@ -494,14 +484,14 @@ class NoteDocument:
             return None
         value = raw["asked_by"]
         if not isinstance(value, str):
-            message = "Frontmatter asked_by must be a string"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_ASSIGNMENT_NOT_STRING, field="asked_by")
             raise NoteParseError(message)
         name = value.strip()
         if not name:
-            message = "Frontmatter asked_by must be a non-empty string"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_ASSIGNMENT_EMPTY, field="asked_by")
             raise NoteParseError(message)
         if note_type is not NoteType.PROJECT:
-            message = "Frontmatter asked_by is only valid on project notes"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_ASSIGNMENT_ONLY_PROJECT, field="asked_by")
             raise NoteParseError(message)
         raw["asked_by"] = name
         return name
@@ -516,20 +506,20 @@ class NoteDocument:
             return None
         value = raw["owner"]
         if not isinstance(value, str):
-            message = "Frontmatter owner must be a string"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_ASSIGNMENT_NOT_STRING, field="owner")
             raise NoteParseError(message)
         name = value.strip()
         if not name:
-            message = "Frontmatter owner must be a non-empty string"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_ASSIGNMENT_EMPTY, field="owner")
             raise NoteParseError(message)
         if note_type is not NoteType.PROJECT:
-            message = "Frontmatter owner is only valid on project notes"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_ASSIGNMENT_ONLY_PROJECT, field="owner")
             raise NoteParseError(message)
         raw["owner"] = name
         return name
 
     @staticmethod
-    def _declared_date(raw: dict[str, object]) -> tuple[NoteDate | None, str | None]:
+    def _declared_date(raw: dict[str, object]) -> tuple[NoteDate | None, DomainMessage | None]:
         """Return the parsed note date and any malformed-value warning.
 
         Parameters
@@ -540,19 +530,19 @@ class NoteDocument:
 
         Returns
         -------
-        tuple[NoteDate | None, str | None]
-            Parsed date and ``None``, or ``None`` and an actionable warning.
+        tuple[NoteDate | None, DomainMessage | None]
+            Parsed date and ``None``, or ``None`` and an actionable message.
             An absent or null key returns ``(None, None)``.
         """
         if "date" not in raw or raw["date"] is None:
             return None, None
         value = raw["date"]
         note_date: NoteDate | None = None
-        warning: str | None = None
+        warning: DomainMessage | None = None
         if isinstance(value, bool):
-            warning = "A note date must be a date written as YYYY, YYYY-MM, or YYYY-MM-DD"
+            warning = DomainMessage.of(MessageCode.NOTE_DATE_FORMAT)
         elif isinstance(value, datetime.datetime):
-            warning = "A note date is a calendar date, not a timestamp"
+            warning = DomainMessage.of(MessageCode.NOTE_DATE_TIMESTAMP)
         else:
             try:
                 if isinstance(value, datetime.date):
@@ -562,9 +552,9 @@ class NoteDocument:
                 elif isinstance(value, str):
                     note_date = NoteDate.from_text(value)
                 else:
-                    warning = "A note date must be a date written as YYYY, YYYY-MM, or YYYY-MM-DD"
-            except ValueError as exc:
-                warning = str(exc)
+                    warning = DomainMessage.of(MessageCode.NOTE_DATE_FORMAT)
+            except ValueError:
+                warning = DomainMessage.of(MessageCode.INVALID_NOTE_DATE, value=repr(value))
         if warning is None and note_date is not None:
             raw["date"] = note_date.to_yaml_value()
             return note_date, None
@@ -591,7 +581,7 @@ class NoteDocument:
             ``YYYY-MM-DD`` calendar date.
         """
         if isinstance(value, datetime.datetime):
-            message = "A due date is a calendar date, not a timestamp"
+            message = DomainMessage.of(MessageCode.DUE_DATE_NOT_TIMESTAMP)
             raise NoteParseError(message)
         if isinstance(value, datetime.date):
             return value
@@ -599,9 +589,9 @@ class NoteDocument:
             try:
                 return datetime.date.fromisoformat(value.strip())
             except ValueError as exc:
-                message = f"Invalid due date: {value!r}; use YYYY-MM-DD"
+                message = DomainMessage.of(MessageCode.INVALID_DUE_DATE, value=repr(value))
                 raise NoteParseError(message) from exc
-        message = "Frontmatter due_date must be a date written as YYYY-MM-DD"
+        message = DomainMessage.of(MessageCode.DUE_DATE_NOT_DATE)
         raise NoteParseError(message)
 
     def _body_title(self) -> str | None:

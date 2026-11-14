@@ -11,7 +11,6 @@ import afanes.core.names
 import afanes.core.template_cards
 import afanes.core.vault.pages
 import afanes.ui.state.browser
-import afanes.ui.strings
 from afanes.core.errors import AfanesError, InvalidReferenceError, VaultError
 from afanes.core.links import DestinationKind, ReferenceParser
 from afanes.core.vault.snapshot import LinkOutcome, VaultSnapshot
@@ -227,7 +226,7 @@ class PageNavigator:
         """
         display_name = name.strip()
         if not display_name:
-            self.status.show_notice(afanes.ui.strings.BROWSER_NAME_REQUIRED)
+            self.status.show_notice(self.status.copy.BROWSER_NAME_REQUIRED)
             return False
         async with self.command_lock:
             vault = self.session.vault
@@ -249,14 +248,16 @@ class PageNavigator:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Browser reference could not be created", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.BROWSER_CREATE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.BROWSER_CREATE_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return False
                 refresh_error: str | None = None
                 try:
                     snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Snapshot refresh after creating a reference failed", exc_info=True)
-                    refresh_error = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
+                    refresh_error = self.status.copy.REFRESH_FAILED.format(detail=self.status.copy.render_error(exc))
                 else:
                     self.session.apply_snapshot(snapshot, focus=path)
                 self.browser.query = ""
@@ -297,7 +298,7 @@ class PageNavigator:
         """
         display_name = name.strip()
         if not display_name:
-            self.status.show_notice(afanes.ui.strings.BROWSER_NAME_REQUIRED)
+            self.status.show_notice(self.status.copy.BROWSER_NAME_REQUIRED)
             return False
         async with self.command_lock:
             vault = self.session.vault
@@ -319,14 +320,16 @@ class PageNavigator:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Role reference could not be created", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.BROWSER_CREATE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.BROWSER_CREATE_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return False
                 refresh_error: str | None = None
                 try:
                     snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Snapshot refresh after creating a role reference failed", exc_info=True)
-                    refresh_error = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
+                    refresh_error = self.status.copy.REFRESH_FAILED.format(detail=self.status.copy.render_error(exc))
                 else:
                     self.session.apply_snapshot(snapshot, focus=path)
                 if not await self.pages.load(path, editing=True):
@@ -430,7 +433,7 @@ class PageNavigator:
         try:
             reference = ReferenceParser().parse(destination)
         except InvalidReferenceError as exc:
-            self.status.show_notice(str(exc))
+            self.status.show_notice(self.status.copy.render_error(exc))
             return
         snapshot = self.session.snapshot
         if snapshot is None:

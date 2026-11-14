@@ -15,7 +15,9 @@ collapsed year tree show the archive; the detail region is the reading and writi
 
 Open **Log** in the navigation region. The browser region shows a month calendar and a collapsed date tree.
 **Today’s Entry**, **Entries**, and **Everything** share one row above the calendar; they wrap only
-when the browser cannot fit them.
+when the browser cannot fit them. The calendar is Monday-first in both languages. Its month heading,
+month names, and weekday labels follow the active language: **October 2025** with **Mo Tu We Th Fr Sa
+Su** in English, and **octubre de 2025** with **Lu Ma Mi Ju Vi Sá Do** in Spanish.
 
 - A day with entries has a tinted cell and a dot.
 - A month with a whole-month entry has a dot on its header.
@@ -32,8 +34,9 @@ tree. An empty day opens an unsaved draft for that date.
 - The **+** on an empty month or year row opens an unsaved draft for that whole month or year.
 - A month or year that already has an entry shows an open control instead of the plus.
 
-The draft starts with a long date title: `November 13, 2026`, `November 2026`, or `2026`. The heading is
-editable; the filename stays the ISO date. While the draft has no content beyond that heading, a
+The draft starts with a long date title in the active language: `November 13, 2026`, `November 2026`,
+or `2026` in English, and `13 de noviembre de 2026`, `noviembre de 2026`, or `2026` in Spanish. The
+heading is editable; the filename stays the ISO date. While the draft has no content beyond that heading, a
 **Starter** control in the label row beside Type and Date offers every valid log card and Empty. The
 Daily entry card adds the `## What happened`, `## What I learned`, and `## Next` prompts; Empty leaves
 only the heading.
@@ -55,11 +58,17 @@ mode for each vault. Search filters both the tree and the calendar.
 
 ## 📅 Changing a date
 
-A log entry's date is its identity. Change it in the page's Date field. Afanes writes the new date,
-renames the file, moves it to the matching `log/<year>/<month>/` folder, and rewrites inbound `log:`
-links. The heading follows the new date only while it still equals the old generated date title; a
-custom heading is preserved. The Rename action is not offered for a log entry; the Date field is the
-rename.
+A log entry's date is its identity. Change it in the page's Date field or with the date picker, which
+opens in the active language. Afanes writes the new date, renames the file, moves it to the matching
+`log/<year>/<month>/` folder, and rewrites inbound `log:` links. Metadata rows show the compact date
+for the active language, such as `Nov 13, 2026` or `13 nov 2026`; the Date field, links, and the
+filename keep the ISO value.
+
+The heading follows the new date only while it still equals a generated date title in English or
+Spanish. The replacement is written in the active language, so an `October 12, 2025` heading becomes
+`13 de octubre de 2025` in a Spanish session, and a `12 de octubre de 2025` heading becomes `October
+13, 2025` in an English session. A custom heading is preserved in either case. The Rename action is
+not offered for a log entry; the Date field is the rename.
 
 A day, month, or year can hold only one log entry. Creating or moving onto an occupied date is refused.
 

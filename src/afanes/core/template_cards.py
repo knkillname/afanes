@@ -19,12 +19,15 @@ from typing import Self
 
 from markdown_it import MarkdownIt
 
-from afanes.core.errors import AfanesError, TemplateCardContentError
+from afanes.core.errors import AfanesError, DomainMessage, MessageCode, TemplateCardContentError
 from afanes.core.frontmatter import NoteDocument
 from afanes.models.note import CategoryLabel, NoteType
 
-# Public package folder that holds the seven bundled cards.
+# Public package folder that holds the bundled card locale folders.
 TEMPLATE_CARDS_PACKAGE = "template_cards"
+
+# Public base language. A locale without its own card set falls back to this one.
+BASE_LOCALE = "en"
 
 # Public canonical card extension shared with the vault layout.
 NOTE_SUFFIX = ".md"
@@ -73,12 +76,12 @@ class TemplateCardIssue:
     ----------
     relative_path : pathlib.Path
         Card path relative to the ``templates/`` folder.
-    message : str
-        Concise explanation of the violated rule.
+    message : DomainMessage
+        Stable explanation of the violated rule.
     """
 
     relative_path: Path
-    message: str
+    message: DomainMessage
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -121,6 +124,9 @@ class TemplateCardCatalog:
     ----------
     root : importlib.resources.abc.Traversable
         Folder holding card files. A filesystem path is accepted.
+    base_root : importlib.resources.abc.Traversable | None
+        English card folder a localized catalog must match, or ``None`` for a
+        base or user catalog.
 
     Notes
     -----
@@ -131,18 +137,34 @@ class TemplateCardCatalog:
     """
 
     root: Traversable
+    base_root: Traversable | None = None
 
     @classmethod
-    def bundled(cls) -> Self:
+    def bundled(cls, locale: str | None = None) -> Self:
         """Return the catalog shipped inside the installed package.
+
+        Parameters
+        ----------
+        locale : str | None
+            Requested locale. ``None`` uses the base locale, and a locale
+            without a card set falls back to the base cards.
 
         Returns
         -------
         TemplateCardCatalog
-            Catalog rooted at the package's ``template_cards`` folder.
+            Catalog rooted at the matching locale folder. A localized catalog
+            remembers the English folder so :meth:`strict_cards` can compare
+            the two sets.
         """
-        package = importlib.resources.files("afanes")
-        return cls(root=package.joinpath(TEMPLATE_CARDS_PACKAGE))
+        package = importlib.resources.files("afanes").joinpath(TEMPLATE_CARDS_PACKAGE)
+        base = package.joinpath(BASE_LOCALE)
+        requested = BASE_LOCALE if locale is None else locale
+        if requested == BASE_LOCALE:
+            return cls(root=base)
+        candidate = package.joinpath(requested)
+        if not candidate.is_dir():
+            return cls(root=base)
+        return cls(root=candidate, base_root=base)
 
     @classmethod
     def from_root(cls, root: Traversable) -> Self:
@@ -176,7 +198,7 @@ class TemplateCardCatalog:
         except OSError as exc:
             issue = TemplateCardIssue(
                 relative_path=Path(self.root.name),
-                message=f"the templates folder cannot be read: {exc}",
+                message=DomainMessage.of(MessageCode.CARD_FOLDER_READ_FAILED, detail=str(exc)),
             )
             return TemplateCardListing(cards=(), issues=(issue,))
 
@@ -191,12 +213,24 @@ class TemplateCardCatalog:
                     continue
                 text = child.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError) as exc:
-                issues.append(TemplateCardIssue(relative_path=relative, message=f"cannot be read: {exc}"))
+                issues.append(
+                    TemplateCardIssue(
+                        relative_path=relative,
+                        message=DomainMessage.of(
+                            MessageCode.CARD_READ_FAILED,
+                            path=relative.as_posix(),
+                            detail=str(exc),
+                        ),
+                    )
+                )
                 continue
             try:
                 cards.append(self.parse(relative, text))
             except AfanesError as exc:
-                issues.append(TemplateCardIssue(relative_path=relative, message=str(exc)))
+                problem = exc.domain_message
+                if problem is None:
+                    problem = DomainMessage.of(MessageCode.CARD_READ_FAILED, path=relative.as_posix(), detail=str(exc))
+                issues.append(TemplateCardIssue(relative_path=relative, message=problem))
 
         cards.sort(key=lambda card: (card.title.casefold(), card.relative_path.as_posix()))
         return TemplateCardListing(cards=tuple(cards), issues=tuple(issues))
@@ -218,12 +252,47 @@ class TemplateCardCatalog:
         listing = self.load()
         if listing.issues:
             issue = listing.issues[0]
-            message = f"Bundled template card {issue.relative_path.as_posix()!r} is invalid: {issue.message}"
-            raise TemplateCardContentError(message)
+            raise TemplateCardContentError(issue.message)
         if not listing.cards:
-            message = "Bundled template cards are missing"
+            message = DomainMessage.of(MessageCode.CARDS_MISSING)
             raise TemplateCardContentError(message)
+        if self.base_root is not None:
+            self._validate_localized(listing.cards)
         return listing.cards
+
+    def _validate_localized(self, cards: tuple[TemplateCard, ...]) -> None:
+        """Verify a localized set matches the English filenames, types, and categories.
+
+        Parameters
+        ----------
+        cards : tuple[TemplateCard, ...]
+            Valid cards read from the localized folder.
+
+        Raises
+        ------
+        TemplateCardContentError
+            If a filename is missing or extra, or a matching filename changes
+            its type or category.
+        """
+        base_root = self.base_root
+        if base_root is None:
+            return
+        base = TemplateCardCatalog(root=base_root).strict_cards()
+        base_by_name = {card.relative_path.name: card for card in base}
+        localized_by_name = {card.relative_path.name: card for card in cards}
+        missing = sorted(set(base_by_name) - set(localized_by_name))
+        extra = sorted(set(localized_by_name) - set(base_by_name))
+        mismatched = sorted(
+            name
+            for name in set(base_by_name) & set(localized_by_name)
+            if (base_by_name[name].note_type, base_by_name[name].category)
+            != (localized_by_name[name].note_type, localized_by_name[name].category)
+        )
+        if not missing and not extra and not mismatched:
+            return
+        detail = f"missing={missing}, extra={extra}, mismatched={mismatched}"
+        message = DomainMessage.of(MessageCode.CARD_LOCALE_SHAPE, detail=detail)
+        raise TemplateCardContentError(message)
 
     @classmethod
     def parse(cls, relative_path: Path, text: str) -> TemplateCard:
@@ -249,28 +318,29 @@ class TemplateCardCatalog:
             category, workflow keys are present, the title or description has
             the wrong type, or the body contains a level-1 heading.
         """
+        path = relative_path.as_posix()
         try:
             document = NoteDocument.from_text(text)
         except AfanesError as exc:
-            message = f"frontmatter cannot be parsed: {exc}"
+            message = DomainMessage.of(MessageCode.CARD_FRONTMATTER_PARSE, path=path, detail=str(exc))
             raise TemplateCardContentError(message) from exc
         note_type = document.note_type
         if note_type not in (NoteType.REFERENCE, NoteType.LOG):
-            message = "must declare type: reference or log"
+            message = DomainMessage.of(MessageCode.CARD_TYPE_REQUIRED, path=path)
             raise TemplateCardContentError(message)
         category = document.category
         if note_type is NoteType.REFERENCE and category is None:
-            message = "must declare a category"
+            message = DomainMessage.of(MessageCode.CARD_CATEGORY_REQUIRED, path=path)
             raise TemplateCardContentError(message)
         if note_type is NoteType.LOG and category is not None:
-            message = "a log card must not declare a category"
+            message = DomainMessage.of(MessageCode.CARD_LOG_NO_CATEGORY, path=path)
             raise TemplateCardContentError(message)
-        cls._refuse_workflow_keys(document)
+        cls._refuse_workflow_keys(relative_path, document)
         title = cls._title(relative_path, document.raw)
-        description = cls._description(document.raw)
+        description = cls._description(relative_path, document.raw)
         body = document.body.strip("\r\n")
         if cls._has_level_one_heading(body):
-            message = "the starter body must not contain a level-1 heading"
+            message = DomainMessage.of(MessageCode.CARD_BODY_HEADING, path=path)
             raise TemplateCardContentError(message)
         return TemplateCard(
             relative_path=relative_path,
@@ -283,13 +353,14 @@ class TemplateCardCatalog:
         )
 
     @staticmethod
-    def _refuse_workflow_keys(document: NoteDocument) -> None:
+    def _refuse_workflow_keys(relative_path: Path, document: NoteDocument) -> None:
         """Refuse a card that carries workflow state."""
+        path = relative_path.as_posix()
         if document.status is not None:
-            message = "must not declare a status"
+            message = DomainMessage.of(MessageCode.CARD_STATUS_NOT_ALLOWED, path=path)
             raise TemplateCardContentError(message)
         if document.raw.get("due_date") is not None:
-            message = "must not declare a due date"
+            message = DomainMessage.of(MessageCode.CARD_DUE_NOT_ALLOWED, path=path)
             raise TemplateCardContentError(message)
 
     @classmethod
@@ -299,19 +370,19 @@ class TemplateCardCatalog:
         if value is None:
             return relative_path.stem
         if not isinstance(value, str):
-            message = "title must be a string"
+            message = DomainMessage.of(MessageCode.CARD_TITLE_NOT_STRING, path=relative_path.as_posix())
             raise TemplateCardContentError(message)
         title = value.strip()
         return title or relative_path.stem
 
     @classmethod
-    def _description(cls, raw: dict[str, object]) -> str | None:
+    def _description(cls, relative_path: Path, raw: dict[str, object]) -> str | None:
         """Return the optional description, normalizing a blank value."""
         value = raw.get("description")
         if value is None:
             return None
         if not isinstance(value, str):
-            message = "description must be a string"
+            message = DomainMessage.of(MessageCode.CARD_DESCRIPTION_NOT_STRING, path=relative_path.as_posix())
             raise TemplateCardContentError(message)
         description = value.strip()
         return description or None

@@ -7,6 +7,8 @@ import dataclasses
 import logging
 from enum import StrEnum
 
+import afanes.i18n.ui
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,11 +52,24 @@ class UiStatus:
         Whether a blocking command is in progress.
     session_active : bool
         Whether a presentation session currently drives the workspace.
+    copy : afanes.i18n.ui.UiCopy
+        Active interface catalog. The English catalog is the default.
     """
 
     notice: Notice | None = None
     busy: bool = False
     session_active: bool = False
+    copy: afanes.i18n.ui.UiCopy = dataclasses.field(default_factory=afanes.i18n.ui.UiCopy.english)
+
+    def set_copy(self, copy: afanes.i18n.ui.UiCopy) -> None:
+        """Replace the active interface catalog.
+
+        Parameters
+        ----------
+        copy : afanes.i18n.ui.UiCopy
+            Catalog resolved for the launch locale.
+        """
+        self.copy = copy
 
     def show_notice(self, message: str, action: NoticeAction | None = None) -> None:
         """Store the latest transient notice, replacing any earlier one.
@@ -127,3 +142,4 @@ class UiStatus:
         self.notice = None
         self.busy = False
         self.session_active = False
+        self.copy = afanes.i18n.ui.UiCopy.english()

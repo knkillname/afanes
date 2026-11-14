@@ -11,10 +11,11 @@ move, and reference rewrite.
 import dataclasses
 from pathlib import Path
 
+import afanes.core.localization
 import afanes.core.log
 import afanes.core.names
 import afanes.core.vault.snapshot
-from afanes.core.errors import NameCollisionError, VaultError
+from afanes.core.errors import DomainMessage, MessageCode, NameCollisionError, VaultError
 from afanes.core.vault.naming import VaultNaming
 from afanes.core.vault.naming_reports import RenamePreview, RenameReport
 from afanes.core.vault.service import Vault
@@ -60,6 +61,7 @@ class LogConversions:
         new_date: NoteDate,
         *,
         snapshot: VaultSnapshot | None = None,
+        locale: afanes.core.localization.LocaleTag | None = None,
     ) -> RenamePreview:
         """Plan a log entry date change without writing.
 
@@ -71,6 +73,8 @@ class LogConversions:
             Replacement ISO date. Its precision selects the filename and folder.
         snapshot : VaultSnapshot | None
             Pre-built scan to avoid rescanning, or ``None`` to scan the vault.
+        locale : afanes.core.localization.LocaleTag | None
+            Active locale for the generated heading. ``None`` uses English.
 
         Returns
         -------
@@ -92,35 +96,37 @@ class LogConversions:
         self-reference cannot be rewritten after the date write. The source
         hash is included in :attr:`afanes.core.vault.naming_reports.RenamePreview.content_hashes` so apply can
         detect an external edit before writing the date. A heading that equals
-        the old generated date title follows the new date; any other heading is
+        the old generated date title in any supported language follows the new
+        date and is written in the active locale; any other heading is
         preserved.
         """
+        active_locale = afanes.core.localization.LocaleTag.parse(None) if locale is None else locale
         source = self.vault.contained(note_path)
         vault = snapshot or self.vault.scan()
         note = vault.find_note(source)
         if note is None:
-            message = f"Note is not part of the vault: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_NOT_IN_VAULT, path=str(note_path))
             raise VaultError(message)
         if note.note_type is not NoteType.LOG:
-            message = "Only log notes use a date identity"
+            message = DomainMessage.of(MessageCode.LOG_DATE_IDENTITY_ONLY)
             raise VaultError(message)
 
         target_directory = self.vault.contained(self.vault.log_directory(new_date))
         target = target_directory / f"{new_date.text}{afanes.core.vault.snapshot.NOTE_SUFFIX}"
         existing = vault.catalog.candidates(ReferenceScheme.LOG, new_date.text)
         if any(not VaultPath.same(path, source) for path in existing):
-            message = f"A log note named {new_date.text!r} already exists"
+            message = DomainMessage.of(MessageCode.LOG_NAME_EXISTS, date=repr(new_date.text))
             raise NameCollisionError(message)
         if target.exists() and not VaultPath.same(target, source):
-            message = f"Destination already exists: {target}"
+            message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target))
             raise NameCollisionError(message)
 
         affected = tuple(site for site in vault.affected_sites(source) if not VaultPath.same(site.path, source))
         hashes = {site.path: vault.hash_for_note(site.path) for site in affected}
         hashes[source] = note.content_hash
         new_heading: str | None = None
-        if note.date is not None and note.title == afanes.core.log.LogTitle.for_date(note.date).text:
-            new_heading = afanes.core.log.LogTitle.for_date(new_date).text
+        if note.date is not None and afanes.core.log.LogTitle.matches_generated(note.title, note.date):
+            new_heading = afanes.core.log.LogTitle.for_date(new_date, active_locale).text
         return RenamePreview(
             note_path=source,
             target_path=target,
@@ -181,20 +187,20 @@ class LogConversions:
         vault = snapshot or self.vault.scan()
         note = vault.find_note(source)
         if note is None:
-            message = f"Note is not part of the vault: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_NOT_IN_VAULT, path=str(note_path))
             raise VaultError(message)
         if note.note_type is new_type:
-            message = "The note already has that type"
+            message = DomainMessage.of(MessageCode.NOTE_ALREADY_HAS_TYPE)
             raise VaultError(message)
         if new_type is NoteType.LOG and note.date is None:
-            message = "Set a date before changing this note to a log entry"
+            message = DomainMessage.of(MessageCode.LOG_DATE_REQUIRED)
             raise VaultError(message)
 
         new_scheme = ReferenceScheme.for_note(new_type)
         new_date = note.date
         if new_type is NoteType.LOG:
             if note.date is None:
-                message = "Set a date before changing this note to a log entry"
+                message = DomainMessage.of(MessageCode.LOG_DATE_REQUIRED)
                 raise VaultError(message)
             new_name = note.date.text
             target_directory = self.vault.contained(self.vault.log_directory(note.date))
@@ -205,10 +211,10 @@ class LogConversions:
 
         existing = vault.catalog.candidates(new_scheme, new_name)
         if any(not VaultPath.same(path, source) for path in existing):
-            message = f"A {new_scheme.value} note named {new_name!r} already exists"
+            message = DomainMessage.of(MessageCode.NOTE_NAME_EXISTS, scheme=new_scheme.value, name=repr(new_name))
             raise NameCollisionError(message)
         if target.exists() and not VaultPath.same(target, source):
-            message = f"Destination already exists: {target}"
+            message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target))
             raise NameCollisionError(message)
 
         affected = tuple(site for site in vault.affected_sites(source) if not VaultPath.same(site.path, source))

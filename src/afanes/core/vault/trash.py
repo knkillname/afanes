@@ -21,6 +21,8 @@ import afanes.core.vault.snapshot
 from afanes.core.errors import (
     AfanesError,
     ContentChangedError,
+    DomainMessage,
+    MessageCode,
     NameCollisionError,
     VaultError,
 )
@@ -78,7 +80,7 @@ class TrashService:
         vault = snapshot or self.vault.scan()
         note = vault.find_note(source)
         if note is None:
-            message = f"Note is not part of the vault: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_NOT_IN_VAULT, path=str(note_path))
             raise VaultError(message)
 
         trash_directory = TrashCatalog(self.vault).trash_directory()
@@ -135,18 +137,18 @@ class TrashService:
             If the note changed after planning.
         """
         if not confirm:
-            message = "Trashing requires explicit confirmation"
+            message = DomainMessage.of(MessageCode.TRASH_CONFIRMATION)
             raise VaultError(message)
 
         preview = self.plan_trash(note_path, snapshot=snapshot, today=today)
         if expected_hash is not None and preview.source_hash != expected_hash:
-            message = f"Note changed on disk: {preview.note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_CHANGED_ON_DISK, path=str(preview.note_path))
             raise ContentChangedError(message)
 
         source = preview.note_path
         source_data = source.read_bytes()
         if hashlib.sha256(source_data).hexdigest() != preview.source_hash:
-            message = f"Note changed on disk: {source}"
+            message = DomainMessage.of(MessageCode.NOTE_CHANGED_ON_DISK, path=str(source))
             raise ContentChangedError(message)
 
         relative_birthplace = source.relative_to(self.vault.root)
@@ -158,7 +160,7 @@ class TrashService:
             document = TrashDocument.from_text(source_data.decode("utf-8"))
             updated_text = document.with_metadata(metadata)
         except (AfanesError, UnicodeDecodeError, OSError) as exc:
-            message = f"Could not add trash metadata to the note: {source}"
+            message = DomainMessage.of(MessageCode.TRASH_METADATA_WRITE_FAILED, path=str(source))
             raise VaultError(message) from exc
 
         trash_directory = preview.trash_path.parent
@@ -166,7 +168,7 @@ class TrashService:
             trash_directory.mkdir(parents=True, exist_ok=True)
             afanes.core.atomic.AtomicWriter.write_text_atomic(source, updated_text)
         except (OSError, VaultError) as exc:
-            message = f"Could not move the note to trash: {source}"
+            message = DomainMessage.of(MessageCode.TRASH_MOVE_FAILED, path=str(source))
             raise VaultError(message) from exc
 
         trash_path = preview.trash_path
@@ -177,7 +179,7 @@ class TrashService:
         except OSError as exc:
             with contextlib.suppress(OSError, VaultError):
                 afanes.core.atomic.AtomicWriter.write_text_atomic(source, source_data.decode("utf-8"))
-            message = f"Could not move the note to trash: {source}"
+            message = DomainMessage.of(MessageCode.TRASH_MOVE_FAILED, path=str(source))
             raise VaultError(message) from exc
 
         return dataclasses.replace(preview, trash_path=trash_path)
@@ -215,7 +217,7 @@ class TrashService:
             If the birthplace is occupied and ``overwrite`` is ``False``.
         """
         if not confirm:
-            message = "Restoring a trashed note requires explicit confirmation"
+            message = DomainMessage.of(MessageCode.TRASH_RESTORE_CONFIRMATION)
             raise VaultError(message)
         return self._restore_paths(preview.trash_path, preview.note_path, overwrite=overwrite)
 
@@ -251,7 +253,7 @@ class TrashService:
             If the birthplace is occupied and ``overwrite`` is ``False``.
         """
         if not confirm:
-            message = "Restoring a trashed note requires explicit confirmation"
+            message = DomainMessage.of(MessageCode.TRASH_RESTORE_CONFIRMATION)
             raise VaultError(message)
         return self._restore_paths(entry.path, entry.birthplace, overwrite=overwrite)
 
@@ -279,7 +281,7 @@ class TrashService:
             self._require_managed_metadata(source)
             source.unlink()
         except OSError as exc:
-            message = "Could not delete the trashed note"
+            message = DomainMessage.of(MessageCode.TRASH_DELETE_FAILED)
             raise VaultError(message) from exc
 
     def empty(self) -> TrashMaintenanceReport:
@@ -365,12 +367,12 @@ class TrashService:
         raw_source = source_candidate if source_candidate.is_absolute() else self.vault.root / source_candidate
         raw_target = target_candidate if target_candidate.is_absolute() else self.vault.root / target_candidate
         if raw_source.is_symlink() or raw_target.is_symlink():
-            message = "The trashed note cannot be restored"
+            message = DomainMessage.of(MessageCode.TRASH_RESTORE_UNSUPPORTED)
             raise VaultError(message)
         source = self.vault.contained(source_candidate)
         target = self.vault.contained(target_candidate)
         if not source.is_file():
-            message = "The trashed note no longer exists"
+            message = DomainMessage.of(MessageCode.TRASH_ENTRY_MISSING)
             raise VaultError(message)
         return source, target, raw_target
 
@@ -379,7 +381,7 @@ class TrashService:
         try:
             return self._restored_text(source)
         except (AfanesError, UnicodeDecodeError, OSError) as exc:
-            message = "The trashed note metadata cannot be read"
+            message = DomainMessage.of(MessageCode.TRASH_METADATA_UNREADABLE)
             raise VaultError(message) from exc
 
     @staticmethod
@@ -394,10 +396,10 @@ class TrashService:
         if not (target.exists() or raw_target.exists()):
             return
         if not target.is_file() or target.is_dir():
-            message = "The birthplace is not a regular note file"
+            message = DomainMessage.of(MessageCode.TRASH_BIRTHPLACE_NOT_FILE)
             raise VaultError(message)
         if not overwrite:
-            message = f"Destination already exists: {target_candidate}"
+            message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target_candidate))
             raise NameCollisionError(message)
 
     @staticmethod
@@ -416,10 +418,10 @@ class TrashService:
             else:
                 afanes.core.atomic.AtomicWriter.write_text_exclusive(target, restored_text)
         except FileExistsError as exc:
-            message = f"Destination already exists: {target_candidate}"
+            message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target_candidate))
             raise NameCollisionError(message) from exc
         except (OSError, VaultError) as exc:
-            message = "Could not restore the trashed note"
+            message = DomainMessage.of(MessageCode.TRASH_RESTORE_FAILED)
             raise VaultError(message) from exc
 
     @staticmethod
@@ -428,7 +430,7 @@ class TrashService:
         try:
             source.unlink()
         except OSError as exc:
-            message = "The note was restored, but the trashed copy could not be removed"
+            message = DomainMessage.of(MessageCode.TRASH_RESTORE_PARTIAL)
             raise VaultError(message) from exc
 
     @staticmethod
@@ -436,7 +438,7 @@ class TrashService:
         """Return the trashed note text with its metadata removed."""
         document = TrashDocument.from_text(source.read_bytes().decode("utf-8"))
         if document.metadata is None:
-            message = "The trashed note has no usable birthplace"
+            message = DomainMessage.of(MessageCode.TRASH_NO_BIRTHPLACE)
             raise VaultError(message)
         return document.without_metadata()
 
@@ -446,7 +448,7 @@ class TrashService:
         document = TrashDocument.from_text(source.read_bytes().decode("utf-8"))
         metadata = document.metadata
         if metadata is None:
-            message = "The trashed note has no usable birthplace"
+            message = DomainMessage.of(MessageCode.TRASH_NO_BIRTHPLACE)
             raise VaultError(message)
         afanes.core.atomic.AtomicWriter.write_text_atomic(source, document.with_metadata(metadata.with_day(today)))
 
@@ -454,19 +456,19 @@ class TrashService:
         """Raise unless a file still carries a safe birthplace."""
         document = TrashDocument.from_text(source.read_bytes().decode("utf-8"))
         if document.metadata is None:
-            message = "The file is not a managed trash entry"
+            message = DomainMessage.of(MessageCode.TRASH_NOT_MANAGED)
             raise VaultError(message)
 
     def _managed_source(self, candidate: Path) -> Path:
         """Resolve a managed file under the trash folder and refuse symlinks."""
         raw = candidate if candidate.is_absolute() else self.vault.root / candidate
         if raw.is_symlink():
-            message = "The trashed note is not a regular file"
+            message = DomainMessage.of(MessageCode.TRASH_NOT_REGULAR)
             raise VaultError(message)
         source = self.vault.contained(candidate)
         trash_directory = TrashCatalog(self.vault).trash_directory().resolve()
         if not source.is_relative_to(trash_directory) or not source.is_file():
-            message = "The file is not a managed trash entry"
+            message = DomainMessage.of(MessageCode.TRASH_NOT_MANAGED)
             raise VaultError(message)
         return source
 

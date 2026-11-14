@@ -5,8 +5,9 @@ from pathlib import Path
 
 import flet as ft
 
+import afanes.i18n.ui
+import afanes.i18n.ui.en
 import afanes.ui.components.role_reference
-import afanes.ui.strings
 from afanes.models.note import CategoryLabel
 from tests.support import versioned
 
@@ -44,7 +45,7 @@ class TestRoleReferenceDialog:
         assert dialog.category_field.editable is True
         assert dialog.category_field.on_text_change == dialog.record_text
         assert dialog.category_field.on_select == dialog.record_selection
-        assert afanes.ui.strings.PAGE_CATEGORY_INVALID not in dialog.error.value
+        assert afanes.i18n.ui.en.PAGE_CATEGORY_INVALID not in dialog.error.value
 
     def test_person_is_the_default_even_when_not_supplied(self) -> None:
         async def confirm(_category: CategoryLabel | None) -> None:
@@ -113,7 +114,7 @@ class TestRoleReferenceDialog:
 
         assert confirmed == []
         assert dialog.error.visible is True
-        assert dialog.error.value == afanes.ui.strings.PAGE_CATEGORY_INVALID
+        assert dialog.error.value == afanes.i18n.ui.en.PAGE_CATEGORY_INVALID
 
     def test_cancelling_writes_nothing(self) -> None:
         confirmed: list[CategoryLabel | None] = []
@@ -140,6 +141,6 @@ class TestRoleReferenceDialog:
 
         body = dialog.dialog.content
         assert isinstance(body, ft.Column)
-        assert afanes.ui.strings.ROLE_REFERENCE_BODY.format(name="Sam Rivera") in [
+        assert afanes.i18n.ui.en.ROLE_REFERENCE_BODY.format(name="Sam Rivera") in [
             control.value for control in body.controls if isinstance(control, ft.Text)
         ]

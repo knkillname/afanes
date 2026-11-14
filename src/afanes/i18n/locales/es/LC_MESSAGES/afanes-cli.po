@@ -1,0 +1,243 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: afanes 0.9.0\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/afanes/i18n/cli/en.py PROGRAM
+msgctxt "PROGRAM"
+msgid "afanes"
+msgstr "afanes"
+
+#: src/afanes/i18n/cli/en.py DESCRIPTION
+msgctxt "DESCRIPTION"
+msgid "Work with Afanes vaults without opening the interface"
+msgstr "Trabaja con bóvedas de Afanes sin abrir la interfaz"
+
+#: src/afanes/i18n/cli/en.py VAULT_COMMAND
+msgctxt "VAULT_COMMAND"
+msgid "vault"
+msgstr "vault"
+
+#: src/afanes/i18n/cli/en.py VAULT_HELP
+msgctxt "VAULT_HELP"
+msgid "Create and manage vault directories"
+msgstr "Crea y gestiona carpetas de bóveda"
+
+#: src/afanes/i18n/cli/en.py CREATE_COMMAND
+msgctxt "CREATE_COMMAND"
+msgid "create"
+msgstr "create"
+
+#: src/afanes/i18n/cli/en.py CREATE_HELP
+msgctxt "CREATE_HELP"
+msgid "Create and seed a new vault directory"
+msgstr "Crea e inicializa una carpeta de bóveda nueva"
+
+#: src/afanes/i18n/cli/en.py CREATE_DIRECTORY_HELP
+msgctxt "CREATE_DIRECTORY_HELP"
+msgid "Vault directory. Missing folders in the path are created"
+msgstr "Carpeta de la bóveda. Las carpetas faltantes de la ruta se crean"
+
+#: src/afanes/i18n/cli/en.py NO_REMEMBER_HELP
+msgctxt "NO_REMEMBER_HELP"
+msgid "Do not make the new vault the one Afanes opens next launch"
+msgstr "No hace que la bóveda nueva sea la que Afanes abre en el próximo inicio"
+
+#: src/afanes/i18n/cli/en.py TEMPLATE_OPTION_HELP
+msgctxt "TEMPLATE_OPTION_HELP"
+msgid "Bundled starter content to write into the new vault"
+msgstr "Contenido inicial incluido que se escribe en la bóveda nueva"
+
+#: src/afanes/i18n/cli/en.py TEMPLATES_COMMAND
+msgctxt "TEMPLATES_COMMAND"
+msgid "templates"
+msgstr "templates"
+
+#: src/afanes/i18n/cli/en.py TEMPLATES_HELP
+msgctxt "TEMPLATES_HELP"
+msgid "List the bundled starter content without opening a vault"
+msgstr "Enumera el contenido inicial incluido sin abrir una bóveda"
+
+#: src/afanes/i18n/cli/en.py ADOPT_COMMAND
+msgctxt "ADOPT_COMMAND"
+msgid "adopt"
+msgstr "adopt"
+
+#: src/afanes/i18n/cli/en.py ADOPT_HELP
+msgctxt "ADOPT_HELP"
+msgid "Add the vault settings file to an existing folder"
+msgstr "Añade el archivo de configuración de la bóveda a una carpeta existente"
+
+#: src/afanes/i18n/cli/en.py ADOPT_DIRECTORY_HELP
+msgctxt "ADOPT_DIRECTORY_HELP"
+msgid "Existing folder with the five default folders"
+msgstr "Carpeta existente con las cinco carpetas predeterminadas"
+
+#: src/afanes/i18n/cli/en.py ADOPT_NO_REMEMBER_HELP
+msgctxt "ADOPT_NO_REMEMBER_HELP"
+msgid "Do not make the adopted vault the one Afanes opens next launch"
+msgstr "No hace que la bóveda adoptada sea la que Afanes abre en el próximo inicio"
+
+#: src/afanes/i18n/cli/en.py CREATED_VAULT
+msgctxt "CREATED_VAULT"
+msgid "Created vault {path}"
+msgstr "Bóveda creada en {path}"
+
+#: src/afanes/i18n/cli/en.py ADOPTED_VAULT
+msgctxt "ADOPTED_VAULT"
+msgid "Adopted vault {path}"
+msgstr "Bóveda adoptada en {path}"
+
+#: src/afanes/i18n/cli/en.py ALREADY_VAULT
+msgctxt "ALREADY_VAULT"
+msgid "{path} is already a vault with schema version {version}; nothing changed"
+msgstr "{path} ya es una bóveda con la versión de esquema {version}; no se cambió nada"
+
+#: src/afanes/i18n/cli/en.py CREATED_PARENTS
+msgctxt "CREATED_PARENTS"
+msgid "Parent folders created: {paths}"
+msgstr "Carpetas principales creadas: {paths}"
+
+#: src/afanes/i18n/cli/en.py SEEDED_FOLDERS
+msgctxt "SEEDED_FOLDERS"
+msgid "Seeded: {folders}"
+msgstr "Inicializadas: {folders}"
+
+#: src/afanes/i18n/cli/en.py SETTINGS_FILE
+msgctxt "SETTINGS_FILE"
+msgid "Settings file: {path} (schema version {version})"
+msgstr "Archivo de configuración: {path} (versión de esquema {version})"
+
+#: src/afanes/i18n/cli/en.py TEMPLATE_USED
+msgctxt "TEMPLATE_USED"
+msgid "Template: {template}"
+msgstr "Plantilla: {template}"
+
+#: src/afanes/i18n/cli/en.py WRITTEN_NOTES
+msgctxt "WRITTEN_NOTES"
+msgid "Notes written: {notes}"
+msgstr "Notas escritas: {notes}"
+
+#: src/afanes/i18n/cli/en.py TEMPLATE_NONE
+msgctxt "TEMPLATE_NONE"
+msgid "none"
+msgstr "ninguna"
+
+#: src/afanes/i18n/cli/en.py TEMPLATE_LINE
+msgctxt "TEMPLATE_LINE"
+msgid "{identifier}: {label} - {description} ({notes})"
+msgstr "{identifier}: {label} - {description} ({notes})"
+
+#: src/afanes/i18n/cli/en.py TEMPLATE_NOTES_ONE
+msgctxt "TEMPLATE_NOTES_ONE"
+msgid "1 note"
+msgstr "1 nota"
+
+#: src/afanes/i18n/cli/en.py TEMPLATE_NOTES_MANY
+msgctxt "TEMPLATE_NOTES_MANY"
+msgid "{count} notes"
+msgstr "{count} notas"
+
+#: src/afanes/i18n/cli/en.py TEMPLATES_FAILED
+msgctxt "TEMPLATES_FAILED"
+msgid "Could not read the bundled starter content: {detail}"
+msgstr "No se pudo leer el contenido inicial incluido: {detail}"
+
+#: src/afanes/i18n/cli/en.py REMEMBERED
+msgctxt "REMEMBERED"
+msgid "Remembered as the vault to open next launch"
+msgstr "Recordada como la bóveda que se abre en el próximo inicio"
+
+#: src/afanes/i18n/cli/en.py NOT_REMEMBERED
+msgctxt "NOT_REMEMBERED"
+msgid "Not remembered; use --vault to open it on the next run"
+msgstr "No recordada; se abre con --vault en la próxima ejecución"
+
+#: src/afanes/i18n/cli/en.py CREATE_FAILED
+msgctxt "CREATE_FAILED"
+msgid "Could not create the vault: {detail}"
+msgstr "No se pudo crear la bóveda: {detail}"
+
+#: src/afanes/i18n/cli/en.py REMEMBER_FAILED
+msgctxt "REMEMBER_FAILED"
+msgid "The vault was created at {path} but could not be remembered: {detail}"
+msgstr "La bóveda se creó en {path}, pero no se pudo recordar: {detail}"
+
+#: src/afanes/i18n/cli/en.py ADOPT_FAILED
+msgctxt "ADOPT_FAILED"
+msgid "Could not adopt the vault: {detail}"
+msgstr "No se pudo adoptar la bóveda: {detail}"
+
+#: src/afanes/i18n/cli/en.py ADOPT_REMEMBER_FAILED
+msgctxt "ADOPT_REMEMBER_FAILED"
+msgid "The vault at {path} was adopted but could not be remembered: {detail}"
+msgstr "La bóveda de {path} se adoptó, pero no se pudo recordar: {detail}"
+
+#: src/afanes/i18n/cli/en.py HELP_OPTION
+msgctxt "HELP_OPTION"
+msgid "Show this help message and exit"
+msgstr "Muestra este mensaje de ayuda y sale"
+
+#: src/afanes/i18n/cli/en.py USAGE_ERROR
+msgctxt "USAGE_ERROR"
+msgid "Invalid command-line arguments"
+msgstr "Argumentos de línea de comandos no válidos"
+
+#: src/afanes/i18n/cli/en.py LAUNCH_DESCRIPTION
+msgctxt "LAUNCH_DESCRIPTION"
+msgid "Open Afanes, an offline Markdown vault"
+msgstr "Abre Afanes, una bóveda Markdown sin conexión"
+
+#: src/afanes/i18n/cli/en.py LAUNCH_WEB_HELP
+msgctxt "LAUNCH_WEB_HELP"
+msgid "Serve the interface in a browser instead of a desktop window"
+msgstr "Sirve la interfaz en un navegador en lugar de una ventana de escritorio"
+
+#: src/afanes/i18n/cli/en.py LAUNCH_VAULT_HELP
+msgctxt "LAUNCH_VAULT_HELP"
+msgid "Open DIR for this run without replacing the remembered vault"
+msgstr "Abre DIR para esta ejecución sin reemplazar la bóveda recordada"
+
+#: src/afanes/i18n/cli/en.py LAUNCH_PORT_HELP
+msgctxt "LAUNCH_PORT_HELP"
+msgid "Port for the browser presentation. 0 chooses a free port"
+msgstr "Puerto para la presentación en el navegador. 0 elige un puerto libre"
+
+#: src/afanes/i18n/cli/en.py LAUNCH_PORT_NOT_NUMBER
+msgctxt "LAUNCH_PORT_NOT_NUMBER"
+msgid "Port must be a whole number"
+msgstr "El puerto debe ser un número entero"
+
+#: src/afanes/i18n/cli/en.py LAUNCH_PORT_OUT_OF_RANGE
+msgctxt "LAUNCH_PORT_OUT_OF_RANGE"
+msgid "Port must be between 0 and {limit}"
+msgstr "El puerto debe estar entre 0 y {limit}"
+
+#: src/afanes/i18n/cli/en.py LAUNCH_MISSING_SDK
+msgctxt "LAUNCH_MISSING_SDK"
+msgid "Afanes needs the Flet SDK, which is not installed. Install it with \"pip install afanes[desktop]\" or \"pip install afanes[web]\""
+msgstr "Afanes necesita el SDK de Flet, que no está instalado. La instalación se realiza con «pip install afanes[desktop]» o «pip install afanes[web]»"
+
+#: src/afanes/i18n/cli/en.py LAUNCH_MISSING_DESKTOP
+msgctxt "LAUNCH_MISSING_DESKTOP"
+msgid "The desktop runtime is not installed. Install it with \"pip install afanes[desktop]\", or run with --web for the browser presentation"
+msgstr "El entorno de escritorio no está instalado. La instalación se realiza con «pip install afanes[desktop]», o ejecuta con --web para la presentación en el navegador"
+
+#: src/afanes/i18n/cli/en.py LAUNCH_MISSING_WEB
+msgctxt "LAUNCH_MISSING_WEB"
+msgid "The web runtime is not installed. Install it with \"pip install afanes[web]\""
+msgstr "El entorno web no está instalado. La instalación se realiza con «pip install afanes[web]»"
+
+#: src/afanes/i18n/cli/en.py LAUNCH_DESKTOP_FAILED
+msgctxt "LAUNCH_DESKTOP_FAILED"
+msgid "The desktop window could not start: {detail}\nRun with --web for the browser presentation"
+msgstr "La ventana de escritorio no pudo iniciarse: {detail}\nEjecuta con --web para la presentación en el navegador"
+
+#: src/afanes/i18n/cli/en.py LAUNCH_VAULT_INVALID
+msgctxt "LAUNCH_VAULT_INVALID"
+msgid "Cannot open {path}: {detail}"
+msgstr "No se puede abrir {path}: {detail}"

@@ -5,8 +5,6 @@ import dataclasses
 import logging
 from pathlib import Path
 
-import afanes.core.templates
-import afanes.ui.strings
 from afanes.core.editing import PageDraftFactory
 from afanes.core.errors import (
     AfanesError,
@@ -91,7 +89,7 @@ class WorkspaceController:
                     settings = await asyncio.to_thread(SettingsStore.default().load)
                 except ConfigurationError:
                     logger.debug("Settings could not be read", exc_info=True)
-                    self._show_welcome(afanes.ui.strings.SETTINGS_UNREADABLE)
+                    self._show_welcome(self.status.copy.SETTINGS_UNREADABLE)
                     return
                 if settings is None:
                     self._show_welcome(None)
@@ -105,11 +103,11 @@ class WorkspaceController:
                     return
                 except VaultSchemaError as exc:
                     logger.debug("Remembered vault settings cannot be used", exc_info=True)
-                    self._show_welcome(str(exc))
+                    self._show_welcome(self.status.copy.render_error(exc))
                     return
                 except (VaultError, OSError) as exc:
                     logger.debug("Saved vault could not be opened", exc_info=True)
-                    self._show_welcome(str(exc))
+                    self._show_welcome(self.status.copy.render_error(exc))
                     return
                 await self._enter_vault(vault, snapshot, settings.log_mode_for(vault.root))
             finally:
@@ -151,7 +149,7 @@ class WorkspaceController:
         """
         trimmed = text.strip()
         if not trimmed:
-            self.banner = afanes.ui.strings.VAULT_PATH_REQUIRED
+            self.banner = self.status.copy.VAULT_PATH_REQUIRED
             return
         await self.choose_vault(Path(trimmed))
 
@@ -203,10 +201,10 @@ class WorkspaceController:
             self._show_welcome(None)
         if adoptable and target is not None:
             self.session.adoption_target = target
-            self.banner = afanes.ui.strings.VAULT_SCHEMA_ADOPT_MESSAGE
+            self.banner = self.status.copy.VAULT_SCHEMA_ADOPT_MESSAGE
             return
         self.session.adoption_target = None
-        self.banner = afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
+        self.banner = self.status.copy.VAULT_SCHEMA_UNAVAILABLE
 
     async def _open_vault_state(self, path: Path, *, remember: bool) -> None:
         """Open a vault while the command lock is held."""
@@ -224,15 +222,15 @@ class WorkspaceController:
                 if remember:
                     await self._offer_adoption(path, welcome=False)
                 else:
-                    self.banner = afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
+                    self.banner = self.status.copy.VAULT_SCHEMA_UNAVAILABLE
                 return
             except VaultSchemaError as exc:
                 logger.debug("Selected folder settings cannot be used", exc_info=True)
-                self.banner = str(exc)
+                self.banner = self.status.copy.render_error(exc)
                 return
             except (VaultError, OSError) as exc:
                 logger.debug("Selected vault could not be opened", exc_info=True)
-                self.banner = str(exc)
+                self.banner = self.status.copy.render_error(exc)
                 return
             if remember:
                 try:
@@ -242,7 +240,9 @@ class WorkspaceController:
                     )
                 except ConfigurationError as exc:
                     logger.debug("Vault selection could not be saved", exc_info=True)
-                    self.banner = afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail=str(exc))
+                    self.banner = self.status.copy.VAULT_SELECTION_FAILED.format(
+                        detail=self.status.copy.render_error(exc)
+                    )
                     return
             await self._enter_vault(
                 vault,
@@ -308,7 +308,9 @@ class WorkspaceController:
                     await asyncio.to_thread(SettingsStore.default().clear)
                 except ConfigurationError as exc:
                     logger.debug("Remembered vault could not be forgotten", exc_info=True)
-                    self._show_welcome(afanes.ui.strings.VAULT_CLOSE_NOT_FORGOTTEN.format(detail=str(exc)))
+                    self._show_welcome(
+                        self.status.copy.VAULT_CLOSE_NOT_FORGOTTEN.format(detail=self.status.copy.render_error(exc))
+                    )
                     return True
                 self._show_welcome(None)
                 return True
@@ -373,11 +375,13 @@ class WorkspaceController:
                 snapshot = await asyncio.to_thread(vault.scan)
             except VaultSchemaNotAdoptableError as exc:
                 logger.debug("Adoption target is no longer eligible", exc_info=True)
-                self.banner = afanes.ui.strings.VAULT_SCHEMA_NOT_ADOPTABLE.format(detail=str(exc))
+                self.banner = self.status.copy.VAULT_SCHEMA_NOT_ADOPTABLE.format(
+                    detail=self.status.copy.render_error(exc)
+                )
                 return False
             except (VaultError, OSError) as exc:
                 logger.debug("Adoption target could not be opened", exc_info=True)
-                self.banner = str(exc)
+                self.banner = self.status.copy.render_error(exc)
                 return False
             existing = await self._load_settings()
             remember_failure: str | None = None
@@ -388,7 +392,9 @@ class WorkspaceController:
                 )
             except ConfigurationError as exc:
                 logger.debug("Adopted vault could not be remembered", exc_info=True)
-                remember_failure = afanes.ui.strings.VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED.format(detail=str(exc))
+                remember_failure = self.status.copy.VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED.format(
+                    detail=self.status.copy.render_error(exc)
+                )
             await self._enter_vault(
                 vault,
                 snapshot,
@@ -409,11 +415,11 @@ class WorkspaceController:
         try:
             existing = await self._load_settings()
             try:
-                creation = await asyncio.to_thread(VaultOpener.create, path, template=template)
+                creation = await asyncio.to_thread(VaultOpener.create, path, self.status.copy, template=template)
                 snapshot = await asyncio.to_thread(creation.vault.scan)
             except (VaultError, OSError) as exc:
                 logger.debug("New vault could not be created", exc_info=True)
-                self.banner = str(exc)
+                self.banner = self.status.copy.render_error(exc)
                 return False
             remember_failure: str | None = None
             try:
@@ -423,7 +429,9 @@ class WorkspaceController:
                 )
             except ConfigurationError as exc:
                 logger.debug("New vault could not be remembered", exc_info=True)
-                remember_failure = afanes.ui.strings.VAULT_CREATED_NOT_REMEMBERED.format(detail=str(exc))
+                remember_failure = self.status.copy.VAULT_CREATED_NOT_REMEMBERED.format(
+                    detail=self.status.copy.render_error(exc)
+                )
             await self._enter_vault(
                 creation.vault,
                 snapshot,
@@ -466,7 +474,9 @@ class WorkspaceController:
                 )
             except ConfigurationError as exc:
                 logger.debug("Log mode could not be saved", exc_info=True)
-                self.status.show_notice(afanes.ui.strings.LOG_MODE_NOT_REMEMBERED.format(detail=str(exc)))
+                self.status.show_notice(
+                    self.status.copy.LOG_MODE_NOT_REMEMBERED.format(detail=self.status.copy.render_error(exc))
+                )
 
     async def _load_settings(self) -> Settings | None:
         """Load settings without failing the active command.
@@ -570,7 +580,9 @@ class WorkspaceController:
                     snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Vault scan failed", exc_info=True)
-                    self.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
+                    self.session.banner = self.status.copy.REFRESH_FAILED.format(
+                        detail=self.status.copy.render_error(exc)
+                    )
                     return
                 self.session.apply_snapshot(snapshot)
                 await self.session.refresh_trash()
@@ -579,7 +591,7 @@ class WorkspaceController:
                     and self.session.trash_snapshot is not None
                     and not await self.pages.follow_trash_change(self.session.trash_snapshot)
                 ):
-                    self.status.show_notice(afanes.ui.strings.TRASH_PAGE_GONE)
+                    self.status.show_notice(self.status.copy.TRASH_PAGE_GONE)
                 page = self.pages.page
                 if (
                     page is not None
@@ -593,7 +605,9 @@ class WorkspaceController:
                     except (AfanesError, OSError, UnicodeError) as exc:
                         logger.debug("Page could not be refreshed", exc_info=True)
                         self.pages.clear()
-                        self.status.show_notice(afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc)))
+                        self.status.show_notice(
+                            self.status.copy.PAGE_OPEN_FAILED.format(detail=self.status.copy.render_error(exc))
+                        )
                 selected = self.session.selected
                 if selected is None:
                     return
@@ -603,7 +617,9 @@ class WorkspaceController:
                     logger.debug("Preview could not be refreshed", exc_info=True)
                     self.session.selected = None
                     self.session.preview_body = None
-                    self.status.show_notice(afanes.ui.strings.PREVIEW_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.PREVIEW_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
             finally:
                 self.status.set_busy(busy=False)
 
@@ -642,7 +658,7 @@ class WorkspaceController:
             if focused and self.pages.trash_entry is not None:
                 current = self.session.trash_snapshot
                 if current is not None and not await self.pages.follow_trash_change(current):
-                    self.status.show_notice(afanes.ui.strings.TRASH_PAGE_GONE)
+                    self.status.show_notice(self.status.copy.TRASH_PAGE_GONE)
             return True
 
     def _show_welcome(self, message: str | None) -> None:

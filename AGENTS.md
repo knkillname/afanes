@@ -12,6 +12,8 @@
 
 **Design principles:** SOLID, DRY, KISS, and YAGNI, read through the Zen of Python (PEP 20). The Zen is necessary but not sufficient. Structure is object-oriented with immutable value objects and small public methods that return values; no free functions. Use functional style inside methods — explicit inputs, returned outputs, no hidden mutation. Prefer the simplest design that satisfies the spec and keep one source of truth for each behavior.
 
+**Standard-library first:** Never reimplement a facility the Python Standard Library already provides. Use `gettext` for message catalogs, `json` for JSON, `pathlib` for paths, `datetime` for dates, `argparse` for command lines, and `logging` for logs. A custom replacement is allowed only when the standard facility cannot meet a recorded requirement without violating a higher rule — for example, `locale.setlocale` mutates process-global state — and the change design must record that exception. Reinventing a standard-library facility is a review finding, not a stylistic preference.
+
 > This file contains prohibited vocabulary only in sections 4.1 and 6.1, as an enforcement target. Never copy those strings into code, UI, tests, specs, commits, or user docs.
 
 ## 1. Project snapshot
@@ -36,6 +38,7 @@ hatch check                         # Ruff lint + format check + Pyrefly strict
 hatch check --fix                   # lint/format fixes only; types need manual fixes
 hatch run docs:build                # Sphinx documentation; warnings are errors
 hatch run docs:serve                # local documentation preview
+hatch run i18n-compile              # compile .mo build artifacts; ignored by Git
 hatch test --cover                  # coverage; fail_under = 85
 hatch test tests/core/vault/test_service.py::TestVaultOpen::test_opens_an_existing_directory
 hatch test -k "frontmatter and not slow"
@@ -46,7 +49,7 @@ hatch run python scripts/scan_benchmark.py --notes 1000 5000 10000 --repeat 5
 
 - Interpreter: `.venv/bin/python` (Windows: `.venv\Scripts\python.exe`).
 - Version: `hatch version`. Bump only through 5.3; never edit `src/afanes/__about__.py`.
-- Build: `hatch run flet build <linux|macos|windows> --build-version "$(hatch version)"`. Build only on the host OS; artifacts land in `build/<platform>/`. `src/main.py` is the packaged launcher.
+- Build: `hatch run package <linux|macos|windows> --build-version "$(hatch version)"`. The `package` script compiles the gettext catalogs before invoking `flet build`. Build only on the host OS; artifacts land in `build/<platform>/`. `src/main.py` is the packaged launcher.
 - Documentation: `docs/` is the user-facing manual; build it with `hatch run docs:build` and preview it with `hatch run docs:serve`. The `docs` Hatch environment installs Sphinx only for documentation work.
 - OpenSpec: `openspec list --json`, `openspec status --change "<name>" --json`, `openspec instructions apply --change "<name>" --json`, `openspec validate --all --strict`, `openspec doctor`, `openspec archive "<name>"`. Slash commands: `/opsx-propose`, `/opsx-apply`, `/opsx-archive`, and siblings.
 - `rg` is not installed here. Use `grep -r` (see 6.1).
@@ -54,7 +57,7 @@ hatch run python scripts/scan_benchmark.py --notes 1000 5000 10000 --repeat 5
 ### 2.1 Dependencies
 
 - Runtime dependencies use compatible ranges in `pyproject.toml` (lower bound tested by the floor matrix, upper bound below the next major). There is no lock or constraints file.
-- A new dependency requires an OpenSpec change covering the need, alternatives, license, offline behavior, and cross-platform impact. Never add cloud, telemetry, or auto-update packages.
+- Prefer the Python Standard Library to a new dependency. A new dependency requires an OpenSpec change covering the need, alternatives, license, offline behavior, and cross-platform impact. Never add cloud, telemetry, or auto-update packages.
 - Flet components come through `flet[desktop]` / `flet[web]` extras; never re-pin a component to a patch version.
 - Ruff, Pyrefly, pytest, and coverage are the only code-quality tools. Do not add a second linter, formatter, type checker, test runner, or coverage tool. `hatch fmt` is deprecated; use `hatch check`.
 - Sphinx builds the documentation; it is not a second linter, formatter, test runner, or coverage tool. Documentation dependencies live in the `docs` dependency group.
@@ -69,8 +72,10 @@ hatch run python scripts/scan_benchmark.py --notes 1000 5000 10000 --repeat 5
 - `src/afanes/ui/app.py` — `main(page, launch_vault=None)` Flet entry.
 - `src/afanes/ui/state/` — the state package. `AppState` lives in `controller.py`; views use the singleton `afanes.ui.state.app_state` and tests call `app_state.reset()`.
 - `core/templates.py` loads bundled Markdown trees from `src/afanes/templates/<template>/<locale>/`; `_guide` is the always-seeded guide and `{{date:±Nd}}` placeholders resolve at creation time.
-- Dependency DAG: `models <- core <- ui` and `core <- cli`. `ui` and `cli` never import each other. `models` imports only the standard library. `core` never imports Flet, `ui`, or `cli`. The graph must stay acyclic at submodule level.
-- `core/` owns parsing, names, links, steps, templates, vault I/O, processing, search, settings. `ui/` is presentational: no Markdown parsing, SQL, or direct vault I/O. `ui/state/` must not import views/components; `theme.py` and `strings.py` are import leaves. `cli/` is a thin adapter over `core`.
+- `src/afanes/i18n/` owns the gettext catalogs. English source modules are the schema; tracked Spanish `.po` catalogs compile to generated `.mo` files loaded with the standard library `gettext`. The package owns no vault I/O and no Flet import.
+- Compiled `.mo` catalogs are build artifacts and MUST NOT be committed; documentation screenshots are the only tracked binary files.
+- Dependency DAG: `models <- core <- i18n <- ui` and `core <- i18n <- cli`. `ui` and `cli` never import each other. `models` imports only the standard library. `core` never imports Flet, `i18n`, `ui`, or `cli`. `i18n` never imports Flet, `ui`, or `cli`. The graph must stay acyclic at submodule level.
+- `core/` owns parsing, names, links, steps, templates, vault I/O, processing, search, settings. `ui/` is presentational: no Markdown parsing, SQL, or direct vault I/O. `ui/state/` must not import views/components; `theme.py` is an import leaf. `cli/` is a thin adapter over `core`.
 - `core/search.py` services (`Browser`, `ProjectBoard`, `ReviewPlanner`) are read-only over a scanned snapshot; they never read files.
 
 ### 3.2 Import rules
@@ -123,7 +128,7 @@ Adding a duplicate view helper or an `AppState` field requires an approved chang
 - Annotate every public and private signature. Use built-in generics (`list[str]`, `dict[str, object]`), `X | None` instead of `Optional`/`Union`, and quoted forward references only when a real cycle makes them unavoidable. No `from __future__ import annotations`; Pyrefly strict is the type gate.
 - No mutable module state in `core` or `models`. The `ui/state/` singleton is the only exception and must reset through `app_state.reset()`.
 - `assert` is for invariants and tests only; validate untrusted input explicitly. No `eval`, `exec`, `pickle`, runtime `subprocess`, or `print` outside the CLI's dedicated output functions.
-- Domain exceptions live in `core/errors.py`. Catch specific exceptions and preserve causes with `raise ... from exc`; never use a bare `except`. Use `logging.getLogger(__name__)` per module; never `logging.basicConfig` in library code. Do not log note bodies or absolute paths at INFO or above.
+- Domain exceptions live in `core/errors.py`. Every `AfanesError` carries a `DomainMessage` built from a `MessageCode`; a raw string message is rejected with `TypeError`. Domain code never renders copy: the interface and command line call `copy.render_error` or `copy.messages.render` at the boundary. Catch specific exceptions and preserve causes with `raise ... from exc`; never use a bare `except`. Use `logging.getLogger(__name__)` per module; never `logging.basicConfig` in library code. Do not log note bodies or absolute paths at INFO or above.
 - Filename policy lives in `core/names.py`: reject reserved Windows device names, trailing dots or spaces, invalid characters, and case-insensitive collisions.
 - Domain-policy constants are public `UPPER_CASE` names; access them through their module, never by importing constants.
 - Source files under `src/` start with the AGPL-3.0-or-later SPDX header; keep it.
@@ -152,9 +157,9 @@ Strict NumPy-style docstrings are mandatory for every public module, class, enum
 - `core/` and `models/` stay synchronous. Async belongs to the UI boundary and the CLI's top-level orchestration; blocking core I/O is reached through `asyncio.to_thread`.
 - Never block the UI thread. Offload I/O with `asyncio.to_thread` or Flet's documented task mechanism and show progress. No `time.sleep` in UI code.
 - One writer per vault; serialize writes so two commands cannot replace the same file concurrently.
-- Colors, spacing, typography, and dimensions live in `ui/theme.py`; all user-facing copy lives in `ui/strings.py` and `cli/strings.py`. No magic hex colors or pixel values in views. The interface standard in `docs/develop/interface-standard.md` is the durable reference for the strict HIG target, the Adwaita 1.8.0 palette, the four surface roles, the neutral navigation-sidebar selection, the GNOME standard text roles, and the five Flet toolkit limits; `tests/ui/test_conformance.py` enforces the visual rules, and its baseline may only shrink.
+- Colors, spacing, typography, and dimensions live in `ui/theme.py`; all user-facing copy lives in the gettext catalogs under `src/afanes/i18n/`. English source modules are the schema and Spanish lives in tracked `.po` catalogs; `.mo` files are generated build artifacts. No magic hex colors or pixel values in views. The interface standard in `docs/develop/interface-standard.md` is the durable reference for the strict HIG target, the Adwaita 1.8.0 palette, the four surface roles, the neutral navigation-sidebar selection, the GNOME standard text roles, and the five Flet toolkit limits; `tests/ui/test_conformance.py` enforces the visual rules, and its baseline may only shrink.
 - The earlier per-section icon-hue requirement is retired. Browser section icons are monochrome, and the active section uses the neutral selected-row fill. The accent is reserved for suggested actions, focus, links, and log marks. Do not reintroduce a per-section palette or an accent selection without an approved change.
-- Copy follows the GNOME writing style: header capitalization for headings and short control labels, sentence capitalization for field labels and prose, no final period, ellipses only on actions that open further input or a confirmation, neutral tone without first- or second-person pronouns, and typographic apostrophes (`’`) and ellipsis (`…`). `tests/ui/test_copy.py` enforces these rules on both catalogs with no baseline; classify every new copy constant in its header-case or sentence-case set and run `hatch test tests/ui/test_copy.py` after a copy change. A new exception requires a standard change.
+- Copy follows the GNOME writing style: header capitalization for headings and short control labels, sentence capitalization for field labels and prose, no final period, ellipses only on actions that open further input or a confirmation, neutral tone without first- or second-person pronouns, and typographic apostrophes (`’`) and ellipsis (`…`). `tests/i18n/test_copy.py` enforces these rules on the English source, Spanish `.po` catalogs, and compiled `.mo` catalogs with no baseline; classify every new English copy constant in its header-case or sentence-case set, run `hatch test tests/i18n/test_copy.py` after a copy change, and let the test session compile the catalogs or run `hatch run i18n-compile` manually. A new exception requires a standard change.
 - Read `page.web` once in the shell; views must not branch on presentation.
 - Feedback follows the lifetime of the event: a transient toast for a one-time result or undo, a banner owned by the state for a condition that remains true, inline text for a field or form problem, and an inline panel or dialog for a decision. A background refresh never clears an owned banner or a waiting notice.
 - Show concise, actionable feedback, never tracebacks. A user-invoked destructive action requires a confirmation or a visible undo path; trash moves immediately and offers Undo. A confirmed restore over an occupied birthplace, Delete Permanently, and Empty Trash require a confirmation with Cancel first. Scheduled trash retention is silent because no user action invokes it. Support light/dark, keyboard access, visible focus, and no color-only status.
@@ -164,7 +169,7 @@ Strict NumPy-style docstrings are mandatory for every public module, class, enum
 ### 4.7 Testing
 
 - Mirror `src/` under `tests/` (`tests/core/vault/test_service.py`, ...). Use `Test<Behavior>` classes; test names describe behavior. One behavior per test, arrange-act-assert.
-- Use `tmp_path` and fixture-created vaults. Never touch the real vault, the home directory, or the network. There is no shared `tests/conftest.py`; fixtures are local or autouse.
+- Use `tmp_path` and fixture-created vaults. Never touch the real vault, the home directory, or the network. Fixtures are local or autouse; the shared `tests/conftest.py` only compiles the generated gettext catalogs before the suite runs.
 - Reset the UI singleton in UI tests: `afanes.ui.state.app_state.reset()`.
 - Use Hypothesis for parser round-trips, reference extraction, name normalization, filename sanitization, path containment, and frontmatter types. Add a deterministic regression test for every minimized failure.
 - Do not import, call, monkeypatch, or test leading-underscore members. Promote the behavior if it needs coverage.

@@ -8,16 +8,15 @@ The component is presentational: it receives a
 intent. It performs no vault access and never derives dates from files.
 """
 
-import datetime
 from collections.abc import Callable
 
 import flet as ft
 
 import afanes.core.log
-import afanes.ui.strings
+import afanes.i18n.ui
+import afanes.models.note
 import afanes.ui.theme
 
-WEEKDAY_LABELS = ("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
 DAYS_PER_WEEK = 7
 CELL_HEIGHT = 34
 
@@ -40,8 +39,11 @@ class LogCalendar:
         on_select: Callable[[int], object],
         on_previous: Callable[[], object],
         on_next: Callable[[], object],
+        *,
+        copy: afanes.i18n.ui.UiCopy | None = None,
     ) -> None:
         """Store the calendar actions."""
+        self._copy = afanes.i18n.ui.UiCopy.english() if copy is None else copy
         self._on_select = on_select
         self._on_previous = on_previous
         self._on_next = on_next
@@ -52,7 +54,7 @@ class LogCalendar:
             border_radius=3,
             bgcolor=afanes.ui.theme.LOG_ENTRY_DOT_COLOR,
             visible=False,
-            tooltip=afanes.ui.strings.LOG_MONTH_ENTRY_MARK,
+            tooltip=self._copy.LOG_MONTH_ENTRY_MARK,
         )
         self.year_dot = ft.Container(
             width=6,
@@ -60,24 +62,24 @@ class LogCalendar:
             border_radius=3,
             bgcolor=afanes.ui.theme.LOG_ENTRY_DOT_COLOR,
             visible=False,
-            tooltip=afanes.ui.strings.LOG_YEAR_ENTRY_MARK,
+            tooltip=self._copy.LOG_YEAR_ENTRY_MARK,
         )
         self.prev_button = ft.IconButton(
             icon=ft.Icons.CHEVRON_LEFT_OUTLINED,
-            tooltip=afanes.ui.strings.LOG_PREVIOUS_MONTH,
+            tooltip=self._copy.LOG_PREVIOUS_MONTH,
             on_click=self._previous,
             key="log-calendar-previous",
         )
         self.next_button = ft.IconButton(
             icon=ft.Icons.CHEVRON_RIGHT_OUTLINED,
-            tooltip=afanes.ui.strings.LOG_NEXT_MONTH,
+            tooltip=self._copy.LOG_NEXT_MONTH,
             on_click=self._next,
             key="log-calendar-next",
         )
         self.weekdays = ft.Row(
             controls=[
                 ft.Text(label, style=afanes.ui.theme.TEXT_ROLES["caption"], expand=True, text_align=ft.TextAlign.CENTER)
-                for label in WEEKDAY_LABELS
+                for label in self._copy.locale_format.weekday_labels()
             ],
             spacing=0,
         )
@@ -110,8 +112,8 @@ class LogCalendar:
         ft.Control
             Month header, weekday row, and day grid.
         """
-        month_name = datetime.date(calendar.year, calendar.month, 1).strftime("%B")
-        self.title.value = f"{month_name} {calendar.year}"
+        month_date = afanes.models.note.NoteDate.from_text(f"{calendar.year:04d}-{calendar.month:02d}")
+        self.title.value = self._copy.locale_format.log_title(month_date)
         self.year_dot.visible = calendar.has_year_entry
         self.month_dot.visible = calendar.has_month_entry
         self.day_buttons = {}
@@ -145,7 +147,7 @@ class LogCalendar:
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             data={"day": cell.day, "count": cell.count},
-            tooltip=afanes.ui.strings.CopyFormatter.log_day_tooltip(cell.day, cell.count),
+            tooltip=self._copy.formatter.log_day_tooltip(cell.day, cell.count),
             style=ft.ButtonStyle(
                 bgcolor=afanes.ui.theme.LOG_ENTRY_TINT if cell.count else None,
                 padding=0,

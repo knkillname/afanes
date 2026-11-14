@@ -11,9 +11,11 @@ from collections.abc import Awaitable, Callable
 
 import flet as ft
 
-import afanes.ui.strings
+import afanes.i18n.ui
 import afanes.ui.theme
 from afanes.ui.components.panel import Panel
+
+_ENGLISH_COPY = afanes.i18n.ui.UiCopy.english()
 
 
 class ConflictPanel:
@@ -25,6 +27,8 @@ class ConflictPanel:
         on_overwrite: Callable[[], Awaitable[None]],
         on_recreate: Callable[[], Awaitable[None]],
         on_discard: Callable[[], Awaitable[None]],
+        *,
+        copy: afanes.i18n.ui.UiCopy = _ENGLISH_COPY,
     ) -> None:
         """Build the disk-conflict panel.
 
@@ -41,23 +45,23 @@ class ConflictPanel:
         """
         self.text = ft.Text("", selectable=True)
         self.reload = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_CONFLICT_RELOAD,
+            content=copy.PAGE_CONFLICT_RELOAD,
             on_click=on_reload,
         )
         self.overwrite = ft.OutlinedButton(
-            content=afanes.ui.strings.PAGE_CONFLICT_OVERWRITE,
+            content=copy.PAGE_CONFLICT_OVERWRITE,
             on_click=on_overwrite,
         )
         self.recreate = ft.OutlinedButton(
-            content=afanes.ui.strings.PAGE_CONFLICT_RECREATE,
+            content=copy.PAGE_CONFLICT_RECREATE,
             on_click=on_recreate,
         )
         self.discard = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CONFLICT_DISCARD,
+            content=copy.PAGE_CONFLICT_DISCARD,
             on_click=on_discard,
         )
         self.panel = Panel(
-            afanes.ui.strings.PAGE_CONFLICT_TITLE,
+            copy.PAGE_CONFLICT_TITLE,
             self.text,
             [self.reload, self.overwrite, self.recreate, self.discard],
         ).build()
@@ -67,7 +71,12 @@ class ConflictPanel:
 class AmbiguousPanel:
     """Choose one page when a reference matches several notes."""
 
-    def __init__(self, on_cancel: Callable[[], Awaitable[None]]) -> None:
+    def __init__(
+        self,
+        on_cancel: Callable[[], Awaitable[None]],
+        *,
+        copy: afanes.i18n.ui.UiCopy = _ENGLISH_COPY,
+    ) -> None:
         """Build the ambiguous-reference panel.
 
         Parameters
@@ -77,14 +86,14 @@ class AmbiguousPanel:
         """
         self.list = ft.Column(controls=[], spacing=afanes.ui.theme.NO_GAP)
         self.cancel = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CANCEL,
+            content=copy.PAGE_CANCEL,
             on_click=on_cancel,
         )
         self.panel = Panel(
-            afanes.ui.strings.PAGE_AMBIGUOUS_TITLE,
+            copy.PAGE_AMBIGUOUS_TITLE,
             ft.Column(
                 controls=[
-                    ft.Text(afanes.ui.strings.PAGE_AMBIGUOUS_BODY, selectable=True),
+                    ft.Text(copy.PAGE_AMBIGUOUS_BODY, selectable=True),
                     self.list,
                 ],
                 spacing=afanes.ui.theme.ITEM_GAP,
@@ -102,6 +111,8 @@ class RepairPanel:
         on_rewrite: Callable[[], Awaitable[None]],
         on_keep: Callable[[], Awaitable[None]],
         on_cancel: Callable[[], Awaitable[None]],
+        *,
+        copy: afanes.i18n.ui.UiCopy = _ENGLISH_COPY,
     ) -> None:
         """Build the link-repair panel.
 
@@ -116,19 +127,19 @@ class RepairPanel:
         """
         self.text = ft.Text("", selectable=True)
         self.rewrite = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_REPAIR_REWRITE,
+            content=copy.PAGE_REPAIR_REWRITE,
             on_click=on_rewrite,
         )
         self.keep = ft.TextButton(
-            content=afanes.ui.strings.PAGE_REPAIR_KEEP,
+            content=copy.PAGE_REPAIR_KEEP,
             on_click=on_keep,
         )
         self.cancel = ft.TextButton(
-            content=afanes.ui.strings.PAGE_REPAIR_CANCEL,
+            content=copy.PAGE_REPAIR_CANCEL,
             on_click=on_cancel,
         )
         self.panel = Panel(
-            afanes.ui.strings.PAGE_REPAIR_TITLE,
+            copy.PAGE_REPAIR_TITLE,
             self.text,
             [self.cancel, self.keep, self.rewrite],
         ).build()
@@ -142,6 +153,8 @@ class TypeChangePanel:
         self,
         on_confirm: Callable[[], Awaitable[None]],
         on_cancel: Callable[[], Awaitable[None]],
+        *,
+        copy: afanes.i18n.ui.UiCopy = _ENGLISH_COPY,
     ) -> None:
         """Build the type-change panel.
 
@@ -154,15 +167,15 @@ class TypeChangePanel:
         """
         self.text = ft.Text("", selectable=True)
         self.confirm = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_TYPE_CHANGE_CONFIRM,
+            content=copy.PAGE_TYPE_CHANGE_CONFIRM,
             on_click=on_confirm,
         )
         self.cancel = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CANCEL,
+            content=copy.PAGE_CANCEL,
             on_click=on_cancel,
         )
         self.panel = Panel(
-            afanes.ui.strings.PAGE_TYPE_CHANGE_TITLE,
+            copy.PAGE_TYPE_CHANGE_TITLE,
             self.text,
             [self.cancel, self.confirm],
         ).build()
@@ -176,6 +189,8 @@ class CategoryMovePanel:
         self,
         on_confirm: Callable[[], Awaitable[None]],
         on_cancel: Callable[[], Awaitable[None]],
+        *,
+        copy: afanes.i18n.ui.UiCopy = _ENGLISH_COPY,
     ) -> None:
         """Build the category-move panel.
 
@@ -188,15 +203,15 @@ class CategoryMovePanel:
         """
         self.text = ft.Text("", selectable=True)
         self.confirm = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_CATEGORY_MOVE_CONFIRM,
+            content=copy.PAGE_CATEGORY_MOVE_CONFIRM,
             on_click=on_confirm,
         )
         self.cancel = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CANCEL,
+            content=copy.PAGE_CANCEL,
             on_click=on_cancel,
         )
         self.panel = Panel(
-            afanes.ui.strings.PAGE_CATEGORY_MOVE_TITLE,
+            copy.PAGE_CATEGORY_MOVE_TITLE,
             self.text,
             [self.cancel, self.confirm],
         ).build()
@@ -218,6 +233,8 @@ class DestructiveConfirmPanel:
         self,
         on_confirm: Callable[[], Awaitable[None]],
         on_cancel: Callable[[], Awaitable[None]],
+        *,
+        copy: afanes.i18n.ui.UiCopy = _ENGLISH_COPY,
     ) -> None:
         """Build a reusable destructive confirmation panel.
 
@@ -236,7 +253,7 @@ class DestructiveConfirmPanel:
             style=afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE,
         )
         self.cancel = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CANCEL,
+            content=copy.PAGE_CANCEL,
             on_click=on_cancel,
         )
         self.actions = ft.Row(
@@ -266,6 +283,8 @@ class RenamePanel:
         on_preview: Callable[[], Awaitable[None]],
         on_confirm: Callable[[], Awaitable[None]],
         on_cancel: Callable[[], Awaitable[None]],
+        *,
+        copy: afanes.i18n.ui.UiCopy = _ENGLISH_COPY,
     ) -> None:
         """Build the rename panel.
 
@@ -281,7 +300,7 @@ class RenamePanel:
             Cancel the rename.
         """
         self.field = ft.TextField(
-            label=afanes.ui.strings.PAGE_RENAME_LABEL,
+            label=copy.PAGE_RENAME_LABEL,
             width=afanes.ui.theme.PAGE_RENAME_WIDTH,
             on_change=on_change,
         )
@@ -294,17 +313,17 @@ class RenamePanel:
         )
         self.preview_text = ft.Text("", selectable=True)
         self.preview = ft.OutlinedButton(
-            content=afanes.ui.strings.PAGE_RENAME_PREVIEW_ACTION,
+            content=copy.PAGE_RENAME_PREVIEW_ACTION,
             on_click=on_preview,
             disabled=True,
         )
         self.confirm = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_RENAME_CONFIRM,
+            content=copy.PAGE_RENAME_CONFIRM,
             on_click=on_confirm,
             disabled=True,
         )
         self.cancel = ft.TextButton(
-            content=afanes.ui.strings.PAGE_CANCEL,
+            content=copy.PAGE_CANCEL,
             on_click=on_cancel,
         )
         self.panel = ft.Container(
@@ -315,7 +334,7 @@ class RenamePanel:
             visible=False,
             content=ft.Column(
                 controls=[
-                    ft.Text(afanes.ui.strings.PAGE_RENAME_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-4"]),
+                    ft.Text(copy.PAGE_RENAME_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-4"]),
                     self.field,
                     self.error,
                     self.preview_text,

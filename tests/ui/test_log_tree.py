@@ -5,8 +5,10 @@ from pathlib import Path
 
 import flet as ft
 
+import afanes.core.localization
 import afanes.core.log
 import afanes.core.vault.service
+import afanes.i18n.ui
 import afanes.ui.components.log_tree as log_tree_component
 
 
@@ -119,3 +121,55 @@ class TestLogTree:
         typing.cast("typing.Callable[[], None]", handler)()
 
         assert selected == [note]
+
+
+def _texts(control: ft.Control) -> list[str]:
+    values: list[str] = []
+    if isinstance(control, ft.Text) and isinstance(control.value, str):
+        values.append(control.value)
+    for child in getattr(control, "controls", []) or []:
+        values.extend(_texts(child))
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        values.extend(_texts(content))
+    return values
+
+
+class TestSpanishLogTree:
+    def test_empty_tree_renders_spanish(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        root.mkdir()
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        tree = log_tree_component.LogTree(
+            lambda _path: None,
+            lambda _y, _m: None,
+            lambda _y: None,
+            copy=copy,
+        )
+
+        control = tree.build(_timeline(root))
+
+        assert copy.LOG_EMPTY in _texts(control)
+        assert afanes.i18n.ui.en.LOG_EMPTY not in _texts(control)
+
+    def test_month_row_uses_spanish_names(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        _write_note(root / "log/2025/10/2025-10-12.md", date="2025-10-12", body="# Day\n")
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        tree = log_tree_component.LogTree(
+            lambda _path: None,
+            lambda _y, _m: None,
+            lambda _y: None,
+            copy=copy,
+        )
+
+        tree.build(_timeline(root))
+
+        tile = tree.month_tiles[(2025, 10)]
+        title = tile.title
+        assert isinstance(title, ft.Row)
+        labels = [control.value for control in title.controls if isinstance(control, ft.Text)]
+        assert "octubre" in labels
+        create = tree.plus_buttons["month:2025-10"]
+        assert create.tooltip == "Escribe una entrada para octubre de 2025"
+        assert "October" not in " ".join(labels)

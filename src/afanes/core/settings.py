@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Self
 
 import afanes.core.atomic
-from afanes.core.errors import ConfigurationError, VaultError
+from afanes.core.errors import ConfigurationError, DomainMessage, MessageCode, VaultError
 
 # Public settings policy. Callers and tests share these values.
 APP_DIRECTORY_NAME = "afanes"
@@ -101,28 +101,28 @@ class Settings:
             not contain an absolute vault path, or carries malformed Log modes.
         """
         if not isinstance(payload, dict):
-            message = f"Settings must be a JSON object: {source}"
+            message = DomainMessage.of(MessageCode.SETTINGS_NOT_OBJECT, source=str(source))
             raise ConfigurationError(message)
         version = payload.get("version")
         if isinstance(version, bool) or not isinstance(version, int) or version != SETTINGS_VERSION:
-            message = f"Unsupported settings version in {source}"
+            message = DomainMessage.of(MessageCode.SETTINGS_VERSION_UNSUPPORTED, source=str(source))
             raise ConfigurationError(message)
         vault = payload.get("vault")
         if not isinstance(vault, str) or not vault:
-            message = f"Settings do not contain a vault path: {source}"
+            message = DomainMessage.of(MessageCode.SETTINGS_VAULT_MISSING, source=str(source))
             raise ConfigurationError(message)
         vault_path = Path(vault)
         if not vault_path.is_absolute():
-            message = f"Settings vault path must be absolute: {source}"
+            message = DomainMessage.of(MessageCode.SETTINGS_VAULT_RELATIVE, source=str(source))
             raise ConfigurationError(message)
         raw_modes = payload.get("log_modes", {})
         if not isinstance(raw_modes, dict):
-            message = f"Settings Log modes must be a JSON object: {source}"
+            message = DomainMessage.of(MessageCode.SETTINGS_LOG_MODES_NOT_OBJECT, source=str(source))
             raise ConfigurationError(message)
         log_modes: dict[str, str] = {}
         for key, value in raw_modes.items():
             if not isinstance(key, str) or not isinstance(value, str):
-                message = f"Settings Log modes must map paths to strings: {source}"
+                message = DomainMessage.of(MessageCode.SETTINGS_LOG_MODES_INVALID, source=str(source))
                 raise ConfigurationError(message)
             log_modes[key] = value
         return cls(vault=vault_path, log_modes=log_modes)
@@ -230,12 +230,12 @@ class SettingsStore:
         try:
             text = self.path.read_text(encoding="utf-8")
         except OSError as exc:
-            message = f"Could not read settings: {self.path}"
+            message = DomainMessage.of(MessageCode.SETTINGS_READ_FAILED, source=str(self.path))
             raise ConfigurationError(message) from exc
         try:
             payload = json.loads(text)
         except json.JSONDecodeError as exc:
-            message = f"Settings are not valid JSON: {self.path}"
+            message = DomainMessage.of(MessageCode.SETTINGS_JSON_INVALID, source=str(self.path))
             raise ConfigurationError(message) from exc
         return Settings.from_payload(payload, self.path)
 
@@ -262,19 +262,19 @@ class SettingsStore:
         """
         vault = settings.vault.expanduser().resolve()
         if not vault.is_dir():
-            message = f"Vault is not a directory: {vault}"
+            message = DomainMessage.of(MessageCode.SETTINGS_VAULT_NOT_DIRECTORY, source=str(vault))
             raise ConfigurationError(message)
         try:
             self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         except OSError as exc:
-            message = f"Could not create the settings directory: {self.path.parent}"
+            message = DomainMessage.of(MessageCode.SETTINGS_DIRECTORY_FAILED, source=str(self.path.parent))
             raise ConfigurationError(message) from exc
         resolved = dataclasses.replace(settings, vault=vault)
         payload = json.dumps(resolved.to_payload(), ensure_ascii=False, indent=2)
         try:
             afanes.core.atomic.AtomicWriter.write_text_atomic(self.path, f"{payload}\n")
         except (OSError, VaultError) as exc:
-            message = f"Could not write settings: {self.path}"
+            message = DomainMessage.of(MessageCode.SETTINGS_WRITE_FAILED, source=str(self.path))
             raise ConfigurationError(message) from exc
 
     def clear(self) -> None:
@@ -294,5 +294,5 @@ class SettingsStore:
         try:
             self.path.unlink(missing_ok=True)
         except OSError as exc:
-            message = f"Could not remove settings: {self.path}"
+            message = DomainMessage.of(MessageCode.SETTINGS_REMOVE_FAILED, source=str(self.path))
             raise ConfigurationError(message) from exc

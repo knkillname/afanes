@@ -4,8 +4,9 @@ import asyncio
 
 import flet as ft
 
+import afanes.i18n.ui
+import afanes.i18n.ui.en
 import afanes.ui.components.role_name
-import afanes.ui.strings
 
 
 class TestRoleNameDialog:
@@ -23,7 +24,7 @@ class TestRoleNameDialog:
             cancelled.append(True)
 
         return afanes.ui.components.role_name.RoleNameDialog(
-            afanes.ui.strings.ROLE_NAME_OWNER_TITLE,
+            afanes.i18n.ui.en.ROLE_NAME_OWNER_TITLE,
             current,
             ["Ada Lovelace", "Sam Rivera", "Priya Nair"],
             save,

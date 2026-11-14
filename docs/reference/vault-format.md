@@ -132,8 +132,12 @@ vault/
 
 These folders are conveniences, not requirements. Existing notes anywhere in the vault still resolve.
 Folders are created only when a write needs them. A newly created vault also contains `afanes.yaml`,
-the `Getting started` guide, the eight template cards under `templates/`, and the chosen template's
-notes; a vault opened later is never seeded or repaired.
+the getting-started guide, the eight template cards under `templates/`, and the chosen template's
+notes; a vault opened later is never seeded or repaired. The guide and notes are written in the
+active language: `reference/Getting started.md` in English and `reference/Primeros pasos.md` in
+Spanish. Template cards stay at the flat `templates/<name>.md` path and carry localized titles,
+descriptions, and starter bodies. A language change never rewrites content that is already in a
+vault.
 
 :::{warning}
 `templates/` is reserved. If an existing vault already used that folder for ordinary notes, those

@@ -20,7 +20,7 @@ from yaml import YAMLError
 
 import afanes.core.names
 import afanes.core.vault.snapshot
-from afanes.core.errors import NoteParseError
+from afanes.core.errors import DomainMessage, MessageCode, NoteParseError
 from afanes.core.frontmatter import FRONTMATTER_FENCE, NoteDocument
 
 # Public trash metadata keys and retention policy.
@@ -250,7 +250,7 @@ class TrashDocument:
                 newline=newline,
                 has_frontmatter=True,
             )
-        message = "Frontmatter opening fence is never closed"
+        message = DomainMessage.of(MessageCode.FRONTMATTER_UNCLOSED)
         raise NoteParseError(message)
 
     @staticmethod
@@ -264,17 +264,17 @@ class TrashDocument:
         try:
             loaded = yaml.safe_load(source)
         except YAMLError as exc:
-            message = "Frontmatter is not valid YAML"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_INVALID_YAML)
             raise NoteParseError(message) from exc
         if loaded is None:
             return {}
         if not isinstance(loaded, dict):
-            message = "Frontmatter must be a YAML mapping"
+            message = DomainMessage.of(MessageCode.FRONTMATTER_NOT_MAPPING)
             raise NoteParseError(message)
         raw: dict[str, object] = {}
         for key, value in loaded.items():
             if not isinstance(key, str):
-                message = "Frontmatter keys must be strings"
+                message = DomainMessage.of(MessageCode.FRONTMATTER_KEYS_NOT_STRINGS)
                 raise NoteParseError(message)
             raw[key] = value
         return raw

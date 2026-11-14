@@ -15,8 +15,8 @@ from pathlib import Path
 import flet as ft
 
 import afanes.core.search
+import afanes.models.note
 import afanes.ui.state
-import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.search import ProjectSummary, ReviewItem
 from afanes.ui.components.panel import Card
@@ -97,9 +97,9 @@ class ReviewView:
         if count == 0:
             body = ft.Column(
                 controls=[
-                    ft.Text(afanes.ui.strings.REVIEW_ZERO_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-3"]),
+                    ft.Text(self._state.status.copy.REVIEW_ZERO_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-3"]),
                     ft.Text(
-                        afanes.ui.strings.REVIEW_ZERO_BODY,
+                        self._state.status.copy.REVIEW_ZERO_BODY,
                         color=afanes.ui.theme.MUTED_TEXT_COLOR,
                         selectable=True,
                     ),
@@ -109,10 +109,10 @@ class ReviewView:
             return Card(body).build()
         body = ft.Column(
             controls=[
-                ft.Text(afanes.ui.strings.REVIEW_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-2"]),
-                ft.Text(afanes.ui.strings.CopyFormatter.review_pending(count), selectable=True),
+                ft.Text(self._state.status.copy.REVIEW_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-2"]),
+                ft.Text(self._state.status.copy.formatter.review_pending(count), selectable=True),
                 ft.FilledButton(
-                    content=afanes.ui.strings.REVIEW_START_ACTION,
+                    content=self._state.status.copy.REVIEW_START_ACTION,
                     on_click=self._start,
                     key="review-start",
                 ),
@@ -125,13 +125,13 @@ class ReviewView:
         """Build the end-of-session summary."""
         body = ft.Column(
             controls=[
-                ft.Text(afanes.ui.strings.REVIEW_COMPLETE_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-2"]),
+                ft.Text(self._state.status.copy.REVIEW_COMPLETE_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-2"]),
                 ft.Text(
-                    afanes.ui.strings.REVIEW_COMPLETE_BODY.format(reviewed=reviewed, skipped=skipped),
+                    self._state.status.copy.REVIEW_COMPLETE_BODY.format(reviewed=reviewed, skipped=skipped),
                     selectable=True,
                 ),
                 ft.FilledButton(
-                    content=afanes.ui.strings.REVIEW_BACK_TO_BROWSER,
+                    content=self._state.status.copy.REVIEW_BACK_TO_BROWSER,
                     on_click=self._finish,
                     key="review-finish",
                 ),
@@ -145,17 +145,17 @@ class ReviewView:
         title = self._state.session.note_title(item.path)
         body = ft.Column(
             controls=[
-                ft.Text(afanes.ui.strings.REVIEW_CAPTURE_TITLE, style=afanes.ui.theme.TEXT_ROLES["heading"]),
+                ft.Text(self._state.status.copy.REVIEW_CAPTURE_TITLE, style=afanes.ui.theme.TEXT_ROLES["heading"]),
                 ft.Text(title, style=afanes.ui.theme.TEXT_ROLES["title-2"], selectable=True),
                 ft.Row(
                     controls=[
                         ft.FilledButton(
-                            content=afanes.ui.strings.REVIEW_PROCESS_ACTION,
+                            content=self._state.status.copy.REVIEW_PROCESS_ACTION,
                             on_click=self._process_handler(item.path),
                             key="review-process-capture",
                         ),
                         ft.TextButton(
-                            content=afanes.ui.strings.REVIEW_SKIP,
+                            content=self._state.status.copy.REVIEW_SKIP,
                             on_click=self._skip,
                             key="review-skip",
                         ),
@@ -175,7 +175,9 @@ class ReviewView:
         if step is None or summary is None:
             return self._broken_card(item)
         due = item.kind is afanes.core.search.ReviewItemKind.DUE_STEP
-        title = afanes.ui.strings.REVIEW_DUE_STEP_TITLE if due else afanes.ui.strings.REVIEW_WAITING_STEP_TITLE
+        title = (
+            self._state.status.copy.REVIEW_DUE_STEP_TITLE if due else self._state.status.copy.REVIEW_WAITING_STEP_TITLE
+        )
         controls: list[ft.Control] = [
             ft.Text(title, style=afanes.ui.theme.TEXT_ROLES["heading"]),
             ft.Text(summary.note.title, style=afanes.ui.theme.TEXT_ROLES["title-4"], selectable=True),
@@ -188,14 +190,18 @@ class ReviewView:
         if step.owners:
             controls.append(
                 ft.Text(
-                    afanes.ui.strings.REVIEW_STEP_OWNERS.format(owners=", ".join(step.owners)),
+                    self._state.status.copy.REVIEW_STEP_OWNERS.format(owners=", ".join(step.owners)),
                     color=afanes.ui.theme.MUTED_TEXT_COLOR,
                 )
             )
         if step.plan is not None:
             controls.append(
                 ft.Text(
-                    afanes.ui.strings.PAGE_STEP_PLAN.format(date=step.plan.isoformat()),
+                    self._state.status.copy.PAGE_STEP_PLAN.format(
+                        date=self._state.status.copy.locale_format.short_date(
+                            afanes.models.note.NoteDate.from_date(step.plan)
+                        )
+                    ),
                     color=afanes.ui.theme.MUTED_TEXT_COLOR,
                 )
             )
@@ -212,17 +218,17 @@ class ReviewView:
             buttons.extend(
                 [
                     ft.FilledButton(
-                        content=afanes.ui.strings.REVIEW_DO_NOW,
+                        content=self._state.status.copy.REVIEW_DO_NOW,
                         on_click=self._do_now,
                         key="review-do-now",
                     ),
                     ft.OutlinedButton(
-                        content=afanes.ui.strings.REVIEW_POSTPONE,
+                        content=self._state.status.copy.REVIEW_POSTPONE,
                         on_click=self._open_postpone,
                         key="review-postpone",
                     ),
                     ft.OutlinedButton(
-                        content=afanes.ui.strings.REVIEW_DELEGATE,
+                        content=self._state.status.copy.REVIEW_DELEGATE,
                         on_click=self._open_delegate,
                         key="review-delegate",
                     ),
@@ -231,7 +237,7 @@ class ReviewView:
         else:
             buttons.append(
                 ft.OutlinedButton(
-                    content=afanes.ui.strings.REVIEW_REASSIGN,
+                    content=self._state.status.copy.REVIEW_REASSIGN,
                     on_click=self._open_reassign,
                     key="review-reassign",
                 )
@@ -239,12 +245,12 @@ class ReviewView:
         buttons.extend(
             [
                 ft.TextButton(
-                    content=afanes.ui.strings.REVIEW_OPEN_PROJECT,
+                    content=self._state.status.copy.REVIEW_OPEN_PROJECT,
                     on_click=self._open_project,
                     key="review-open-project",
                 ),
                 ft.TextButton(
-                    content=afanes.ui.strings.REVIEW_SKIP,
+                    content=self._state.status.copy.REVIEW_SKIP,
                     on_click=self._skip,
                     key="review-skip",
                 ),
@@ -258,17 +264,23 @@ class ReviewView:
         if summary is None:
             return self._broken_card(item)
         controls: list[ft.Control] = [
-            ft.Text(afanes.ui.strings.REVIEW_TITLE, style=afanes.ui.theme.TEXT_ROLES["heading"]),
+            ft.Text(self._state.status.copy.REVIEW_TITLE, style=afanes.ui.theme.TEXT_ROLES["heading"]),
             ft.Text(summary.note.title, style=afanes.ui.theme.TEXT_ROLES["title-2"], selectable=True),
             ft.Text(
-                afanes.ui.strings.PROJECT_STATUS.format(status=StatusLabel(summary.note.status).text),
+                self._state.status.copy.PROJECT_STATUS.format(
+                    status=StatusLabel(summary.note.status, copy=self._state.status.copy).text
+                ),
                 color=afanes.ui.theme.MUTED_TEXT_COLOR,
             ),
         ]
         if summary.note.due_date is not None:
             controls.append(
                 ft.Text(
-                    afanes.ui.strings.PROJECT_DUE.format(date=summary.note.due_date.isoformat()),
+                    self._state.status.copy.PROJECT_DUE.format(
+                        date=self._state.status.copy.locale_format.short_date(
+                            afanes.models.note.NoteDate.from_date(summary.note.due_date)
+                        )
+                    ),
                     color=afanes.ui.theme.MUTED_TEXT_COLOR,
                 )
             )
@@ -280,17 +292,17 @@ class ReviewView:
             stalled = ft.Row(
                 controls=[
                     ft.OutlinedButton(
-                        content=afanes.ui.strings.REVIEW_CREATE_STEP,
+                        content=self._state.status.copy.REVIEW_CREATE_STEP,
                         on_click=self._open_add_step,
                         key="review-create",
                     ),
                     ft.OutlinedButton(
-                        content=afanes.ui.strings.REVIEW_MARK_DONE,
+                        content=self._state.status.copy.REVIEW_MARK_DONE,
                         on_click=self._confirm_done,
                         key="review-mark-done",
                     ),
                     ft.OutlinedButton(
-                        content=afanes.ui.strings.REVIEW_DEFER,
+                        content=self._state.status.copy.REVIEW_DEFER,
                         on_click=self._confirm_defer,
                         key="review-defer",
                     ),
@@ -303,17 +315,17 @@ class ReviewView:
         next_row = ft.Row(
             controls=[
                 ft.TextButton(
-                    content=afanes.ui.strings.REVIEW_OPEN_PROJECT,
+                    content=self._state.status.copy.REVIEW_OPEN_PROJECT,
                     on_click=self._open_project,
                     key="review-open-project",
                 ),
                 ft.FilledButton(
-                    content=afanes.ui.strings.REVIEW_NEXT,
+                    content=self._state.status.copy.REVIEW_NEXT,
                     on_click=self._next,
                     key="review-next",
                 ),
                 ft.TextButton(
-                    content=afanes.ui.strings.REVIEW_SKIP,
+                    content=self._state.status.copy.REVIEW_SKIP,
                     on_click=self._skip,
                     key="review-skip",
                 ),
@@ -331,7 +343,7 @@ class ReviewView:
         if summary.next_step is None:
             controls.append(
                 ft.Text(
-                    afanes.ui.strings.REVIEW_NO_NEXT_STEP,
+                    self._state.status.copy.REVIEW_NO_NEXT_STEP,
                     color=afanes.ui.theme.MUTED_TEXT_COLOR,
                     selectable=True,
                 )
@@ -341,7 +353,7 @@ class ReviewView:
         controls.append(
             ft.Column(
                 controls=[
-                    ft.Text(afanes.ui.strings.REVIEW_NEXT_STEP, style=afanes.ui.theme.TEXT_ROLES["heading"]),
+                    ft.Text(self._state.status.copy.REVIEW_NEXT_STEP, style=afanes.ui.theme.TEXT_ROLES["heading"]),
                     StepText(summary.next_step.text, body_style, StepTextOptions(selectable=True)).build(),
                 ],
                 spacing=0,
@@ -349,7 +361,9 @@ class ReviewView:
         )
         remaining = summary.open_steps[1:]
         if remaining:
-            controls.append(ft.Text(afanes.ui.strings.REVIEW_OTHER_STEPS, style=afanes.ui.theme.TEXT_ROLES["heading"]))
+            controls.append(
+                ft.Text(self._state.status.copy.REVIEW_OTHER_STEPS, style=afanes.ui.theme.TEXT_ROLES["heading"])
+            )
             controls.extend(
                 StepText(step.text, body_style, StepTextOptions(selectable=True)).build() for step in remaining
             )
@@ -360,8 +374,8 @@ class ReviewView:
         return Card(
             ft.Column(
                 controls=[
-                    ft.Text(afanes.ui.strings.REVIEW_PROJECT_FAILED.format(detail=item.path.as_posix())),
-                    ft.TextButton(content=afanes.ui.strings.REVIEW_SKIP, on_click=self._skip),
+                    ft.Text(self._state.status.copy.REVIEW_PROJECT_FAILED.format(detail=item.path.as_posix())),
+                    ft.TextButton(content=self._state.status.copy.REVIEW_SKIP, on_click=self._skip),
                 ],
                 spacing=afanes.ui.theme.ITEM_GAP,
             )
@@ -386,7 +400,7 @@ class ReviewView:
             key="review-form-field",
         )
         self._form_submit = ft.FilledButton(
-            content=afanes.ui.strings.REVIEW_CONFIRM,
+            content=self._state.status.copy.REVIEW_CONFIRM,
             on_click=self._submit_form,
             disabled=not self._form_value_valid(),
             key="review-form-submit",
@@ -399,7 +413,7 @@ class ReviewView:
                     controls=[
                         self._form_submit,
                         ft.TextButton(
-                            content=afanes.ui.strings.REVIEW_CANCEL,
+                            content=self._state.status.copy.REVIEW_CANCEL,
                             on_click=self._cancel_form,
                             key="review-form-cancel",
                         ),
@@ -426,16 +440,20 @@ class ReviewView:
     def _form_label(self) -> str:
         """Return the label for the active inline form."""
         if self._form_mode in {"delegate", "reassign"}:
-            return afanes.ui.strings.REVIEW_OWNER_LABEL
+            return self._state.status.copy.REVIEW_OWNER_LABEL
         if self._form_mode == "postpone":
-            return afanes.ui.strings.REVIEW_POSTPONE_LABEL
-        return afanes.ui.strings.REVIEW_STEP_TITLE_LABEL
+            return self._state.status.copy.REVIEW_POSTPONE_LABEL
+        return self._state.status.copy.REVIEW_STEP_TITLE_LABEL
 
     def _confirmation_controls(self) -> ft.Control:
         """Build the inline confirmation for closing or deferring."""
         if self._confirmation is None:
             return ft.Container(visible=False)
-        message = afanes.ui.strings.REVIEW_MARK_DONE if self._confirmation == "done" else afanes.ui.strings.REVIEW_DEFER
+        message = (
+            self._state.status.copy.REVIEW_MARK_DONE
+            if self._confirmation == "done"
+            else self._state.status.copy.REVIEW_DEFER
+        )
         return ft.Container(
             bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
@@ -448,15 +466,15 @@ class ReviewView:
                         controls=[
                             ft.FilledButton(
                                 content=(
-                                    afanes.ui.strings.REVIEW_CONFIRM_DONE
+                                    self._state.status.copy.REVIEW_CONFIRM_DONE
                                     if self._confirmation == "done"
-                                    else afanes.ui.strings.REVIEW_CONFIRM_DEFER
+                                    else self._state.status.copy.REVIEW_CONFIRM_DEFER
                                 ),
                                 on_click=self._confirm_status,
                                 key="review-confirm",
                             ),
                             ft.TextButton(
-                                content=afanes.ui.strings.REVIEW_CANCEL,
+                                content=self._state.status.copy.REVIEW_CANCEL,
                                 on_click=self._cancel_confirmation,
                                 key="review-cancel-confirmation",
                             ),
@@ -569,9 +587,9 @@ class ReviewView:
         value = self._typed.strip()
         if not value:
             self._form_error = (
-                afanes.ui.strings.REVIEW_INVALID_DATE
+                self._state.status.copy.REVIEW_INVALID_DATE
                 if self._form_mode == "postpone"
-                else afanes.ui.strings.REVIEW_TITLE_REQUIRED
+                else self._state.status.copy.REVIEW_TITLE_REQUIRED
             )
             self.refresh()
             self._update()
@@ -581,7 +599,7 @@ class ReviewView:
             try:
                 plan = datetime.date.fromisoformat(value)
             except ValueError:
-                self._form_error = afanes.ui.strings.REVIEW_INVALID_DATE
+                self._form_error = self._state.status.copy.REVIEW_INVALID_DATE
                 self.refresh()
                 self._update()
                 return

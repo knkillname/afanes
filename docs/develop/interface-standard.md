@@ -223,6 +223,10 @@ Field labels, hints, dialog bodies, banners, and status messages use **sentence 
 capitalize the first word and proper nouns only. Examples: **Vault folder path**, **Due date**, **The
 first line becomes the title**.
 
+Spanish follows Spanish sentence-style capitalization in every role: the first word of a heading,
+control label, field label, or prose line is capitalized, and later words stay lowercase unless they
+are proper nouns or acronyms. Spanish headings do not copy English header capitalization.
+
 Copy does not end with a period, even when it is written as a complete sentence. Internal periods
 remain in text that needs more than one sentence.
 
@@ -236,6 +240,21 @@ reference allows it, because no current string needs it. Command examples keep s
 because they are typed syntax; prose uses typographic quotation marks.
 
 The typographic apostrophe (’) and the single-character ellipsis (…) are mandatory.
+
+## 🌍 Localized display
+
+The interface, command line, validation messages, dates, numbers, and bundled starter content follow
+the active locale. English and Spanish ship together; the setting applies on the next launch.
+
+Date and number display uses the explicit tables in `LocaleFormat`, not the process C locale. A log
+title reads **November 13, 2026** in English and **13 de noviembre de 2026** in Spanish; short metadata
+dates read **Nov 13, 2026** and **13 nov 2026**. The calendar is Monday-first in both languages, because
+region-specific week starts are out of scope for the two supported locales. Counts use comma grouping
+and the dot as the decimal separator in both languages: **1,234**. Spanish regional formats disagree
+about this convention; the supported Spanish convention is the Mexican one.
+
+ISO input and filenames never follow the display locale. A log entry titled **13 de noviembre de 2026**
+is still stored as `2026-11-13.md`.
 
 ## 📋 Lists and rows
 
@@ -314,15 +333,22 @@ change pass. The icon-or-label and dense-row ledgers are empty after wave 2.
 
 ### 🧪 The copy gate
 
-`tests/ui/test_copy.py` scans `src/afanes/ui/strings.py` and `src/afanes/cli/strings.py`. It applies
-the mechanical rules to every string literal and the capitalization rules to the constants and
-mapping values declared in its header-case and sentence-case sets. A name without a declared style
-fails the gate. The ellipsis rule requires every `…` string to appear in the declared further-input
-action set, and every member of that set to carry the ellipsis.
+`tests/i18n/test_copy.py` scans the English source modules under `src/afanes/i18n/`, the Spanish
+`.po` catalogs under `src/afanes/i18n/locales/`, and their compiled `.mo` files. The test session
+compiles the `.mo` files from the tracked `.po` sources; the compiled catalogs are not tracked. It
+applies the mechanical rules to every message and the capitalization rules to the constants and
+mapping values declared in its English header-case and sentence-case sets. A name without a declared style fails the
+gate. Spanish messages are checked separately for Spanish sentence-style capitalization and banned
+Spanish pronouns. The ellipsis rule requires every `…` message to appear in the declared further-input
+action set, and every member of that set to carry the ellipsis in every locale.
+
+The gate also requires every English source message to have a context-matching `.po` entry with the
+same interpolation placeholders, rejects missing, extra, blank, or mismatched entries, and fails when
+a `.mo` file does not match its `.po` source. Run `hatch run i18n-compile` after a copy change.
 
 The gate has no baseline: a copy violation is either fixed or the change is not complete. Its
 header-capitalization check cannot identify short nouns and verbs, so a lowercase three-letter
-content word in the middle of a label remains a manual-review catch.
+content word in the middle of an English label remains a manual-review catch.
 
 ## 🧭 Migration waves
 

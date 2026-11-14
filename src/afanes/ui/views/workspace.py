@@ -23,12 +23,12 @@ import afanes.core.vault.trash_catalog
 import afanes.ui.components.calendar
 import afanes.ui.components.capture_bar
 import afanes.ui.components.frozen
+import afanes.ui.components.language
 import afanes.ui.components.log_tree
 import afanes.ui.components.page_panels
 import afanes.ui.state
 import afanes.ui.state.browser
 import afanes.ui.state.status
-import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.page
 import afanes.ui.views.processing
@@ -93,6 +93,7 @@ class WorkspaceActions:
     pick_role: afanes.ui.views.page.PickRole | None = None
     on_about: Callable[[], Awaitable[None]] | None = None
     on_notice: Callable[[afanes.ui.state.status.Notice], None] | None = None
+    on_language: Callable[[str | None], Awaitable[None] | None] | None = None
 
 
 class WorkspaceView:
@@ -124,6 +125,7 @@ class WorkspaceView:
         self._on_missing_role = actions.on_missing_role
         self._pick_role = actions.pick_role
         self._on_notice = actions.on_notice
+        self._on_language = actions.on_language
         self.log_calendar: afanes.ui.components.calendar.LogCalendar | None = None
         self.log_tree: afanes.ui.components.log_tree.LogTree | None = None
         self.log_today_button: ft.TextButton | None = None
@@ -150,7 +152,7 @@ class WorkspaceView:
             width=16,
             height=16,
             visible=False,
-            semantics_label=afanes.ui.strings.WORKING,
+            semantics_label=self._state.status.copy.WORKING,
         )
         self.vault_text = ft.Text(
             "",
@@ -161,65 +163,76 @@ class WorkspaceView:
         )
         self.refresh_button = ft.IconButton(
             icon=ft.Icons.REFRESH_OUTLINED,
-            tooltip=afanes.ui.strings.REFRESH_ACTION,
+            tooltip=self._state.status.copy.REFRESH_ACTION,
             on_click=self._refresh,
             key="workspace-refresh",
         )
         self.new_reference_button = ft.IconButton(
             icon=ft.Icons.ADD_OUTLINED,
-            tooltip=afanes.ui.strings.BROWSER_NEW_REFERENCE,
+            tooltip=self._state.status.copy.BROWSER_NEW_REFERENCE,
             on_click=self._new_reference,
             visible=False,
             key="browser-new-reference",
         )
+        menu_items: list[ft.PopupMenuItem] = [
+            ft.PopupMenuItem(
+                content=self._state.status.copy.CHANGE_VAULT_OPEN,
+                on_click=self._change_vault,
+                key="workspace-change-open",
+            ),
+            ft.PopupMenuItem(
+                content=self._state.status.copy.CHANGE_VAULT_CREATE,
+                on_click=self._create_vault,
+                key="workspace-change-create",
+            ),
+            ft.PopupMenuItem(
+                content=self._state.status.copy.CLOSE_VAULT_ACTION,
+                on_click=self._close_vault,
+                key="workspace-close-vault",
+            ),
+            ft.PopupMenuItem(
+                content=self._state.status.copy.ABOUT_ACTION,
+                on_click=self._about,
+                key="workspace-about",
+            ),
+        ]
+        if self._on_language is not None:
+            menu_items.extend(
+                afanes.ui.components.language.LanguageMenu(
+                    self._state.status.copy,
+                    self._on_language,
+                    prefix="workspace",
+                ).items()
+            )
         self.change_button = ft.PopupMenuButton(
             icon=ft.Icons.FOLDER_OPEN_OUTLINED,
-            tooltip=afanes.ui.strings.MAIN_MENU,
-            items=[
-                ft.PopupMenuItem(
-                    content=afanes.ui.strings.CHANGE_VAULT_OPEN,
-                    on_click=self._change_vault,
-                    key="workspace-change-open",
-                ),
-                ft.PopupMenuItem(
-                    content=afanes.ui.strings.CHANGE_VAULT_CREATE,
-                    on_click=self._create_vault,
-                    key="workspace-change-create",
-                ),
-                ft.PopupMenuItem(
-                    content=afanes.ui.strings.CLOSE_VAULT_ACTION,
-                    on_click=self._close_vault,
-                    key="workspace-close-vault",
-                ),
-                ft.PopupMenuItem(
-                    content=afanes.ui.strings.ABOUT_ACTION,
-                    on_click=self._about,
-                    key="workspace-about",
-                ),
-            ],
+            tooltip=self._state.status.copy.MAIN_MENU,
+            items=menu_items,
             key="workspace-change",
         )
         self.drawer_close_button = ft.IconButton(
             icon=ft.Icons.CLOSE_OUTLINED,
-            tooltip=afanes.ui.strings.CLOSE_NAVIGATION,
+            tooltip=self._state.status.copy.CLOSE_NAVIGATION,
             on_click=self._close_drawer,
             visible=False,
             key="workspace-drawer-close",
         )
         self.nav_toggle = ft.IconButton(
             icon=ft.Icons.MENU_OUTLINED,
-            tooltip=afanes.ui.strings.WORKSPACE_NAVIGATION,
+            tooltip=self._state.status.copy.WORKSPACE_NAVIGATION,
             on_click=self._open_drawer,
             visible=False,
             key="workspace-navigation-toggle",
         )
         self.new_capture_button = ft.IconButton(
             icon=ft.Icons.NOTE_ADD_OUTLINED,
-            tooltip=afanes.ui.strings.NEW_CAPTURE_ACTION,
+            tooltip=self._state.status.copy.NEW_CAPTURE_ACTION,
             on_click=self._new_capture,
             key="workspace-new-capture",
         )
-        self.capture = afanes.ui.components.capture_bar.CaptureBar(self._capture, self._capture_changed)
+        self.capture = afanes.ui.components.capture_bar.CaptureBar(
+            self._capture, self._capture_changed, copy=self._state.status.copy
+        )
         self.capture_field = self.capture.field
         self.capture_button = self.capture.button
         self.capture_actions = self.capture.actions
@@ -231,7 +244,7 @@ class WorkspaceView:
         self.review_count = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.review_icon = ft.Icon(ft.Icons.PLAY_ARROW_OUTLINED, color=afanes.ui.theme.SECTION_ICON_COLOR)
         self.review_tile = ft.ListTile(
-            title=afanes.ui.strings.REVIEW_TITLE,
+            title=self._state.status.copy.REVIEW_TITLE,
             leading=self.review_icon,
             trailing=self.review_count,
             selected=False,
@@ -249,7 +262,7 @@ class WorkspaceView:
             self.section_counts[section] = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
             self.section_icons[section] = ft.Icon(_SECTION_ICONS[section], color=afanes.ui.theme.SECTION_ICON_COLOR)
             tile = ft.ListTile(
-                title=afanes.ui.strings.WORKSPACE_SECTION_LABELS[section.value],
+                title=self._state.status.copy.WORKSPACE_SECTION_LABELS[section.value],
                 leading=self.section_icons[section],
                 trailing=self.section_counts[section],
                 selected=False,
@@ -286,7 +299,7 @@ class WorkspaceView:
     def _build_browser(self) -> None:
         """Build the browser search, header, and list."""
         self.search_field = ft.TextField(
-            hint_text=afanes.ui.strings.BROWSER_SEARCH_HINT,
+            hint_text=self._state.status.copy.BROWSER_SEARCH_HINT,
             prefix_icon=ft.Icons.SEARCH_OUTLINED,
             expand=True,
             on_change=self._search,
@@ -294,7 +307,7 @@ class WorkspaceView:
         )
         self.browser_search_clear = ft.IconButton(
             icon=ft.Icons.CLOSE_OUTLINED,
-            tooltip=afanes.ui.strings.BROWSER_SEARCH_CLEAR,
+            tooltip=self._state.status.copy.BROWSER_SEARCH_CLEAR,
             on_click=self._clear_search,
             visible=False,
             key="browser-search-clear",
@@ -324,7 +337,7 @@ class WorkspaceView:
         )
         self.browser_actions = ft.Row(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
         self.empty_trash_button = ft.OutlinedButton(
-            content=afanes.ui.strings.TRASH_EMPTY_ACTION,
+            content=self._state.status.copy.TRASH_EMPTY_ACTION,
             on_click=self._begin_empty_trash,
             visible=False,
             style=afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE,
@@ -347,6 +360,7 @@ class WorkspaceView:
         self.empty_trash_confirm = afanes.ui.components.page_panels.DestructiveConfirmPanel(
             self._confirm_empty_trash,
             self._cancel_empty_trash,
+            copy=self._state.status.copy,
         )
         self.empty_trash_confirm_panel = self.empty_trash_confirm.panel
         self.browser_body = ft.Column(
@@ -396,7 +410,7 @@ class WorkspaceView:
         )
         self.detail_back_button = ft.IconButton(
             icon=ft.Icons.ARROW_BACK_OUTLINED,
-            tooltip=afanes.ui.strings.PAGE_BACK,
+            tooltip=self._state.status.copy.PAGE_BACK,
             on_click=self._back_to_browser,
             visible=False,
             key="workspace-detail-back",
@@ -873,7 +887,7 @@ class WorkspaceView:
             tile.selected = active
             self.section_icons[section].color = afanes.ui.theme.SECTION_ICON_COLOR
         review_active = state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW
-        self.review_count.value = afanes.ui.strings.CopyFormatter.review_pending(state.browser.pending_count())
+        self.review_count.value = self._state.status.copy.locale_format.count(state.browser.pending_count())
         self.review_tile.selected = review_active
         self.review_icon.color = afanes.ui.theme.SECTION_ICON_COLOR
         self.search_field.value = state.browser.query
@@ -901,11 +915,11 @@ class WorkspaceView:
         section = state.browser.active_section
         searching = self._searching()
         if searching:
-            title = afanes.ui.strings.BROWSER_SEARCH_TITLE
+            title = self._state.status.copy.BROWSER_SEARCH_TITLE
         elif section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
-            title = afanes.ui.strings.REVIEW_TITLE
+            title = self._state.status.copy.REVIEW_TITLE
         else:
-            title = afanes.ui.strings.WORKSPACE_SECTION_LABELS[section.value]
+            title = self._state.status.copy.WORKSPACE_SECTION_LABELS[section.value]
         self.browser_title.value = title
         references = section is afanes.ui.state.browser.WorkspaceSection.REFERENCES and not searching
         trash = section is afanes.ui.state.browser.WorkspaceSection.TRASH and not searching
@@ -958,25 +972,28 @@ class WorkspaceView:
         for group in groups:
             if not group.notes:
                 continue
+            heading = (
+                self._state.status.copy.WORKSPACE_SECTION_LABELS["references"] if group.label is None else group.title
+            )
             controls.append(
                 ft.Container(
                     padding=afanes.ui.theme.ITEM_GAP,
                     content=ft.Text(
-                        group.title,
+                        heading,
                         style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
                     ),
                 )
             )
             controls.extend(self._note_row(note) for note in group.notes)
         if not controls:
-            controls.append(self._empty_message(afanes.ui.strings.BROWSER_EMPTY))
+            controls.append(self._empty_message(self._state.status.copy.BROWSER_EMPTY))
         return controls
 
     def _flat_controls(self, groups: tuple[afanes.core.search.BrowserGroup, ...]) -> list[ft.Control]:
         """Build the flat note list for Inbox or Needs attention."""
         notes = groups[0].notes if groups else ()
         if not notes:
-            return [self._empty_message(afanes.ui.strings.BROWSER_EMPTY)]
+            return [self._empty_message(self._state.status.copy.BROWSER_EMPTY)]
         return [self._note_row(note) for note in notes]
 
     def _empty_message(self, message: str) -> ft.Control:
@@ -1004,13 +1021,15 @@ class WorkspaceView:
                 if not notes:
                     continue
                 matched = True
-                controls.append(self._heading(afanes.ui.strings.WORKSPACE_SECTION_LABELS[section.value], len(notes)))
+                controls.append(
+                    self._heading(self._state.status.copy.WORKSPACE_SECTION_LABELS[section.value], len(notes))
+                )
                 controls.extend(self._note_row(note) for note in notes)
         timeline = state.browser.timeline()
         log_entries = timeline.entries() if timeline is not None else ()
         if log_entries:
             matched = True
-            controls.append(self._heading(afanes.ui.strings.WORKSPACE_SECTION_LABELS["log"], len(log_entries)))
+            controls.append(self._heading(self._state.status.copy.WORKSPACE_SECTION_LABELS["log"], len(log_entries)))
         controls.extend(self._note_row(note) for note in log_entries)
         if listing is not None:
             misplaced = listing.group(afanes.core.search.BrowserSection.NEEDS_ATTENTION).notes
@@ -1018,7 +1037,7 @@ class WorkspaceView:
                 matched = True
                 controls.append(
                     self._heading(
-                        afanes.ui.strings.WORKSPACE_SECTION_LABELS[
+                        self._state.status.copy.WORKSPACE_SECTION_LABELS[
                             afanes.core.search.BrowserSection.NEEDS_ATTENTION.value
                         ],
                         len(misplaced),
@@ -1030,14 +1049,18 @@ class WorkspaceView:
             matched = True
             controls.append(
                 self._heading(
-                    afanes.ui.strings.WORKSPACE_SECTION_LABELS[afanes.ui.state.browser.WorkspaceSection.TRASH.value],
+                    self._state.status.copy.WORKSPACE_SECTION_LABELS[
+                        afanes.ui.state.browser.WorkspaceSection.TRASH.value
+                    ],
                     len(trashed),
                 )
             )
             controls.extend(self._trash_row(entry) for entry in trashed)
         if not matched:
             return [
-                self._empty_message(afanes.ui.strings.BROWSER_NO_MATCH_QUERY.format(query=state.browser.query.strip()))
+                self._empty_message(
+                    self._state.status.copy.BROWSER_NO_MATCH_QUERY.format(query=state.browser.query.strip())
+                )
             ]
         return controls
 
@@ -1056,7 +1079,7 @@ class WorkspaceView:
         """Build the managed-entry rows for the Trash destination."""
         entries = self._state.browser.trash_entries()
         if not entries:
-            return [self._empty_message(afanes.ui.strings.TRASH_EMPTY)]
+            return [self._empty_message(self._state.status.copy.TRASH_EMPTY)]
         return [self._trash_row(entry) for entry in entries]
 
     def _trash_row(self, entry: afanes.core.vault.trash_catalog.TrashEntry) -> ft.Control:
@@ -1065,7 +1088,7 @@ class WorkspaceView:
         selected = page is not None and page.path == entry.path
         return ft.ListTile(
             title=entry.title,
-            subtitle=afanes.ui.strings.TRASH_ROW_FROM.format(path=entry.birthplace_text),
+            subtitle=self._state.status.copy.TRASH_ROW_FROM.format(path=entry.birthplace_text),
             leading=ft.Icons.DESCRIPTION_OUTLINED,
             selected=selected,
             on_click=self._trash_select_handler(entry),
@@ -1105,11 +1128,11 @@ class WorkspaceView:
         if not pending:
             return
         count = self._state.session.trash_count
-        self.empty_trash_confirm.title.value = afanes.ui.strings.TRASH_EMPTY_TITLE
-        self.empty_trash_confirm.body.value = afanes.ui.strings.TRASH_EMPTY_BODY.format(
-            count=afanes.ui.strings.CopyFormatter.trash_entry_count(count),
+        self.empty_trash_confirm.title.value = self._state.status.copy.TRASH_EMPTY_TITLE
+        self.empty_trash_confirm.body.value = self._state.status.copy.TRASH_EMPTY_BODY.format(
+            count=self._state.status.copy.formatter.trash_entry_count(count),
         )
-        self.empty_trash_confirm.confirm.content = afanes.ui.strings.TRASH_EMPTY_CONFIRM
+        self.empty_trash_confirm.confirm.content = self._state.status.copy.TRASH_EMPTY_CONFIRM
 
     async def _begin_empty_trash(self) -> None:
         """Open the Empty Trash confirmation."""
@@ -1138,7 +1161,7 @@ class WorkspaceView:
                 ft.Container(
                     padding=afanes.ui.theme.ITEM_GAP,
                     content=ft.Text(
-                        afanes.ui.strings.CopyFormatter.review_pending(state.browser.pending_count()),
+                        self._state.status.copy.formatter.review_pending(state.browser.pending_count()),
                         color=afanes.ui.theme.MUTED_TEXT_COLOR,
                     ),
                 )
@@ -1155,14 +1178,14 @@ class WorkspaceView:
         current: bool,
     ) -> ft.Control:
         """Build one clickable review queue card."""
-        kind = afanes.ui.strings.REVIEW_KIND_LABELS[item.kind.value]
+        kind = self._state.status.copy.REVIEW_KIND_LABELS[item.kind.value]
         details: list[ft.Control] = [
             ft.Text(kind, style=afanes.ui.theme.TEXT_ROLES["caption"]),
         ]
         if current:
             details.append(
                 ft.Text(
-                    afanes.ui.strings.REVIEW_CURRENT,
+                    self._state.status.copy.REVIEW_CURRENT,
                     style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
                 )
             )
@@ -1299,19 +1322,19 @@ class WorkspaceView:
         ):
             selected_day = (state.browser.log_year, state.browser.log_month, state.browser.log_day)
         self.log_entries_button = self._log_mode_button(
-            afanes.ui.strings.LOG_MODE_ENTRIES,
+            self._state.status.copy.LOG_MODE_ENTRIES,
             active=state.browser.log_mode is afanes.core.log.LogMode.ENTRIES,
             on_click=self._log_entries,
             key="log-mode-entries",
         )
         self.log_everything_button = self._log_mode_button(
-            afanes.ui.strings.LOG_MODE_EVERYTHING,
+            self._state.status.copy.LOG_MODE_EVERYTHING,
             active=state.browser.log_mode is afanes.core.log.LogMode.EVERYTHING,
             on_click=self._log_everything,
             key="log-mode-everything",
         )
         self.log_today_button = ft.TextButton(
-            content=afanes.ui.strings.LOG_TODAY_ENTRY,
+            content=self._state.status.copy.LOG_TODAY_ENTRY,
             on_click=self._log_today,
             key="log-today-entry",
         )
@@ -1319,12 +1342,14 @@ class WorkspaceView:
             lambda day: asyncio.create_task(self._log_select_day(day)),
             lambda: asyncio.create_task(self._log_previous_month()),
             lambda: asyncio.create_task(self._log_next_month()),
+            copy=self._state.status.copy,
         )
         self.log_tree = afanes.ui.components.log_tree.LogTree(
             lambda path: asyncio.create_task(self._select(path)),
             lambda year, month: asyncio.create_task(self._log_create_month(year, month)),
             lambda year: asyncio.create_task(self._log_create_year(year)),
             selected_day,
+            copy=self._state.status.copy,
         )
         calendar_month = timeline.calendar(year, month)
         return [
@@ -1498,7 +1523,7 @@ class WorkspaceView:
         controls: list[ft.Control] = [
             ft.Divider(height=1),
             ft.Text(
-                afanes.ui.strings.BROWSER_FAILURES,
+                self._state.status.copy.BROWSER_FAILURES,
                 style=afanes.ui.theme.TEXT_ROLES["caption"],
                 color=afanes.ui.theme.ERROR_TEXT_COLOR,
             ),
@@ -1555,7 +1580,7 @@ class WorkspaceView:
                     self._finish_processing,
                 )
                 self._processing_key = key
-            self.detail_title.value = afanes.ui.strings.PROCESSING_TITLE
+            self.detail_title.value = self._state.status.copy.PROCESSING_TITLE
             self._show_flow_toolbar()
             self.main_host.content = self._processing_view.build()
             return
@@ -1565,7 +1590,7 @@ class WorkspaceView:
             if self._review_view is None:
                 self._review_view = afanes.ui.views.review.ReviewView(self._on_review_update)
             self._review_view.refresh()
-            self.detail_title.value = afanes.ui.strings.REVIEW_TITLE
+            self.detail_title.value = self._state.status.copy.REVIEW_TITLE
             self._show_flow_toolbar()
             self.main_host.content = self._review_view.build()
             return

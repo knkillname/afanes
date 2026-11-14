@@ -21,6 +21,7 @@ from afanes.core.frontmatter import NoteDocument
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan, ProcessingTarget
 from afanes.core.steps import StepDocument
 from afanes.models.note import CategoryLabel, NoteType, Status
+from tests.support import simulated_message
 
 HASH_A = "a" * 64
 HASH_B = "b" * 64
@@ -300,7 +301,7 @@ class TestProcessingPlan:
         target_type: NoteType,
         target_status: Status | None,
     ) -> None:
-        with pytest.raises(ProcessingError, match="Only projects"):
+        with pytest.raises(ProcessingError, match="processing-project-assignment"):
             _plan(
                 tmp_path,
                 outcome=outcome,
@@ -806,7 +807,7 @@ class TestPlanProcessing:
         root.mkdir()
         source = _capture(root)
 
-        with pytest.raises(ProcessingError, match="Only projects"):
+        with pytest.raises(ProcessingError, match="processing-project-assignment"):
             afanes.core.vault.processing.VaultProcessing(afanes.core.vault.service.Vault(root)).plan_processing(
                 _request(
                     source,
@@ -984,7 +985,7 @@ class TestApplyProcessing:
 
         def fail_replace(self_path: Path, target: Path) -> Path:
             if self_path == source:
-                message = "busy"
+                message = "disk full"
                 raise OSError(message)
             return original_replace(self_path, target)
 
@@ -1156,8 +1157,7 @@ class TestApplyAppend:
             *_args: object,
             **_kwargs: object,
         ) -> afanes.core.vault.naming_reports.TrashPreview:
-            message = "busy"
-            raise VaultError(message)
+            raise VaultError(simulated_message())
 
         monkeypatch.setattr(afanes.core.vault.naming.VaultNaming, "trash", fail_trash)
         with pytest.raises(ProcessingError):

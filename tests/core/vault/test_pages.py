@@ -388,7 +388,7 @@ class TestCreateLogPage:
         root = tmp_path / "vault"
         root.mkdir()
 
-        with pytest.raises(NoteParseError, match="type log"):
+        with pytest.raises(NoteParseError, match="log-text-type"):
             afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).create_log_page(
                 NoteDate.from_text("2025-10-12"),
                 "---\ntype: note\ndate: 2025-10-12\n---\n\n# A note\n",
@@ -564,7 +564,7 @@ class TestCaptureNote:
         root.mkdir()
         (root / "inbox").write_text("not a directory", encoding="utf-8")
 
-        with pytest.raises(VaultError, match="not a directory"):
+        with pytest.raises(VaultError, match="note-directory-not-directory"):
             afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).capture("Buy milk")
 
 

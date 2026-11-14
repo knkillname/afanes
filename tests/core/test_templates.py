@@ -13,14 +13,16 @@ import afanes.core.steps
 import afanes.core.template_cards
 import afanes.core.templates
 import afanes.core.vault.service
+import afanes.i18n.templates
 from afanes.core.errors import (
+    MessageCode,
     TemplateCardContentError,
     TemplateCardWriteError,
     TemplateContentError,
     TemplateWriteError,
     UnknownTemplateError,
 )
-from afanes.models.note import NoteDate, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 from tests.support import constant
 
 GUIDE_TEXT = "---\ntype: reference\n---\n\n# Getting started\n\nA guide.\n"
@@ -128,6 +130,10 @@ def _inert_violations(
     return violations
 
 
+def _labels() -> tuple[afanes.core.templates.TemplateLabel, ...]:
+    return afanes.i18n.templates.TemplateLabelCatalog.english().labels()
+
+
 class TestBundledCatalog:
     def test_catalog_reports_three_templates_in_order(self) -> None:
         catalog = afanes.core.templates.TemplateCatalog.bundled()
@@ -135,13 +141,14 @@ class TestBundledCatalog:
         assert catalog.identifiers == ("personal", "work", "study")
 
     def test_every_entry_carries_a_label_and_description(self) -> None:
-        catalog = afanes.core.templates.TemplateCatalog.bundled()
+        labels = _labels()
 
-        assert all(template.label for template in catalog.templates)
-        assert all(template.description.endswith(".") for template in catalog.templates)
+        assert [label.identifier for label in labels] == ["personal", "work", "study"]
+        assert all(label.label for label in labels)
+        assert all(not label.description.endswith(".") for label in labels)
 
     def test_summaries_report_a_non_zero_note_count(self) -> None:
-        summaries = afanes.core.templates.TemplateCatalog.bundled().summaries()
+        summaries = afanes.core.templates.TemplateCatalog.bundled().summaries(_labels())
 
         assert [summary.identifier for summary in summaries] == ["personal", "work", "study"]
         assert all(summary.note_count > 0 for summary in summaries)
@@ -151,7 +158,7 @@ class TestBundledCatalog:
         before = sorted(path.as_posix() for path in (package / "templates").rglob("*"))
         monkeypatch.chdir(tmp_path)
 
-        afanes.core.templates.TemplateCatalog.bundled().summaries()
+        afanes.core.templates.TemplateCatalog.bundled().summaries(_labels())
 
         after = sorted(path.as_posix() for path in (package / "templates").rglob("*"))
         assert after == before
@@ -160,7 +167,7 @@ class TestBundledCatalog:
     def test_catalog_needs_no_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
 
-        summaries = afanes.core.templates.TemplateCatalog.bundled().summaries()
+        summaries = afanes.core.templates.TemplateCatalog.bundled().summaries(_labels())
 
         assert len(summaries) == CATALOG_SIZE
 
@@ -349,7 +356,7 @@ class TestBundledTreeValidation:
         with pytest.raises(TemplateContentError) as info:
             catalog.bundle("personal")
 
-        assert "does not match the shape" in str(info.value)
+        assert info.value.domain_message.code is MessageCode.TEMPLATE_LOCALE_SHAPE
 
     def test_locale_with_a_missing_step_is_refused(self, tmp_path: Path) -> None:
         root = tmp_path / "templates"
@@ -365,7 +372,7 @@ class TestBundledTreeValidation:
         with pytest.raises(TemplateContentError) as info:
             catalog.bundle("personal")
 
-        assert "does not match the shape" in str(info.value)
+        assert info.value.domain_message.code is MessageCode.TEMPLATE_LOCALE_SHAPE
 
     def test_guide_without_the_canonical_path_is_refused(self, tmp_path: Path) -> None:
         root = tmp_path / "templates"
@@ -403,6 +410,61 @@ class TestBundledContent:
         assert guide.note_type is NoteType.REFERENCE
         assert guide.category is None
         assert guide.document.status is None
+
+    def test_spanish_bundle_uses_spanish_guide_and_notes(self) -> None:
+        catalog = afanes.core.templates.TemplateCatalog.bundled()
+
+        bundle = catalog.bundle("personal", "es", today=TODAY)
+
+        assert bundle.locale == "es"
+        assert bundle.guide[0].relative_path == Path("reference/Primeros pasos.md")
+        assert bundle.guide[0].document.title == "Primeros pasos"
+        assert "Cuatro tipos de notas" in bundle.guide[0].document.body
+        stems = {note.stem for note in bundle.notes}
+        assert "Revisión del coche" in stems
+        assert "El taller del barrio" in stems
+        assert {note.category for note in bundle.notes if note.note_type is NoteType.REFERENCE} == {
+            CategoryLabel("person"),
+            CategoryLabel("place"),
+        }
+
+    @pytest.mark.parametrize("identifier", ["personal", "work", "study"])
+    def test_spanish_trees_keep_the_english_shape(self, identifier: str) -> None:
+        catalog = afanes.core.templates.TemplateCatalog.bundled()
+
+        english = catalog.bundle(identifier, "en", today=TODAY)
+        spanish = catalog.bundle(identifier, "es", today=TODAY)
+
+        assert _shape(english.notes) == _shape(spanish.notes)
+        assert len(english.guide) == len(spanish.guide) == 1
+
+    def test_missing_spanish_guide_falls_back_to_the_english_path(self, tmp_path: Path) -> None:
+        root = tmp_path / "templates"
+        _guide(root)
+
+        bundle = afanes.core.templates.TemplateCatalog.from_root(root).bundle(None, "es")
+
+        assert bundle.locale == "en"
+        assert bundle.guide[0].relative_path == afanes.core.templates.GUIDE_RELATIVE_PATH
+
+    def test_a_spanish_guide_at_the_english_path_is_refused(self, tmp_path: Path) -> None:
+        root = tmp_path / "templates"
+        _write(root, Path("_guide/es/reference/Getting started.md"), GUIDE_TEXT)
+
+        with pytest.raises(TemplateContentError) as info:
+            afanes.core.templates.TemplateCatalog.from_root(root).bundle(None, "es")
+
+        assert "Primeros pasos.md" in str(info.value)
+
+    def test_the_spanish_guide_stem_is_reserved(self, tmp_path: Path) -> None:
+        root = tmp_path / "templates"
+        _catalog(root)
+        _write(root, Path("personal/en/reference/Primeros pasos.md"), GUIDE_TEXT)
+
+        with pytest.raises(TemplateContentError) as info:
+            afanes.core.templates.TemplateCatalog.from_root(root).bundle("personal")
+
+        assert "reserved guide name" in str(info.value)
 
     def test_bundled_notes_carry_the_creation_date(self, fixed_today: datetime.date) -> None:
         bundle = afanes.core.templates.TemplateCatalog.bundled().bundle(
@@ -551,7 +613,7 @@ class TestDateRendering:
         with pytest.raises(TemplateContentError) as info:
             catalog.bundle("personal", today=TODAY)
 
-        assert "brace expression" in str(info.value)
+        assert info.value.domain_message.code is MessageCode.TEMPLATE_NOTE_BRACE
 
     def test_placeholder_without_a_sign_is_refused(self, tmp_path: Path) -> None:
         root = tmp_path / "templates"
@@ -566,7 +628,7 @@ class TestDateRendering:
         with pytest.raises(TemplateContentError) as info:
             catalog.bundle("personal", today=TODAY)
 
-        assert "brace expression" in str(info.value)
+        assert info.value.domain_message.code is MessageCode.TEMPLATE_NOTE_BRACE
 
 
 class TestDateRules:
@@ -683,6 +745,20 @@ class TestCreationWritesBundledContent:
         creation = afanes.core.vault.service.Vault.create_directory(root, template="study")
 
         assert all(path.is_relative_to(creation.vault.root) for path in creation.written_notes)
+
+    def test_spanish_creation_writes_the_spanish_guide_and_cards(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+
+        afanes.core.vault.service.Vault.create_directory(root, template="personal", locale="es")
+
+        assert (root / "reference" / "Primeros pasos.md").is_file()
+        assert not (root / "reference" / "Getting started.md").exists()
+        assert (root / "projects" / "Revisión del coche.md").is_file()
+        assert (root / "templates" / "person.md").is_file()
+        document = afanes.core.frontmatter.NoteDocument.from_text(
+            (root / "templates" / "person.md").read_text(encoding="utf-8"),
+        )
+        assert document.raw["title"] == "Persona"
 
     def test_missing_locale_still_creates_the_vault(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"

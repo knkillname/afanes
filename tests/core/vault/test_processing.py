@@ -184,7 +184,7 @@ class TestProcessingGuards:
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
         service = afanes.core.vault.processing.VaultProcessing(vault)
 
-        with pytest.raises(ProcessingError, match="Only projects"):
+        with pytest.raises(ProcessingError, match="processing-project-assignment"):
             service.plan_processing(processing_request(capture, outcome, owner="Sam Rivera"))
 
     def test_blank_role_values_write_no_keys(self, tmp_path: Path) -> None:
@@ -237,7 +237,7 @@ class TestProcessingGuards:
         capture = afanes.core.vault.pages.VaultPages(vault).capture("Buy milk")
         service = afanes.core.vault.processing.VaultProcessing(vault)
 
-        with pytest.raises(ProcessingError, match="Only projects"):
+        with pytest.raises(ProcessingError, match="processing-project-assignment"):
             service.plan_processing(
                 processing_request(capture, ProcessingOutcome.APPEND_STEP, project="Home", asked_by="Sam Rivera")
             )

@@ -8,9 +8,11 @@ from pathlib import Path
 import flet as ft
 import pytest
 
+import afanes.core.localization
 import afanes.core.settings
+import afanes.i18n.ui
+import afanes.i18n.ui.en
 import afanes.ui.state
-import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.projects
 from tests.support import constant, ensure_vault, versioned
@@ -184,8 +186,8 @@ class TestProjectGrouping:
         _write_note(vault / "projects" / "Now.md", status="active")
         _write_note(vault / "projects" / "Plain.md")
         view = _open_view(tmp_path, monkeypatch)
-        expected = afanes.ui.strings.PROJECT_META_SEPARATOR.join(
-            ["Active", afanes.ui.strings.CopyFormatter.open_step_count(0)]
+        expected = afanes.i18n.ui.en.PROJECT_META_SEPARATOR.join(
+            ["Active", afanes.i18n.ui.UiCopy.english().formatter.open_step_count(0)]
         )
 
         active_details = _details(_project_buttons(view, "active")[0])
@@ -208,7 +210,7 @@ class TestProjectRows:
 
         details = _details(_project_buttons(view, "active")[0])
 
-        assert "Due 2026-11-20" in details[-1]
+        assert "Due Nov 20, 2026" in details[-1]
         assert "1 open step" in details[-1]
         assert "Next: Write copy" in details
 
@@ -278,7 +280,7 @@ class TestProjectRows:
         assert _titles(view, "waiting") == ["Launch"]
         details = _details(tiles[0])
         assert "Waiting" in details[-1]
-        assert afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01") in details[-1]
+        assert afanes.i18n.ui.en.PROJECT_DUE.format(date="Dec 1, 2026") in details[-1]
         assert "2 open steps" in details[-1]
         assert any("Write copy" in detail for detail in details)
         assert "Sam Rivera" not in " ".join(details)
@@ -307,7 +309,7 @@ class TestProjectRows:
         assert _titles(view, "waiting") == ["Launch"]
         details = _details(tiles[0])
         assert "Waiting" in details[-1]
-        assert afanes.ui.strings.PROJECT_DUE.format(date="2026-12-01") in details[-1]
+        assert afanes.i18n.ui.en.PROJECT_DUE.format(date="Dec 1, 2026") in details[-1]
         assert "2 open steps" in details[-1]
         assert any("Write copy" in detail for detail in details)
         assert "Sam Rivera" not in " ".join(details)
@@ -320,7 +322,7 @@ class TestProjectRows:
         details = _details(_project_buttons(view, "active")[0])
 
         assert "0 open steps" in details[-1]
-        assert afanes.ui.strings.PROJECT_NO_NEXT_STEP in details
+        assert afanes.i18n.ui.en.PROJECT_NO_NEXT_STEP in details
 
     def test_next_step_renders_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -575,7 +577,7 @@ class TestProjectRefresh:
 
         details = _details(_project_buttons(view, "active")[0])
         assert "0 open steps" in details[-1]
-        assert afanes.ui.strings.PROJECT_NO_NEXT_STEP in details
+        assert afanes.i18n.ui.en.PROJECT_NO_NEXT_STEP in details
 
     def test_search_filters_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -608,3 +610,35 @@ class TestProjectRefresh:
         details = _details(tiles[0])
         assert any("Write copy" in detail for detail in details)
         assert "printer" not in " ".join(details).lower()
+
+
+class TestSpanishProjects:
+    def test_projects_render_spanish(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        state = afanes.ui.state.app_state
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        state.status.set_copy(copy)
+
+        view = _open_view(tmp_path, monkeypatch)
+
+        title = _group(view, "active").title
+        assert isinstance(title, ft.Text)
+        assert title.value.startswith(copy.PROJECT_GROUP_LABELS["active"])
+        assert afanes.i18n.ui.en.PROJECT_GROUP_LABELS["active"] not in (title.value or "")
+
+    def test_due_date_renders_spanish(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        state = afanes.ui.state.app_state
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        state.status.set_copy(copy)
+        vault = tmp_path / "vault"
+        _write_note(
+            vault / "projects" / "Launch.md",
+            status="active",
+            due_date="2026-11-20",
+            body="# Launch\n\n- [ ] Write copy\n",
+        )
+
+        view = _open_view(tmp_path, monkeypatch)
+
+        details = _details(_project_buttons(view, "active")[0])
+        assert copy.PROJECT_DUE.format(date="20 nov 2026") in details[-1]
+        assert "2026-11-20" not in details[-1]

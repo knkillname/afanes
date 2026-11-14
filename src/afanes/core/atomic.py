@@ -11,7 +11,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from afanes.core.errors import VaultError
+from afanes.core.errors import DomainMessage, MessageCode, VaultError
 
 
 class AtomicWriter:
@@ -52,7 +52,7 @@ class AtomicWriter:
         """
         parent = path.parent
         if not parent.is_dir():
-            message = f"Destination directory does not exist: {parent}"
+            message = DomainMessage.of(MessageCode.DESTINATION_DIRECTORY_MISSING, path=str(parent))
             raise VaultError(message)
 
         data = text.encode("utf-8")
@@ -109,7 +109,7 @@ class AtomicWriter:
         """
         parent = path.parent
         if not parent.is_dir():
-            message = f"Destination directory does not exist: {parent}"
+            message = DomainMessage.of(MessageCode.DESTINATION_DIRECTORY_MISSING, path=str(parent))
             raise VaultError(message)
 
         data = text.encode("utf-8")

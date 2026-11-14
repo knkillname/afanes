@@ -15,6 +15,7 @@ from pathlib import Path
 
 import afanes.core.links
 import afanes.core.names
+from afanes.core.errors import DomainMessage
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.links import NameCatalog, ResolutionOutcome
 from afanes.models.link import NoteReference, ReferenceScheme
@@ -465,12 +466,12 @@ class VaultFailure:
     ----------
     path : Path
         Vault-relative path to the failing note.
-    message : str
-        Concise diagnostic. The scan continues with the remaining notes.
+    message : DomainMessage
+        Stable diagnostic. The scan continues with the remaining notes.
     """
 
     path: Path
-    message: str
+    message: DomainMessage
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -539,13 +540,13 @@ class UnparsedPage:
     ----------
     file : PageFile
         Raw file content and identity.
-    failure : str
+    failure : DomainMessage
         Parse failure message. The raw text is retained so the page can open in
         raw rescue mode without losing the file's current content.
     """
 
     file: PageFile
-    failure: str
+    failure: DomainMessage
 
     @property
     def path(self) -> Path:

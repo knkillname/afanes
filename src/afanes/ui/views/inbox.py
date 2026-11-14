@@ -13,10 +13,11 @@ from collections.abc import Awaitable, Callable
 
 import flet as ft
 
+import afanes.i18n.ui
 import afanes.ui.state
-import afanes.ui.strings
 import afanes.ui.theme
 from afanes.ui.components.banner import Banner
+from afanes.ui.components.language import LanguageMenu
 
 
 class WelcomeView:
@@ -47,6 +48,9 @@ class WelcomeView:
         on_choose: Callable[[], Awaitable[None]] | None = None,
         on_open_path: Callable[[str], Awaitable[None]] | None = None,
         on_create: Callable[[], Awaitable[None]] | None = None,
+        on_language: Callable[[str | None], Awaitable[None] | None] | None = None,
+        *,
+        copy: afanes.i18n.ui.UiCopy | None = None,
     ) -> None:
         """Store the vault selection actions for this presentation."""
         if on_choose is None and on_open_path is None:
@@ -55,6 +59,8 @@ class WelcomeView:
         self._on_choose = on_choose
         self._on_open_path = on_open_path
         self._on_create = on_create
+        self._on_language = on_language
+        self._copy = afanes.i18n.ui.UiCopy.english() if copy is None else copy
 
     def build(self) -> ft.Control:
         """Build the welcome layout.
@@ -67,16 +73,16 @@ class WelcomeView:
         """
         controls: list[ft.Control] = [
             ft.Text(
-                afanes.ui.strings.WELCOME_TITLE,
+                self._copy.WELCOME_TITLE,
                 style=afanes.ui.theme.TEXT_ROLES["title-1"],
                 text_align=ft.TextAlign.CENTER,
             ),
-            ft.Text(afanes.ui.strings.WELCOME_BODY, text_align=ft.TextAlign.CENTER),
+            ft.Text(self._copy.WELCOME_BODY, text_align=ft.TextAlign.CENTER),
         ]
         if self._on_choose is not None:
             controls.append(
                 ft.FilledButton(
-                    content=afanes.ui.strings.WELCOME_CHOOSE,
+                    content=self._copy.WELCOME_CHOOSE,
                     on_click=self._on_choose,
                     autofocus=True,
                     key="welcome-choose",
@@ -87,18 +93,20 @@ class WelcomeView:
         if self._on_create is not None:
             controls.append(
                 ft.OutlinedButton(
-                    content=afanes.ui.strings.NEW_VAULT_ACTION,
+                    content=self._copy.NEW_VAULT_ACTION,
                     on_click=self._on_create,
                     key="welcome-create",
                 ),
             )
         controls.append(
             ft.Text(
-                afanes.ui.strings.WELCOME_NOTE,
+                self._copy.WELCOME_NOTE,
                 style=afanes.ui.theme.TEXT_ROLES["caption"],
                 text_align=ft.TextAlign.CENTER,
             ),
         )
+        if self._on_language is not None:
+            controls.append(LanguageMenu(self._copy, self._on_language, prefix="welcome").control())
         message = afanes.ui.state.app_state.workspace.banner
         if message is not None:
             controls.append(Banner(message).build())
@@ -113,12 +121,11 @@ class WelcomeView:
             ),
         )
 
-    @staticmethod
-    def _vault_path_entry(on_open_path: Callable[[str], Awaitable[None]]) -> list[ft.Control]:
+    def _vault_path_entry(self, on_open_path: Callable[[str], Awaitable[None]]) -> list[ft.Control]:
         """Build the typed-path selection controls for a browser session."""
         field = ft.TextField(
-            label=afanes.ui.strings.WELCOME_PATH_LABEL,
-            hint_text=afanes.ui.strings.WELCOME_PATH_HINT,
+            label=self._copy.WELCOME_PATH_LABEL,
+            hint_text=self._copy.WELCOME_PATH_HINT,
             width=420,
             autofocus=True,
             key="welcome-path",
@@ -129,7 +136,7 @@ class WelcomeView:
 
         field.on_submit = open_typed_path
         button = ft.FilledButton(
-            content=afanes.ui.strings.WELCOME_OPEN,
+            content=self._copy.WELCOME_OPEN,
             on_click=open_typed_path,
             key="welcome-open",
         )
@@ -145,9 +152,15 @@ class SessionNotice:
         Command that tries to claim the session again.
     """
 
-    def __init__(self, on_retry: Callable[[], Awaitable[None]]) -> None:
+    def __init__(
+        self,
+        on_retry: Callable[[], Awaitable[None]],
+        *,
+        copy: afanes.i18n.ui.UiCopy | None = None,
+    ) -> None:
         """Store the retry action."""
         self._on_retry = on_retry
+        self._copy = afanes.i18n.ui.UiCopy.english() if copy is None else copy
 
     def build(self) -> ft.Control:
         """Build the session notice.
@@ -163,13 +176,13 @@ class SessionNotice:
             content=ft.Column(
                 controls=[
                     ft.Text(
-                        afanes.ui.strings.SESSION_ACTIVE_TITLE,
+                        self._copy.SESSION_ACTIVE_TITLE,
                         style=afanes.ui.theme.TEXT_ROLES["title-1"],
                         text_align=ft.TextAlign.CENTER,
                     ),
-                    ft.Text(afanes.ui.strings.SESSION_ACTIVE_BODY, text_align=ft.TextAlign.CENTER),
+                    ft.Text(self._copy.SESSION_ACTIVE_BODY, text_align=ft.TextAlign.CENTER),
                     ft.FilledButton(
-                        content=afanes.ui.strings.SESSION_RETRY,
+                        content=self._copy.SESSION_RETRY,
                         on_click=self._on_retry,
                         autofocus=True,
                         key="session-retry",

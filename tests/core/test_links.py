@@ -19,6 +19,7 @@ from afanes.core.links import (
 )
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteType
+from tests.support import simulated_message
 
 TWO_REWRITES = 2
 LABEL_END_INDEX = 4
@@ -90,7 +91,7 @@ class TestParseReference:
             _parse("<note:   >")
 
     def test_rejects_the_retired_person_scheme(self) -> None:
-        with pytest.raises(RetiredReferenceSchemeError, match="note:Name"):
+        with pytest.raises(RetiredReferenceSchemeError, match="retired-person-scheme"):
             _parse("person:Ada")
 
 
@@ -427,8 +428,7 @@ class TestRewriteBodyReferences:
 
     def test_raises_when_verification_cannot_parse(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def broken(_reader: afanes.core.links.ReferenceReader, _markdown: str) -> list[NoteReference]:
-            message = "broken"
-            raise InvalidReferenceError(message)
+            raise InvalidReferenceError(simulated_message())
 
         monkeypatch.setattr(afanes.core.links.ReferenceReader, "extract", broken)
         with pytest.raises(ReferenceRewriteError):

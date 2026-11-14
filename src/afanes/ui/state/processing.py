@@ -8,8 +8,7 @@ from pathlib import Path
 import afanes.core.processing
 import afanes.core.vault.processing
 import afanes.core.vault.service
-import afanes.ui.strings
-from afanes.core.errors import AfanesError, VaultError
+from afanes.core.errors import AfanesError, DomainMessage, MessageCode, VaultError
 from afanes.core.processing import AppendStepPlan, ProcessingPlan
 from afanes.core.template_cards import TemplateCard, TemplateCardCatalog, TemplateCardIssue, TemplateCardListing
 from afanes.ui.state.lock import CommandLock
@@ -98,7 +97,7 @@ class ProcessingState:
             if vault is None:
                 return False
             if all(note.path != path for note in self.session.notes):
-                self.status.show_notice(afanes.ui.strings.PROCESSING_MISSING)
+                self.status.show_notice(self.status.copy.PROCESSING_MISSING)
                 return False
             self.banner = None
             self.status.set_busy(busy=True)
@@ -107,7 +106,9 @@ class ProcessingState:
                     await self.load(path)
                 except (AfanesError, OSError, UnicodeError) as exc:
                     logger.debug("Capture could not be read for processing", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.PROCESSING_READ_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.PROCESSING_READ_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return False
                 return True
             finally:
@@ -136,7 +137,7 @@ class ProcessingState:
         """
         vault = self.session.vault
         if vault is None:
-            raise VaultError(afanes.ui.strings.VAULT_MISSING)
+            raise VaultError(DomainMessage.of(MessageCode.UI_VAULT_NOT_OPEN))
         body = await asyncio.to_thread(vault.read_body, path)
         listing = await asyncio.to_thread(self._load_cards, vault)
         self.note = path
@@ -188,7 +189,9 @@ class ProcessingState:
                 except (AfanesError, OSError) as exc:
                     logger.debug("Processing plan failed", exc_info=True)
                     self.plan = None
-                    self.status.show_notice(afanes.ui.strings.PROCESSING_PLAN_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.PROCESSING_PLAN_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return None
                 self.plan = plan
                 return plan
@@ -223,14 +226,18 @@ class ProcessingState:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Processing apply failed", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.PROCESSING_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.PROCESSING_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return None
                 refresh_failure: str | None = None
                 try:
                     snapshot = await asyncio.to_thread(vault.scan)
                 except (VaultError, OSError) as exc:
                     logger.debug("Inbox refresh after processing failed", exc_info=True)
-                    refresh_failure = afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail=str(exc))
+                    refresh_failure = self.status.copy.PROCESSING_REFRESH_FAILED.format(
+                        detail=self.status.copy.render_error(exc)
+                    )
                 else:
                     self.session.apply_snapshot(snapshot)
                 outcome = plan.outcome if isinstance(plan, ProcessingPlan) else None

@@ -18,7 +18,7 @@ import yaml
 from markdown_it import MarkdownIt
 from yaml import YAMLError
 
-from afanes.core.errors import StepEditError, StepMetadataError
+from afanes.core.errors import DomainMessage, MessageCode, StepEditError, StepMetadataError
 from afanes.models.step import ProjectStep, StepMetadata
 
 _TASK_PATTERN = re.compile(
@@ -294,7 +294,7 @@ class StepDocument:
         """
         lines = text.strip().splitlines()
         if not lines:
-            message = "A step needs text"
+            message = DomainMessage.of(MessageCode.STEP_TEXT_REQUIRED)
             raise StepEditError(message)
         step_text = lines[0].strip()
         extra_detail = "\n".join(part for part in (*lines[1:],) if part.strip())
@@ -462,12 +462,12 @@ class StepDocument:
         """Replace one step line with a new checkbox and metadata comment."""
         lines = self._body.splitlines(keepends=True)
         if step.line_index < 0 or step.line_index >= len(lines):
-            message = "The step line no longer exists in this project"
+            message = DomainMessage.of(MessageCode.STEP_LINE_MISSING)
             raise StepEditError(message)
         line = lines[step.line_index]
         match = _TASK_PATTERN.match(line.rstrip("\r\n"))
         if match is None:
-            message = "The line changed and is no longer a task list item"
+            message = DomainMessage.of(MessageCode.STEP_LINE_CHANGED)
             raise StepEditError(message)
         ending = self._line_ending(line)
         comment = self._comment_for(raw)
@@ -493,13 +493,13 @@ class StepDocument:
                 width=_METADATA_WIDTH,
             )
         except YAMLError as exc:
-            message = "The step metadata could not be written as YAML"
+            message = DomainMessage.of(MessageCode.STEP_METADATA_INVALID_YAML)
             raise StepMetadataError(message) from exc
         serialized = " ".join(serialized.splitlines()).strip()
         if not serialized:
             return ""
         if "--" in serialized:
-            message = "A step value contains '--', which cannot appear inside an HTML comment; rename the value first"
+            message = DomainMessage.of(MessageCode.STEP_VALUE_DOUBLE_DASH)
             raise StepMetadataError(message)
         return f"<!-- {serialized} -->"
 

@@ -18,7 +18,6 @@ import afanes.core.vault.processing
 import afanes.core.vault.service
 import afanes.core.vault.steps
 import afanes.core.vault.trash_catalog
-import afanes.ui.strings
 from afanes.core.log import LogMode, LogTimeline
 from afanes.core.search import (
     BrowserListing,

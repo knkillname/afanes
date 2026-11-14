@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 import afanes.core.template_cards
-from afanes.core.errors import TemplateCardContentError
+from afanes.core.errors import MessageCode, TemplateCardContentError
 from afanes.models.note import NoteType
 
 CARD_TEXT = """---
@@ -107,7 +107,7 @@ class TestCardParsing:
         listing = _catalog(tmp_path).load()
 
         assert listing.cards == ()
-        assert "level-1 heading" in listing.issues[0].message
+        assert listing.issues[0].message.code is MessageCode.CARD_BODY_HEADING
 
     def test_a_missing_category_is_refused(self, tmp_path: Path) -> None:
         _write(tmp_path, "vendor.md", "---\ntype: reference\n---\n")
@@ -115,7 +115,7 @@ class TestCardParsing:
         listing = _catalog(tmp_path).load()
 
         assert listing.cards == ()
-        assert "category" in listing.issues[0].message
+        assert listing.issues[0].message.code is MessageCode.CARD_CATEGORY_REQUIRED
 
     def test_a_non_reference_type_is_refused(self, tmp_path: Path) -> None:
         _write(tmp_path, "vendor.md", "---\ntype: project\n---\n")
@@ -123,7 +123,7 @@ class TestCardParsing:
         listing = _catalog(tmp_path).load()
 
         assert listing.cards == ()
-        assert "type: reference" in listing.issues[0].message
+        assert listing.issues[0].message.code is MessageCode.CARD_TYPE_REQUIRED
 
     def test_a_status_is_refused(self, tmp_path: Path) -> None:
         _write(tmp_path, "vendor.md", "---\ntype: reference\ncategory: vendor\nstatus: later\n---\n")
@@ -131,7 +131,7 @@ class TestCardParsing:
         listing = _catalog(tmp_path).load()
 
         assert listing.cards == ()
-        assert "status" in listing.issues[0].message
+        assert listing.issues[0].message.code is MessageCode.CARD_STATUS_NOT_ALLOWED
 
     def test_a_due_date_is_refused(self, tmp_path: Path) -> None:
         _write(tmp_path, "vendor.md", "---\ntype: reference\ncategory: vendor\ndue_date: 2026-12-01\n---\n")
@@ -139,7 +139,7 @@ class TestCardParsing:
         listing = _catalog(tmp_path).load()
 
         assert listing.cards == ()
-        assert "due_date" in listing.issues[0].message
+        assert listing.issues[0].message.code is MessageCode.CARD_FRONTMATTER_PARSE
 
     def test_malformed_frontmatter_is_refused(self, tmp_path: Path) -> None:
         _write(tmp_path, "vendor.md", "---\ntype: reference\ncategory: [unclosed\n---\n")
@@ -147,7 +147,7 @@ class TestCardParsing:
         listing = _catalog(tmp_path).load()
 
         assert listing.cards == ()
-        assert "frontmatter" in listing.issues[0].message
+        assert listing.issues[0].message.code is MessageCode.CARD_FRONTMATTER_PARSE
 
     def test_a_non_string_title_is_refused(self, tmp_path: Path) -> None:
         _write(tmp_path, "vendor.md", "---\ntype: reference\ncategory: vendor\ntitle: 3\n---\n")
@@ -155,7 +155,7 @@ class TestCardParsing:
         listing = _catalog(tmp_path).load()
 
         assert listing.cards == ()
-        assert "title must be a string" in listing.issues[0].message
+        assert listing.issues[0].message.code is MessageCode.CARD_TITLE_NOT_STRING
 
     def test_a_non_string_description_is_refused(self, tmp_path: Path) -> None:
         _write(tmp_path, "vendor.md", "---\ntype: reference\ncategory: vendor\ndescription: [a]\n---\n")
@@ -163,7 +163,7 @@ class TestCardParsing:
         listing = _catalog(tmp_path).load()
 
         assert listing.cards == ()
-        assert "description must be a string" in listing.issues[0].message
+        assert listing.issues[0].message.code is MessageCode.CARD_DESCRIPTION_NOT_STRING
 
     def test_a_non_markdown_file_is_ignored(self, tmp_path: Path) -> None:
         _write(tmp_path, "notes.txt", "not a card")
@@ -252,3 +252,57 @@ class TestBundledCards:
             _catalog(tmp_path).strict_cards()
 
         assert "missing" in str(info.value)
+
+    def test_spanish_catalog_holds_translated_titles(self) -> None:
+        cards = afanes.core.template_cards.TemplateCardCatalog.bundled("es").strict_cards()
+
+        assert [card.title for card in cards] == [
+            "Entrada diaria",
+            "Equipo",
+            "Fuente",
+            "Lugar",
+            "Organización",
+            "Persona",
+            "Proceso",
+            "Tema",
+        ]
+        assert all(" " not in card.relative_path.parts for card in cards)
+        assert {card.relative_path.name for card in cards} == {
+            "daily.md",
+            "organization.md",
+            "person.md",
+            "place.md",
+            "process.md",
+            "source.md",
+            "team.md",
+            "topic.md",
+        }
+
+    def test_an_unknown_locale_falls_back_to_english(self) -> None:
+        cards = afanes.core.template_cards.TemplateCardCatalog.bundled("fr").strict_cards()
+
+        assert "Daily entry" in {card.title for card in cards}
+
+    def test_a_localized_set_missing_a_file_is_refused(self, tmp_path: Path) -> None:
+        base = tmp_path / "en"
+        _write(base, "person.md", "---\ntype: reference\ncategory: person\ntitle: Person\n---\n")
+        localized = tmp_path / "es"
+        _write(localized, "place.md", "---\ntype: reference\ncategory: place\ntitle: Lugar\n---\n")
+        catalog = afanes.core.template_cards.TemplateCardCatalog(root=localized, base_root=base)
+
+        with pytest.raises(TemplateCardContentError) as info:
+            catalog.strict_cards()
+
+        assert info.value.domain_message.code is MessageCode.CARD_LOCALE_SHAPE
+
+    def test_a_localized_set_with_a_changed_type_is_refused(self, tmp_path: Path) -> None:
+        base = tmp_path / "en"
+        _write(base, "person.md", "---\ntype: reference\ncategory: person\ntitle: Person\n---\n")
+        localized = tmp_path / "es"
+        _write(localized, "person.md", "---\ntype: log\ntitle: Persona\n---\n")
+        catalog = afanes.core.template_cards.TemplateCardCatalog(root=localized, base_root=base)
+
+        with pytest.raises(TemplateCardContentError) as info:
+            catalog.strict_cards()
+
+        assert info.value.domain_message.code is MessageCode.CARD_LOCALE_SHAPE

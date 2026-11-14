@@ -19,6 +19,8 @@ import yaml
 import afanes.core.atomic
 import afanes.core.vault.snapshot
 from afanes.core.errors import (
+    DomainMessage,
+    MessageCode,
     VaultError,
     VaultMissingError,
     VaultNotDirectoryError,
@@ -135,10 +137,10 @@ class VaultSchemaStore:
         """
         resolved = self.root.expanduser().resolve()
         if not resolved.exists():
-            message = f"Vault root does not exist: {self.root}"
+            message = DomainMessage.of(MessageCode.VAULT_ROOT_MISSING, path=str(self.root))
             raise VaultMissingError(message)
         if not resolved.is_dir():
-            message = f"Vault root is not a directory: {self.root}"
+            message = DomainMessage.of(MessageCode.VAULT_ROOT_NOT_DIRECTORY, path=str(self.root))
             raise VaultNotDirectoryError(message)
         object.__setattr__(self, "root", resolved)
 
@@ -183,24 +185,24 @@ class VaultSchemaStore:
         except FileNotFoundError:
             return None
         except OSError as exc:
-            message = f"Could not inspect {SCHEMA_FILENAME}: {path}"
+            message = DomainMessage.of(MessageCode.SCHEMA_INSPECT_FAILED, path=str(path))
             raise VaultSchemaInvalidError(message) from exc
         if stat.S_ISLNK(info.st_mode):
-            message = f"{SCHEMA_FILENAME} is a symbolic link and cannot be used: {path}"
+            message = DomainMessage.of(MessageCode.SCHEMA_SYMLINK, path=str(path))
             raise VaultSchemaInvalidError(message)
         if not stat.S_ISREG(info.st_mode):
-            message = f"{SCHEMA_FILENAME} is not a regular file: {path}"
+            message = DomainMessage.of(MessageCode.SCHEMA_NOT_FILE, path=str(path))
             raise VaultSchemaInvalidError(message)
         if info.st_size > SCHEMA_MAX_BYTES:
-            message = f"{SCHEMA_FILENAME} is too large to be a settings file: {path}"
+            message = DomainMessage.of(MessageCode.SCHEMA_TOO_LARGE, path=str(path))
             raise VaultSchemaInvalidError(message)
         try:
             data = path.read_bytes()
         except OSError as exc:
-            message = f"Could not read {SCHEMA_FILENAME}: {path}"
+            message = DomainMessage.of(MessageCode.SCHEMA_READ_FAILED, path=str(path))
             raise VaultSchemaInvalidError(message) from exc
         if len(data) > SCHEMA_MAX_BYTES:
-            message = f"{SCHEMA_FILENAME} is too large to be a settings file: {path}"
+            message = DomainMessage.of(MessageCode.SCHEMA_TOO_LARGE, path=str(path))
             raise VaultSchemaInvalidError(message)
         return self._parse(path, data)
 
@@ -223,7 +225,7 @@ class VaultSchemaStore:
         """
         schema = self.load()
         if schema is None:
-            message = f"Vault has no {SCHEMA_FILENAME} settings file: {self.root}"
+            message = DomainMessage.of(MessageCode.SCHEMA_MISSING, path=str(self.root))
             raise VaultSchemaMissingError(message)
         return schema
 
@@ -313,7 +315,7 @@ class VaultSchemaStore:
         try:
             afanes.core.atomic.AtomicWriter.write_text_exclusive(self.settings_path, text)
         except (VaultError, OSError) as exc:
-            message = f"Could not write {SCHEMA_FILENAME} in {self.root}: {exc}"
+            message = DomainMessage.of(MessageCode.SCHEMA_WRITE_FAILED, path=str(self.root), detail=str(exc))
             raise VaultSchemaWriteError(message) from exc
         return schema
 
@@ -343,12 +345,12 @@ class VaultSchemaStore:
         try:
             text = data.decode("utf-8-sig")
         except UnicodeDecodeError as exc:
-            message = f"{SCHEMA_FILENAME} is not valid UTF-8: {path}"
+            message = DomainMessage.of(MessageCode.SCHEMA_INVALID_UTF8, path=str(path))
             raise VaultSchemaInvalidError(message) from exc
         try:
             node = yaml.compose(text, Loader=yaml.SafeLoader)
         except yaml.YAMLError as exc:
-            message = f"{SCHEMA_FILENAME} is not valid YAML: {path}"
+            message = DomainMessage.of(MessageCode.SCHEMA_INVALID_YAML, path=str(path))
             raise VaultSchemaInvalidError(message) from exc
         if not isinstance(node, yaml.MappingNode) or len(node.value) != 1:
             raise VaultSchemaInvalidError(self._shape_message(path))
@@ -360,38 +362,40 @@ class VaultSchemaStore:
         try:
             version = int(value_node.value)
         except ValueError as exc:
-            message = f"{SCHEMA_FILENAME} schema_version is not an integer: {path}"
+            message = DomainMessage.of(MessageCode.SCHEMA_VERSION_NOT_INT, path=str(path))
             raise VaultSchemaInvalidError(message) from exc
         if version != CURRENT_SCHEMA_VERSION:
             raise VaultSchemaUnsupportedError(self._unsupported_message(path, version))
         return VaultSchema(version=version)
 
-    def _shape_message(self, path: Path) -> str:
+    def _shape_message(self, path: Path) -> DomainMessage:
         """Return the diagnostic for a file that does not match version 1."""
-        return f"{SCHEMA_FILENAME} must contain exactly schema_version: {CURRENT_SCHEMA_VERSION}: {path}"
+        return DomainMessage.of(MessageCode.SCHEMA_SHAPE, version=str(CURRENT_SCHEMA_VERSION), path=str(path))
 
-    def _unsupported_message(self, path: Path, version: int) -> str:
+    def _unsupported_message(self, path: Path, version: int) -> DomainMessage:
         """Return the diagnostic for an unsupported declared version."""
         if version > CURRENT_SCHEMA_VERSION:
-            return (
-                f"{SCHEMA_FILENAME} declares schema version {version}, which is newer than this "
-                f"Afanes supports ({CURRENT_SCHEMA_VERSION}); update Afanes: {path}"
+            return DomainMessage.of(
+                MessageCode.SCHEMA_NEWER,
+                declared=str(version),
+                supported=str(CURRENT_SCHEMA_VERSION),
+                path=str(path),
             )
-        return (
-            f"{SCHEMA_FILENAME} declares schema version {version}, which this Afanes does not "
-            f"migrate; this version supports schema {CURRENT_SCHEMA_VERSION}: {path}"
+        return DomainMessage.of(
+            MessageCode.SCHEMA_OLDER,
+            declared=str(version),
+            supported=str(CURRENT_SCHEMA_VERSION),
+            path=str(path),
         )
 
-    def _not_adoptable_message(self) -> str:
+    def _not_adoptable_message(self) -> DomainMessage:
         """Return the diagnostic for a folder that cannot be adopted."""
         if not os.access(self.root, os.W_OK | os.X_OK):
-            return (
-                f"{self.root} cannot be adopted: the folder is not writable and needs {SCHEMA_FILENAME} or write access"
-            )
+            return DomainMessage.of(MessageCode.SCHEMA_NOT_WRITABLE, path=str(self.root))
         try:
             names = {child.name.casefold() for child in self.root.iterdir() if child.is_dir()}
         except OSError:
             names = set()
         missing = [folder.name for folder in DEFAULT_FOLDERS if folder.name.casefold() not in names]
         folders = ", ".join(f"{name}/" for name in missing)
-        return f"{self.root} cannot be adopted: it is missing default folders: {folders}"
+        return DomainMessage.of(MessageCode.SCHEMA_MISSING_FOLDERS, path=str(self.root), folders=folders)

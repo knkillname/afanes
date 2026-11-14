@@ -6,17 +6,21 @@
 import asyncio
 import contextlib
 import datetime
+import os
 from pathlib import Path
 
 import flet as ft
 
 import afanes.__about__
+import afanes.core.errors
+import afanes.core.localization
+import afanes.core.preferences
 import afanes.core.vault.service
+import afanes.i18n.ui
 import afanes.ui.components.toast
 import afanes.ui.state
 import afanes.ui.state.session
 import afanes.ui.state.status
-import afanes.ui.strings
 import afanes.ui.theme
 import afanes.ui.views.inbox
 import afanes.ui.views.workspace
@@ -66,34 +70,51 @@ class AppShell:
 
         Notes
         -----
-        The shell performs no network I/O. The first development run may
-        provision the Flet desktop client; that provisioning is an environment
-        step, not product behavior.
+        The saved language is read before the first render, so the welcome
+        surface already uses the active locale. The shell performs no network
+        I/O. The first development run may provision the Flet desktop client;
+        that provisioning is an environment step, not product behavior.
         """
-        await cls(page, launch_vault).start()
+        load = await asyncio.to_thread(afanes.core.preferences.PreferencesStore.default().load)
+        locale = afanes.core.localization.LocaleResolver.resolve(
+            load.preferences.language,
+            os.environ,
+            afanes.core.localization.LocaleResolver.system_locale(),
+        )
+        copy = afanes.i18n.ui.UiCopy.for_locale(locale)
+        afanes.ui.state.app_state.status.set_copy(copy)
+        await cls(page, launch_vault, preferences_problem=load.problem).start()
 
-    def __init__(self, page: ft.Page, launch_vault: Path | None) -> None:
+    def __init__(
+        self,
+        page: ft.Page,
+        launch_vault: Path | None,
+        *,
+        preferences_problem: afanes.core.errors.DomainMessage | None = None,
+    ) -> None:
         self.page = page
         self.launch_vault = launch_vault
         self.state = afanes.ui.state.app_state
+        self.copy = self.state.status.copy
+        self.preferences_problem = preferences_problem
         self.is_desktop = not page.web
         self.picker: ft.FilePicker | None = None
         self.workspace: afanes.ui.views.workspace.WorkspaceView | None = None
-        self.toast = afanes.ui.components.toast.ToastPresenter(page, self._handle_notice_action)
+        self.toast = afanes.ui.components.toast.ToastPresenter(page, self._handle_notice_action, copy=self.copy)
         self.refresh_task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
         """Configure the page, claim the session, and open the first state."""
         self._configure()
         if not self.state.status.begin_session():
-            self.page.add(afanes.ui.views.inbox.SessionNotice(self.retry_session).build())
+            self.page.add(afanes.ui.views.inbox.SessionNotice(self.retry_session, copy=self.copy).build())
             self.page.update()
             return
         await self._start_workspace()
 
     def _configure(self) -> None:
         """Apply page chrome and create the native picker when available."""
-        self.page.title = afanes.ui.strings.APP_TITLE
+        self.page.title = self.copy.APP_TITLE
         self.page.theme_mode = ft.ThemeMode.SYSTEM
         self.page.theme = afanes.ui.theme.LIGHT_THEME
         self.page.dark_theme = afanes.ui.theme.DARK_THEME
@@ -117,6 +138,8 @@ class AppShell:
             await self.state.workspace.start()
         else:
             await self.state.workspace.open_vault_for_run(self.launch_vault)
+        if self.preferences_problem is not None and self.state.workspace.banner is None:
+            self.state.workspace.banner = self.copy.PREFERENCES_CORRUPT
         await self.render()
 
     async def retry_session(self) -> None:
@@ -239,20 +262,20 @@ class AppShell:
 
         self.page.show_dialog(
             ft.AlertDialog(
-                title=ft.Text(afanes.ui.strings.ABOUT_TITLE),
+                title=ft.Text(self.copy.ABOUT_TITLE),
                 content=ft.Column(
                     controls=[
                         ft.Text(
-                            afanes.ui.strings.ABOUT_VERSION.format(version=afanes.__about__.__version__),
+                            self.copy.ABOUT_VERSION.format(version=afanes.__about__.__version__),
                             selectable=True,
                         ),
-                        ft.Text(afanes.ui.strings.ABOUT_LICENSE, selectable=True),
+                        ft.Text(self.copy.ABOUT_LICENSE, selectable=True),
                     ],
                     tight=True,
                 ),
                 actions=[
                     ft.TextButton(
-                        content=afanes.ui.strings.CLOSE_ACTION,
+                        content=self.copy.CLOSE_ACTION,
                         on_click=close,
                         autofocus=True,
                         key="about-close",
@@ -275,6 +298,32 @@ class AppShell:
             await self.state.dialogs.undo_trash()
         self._refresh_current_workspace()
 
+    async def set_language(self, language: str | None) -> None:
+        """Store the language choice for the next launch.
+
+        Parameters
+        ----------
+        language : str | None
+            ``en`` or ``es`` to override the system locale, or ``None`` to use
+            the system locale.
+
+        Notes
+        -----
+        The running session keeps its catalog. The new preference is written
+        outside the vault and a toast explains that a restart is required. A
+        failed write is reported in the active locale without changing the
+        preference file.
+        """
+        preferences = afanes.core.preferences.Preferences(language=language)
+        try:
+            await asyncio.to_thread(afanes.core.preferences.PreferencesStore.default().save, preferences)
+        except afanes.core.errors.ConfigurationError as exc:
+            problem = exc.domain_message
+            message = self.copy.render_error(exc) if problem is None else self.copy.messages.render(problem)
+            self.toast.show(afanes.ui.state.status.Notice(message=message))
+            return
+        self.toast.show(afanes.ui.state.status.Notice(message=self.copy.LANGUAGE_RESTART))
+
     async def render(self) -> None:
         """Render the welcome state or the workspace for the current session."""
         await self._stop_refresh_loop()
@@ -289,6 +338,8 @@ class AppShell:
                     afanes.ui.views.inbox.WelcomeView(
                         on_choose=self.choose_vault,
                         on_create=self.create_vault,
+                        on_language=self.set_language,
+                        copy=self.copy,
                     ).build(),
                 )
             else:
@@ -296,6 +347,8 @@ class AppShell:
                     afanes.ui.views.inbox.WelcomeView(
                         on_open_path=self.open_path,
                         on_create=self.create_vault,
+                        on_language=self.set_language,
+                        copy=self.copy,
                     ).build(),
                 )
         else:
@@ -312,6 +365,7 @@ class AppShell:
                     pick_role=self.pick_role,
                     on_about=self.show_about_dialog,
                     on_notice=self.toast.show,
+                    on_language=self.set_language,
                 )
             )
             self.workspace = workspace
@@ -350,23 +404,23 @@ class AppShell:
         if target is None:
             return ft.Container(visible=False)
         body = ft.Text(
-            afanes.ui.strings.VAULT_SCHEMA_ADOPT_BODY.format(path=target),
+            self.copy.VAULT_SCHEMA_ADOPT_BODY.format(path=target),
             selectable=True,
         )
         actions: list[ft.Control] = [
             ft.TextButton(
-                content=afanes.ui.strings.CANCEL_ACTION,
+                content=self.copy.CANCEL_ACTION,
                 on_click=self.cancel_adoption,
                 key="adoption-cancel",
             ),
             ft.FilledButton(
-                content=afanes.ui.strings.VAULT_SCHEMA_ADOPT_ACTION,
+                content=self.copy.VAULT_SCHEMA_ADOPT_ACTION,
                 on_click=self.adopt_vault,
                 key="adoption-confirm",
             ),
         ]
         panel = Panel(
-            afanes.ui.strings.VAULT_SCHEMA_ADOPT_TITLE,
+            self.copy.VAULT_SCHEMA_ADOPT_TITLE,
             body,
             actions,
         ).build()
@@ -404,9 +458,9 @@ class AppShell:
         if count == 0 or self.state.review.review_session is not None:
             return None
         message = (
-            afanes.ui.strings.REVIEW_LAUNCH_DIGEST_ONE
+            self.copy.REVIEW_LAUNCH_DIGEST_ONE
             if count == 1
-            else afanes.ui.strings.REVIEW_LAUNCH_DIGEST_MANY.format(count=count)
+            else self.copy.REVIEW_LAUNCH_DIGEST_MANY.format(count=count)
         )
         return ft.Container(
             key="launch-digest",
@@ -418,7 +472,7 @@ class AppShell:
                 controls=[
                     ft.Text(message, expand=True, selectable=True),
                     ft.FilledButton(
-                        content=afanes.ui.strings.REVIEW_LAUNCH_DIGEST_ACTION,
+                        content=self.copy.REVIEW_LAUNCH_DIGEST_ACTION,
                         on_click=self.start_launch_review,
                         key="launch-digest-start",
                     ),
@@ -445,7 +499,7 @@ class AppShell:
             return
         if self.picker is None:
             return
-        selected = await self.picker.get_directory_path(dialog_title=afanes.ui.strings.WELCOME_PICKER_TITLE)
+        selected = await self.picker.get_directory_path(dialog_title=self.copy.WELCOME_PICKER_TITLE)
         if selected is None:
             return
         path = Path(selected)
@@ -516,6 +570,7 @@ class AppShell:
             value=current,
             first_date=datetime.date(1900, 1, 1),
             last_date=datetime.date(2100, 12, 31),
+            locale=ft.Locale(language_code=self.copy.locale.language),
             on_change=on_change,
             on_dismiss=on_dismiss,
         )
@@ -537,15 +592,15 @@ class AppShell:
         summaries = await self.state.session.template_summaries()
         by_identifier = {summary.identifier: summary for summary in summaries or ()}
         field = ft.TextField(
-            label=afanes.ui.strings.NEW_VAULT_PATH_LABEL,
-            hint_text=afanes.ui.strings.WELCOME_PATH_HINT,
+            label=self.copy.NEW_VAULT_PATH_LABEL,
+            hint_text=self.copy.WELCOME_PATH_HINT,
             value="",
             autofocus=True,
             expand=True,
             key="create-vault-path",
         )
         submit_button = ft.FilledButton(
-            content=afanes.ui.strings.NEW_VAULT_CREATE,
+            content=self.copy.NEW_VAULT_CREATE,
             disabled=True,
             key="create-vault-submit",
         )
@@ -553,26 +608,26 @@ class AppShell:
         async def browse() -> None:
             if self.picker is None:
                 return
-            selected = await self.picker.get_directory_path(dialog_title=afanes.ui.strings.NEW_VAULT_PICKER_TITLE)
+            selected = await self.picker.get_directory_path(dialog_title=self.copy.NEW_VAULT_PICKER_TITLE)
             if selected is None:
                 return
             field.value = selected
             self._refresh_dialog_submit(field, submit_button)
 
         browse_button = ft.TextButton(
-            content=afanes.ui.strings.NEW_VAULT_BROWSE,
+            content=self.copy.NEW_VAULT_BROWSE,
             on_click=browse,
             visible=self.is_desktop,
             key="create-vault-browse",
         )
         selector = ft.Dropdown(
-            label=afanes.ui.strings.NEW_VAULT_TEMPLATE_LABEL,
+            label=self.copy.NEW_VAULT_TEMPLATE_LABEL,
             options=[
-                ft.dropdown.Option(key="", text=afanes.ui.strings.NEW_VAULT_TEMPLATE_NONE),
+                ft.dropdown.Option(key="", text=self.copy.NEW_VAULT_TEMPLATE_NONE),
                 *[
                     ft.dropdown.Option(
                         key=summary.identifier,
-                        text=afanes.ui.strings.NEW_VAULT_TEMPLATE_OPTION.format(
+                        text=self.copy.NEW_VAULT_TEMPLATE_OPTION.format(
                             label=summary.label,
                             description=summary.description,
                         ),
@@ -584,14 +639,14 @@ class AppShell:
             key="create-vault-template",
         )
         unavailable = ft.Text(
-            afanes.ui.strings.NEW_VAULT_TEMPLATE_UNAVAILABLE,
+            self.copy.NEW_VAULT_TEMPLATE_UNAVAILABLE,
             color=afanes.ui.theme.ERROR_TEXT_COLOR,
             visible=summaries is None,
             key="create-vault-templates-error",
         )
         folders = ", ".join(f"{folder.as_posix()}/" for folder in afanes.core.vault.service.Vault.default_layout())
         preview = ft.Text(
-            afanes.ui.strings.NEW_VAULT_PREVIEW_GUIDE.format(folders=folders),
+            self.copy.NEW_VAULT_PREVIEW_GUIDE.format(folders=folders),
             style=afanes.ui.theme.TEXT_ROLES["caption"],
             selectable=True,
             key="create-vault-preview",
@@ -606,11 +661,11 @@ class AppShell:
         def refresh_preview() -> None:
             summary = by_identifier.get(selector.value or "")
             if summary is None:
-                preview.value = afanes.ui.strings.NEW_VAULT_PREVIEW_GUIDE.format(folders=folders)
+                preview.value = self.copy.NEW_VAULT_PREVIEW_GUIDE.format(folders=folders)
             else:
-                preview.value = afanes.ui.strings.NEW_VAULT_PREVIEW_TEMPLATE.format(
+                preview.value = self.copy.NEW_VAULT_PREVIEW_TEMPLATE.format(
                     folders=folders,
-                    notes=afanes.ui.strings.CopyFormatter.note_count(summary.note_count),
+                    notes=self.copy.formatter.note_count(summary.note_count),
                 )
             self.page.update()
 
@@ -619,12 +674,12 @@ class AppShell:
         async def submit() -> None:
             text = (field.value or "").strip()
             if not text:
-                self._show_create_error(error, afanes.ui.strings.VAULT_PATH_REQUIRED)
+                self._show_create_error(error, self.copy.VAULT_PATH_REQUIRED)
                 return
             if not await self.state.workspace.create_vault(Path(text), template=selector.value or None):
                 self._show_create_error(
                     error,
-                    self.state.workspace.take_banner(afanes.ui.strings.VAULT_PATH_REQUIRED),
+                    self.state.workspace.take_banner(self.copy.VAULT_PATH_REQUIRED),
                 )
                 return
             self.page.pop_dialog()
@@ -639,10 +694,10 @@ class AppShell:
         field.on_submit = submit
         self.page.show_dialog(
             ft.AlertDialog(
-                title=ft.Text(afanes.ui.strings.NEW_VAULT_DIALOG_TITLE),
+                title=ft.Text(self.copy.NEW_VAULT_DIALOG_TITLE),
                 content=ft.Column(
                     controls=[
-                        ft.Text(afanes.ui.strings.NEW_VAULT_DIALOG_BODY),
+                        ft.Text(self.copy.NEW_VAULT_DIALOG_BODY),
                         ft.Row(
                             controls=[field, browse_button],
                             spacing=afanes.ui.theme.ITEM_GAP,
@@ -657,7 +712,7 @@ class AppShell:
                 ),
                 actions=[
                     ft.TextButton(
-                        content=afanes.ui.strings.CANCEL_ACTION,
+                        content=self.copy.CANCEL_ACTION,
                         on_click=cancel,
                         key="create-vault-cancel",
                     ),
@@ -708,15 +763,15 @@ class AppShell:
         listing = await self.state.session.template_cards()
         if listing is None:
             listing = TemplateCardListing(cards=(), issues=())
-        picker = TemplateCardPicker(TemplateCardContext.REFERENCE, "new-reference", self.page.update)
+        picker = TemplateCardPicker(TemplateCardContext.REFERENCE, "new-reference", self.page.update, copy=self.copy)
         picker.refresh(listing.for_type(NoteType.REFERENCE), listing.issues)
         name_field = ft.TextField(
-            label=afanes.ui.strings.BROWSER_NAME_LABEL,
+            label=self.copy.BROWSER_NAME_LABEL,
             autofocus=True,
             key="new-reference-name",
         )
         submit_button = ft.FilledButton(
-            content=afanes.ui.strings.BROWSER_CREATE_ACTION,
+            content=self.copy.BROWSER_CREATE_ACTION,
             disabled=True,
             key="new-reference-submit",
         )
@@ -730,7 +785,7 @@ class AppShell:
         async def submit() -> None:
             name = (name_field.value or "").strip()
             if not name:
-                self._show_create_error(error, afanes.ui.strings.BROWSER_NAME_REQUIRED)
+                self._show_create_error(error, self.copy.BROWSER_NAME_REQUIRED)
                 return
             card = picker.selected_card
             category = card.category if card is not None and card.category is not None else CategoryLabel("general")
@@ -738,7 +793,7 @@ class AppShell:
             if not await self.state.navigation.create_reference(name, category, scaffold):
                 self._show_create_error(
                     error,
-                    self._take_notice(afanes.ui.strings.BROWSER_NAME_REQUIRED),
+                    self._take_notice(self.copy.BROWSER_NAME_REQUIRED),
                 )
                 return
             self.page.pop_dialog()
@@ -754,10 +809,10 @@ class AppShell:
         name_field.on_submit = submit
         self.page.show_dialog(
             ft.AlertDialog(
-                title=ft.Text(afanes.ui.strings.BROWSER_NEW_REFERENCE_TITLE),
+                title=ft.Text(self.copy.BROWSER_NEW_REFERENCE_TITLE),
                 content=ft.Column(
                     controls=[
-                        ft.Text(afanes.ui.strings.BROWSER_NEW_REFERENCE_BODY),
+                        ft.Text(self.copy.BROWSER_NEW_REFERENCE_BODY),
                         name_field,
                         picker.dropdown,
                         picker.description,
@@ -768,7 +823,7 @@ class AppShell:
                 ),
                 actions=[
                     ft.TextButton(
-                        content=afanes.ui.strings.CANCEL_ACTION,
+                        content=self.copy.CANCEL_ACTION,
                         on_click=cancel,
                         key="new-reference-cancel",
                     ),
@@ -807,7 +862,7 @@ class AppShell:
             self.page.update()
 
         ordered = await self.state.browser.role_categories()
-        dialog = RoleReferenceDialog(name, ordered, confirm, cancel)
+        dialog = RoleReferenceDialog(name, ordered, confirm, cancel, copy=self.copy)
         dialog.dialog.on_dismiss = self._dialog_dismissed
         self.page.show_dialog(dialog.dialog)
         self.page.update()
@@ -851,10 +906,8 @@ class AppShell:
             settle(None)
 
         names = [note.name for note in self.state.session.assignment_candidates(ReferenceScheme.NOTE, "")]
-        title = (
-            afanes.ui.strings.ROLE_NAME_OWNER_TITLE if role == "owner" else afanes.ui.strings.ROLE_NAME_ASKED_BY_TITLE
-        )
-        dialog = RoleNameDialog(title, current, names, save, cancel)
+        title = self.copy.ROLE_NAME_OWNER_TITLE if role == "owner" else self.copy.ROLE_NAME_ASKED_BY_TITLE
+        dialog = RoleNameDialog(title, current, names, save, cancel, copy=self.copy)
         dialog.dialog.on_dismiss = dismiss
         self.page.show_dialog(dialog.dialog)
         self.page.update()
@@ -894,8 +947,8 @@ class AppShell:
     def show_vault_dialog(self) -> None:
         """Ask for a vault path in a dialog, for a browser session."""
         field = ft.TextField(
-            label=afanes.ui.strings.WELCOME_PATH_LABEL,
-            hint_text=afanes.ui.strings.WELCOME_PATH_HINT,
+            label=self.copy.WELCOME_PATH_LABEL,
+            hint_text=self.copy.WELCOME_PATH_HINT,
             value="" if self.state.session.vault_root is None else str(self.state.session.vault_root),
             autofocus=True,
             key="change-vault-path",
@@ -912,22 +965,22 @@ class AppShell:
         field.on_submit = submit
         self.page.show_dialog(
             ft.AlertDialog(
-                title=ft.Text(afanes.ui.strings.CHANGE_VAULT_DIALOG_TITLE),
+                title=ft.Text(self.copy.CHANGE_VAULT_DIALOG_TITLE),
                 content=ft.Column(
                     controls=[
-                        ft.Text(afanes.ui.strings.CHANGE_VAULT_DIALOG_BODY),
+                        ft.Text(self.copy.CHANGE_VAULT_DIALOG_BODY),
                         field,
                     ],
                     tight=True,
                 ),
                 actions=[
                     ft.TextButton(
-                        content=afanes.ui.strings.CANCEL_ACTION,
+                        content=self.copy.CANCEL_ACTION,
                         on_click=cancel,
                         key="change-vault-cancel",
                     ),
                     ft.FilledButton(
-                        content=afanes.ui.strings.WELCOME_OPEN,
+                        content=self.copy.WELCOME_OPEN,
                         on_click=submit,
                         key="change-vault-open",
                     ),

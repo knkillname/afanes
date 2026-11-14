@@ -9,14 +9,14 @@ It performs no vault access and never derives dates from files.
 """
 
 import dataclasses
-import datetime
 from collections.abc import Callable
 from pathlib import Path
 
 import flet as ft
 
 import afanes.core.log
-import afanes.ui.strings
+import afanes.i18n.ui
+import afanes.models.note
 import afanes.ui.theme
 from afanes.core.vault.snapshot import VaultNote
 
@@ -84,8 +84,11 @@ class LogTree:
         on_create_month: Callable[[int, int], object],
         on_create_year: Callable[[int], object],
         selected_day: tuple[int, int, int] | None = None,
+        *,
+        copy: afanes.i18n.ui.UiCopy | None = None,
     ) -> None:
         """Store the tree actions and initial expansion."""
+        self._copy = afanes.i18n.ui.UiCopy.english() if copy is None else copy
         self._on_select = on_select
         self._on_create_month = on_create_month
         self._on_create_year = on_create_year
@@ -128,7 +131,7 @@ class LogTree:
                 ft.Container(
                     padding=afanes.ui.theme.ITEM_GAP,
                     content=ft.Text(
-                        afanes.ui.strings.LOG_EMPTY,
+                        self._copy.LOG_EMPTY,
                         color=afanes.ui.theme.MUTED_TEXT_COLOR,
                         selectable=True,
                     ),
@@ -150,8 +153,8 @@ class LogTree:
                 entry=year.entries[0] if year.entries else None,
             ),
             ControlLabels(
-                tooltip_create=afanes.ui.strings.LOG_NEW_YEAR_ENTRY.format(year=year.year),
-                tooltip_open=afanes.ui.strings.LOG_OPEN_YEAR_ENTRY.format(year=year.year),
+                tooltip_create=self._copy.LOG_NEW_YEAR_ENTRY.format(year=year.year),
+                tooltip_open=self._copy.LOG_OPEN_YEAR_ENTRY.format(year=year.year),
             ),
         )
         tile = ft.ExpansionTile(
@@ -159,7 +162,7 @@ class LogTree:
                 controls=[
                     ft.Text(str(year.year)),
                     ft.Text(
-                        afanes.ui.strings.CopyFormatter.log_entry_count(year.count),
+                        self._copy.formatter.log_entry_count(year.count),
                         style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                     control,
@@ -179,8 +182,9 @@ class LogTree:
         """Build one month row and its entries and days."""
         controls: list[ft.Control] = [self._note_row(note) for note in month.entries]
         controls.extend(self._day_tile(day) for day in month.days)
-        name = datetime.date(month.year, month.month, 1).strftime("%B")
-        period = f"{name} {month.year}"
+        month_date = afanes.models.note.NoteDate.from_text(f"{month.year:04d}-{month.month:02d}")
+        name = self._copy.locale_format.month_name(month.month)
+        period = self._copy.locale_format.log_title(month_date)
         control = self._control_for(
             CalendarCell(
                 key=f"month:{month.year}-{month.month:02d}",
@@ -190,8 +194,8 @@ class LogTree:
                 entry=month.entries[0] if month.entries else None,
             ),
             ControlLabels(
-                tooltip_create=afanes.ui.strings.LOG_NEW_MONTH_ENTRY.format(period=period),
-                tooltip_open=afanes.ui.strings.LOG_OPEN_MONTH_ENTRY.format(period=period),
+                tooltip_create=self._copy.LOG_NEW_MONTH_ENTRY.format(period=period),
+                tooltip_open=self._copy.LOG_OPEN_MONTH_ENTRY.format(period=period),
             ),
         )
         tile = ft.ExpansionTile(
@@ -199,7 +203,7 @@ class LogTree:
                 controls=[
                     ft.Text(name),
                     ft.Text(
-                        afanes.ui.strings.CopyFormatter.log_entry_count(month.count),
+                        self._copy.formatter.log_entry_count(month.count),
                         style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                     control,
@@ -232,7 +236,7 @@ class LogTree:
                 controls=[
                     ft.Text(str(day.day)),
                     ft.Text(
-                        afanes.ui.strings.CopyFormatter.log_entry_count(day.count),
+                        self._copy.formatter.log_entry_count(day.count),
                         style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                 ],
@@ -264,9 +268,9 @@ class LogTree:
         return ft.ExpansionTile(
             title=ft.Row(
                 controls=[
-                    ft.Text(afanes.ui.strings.LOG_UNDATED),
+                    ft.Text(self._copy.LOG_UNDATED),
                     ft.Text(
-                        afanes.ui.strings.CopyFormatter.log_entry_count(len(notes)),
+                        self._copy.formatter.log_entry_count(len(notes)),
                         style=afanes.ui.theme.TEXT_ROLES["caption"],
                     ),
                 ]

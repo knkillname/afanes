@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import afanes.core.localization
 import afanes.core.log
 import afanes.core.vault.service
 from afanes.models.note import NoteDate
@@ -11,6 +12,8 @@ MONTH = 10
 DAY = 12
 OCTOBER_DAYS = 31
 TWO_ENTRIES = 2
+ENGLISH = afanes.core.localization.LocaleTag.parse("en")
+SPANISH = afanes.core.localization.LocaleTag.parse("es")
 
 
 def _write_note(
@@ -43,24 +46,42 @@ def _timeline(
 
 class TestLogTitle:
     def test_day_precision_uses_a_long_date(self) -> None:
-        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026-11-13"))
+        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026-11-13"), ENGLISH)
 
         assert title.text == "November 13, 2026"
 
     def test_month_precision_names_the_month_and_year(self) -> None:
-        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026-11"))
+        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026-11"), ENGLISH)
 
         assert title.text == "November 2026"
 
     def test_year_precision_is_the_year(self) -> None:
-        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026"))
+        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026"), ENGLISH)
 
         assert title.text == "2026"
 
     def test_single_digit_day_has_no_leading_zero(self) -> None:
-        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026-11-03"))
+        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026-11-03"), ENGLISH)
 
         assert title.text == "November 3, 2026"
+
+    def test_spanish_day_title_uses_spanish(self) -> None:
+        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026-11-13"), SPANISH)
+
+        assert title.text == "13 de noviembre de 2026"
+
+    def test_spanish_month_title_uses_de(self) -> None:
+        title = afanes.core.log.LogTitle.for_date(NoteDate.from_text("2026-11"), SPANISH)
+
+        assert title.text == "noviembre de 2026"
+
+    def test_a_generated_heading_matches_in_either_language(self) -> None:
+        date = NoteDate.from_text("2026-11-13")
+
+        assert afanes.core.log.LogTitle.matches_generated("November 13, 2026", date) is True
+        assert afanes.core.log.LogTitle.matches_generated("13 de noviembre de 2026", date) is True
+        assert afanes.core.log.LogTitle.matches_generated("  November 13, 2026  ", date) is True
+        assert afanes.core.log.LogTitle.matches_generated("A quiet Tuesday", date) is False
 
 
 class TestLogBuckets:

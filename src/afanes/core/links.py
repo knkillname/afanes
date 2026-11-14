@@ -15,7 +15,13 @@ from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
 import afanes.core.names
-from afanes.core.errors import InvalidReferenceError, ReferenceRewriteError, RetiredReferenceSchemeError
+from afanes.core.errors import (
+    DomainMessage,
+    InvalidReferenceError,
+    MessageCode,
+    ReferenceRewriteError,
+    RetiredReferenceSchemeError,
+)
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteType
 
@@ -170,22 +176,22 @@ class ReferenceParser:
         value = urllib.parse.unquote(DestinationText(destination).stripped)
         match = self._pattern.match(value)
         if match is None:
-            message = f"Not a scheme reference: {destination!r}"
+            message = DomainMessage.of(MessageCode.NOT_SCHEME_REFERENCE, destination=repr(destination))
             raise InvalidReferenceError(message)
 
         scheme_token = match.group("scheme")
         if scheme_token.casefold() == "person":
-            message = "The person scheme was retired; link people as note:Name instead"
+            message = DomainMessage.of(MessageCode.RETIRED_PERSON_SCHEME)
             raise RetiredReferenceSchemeError(message)
         try:
             scheme = ReferenceScheme(scheme_token.casefold())
         except ValueError as exc:
-            message = f"Unknown reference scheme: {scheme_token!r}"
+            message = DomainMessage.of(MessageCode.UNKNOWN_REFERENCE_SCHEME, scheme=repr(scheme_token))
             raise InvalidReferenceError(message) from exc
 
         name = match.group("name").strip()
         if not name:
-            message = f"Reference name is empty: {destination!r}"
+            message = DomainMessage.of(MessageCode.REFERENCE_NAME_EMPTY, destination=repr(destination))
             raise InvalidReferenceError(message)
         return NoteReference(scheme=scheme, name=name)
 
@@ -648,11 +654,11 @@ class MarkdownBody:
         try:
             remaining = ReferenceReader().extract(rewritten)
         except InvalidReferenceError as exc:
-            message = "Rewritten body is no longer valid Markdown"
+            message = DomainMessage.of(MessageCode.REWRITE_INVALID_MARKDOWN)
             raise ReferenceRewriteError(message) from exc
 
         if any(ReferenceKey.from_reference(reference) == old_key for reference in remaining):
-            message = "Rewritten body still contains the old reference"
+            message = DomainMessage.of(MessageCode.REWRITE_OLD_REFERENCE)
             raise ReferenceRewriteError(message)
         return MarkdownRewrite(text=rewritten, count=batch.count)
 

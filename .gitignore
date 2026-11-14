@@ -53,6 +53,7 @@ coverage.xml
 cover/
 
 # Translations
+# The .po sources are tracked; .mo files are generated build artifacts.
 *.mo
 *.pot
 

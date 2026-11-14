@@ -7,7 +7,7 @@ import hypothesis.strategies
 import pytest
 
 import afanes.models.note
-from afanes.core.errors import NoteParseError, RetiredValueError
+from afanes.core.errors import MessageCode, NoteParseError, RetiredValueError
 from afanes.core.frontmatter import FrontmatterSplit, NoteDocument
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 
@@ -70,19 +70,19 @@ class TestParseDocument:
         assert document.note_type is None
 
     def test_action_is_rejected_with_its_replacement(self) -> None:
-        with pytest.raises(RetiredValueError, match="one-step project"):
+        with pytest.raises(RetiredValueError, match="retired-action-type"):
             NoteDocument.from_text("---\ntype: action\n---\n")
 
     def test_person_is_rejected_with_its_replacement(self) -> None:
-        with pytest.raises(RetiredValueError, match="category label"):
+        with pytest.raises(RetiredValueError, match="retired-person-type"):
             NoteDocument.from_text("---\ntype: person\n---\n")
 
     def test_people_key_is_rejected_with_its_replacement(self) -> None:
-        with pytest.raises(RetiredValueError, match="step owners"):
+        with pytest.raises(RetiredValueError, match="retired-people-key"):
             NoteDocument.from_text('---\ntype: note\npeople: ["person:Ada"]\n---\n')
 
     def test_project_key_is_rejected_with_its_replacement(self) -> None:
-        with pytest.raises(RetiredValueError, match="project body"):
+        with pytest.raises(RetiredValueError, match="retired-project-key"):
             NoteDocument.from_text('---\ntype: note\nproject: "project:Turing"\n---\n')
 
     def test_malformed_yaml_is_rejected(self) -> None:
@@ -236,11 +236,11 @@ class TestDueDate:
         assert document.due_date is None
 
     def test_timestamp_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="not a timestamp"):
+        with pytest.raises(NoteParseError, match="due-date-not-timestamp"):
             NoteDocument.from_text("---\ntype: project\ndue_date: 2026-11-20T10:00:00\n---\n")
 
     def test_invalid_calendar_date_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="YYYY-MM-DD"):
+        with pytest.raises(NoteParseError, match="invalid-due-date"):
             NoteDocument.from_text("---\ntype: project\ndue_date: '2026-13-40'\n---\n")
 
     def test_non_date_value_is_rejected(self) -> None:
@@ -248,7 +248,7 @@ class TestDueDate:
             NoteDocument.from_text("---\ntype: project\ndue_date: tomorrow\n---\n")
 
     def test_due_date_on_a_reference_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="project notes"):
+        with pytest.raises(NoteParseError, match="frontmatter-due-only-project"):
             NoteDocument.from_text("---\ntype: reference\ndue_date: 2026-12-01\n---\n")
 
     def test_due_date_without_a_type_is_rejected(self) -> None:
@@ -304,7 +304,7 @@ class TestNoteDate:
         document = NoteDocument.from_text("---\ntype: note\ndate: 2025-10-12T09:30:00\n---\n")
         assert document.date is None
         assert document.date_error is not None
-        assert "calendar date" in document.date_error
+        assert document.date_error.code is MessageCode.NOTE_DATE_TIMESTAMP
 
     @pytest.mark.parametrize("value", ["last Tuesday", "2025-13", "2025-02-30", "2025-1-2"])
     def test_malformed_text_is_reported(self, value: str) -> None:
@@ -376,11 +376,11 @@ class TestAskedBy:
         assert document.asked_by is None
 
     def test_reference_rejects_a_requester(self) -> None:
-        with pytest.raises(NoteParseError, match="project notes"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-only-project"):
             NoteDocument.from_text("---\ntype: reference\nasked_by: Priya Nair\n---\n")
 
     def test_capture_rejects_a_requester(self) -> None:
-        with pytest.raises(NoteParseError, match="project notes"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-only-project"):
             NoteDocument.from_text("---\ntype: note\nasked_by: Priya Nair\n---\n")
 
     def test_requester_without_a_type_is_rejected(self) -> None:
@@ -388,23 +388,23 @@ class TestAskedBy:
             NoteDocument.from_text("---\nasked_by: Priya Nair\n---\n")
 
     def test_empty_requester_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="non-empty"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-empty"):
             NoteDocument.from_text("---\ntype: project\nasked_by: ''\n---\n")
 
     def test_whitespace_only_requester_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="non-empty"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-empty"):
             NoteDocument.from_text("---\ntype: project\nasked_by: '   '\n---\n")
 
     def test_null_requester_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="string"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-not-string"):
             NoteDocument.from_text("---\ntype: project\nasked_by: null\n---\n")
 
     def test_list_requester_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="string"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-not-string"):
             NoteDocument.from_text("---\ntype: project\nasked_by: [Priya Nair]\n---\n")
 
     def test_number_requester_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="string"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-not-string"):
             NoteDocument.from_text("---\ntype: project\nasked_by: 3\n---\n")
 
     def test_requester_survives_a_round_trip(self) -> None:
@@ -443,7 +443,7 @@ class TestAskedBy:
     def test_with_metadata_rejects_a_misplaced_requester(self) -> None:
         document = NoteDocument.from_text("---\ntype: reference\n---\n")
 
-        with pytest.raises(NoteParseError, match="project notes"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-only-project"):
             document.with_metadata({"type": "reference", "asked_by": "Priya Nair"})
 
 
@@ -466,11 +466,11 @@ class TestOwner:
         assert document.owner is None
 
     def test_reference_rejects_an_owner(self) -> None:
-        with pytest.raises(NoteParseError, match="project notes"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-only-project"):
             NoteDocument.from_text("---\ntype: reference\nowner: Sam Rivera\n---\n")
 
     def test_capture_rejects_an_owner(self) -> None:
-        with pytest.raises(NoteParseError, match="project notes"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-only-project"):
             NoteDocument.from_text("---\ntype: note\nowner: Sam Rivera\n---\n")
 
     def test_owner_without_a_type_is_rejected(self) -> None:
@@ -478,23 +478,23 @@ class TestOwner:
             NoteDocument.from_text("---\nowner: Sam Rivera\n---\n")
 
     def test_empty_owner_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="non-empty"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-empty"):
             NoteDocument.from_text("---\ntype: project\nowner: ''\n---\n")
 
     def test_whitespace_only_owner_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="non-empty"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-empty"):
             NoteDocument.from_text("---\ntype: project\nowner: '   '\n---\n")
 
     def test_null_owner_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="string"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-not-string"):
             NoteDocument.from_text("---\ntype: project\nowner: null\n---\n")
 
     def test_list_owner_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="string"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-not-string"):
             NoteDocument.from_text("---\ntype: project\nowner: [Sam Rivera]\n---\n")
 
     def test_number_owner_is_rejected(self) -> None:
-        with pytest.raises(NoteParseError, match="string"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-not-string"):
             NoteDocument.from_text("---\ntype: project\nowner: 3\n---\n")
 
     def test_owner_survives_a_round_trip(self) -> None:
@@ -533,7 +533,7 @@ class TestOwner:
     def test_with_metadata_rejects_a_misplaced_owner(self) -> None:
         document = NoteDocument.from_text("---\ntype: reference\n---\n")
 
-        with pytest.raises(NoteParseError, match="project notes"):
+        with pytest.raises(NoteParseError, match="frontmatter-assignment-only-project"):
             document.with_metadata({"type": "reference", "owner": "Sam Rivera"})
 
 

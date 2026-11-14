@@ -14,6 +14,7 @@ from collections.abc import Iterable
 from enum import StrEnum
 from typing import Self
 
+import afanes.core.localization
 import afanes.core.names
 import afanes.core.search
 from afanes.core.vault.snapshot import VaultNote, VaultSnapshot
@@ -60,31 +61,57 @@ class LogTitle:
     text: str
 
     @classmethod
-    def for_date(cls, date: NoteDate) -> Self:
+    def for_date(cls, date: NoteDate, locale: afanes.core.localization.LocaleTag) -> Self:
         """Build the default title for one note date.
 
         Parameters
         ----------
         date : NoteDate
             Entry date at year, month, or day precision.
+        locale : afanes.core.localization.LocaleTag
+            Active locale that selects the month names and title pattern.
 
         Returns
         -------
         LogTitle
-            Long date title using the standard library English month names.
-            A single-digit day is written without a leading zero.
+            Long date title in the active language. A single-digit day is
+            written without a leading zero.
 
         Notes
         -----
         The title stays independent from the filename, which always uses the
         ISO date text.
         """
-        if date.precision is DatePrecision.YEAR:
-            return cls(f"{date.year:04d}")
-        month_name = calendar.month_name[date.month]
-        if date.precision is DatePrecision.MONTH:
-            return cls(f"{month_name} {date.year:04d}")
-        return cls(f"{month_name} {date.day}, {date.year:04d}")
+        return cls(afanes.core.localization.LocaleFormat.for_locale(locale).log_title(date))
+
+    @classmethod
+    def matches_generated(cls, title: str, date: NoteDate) -> bool:
+        """Return whether a heading is the generated title for a date.
+
+        Parameters
+        ----------
+        title : str
+            Existing level-1 heading text.
+        date : NoteDate
+            Date the heading may have been generated from.
+
+        Returns
+        -------
+        bool
+            ``True`` when the trimmed heading equals the generated title in
+            any supported language.
+
+        Notes
+        -----
+        Comparing every supported language keeps the heading rule stable after
+        a language change: an English heading written before the change still
+        follows a later date change.
+        """
+        stripped = title.strip()
+        return any(
+            afanes.core.localization.LocaleFormat.for_language(language).log_title(date) == stripped
+            for language in afanes.core.localization.SUPPORTED_LANGUAGES
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

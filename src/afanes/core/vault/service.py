@@ -20,7 +20,9 @@ import afanes.core.vault.snapshot
 import afanes.models.step
 from afanes.core.errors import (
     AfanesError,
+    DomainMessage,
     InvalidReferenceError,
+    MessageCode,
     NoteParseError,
     TemplateCardWriteError,
     TemplateWriteError,
@@ -114,10 +116,10 @@ class Vault:
         """
         resolved = self.root.expanduser().resolve()
         if not resolved.exists():
-            message = f"Vault root does not exist: {self.root}"
+            message = DomainMessage.of(MessageCode.VAULT_ROOT_MISSING, path=str(self.root))
             raise VaultMissingError(message)
         if not resolved.is_dir():
-            message = f"Vault root is not a directory: {self.root}"
+            message = DomainMessage.of(MessageCode.VAULT_ROOT_NOT_DIRECTORY, path=str(self.root))
             raise VaultNotDirectoryError(message)
         object.__setattr__(self, "root", resolved)
 
@@ -160,7 +162,7 @@ class Vault:
         """
         vault = cls(path)
         if not os.access(vault.root, os.R_OK):
-            message = f"Vault root cannot be read: {path}"
+            message = DomainMessage.of(MessageCode.VAULT_ROOT_UNREADABLE, path=str(path))
             raise VaultUnreadableError(message)
         afanes.core.vault.schema.VaultSchemaStore(vault.root).require()
         return vault
@@ -253,23 +255,23 @@ class Vault:
         target = path.expanduser().resolve()
         try:
             if target.exists() and not target.is_dir():
-                message = f"Vault path is not a directory: {path}"
+                message = DomainMessage.of(MessageCode.VAULT_PATH_NOT_DIRECTORY, path=str(path))
                 raise VaultNotDirectoryError(message)
             if target.is_dir() and any(target.iterdir()):
-                message = f"Vault path is not empty: {path}"
+                message = DomainMessage.of(MessageCode.VAULT_PATH_NOT_EMPTY, path=str(path))
                 raise VaultNotEmptyError(message)
         except OSError as exc:
-            message = f"Could not inspect the vault directory: {path}"
+            message = DomainMessage.of(MessageCode.VAULT_INSPECT_FAILED, path=str(path))
             raise VaultError(message) from exc
 
         bundle = afanes.core.templates.TemplateCatalog.bundled().bundle(template, locale)
-        cards = TemplateCardCatalog.bundled().strict_cards()
+        cards = TemplateCardCatalog.bundled(locale).strict_cards()
 
         try:
             created = cls._missing_directories(target.parent)
             target.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            message = f"Could not create the vault directory: {path}"
+            message = DomainMessage.of(MessageCode.VAULT_CREATE_FAILED, path=str(path))
             raise VaultError(message) from exc
         vault = cls(target)
         settings = afanes.core.vault.schema.VaultSchemaStore(vault.root)
@@ -277,7 +279,7 @@ class Vault:
         try:
             seeded = vault._seed_layout()
         except OSError as exc:
-            message = f"Could not seed the vault directory: {path}"
+            message = DomainMessage.of(MessageCode.VAULT_SEED_FAILED, path=str(path))
             raise VaultError(message) from exc
         written = vault._write_bundle(bundle)
         written_cards = vault._write_template_cards(cards)
@@ -318,8 +320,10 @@ class Vault:
                 afanes.core.atomic.AtomicWriter.write_text_atomic(target, note.text)
             except (OSError, VaultError) as exc:
                 already = ", ".join(path.relative_to(self.root).as_posix() for path in written) or "none"
-                message = (
-                    f"Could not write bundled note {note.relative_path.as_posix()!r}; notes already written: {already}"
+                message = DomainMessage.of(
+                    MessageCode.TEMPLATE_WRITE_FAILED,
+                    note=repr(note.relative_path.as_posix()),
+                    already=already,
                 )
                 raise TemplateWriteError(message) from exc
             written.append(target)
@@ -355,8 +359,10 @@ class Vault:
                 afanes.core.atomic.AtomicWriter.write_text_atomic(target, card.text)
             except (OSError, VaultError) as exc:
                 already = ", ".join(path.relative_to(self.root).as_posix() for path in written) or "none"
-                message = (
-                    f"Could not write template card {card.relative_path.as_posix()!r}; cards already written: {already}"
+                message = DomainMessage.of(
+                    MessageCode.TEMPLATE_CARD_WRITE_FAILED,
+                    card=repr(card.relative_path.as_posix()),
+                    already=already,
                 )
                 raise TemplateCardWriteError(message) from exc
             written.append(target)
@@ -412,7 +418,7 @@ class Vault:
         """
         resolved = candidate.resolve() if candidate.is_absolute() else (self.root / candidate).resolve()
         if not resolved.is_relative_to(self.root):
-            message = f"Path escapes the vault: {candidate}"
+            message = DomainMessage.of(MessageCode.VAULT_PATH_ESCAPES, path=str(candidate))
             raise VaultPathError(message)
         return resolved
 
@@ -471,7 +477,15 @@ class Vault:
             try:
                 notes.append(Vault._read_note(note_path, reader))
             except (OSError, UnicodeDecodeError, AfanesError) as exc:
-                failures.append(VaultFailure(path=note_path.relative_path, message=str(exc)))
+                if isinstance(exc, AfanesError):
+                    problem = exc.domain_message or DomainMessage.of(MessageCode.NOTE_PARSE_FAILED, detail=str(exc))
+                else:
+                    problem = DomainMessage.of(
+                        MessageCode.NOTE_READ_FAILED,
+                        path=note_path.relative_path.as_posix(),
+                        detail=str(exc),
+                    )
+                failures.append(VaultFailure(path=note_path.relative_path, message=problem))
 
         catalog = NameCatalog.from_entries(CatalogEntry(path=note.path, note_type=note.note_type) for note in notes)
         return VaultSnapshot(
@@ -514,7 +528,7 @@ class Vault:
         text = data.decode("utf-8")
         document = NoteDocument.from_text(text)
         if document.note_type is None:
-            message = "Note has no type"
+            message = DomainMessage.of(MessageCode.NOTE_HAS_NO_TYPE)
             raise NoteParseError(message)
         body_references = tuple(reader.extract(document.body))
         steps: tuple[afanes.models.step.ProjectStep, ...] = ()
@@ -574,10 +588,10 @@ class Vault:
             If a category is supplied for a non-reference note.
         """
         if category is not None and note_type is not NoteType.REFERENCE:
-            message = "Only reference notes can declare a category"
+            message = DomainMessage.of(MessageCode.ONLY_REFERENCE_CATEGORIES)
             raise VaultError(message)
         if note_type is NoteType.LOG:
-            message = "Log directories are selected by date; use log_directory"
+            message = DomainMessage.of(MessageCode.LOG_DIRECTORY_SELECTED)
             raise VaultError(message)
         if note_type is NoteType.PROJECT:
             return self.existing_directory(self.root, PROJECTS_DIRECTORY)
@@ -699,10 +713,10 @@ class Vault:
         try:
             data = source.read_bytes()
         except FileNotFoundError as exc:
-            message = f"Note does not exist: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_MISSING, path=str(note_path))
             raise VaultPathError(message) from exc
         except IsADirectoryError as exc:
-            message = f"Not a note file: {note_path}"
+            message = DomainMessage.of(MessageCode.NOT_A_NOTE_FILE, path=str(note_path))
             raise VaultPathError(message) from exc
 
         text = data.decode("utf-8")
@@ -712,9 +726,10 @@ class Vault:
         try:
             document = NoteDocument.from_text(text)
         except (NoteParseError, InvalidReferenceError) as exc:
-            return UnparsedPage(file=file, failure=str(exc))
+            problem = exc.domain_message or DomainMessage.of(MessageCode.NOTE_PARSE_FAILED, detail=str(exc))
+            return UnparsedPage(file=file, failure=problem)
         if document.note_type is None:
-            return UnparsedPage(file=file, failure="Note has no type")
+            return UnparsedPage(file=file, failure=DomainMessage.of(MessageCode.NOTE_HAS_NO_TYPE))
         return ParsedPage(file=file, document=document)
 
     def create(self, draft: NoteDraft) -> Path:
@@ -747,14 +762,14 @@ class Vault:
         body = draft.body
         status = draft.status
         if category is not None and note_type is not NoteType.REFERENCE:
-            message = "Only reference notes can declare a category"
+            message = DomainMessage.of(MessageCode.ONLY_REFERENCE_CATEGORIES)
             raise NoteParseError(message)
 
         target_directory = (
             self.contained(self.directory_for(note_type, category)) if directory is None else self.contained(directory)
         )
         if target_directory.exists() and not target_directory.is_dir():
-            message = f"Note directory is not a directory: {target_directory}"
+            message = DomainMessage.of(MessageCode.NOTE_DIRECTORY_NOT_DIRECTORY, path=str(target_directory))
             raise VaultError(message)
         target_directory.mkdir(parents=True, exist_ok=True)
 

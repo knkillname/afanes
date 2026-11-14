@@ -11,9 +11,10 @@ import flet as ft
 import pytest
 
 import afanes.core.settings
+import afanes.i18n.ui
+import afanes.i18n.ui.en
 import afanes.ui.state
 import afanes.ui.state.navigation
-import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.steps import StepDocument
@@ -232,8 +233,8 @@ class TestActions:
         body = "# Home\n\n- [ ] Call\n"
         _path, view, _followed = _open_project(tmp_path, monkeypatch, body)
 
-        calendar = _button(view.root, afanes.ui.strings.PAGE_STEP_PLAN_ACTION)
-        person = _button(view.root, afanes.ui.strings.PAGE_STEP_OWNER_ACTION)
+        calendar = _button(view.root, afanes.i18n.ui.en.PAGE_STEP_PLAN_ACTION)
+        person = _button(view.root, afanes.i18n.ui.en.PAGE_STEP_OWNER_ACTION)
 
         assert calendar.visible is True
         assert person.visible is True
@@ -245,7 +246,7 @@ class TestActions:
     def test_calendar_action_sets_the_plan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         path, view, _followed = _open_project(tmp_path, monkeypatch, "# Home\n\n- [ ] Call\n", chosen=PLAN)
 
-        _run(_button(view.root, afanes.ui.strings.PAGE_STEP_PLAN_ACTION).on_click)
+        _run(_button(view.root, afanes.i18n.ui.en.PAGE_STEP_PLAN_ACTION).on_click)
 
         step = StepDocument(NoteDocument.from_text(path.read_text(encoding="utf-8")).body).steps[0]
         assert step.plan == PLAN
@@ -254,7 +255,7 @@ class TestActions:
         body = "# Home\n\n- [ ] Call <!-- {plan: 2026-11-20} -->\n"
         path, view, _followed = _open_project(tmp_path, monkeypatch, body)
 
-        _run(_button(view.root, afanes.ui.strings.PAGE_STEP_CLEAR_PLAN).on_click)
+        _run(_button(view.root, afanes.i18n.ui.en.PAGE_STEP_CLEAR_PLAN).on_click)
 
         step = StepDocument(NoteDocument.from_text(path.read_text(encoding="utf-8")).body).steps[0]
         assert step.plan is None
@@ -265,7 +266,7 @@ class TestActions:
         body = "# Home\n\n- [ ] Call <!-- {owners: [Ada]} -->\n"
         path, view, followed = _open_project(tmp_path, monkeypatch, body)
 
-        _run(_button(view.root, afanes.ui.strings.PAGE_STEP_OWNER_ACTION).on_click)
+        _run(_button(view.root, afanes.i18n.ui.en.PAGE_STEP_OWNER_ACTION).on_click)
         field = _field(view.root)
         field.value = "Grace"
         _run(field.on_submit)
@@ -284,7 +285,7 @@ class TestActions:
         body = "# Home\n\n- [ ] Call <!-- {owners: [Ada]} -->\n"
         path, view, _followed = _open_project(tmp_path, monkeypatch, body)
 
-        _run(_button(view.root, afanes.ui.strings.PAGE_STEP_OWNER_ACTION).on_click)
+        _run(_button(view.root, afanes.i18n.ui.en.PAGE_STEP_OWNER_ACTION).on_click)
         chip = next(item for item in _walk(view.root) if isinstance(item, ft.Chip))
         _run(chip.on_delete)
 
@@ -312,7 +313,7 @@ class TestActions:
 
         asyncio.run(scenario())
         view = ProjectBodyView(lambda: None, follow, pick_date)
-        _run(_button(view.root, afanes.ui.strings.PAGE_STEP_OWNER_ACTION).on_click)
+        _run(_button(view.root, afanes.i18n.ui.en.PAGE_STEP_OWNER_ACTION).on_click)
         field = _field(view.root)
         field.value = "Ada"
         _run(field.on_change)
@@ -332,7 +333,7 @@ class TestActions:
         body = "# Home\n\n- [ ] Call <!-- {owners: [Ada]} -->\n"
         _path, view, _followed = _open_project(tmp_path, monkeypatch, body)
 
-        _run(_button(view.root, afanes.ui.strings.PAGE_STEP_OWNER_ACTION).on_click)
+        _run(_button(view.root, afanes.i18n.ui.en.PAGE_STEP_OWNER_ACTION).on_click)
         chip = next(item for item in _walk(view.root) if isinstance(item, ft.Chip) and item.label == "Ada")
         _run(chip.on_click)
 
@@ -347,11 +348,11 @@ class TestActions:
         body = "# Home\n\n- [ ] Call <!-- {owners: [Nobody]} -->\n"
         _path, view, _followed = _open_project(tmp_path, monkeypatch, body, missing_roles=missing)
 
-        _run(_button(view.root, afanes.ui.strings.PAGE_STEP_OWNER_ACTION).on_click)
+        _run(_button(view.root, afanes.i18n.ui.en.PAGE_STEP_OWNER_ACTION).on_click)
         chip = next(item for item in _walk(view.root) if isinstance(item, ft.Chip) and item.label == "Nobody")
 
         assert chip.label_text_style is afanes.ui.theme.ROLE_BROKEN_TEXT_STYLE
-        assert chip.tooltip == afanes.ui.strings.ROLE_LINK_MISSING
+        assert chip.tooltip == afanes.i18n.ui.en.ROLE_LINK_MISSING
 
         _run(chip.on_click)
 

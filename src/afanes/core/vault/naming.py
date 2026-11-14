@@ -21,6 +21,8 @@ import afanes.core.vault.trash
 from afanes.core.errors import (
     AfanesError,
     ContentChangedError,
+    DomainMessage,
+    MessageCode,
     NameCollisionError,
     ReferenceRewriteError,
     VaultError,
@@ -121,23 +123,23 @@ class VaultNaming:
             If the destination already contains a file with the same name.
         """
         if not confirm:
-            message = "Directory moves require explicit confirmation"
+            message = DomainMessage.of(MessageCode.DIRECTORY_MOVE_CONFIRMATION)
             raise VaultError(message)
 
         source = self.vault.contained(note_path)
         if not source.is_file() or source.suffix.casefold() != afanes.core.vault.snapshot.NOTE_SUFFIX:
-            message = f"Not a note file: {note_path}"
+            message = DomainMessage.of(MessageCode.NOT_A_NOTE_FILE, path=str(note_path))
             raise VaultPathError(message)
 
         destination = self.vault.contained(destination_directory)
         if destination.exists() and not destination.is_dir():
-            message = f"Move destination is not a directory: {destination}"
+            message = DomainMessage.of(MessageCode.MOVE_DESTINATION_NOT_DIRECTORY, path=str(destination))
             raise VaultError(message)
         destination.mkdir(parents=True, exist_ok=True)
 
         target = destination / source.name
         if target.exists():
-            message = f"Destination already contains a note named {source.name!r}"
+            message = DomainMessage.of(MessageCode.MOVE_NAME_CONFLICT, name=repr(source.name))
             raise NameCollisionError(message)
 
         source.replace(target)
@@ -179,15 +181,15 @@ class VaultNaming:
         vault = snapshot or self.vault.scan()
         note = vault.find_note(source)
         if note is None:
-            message = f"Note is not part of the vault: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_NOT_IN_VAULT, path=str(note_path))
             raise VaultError(message)
         if note.note_type is not NoteType.REFERENCE:
-            message = "Only reference notes use a category folder"
+            message = DomainMessage.of(MessageCode.CATEGORY_ONLY_REFERENCE)
             raise VaultError(message)
         target_directory = self.vault.directory_for(NoteType.REFERENCE, category)
         target = target_directory / source.name
         if not VaultPath.same(target, source) and target.exists():
-            message = f"Destination already exists: {target}"
+            message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target))
             raise NameCollisionError(message)
         return CategoryMovePreview(note_path=source, target_path=target, category=category)
 
@@ -230,7 +232,7 @@ class VaultNaming:
         uses the label, so the drift is invisible and retryable.
         """
         if not confirm:
-            message = "Moving a category requires explicit confirmation"
+            message = DomainMessage.of(MessageCode.CATEGORY_MOVE_CONFIRMATION)
             raise VaultError(message)
         source = self.vault.contained(preview.note_path)
         target = self.vault.contained(preview.target_path)
@@ -240,13 +242,13 @@ class VaultNaming:
         if VaultPath.same(source, target):
             return source
         if target.exists():
-            message = f"Destination already exists: {target}"
+            message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target))
             raise NameCollisionError(message)
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
             source.replace(target)
         except OSError as exc:
-            message = f"Could not move the note to its category folder: {source}"
+            message = DomainMessage.of(MessageCode.CATEGORY_MOVE_FAILED, path=str(source))
             raise VaultError(message) from exc
         return target
 
@@ -287,7 +289,7 @@ class VaultNaming:
         vault = snapshot or self.vault.scan()
         note = vault.find_note(source)
         if note is None:
-            message = f"Note is not part of the vault: {note_path}"
+            message = DomainMessage.of(MessageCode.NOTE_NOT_IN_VAULT, path=str(note_path))
             raise VaultError(message)
 
         new_name = afanes.core.names.NamePolicy.safe_filename(new_title)
@@ -300,10 +302,10 @@ class VaultNaming:
         if not same_name:
             existing = vault.catalog.candidates(scheme, new_name)
             if any(not VaultPath.same(path, source) for path in existing):
-                message = f"A {scheme.value} note named {new_name!r} already exists"
+                message = DomainMessage.of(MessageCode.NOTE_NAME_EXISTS, scheme=scheme.value, name=repr(new_name))
                 raise NameCollisionError(message)
             if target.exists():
-                message = f"Destination already exists: {target}"
+                message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target))
                 raise NameCollisionError(message)
 
         affected = () if same_name else vault.affected_sites(source)
@@ -315,7 +317,7 @@ class VaultNaming:
                 data = source.read_bytes()
                 document = NoteDocument.from_text(data.decode("utf-8"))
             except (OSError, UnicodeDecodeError, AfanesError) as exc:
-                message = f"Could not inspect the note before renaming: {source}"
+                message = DomainMessage.of(MessageCode.RENAME_INSPECT_FAILED, path=str(source))
                 raise VaultError(message) from exc
             heading_update = document.title == note.name
             if heading_update:
@@ -333,12 +335,7 @@ class VaultNaming:
             content_hashes=hashes,
         )
 
-    def apply_rename(
-        self,
-        preview: RenamePreview,
-        *,
-        confirm: bool = False,
-    ) -> RenameReport:
+    def apply_rename(self, preview: RenamePreview, *, confirm: bool = False) -> RenameReport:
         """Apply a rename preview and rewrite resolving references.
 
         Parameters
@@ -364,7 +361,7 @@ class VaultNaming:
             If the target path appeared after planning.
         """
         if not confirm:
-            message = "Renames require explicit confirmation"
+            message = DomainMessage.of(MessageCode.RENAME_CONFIRMATION)
             raise VaultError(message)
 
         source = self.vault.contained(preview.note_path)
@@ -373,19 +370,19 @@ class VaultNaming:
 
         if source.exists():
             if target.exists() and not VaultPath.same(source, target):
-                message = f"Destination already exists: {target}"
+                message = DomainMessage.of(MessageCode.DESTINATION_EXISTS, path=str(target))
                 raise NameCollisionError(message)
             if preview.new_date is not None or preview.new_type is not None:
                 self._write_conversion(source, preview)
             try:
                 target.parent.mkdir(parents=True, exist_ok=True)
             except OSError as exc:
-                message = f"Could not create the destination directory: {target.parent}"
+                message = DomainMessage.of(MessageCode.RENAME_DIRECTORY_FAILED, path=str(target.parent))
                 raise VaultError(message) from exc
             source.replace(target)
             renamed = True
         elif not target.exists():
-            message = f"Note no longer exists: {preview.note_path}"
+            message = DomainMessage.of(MessageCode.RENAME_NOTE_GONE, path=str(preview.note_path))
             raise VaultError(message)
 
         old_reference = NoteReference(scheme=preview.scheme, name=preview.old_name)
@@ -456,7 +453,7 @@ class VaultNaming:
         data = source.read_bytes()
         expected = preview.content_hashes.get(source)
         if expected is not None and hashlib.sha256(data).hexdigest() != expected:
-            message = f"Note changed on disk: {source}"
+            message = DomainMessage.of(MessageCode.NOTE_CHANGED_ON_DISK, path=str(source))
             raise ContentChangedError(message)
         document = NoteDocument.from_text(data.decode("utf-8"))
         labels = PageLabels.from_document(document)
@@ -481,7 +478,7 @@ class VaultNaming:
         try:
             data = target.read_bytes()
         except OSError as exc:
-            return ((), (), (), (RewriteFailure(path=target, message=str(exc)),))
+            return ((), (), (), (RewriteFailure.from_error(target, exc),))
         if hashlib.sha256(data).hexdigest() != preview.content_hashes.get(source):
             return ((), (target,), (), ())
         try:
@@ -493,7 +490,7 @@ class VaultNaming:
                 preview.new_name,
             )
         except (OSError, UnicodeDecodeError, AfanesError) as exc:
-            return ((), (), (), (RewriteFailure(path=target, message=str(exc)),))
+            return ((), (), (), (RewriteFailure.from_error(target, exc),))
         if changed:
             return ((target,), (), (), ())
         return ((), (), (target,), ())
@@ -519,7 +516,7 @@ class VaultNaming:
             try:
                 data = read_path.read_bytes()
             except OSError as exc:
-                failed.append(RewriteFailure(path=read_path, message=str(exc)))
+                failed.append(RewriteFailure.from_error(read_path, exc))
                 continue
             if hashlib.sha256(data).hexdigest() != preview.content_hashes.get(site.path):
                 skipped.append(read_path)
@@ -528,7 +525,7 @@ class VaultNaming:
             try:
                 changed = self._rewrite_note(read_path, data, old_reference, new_reference)
             except (OSError, UnicodeDecodeError, AfanesError) as exc:
-                failed.append(RewriteFailure(path=read_path, message=str(exc)))
+                failed.append(RewriteFailure.from_error(read_path, exc))
                 continue
             if changed:
                 updated.append(read_path)
@@ -580,7 +577,7 @@ class VaultNaming:
         performs blocking file I/O when it scans, and never writes.
         """
         if old.scheme is not new.scheme and not allow_scheme_change:
-            message = "Reference repair must stay within one scheme"
+            message = DomainMessage.of(MessageCode.REFERENCE_REPAIR_SCHEME)
             raise VaultError(message)
 
         vault = snapshot or self.vault.scan()
@@ -629,7 +626,7 @@ class VaultNaming:
         rewritten by an earlier run are skipped by the hash guard.
         """
         if not confirm:
-            message = "Reference repairs require explicit confirmation"
+            message = DomainMessage.of(MessageCode.REFERENCE_REPAIR_CONFIRMATION)
             raise VaultError(message)
 
         updated: list[Path] = []
@@ -640,7 +637,7 @@ class VaultNaming:
             try:
                 data = site.path.read_bytes()
             except OSError as exc:
-                failed.append(RewriteFailure(path=site.path, message=str(exc)))
+                failed.append(RewriteFailure.from_error(site.path, exc))
                 continue
             if hashlib.sha256(data).hexdigest() != preview.content_hashes.get(site.path):
                 skipped.append(site.path)
@@ -648,7 +645,7 @@ class VaultNaming:
             try:
                 changed = self._rewrite_note(site.path, data, preview.old, preview.new)
             except (OSError, UnicodeDecodeError, AfanesError) as exc:
-                failed.append(RewriteFailure(path=site.path, message=str(exc)))
+                failed.append(RewriteFailure.from_error(site.path, exc))
                 continue
             if changed:
                 updated.append(site.path)
@@ -896,5 +893,5 @@ class VaultNaming:
             for step in afanes.core.steps.StepDocument(document.body).steps:
                 remaining.extend(NoteReference(scheme=ReferenceScheme.NOTE, name=owner) for owner in step.owners)
         if any(ReferenceKey.from_reference(reference) == old_key for reference in remaining):
-            message = "Rewritten note still contains the old reference"
+            message = DomainMessage.of(MessageCode.REWRITE_OLD_REFERENCE)
             raise ReferenceRewriteError(message)

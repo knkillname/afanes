@@ -25,6 +25,7 @@ from afanes.core.vault.trash_metadata import (
     TrashDocument,
     TrashMetadata,
 )
+from tests.support import simulated_message
 
 TODAY = datetime.date(2026, 11, 13)
 THIRTY_DAYS = 30
@@ -360,9 +361,8 @@ class TestTrashWrite:
         vault = _vault(root)
         note = _write_note(root / "inbox" / "Ada.md")
 
-        message = "read only"
-
         def fail(*_args: object, **_kwargs: object) -> None:
+            message = "disk full"
             raise OSError(message)
 
         monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail)
@@ -530,10 +530,8 @@ class TestTrashDelete:
         service = afanes.core.vault.trash.TrashService(vault)
         service.trash(_write_note(root / "inbox" / "Ada.md"), confirm=True, today=TODAY)
 
-        message = "no"
-
         def fail(_self: object, _entry: object) -> None:
-            raise VaultError(message)
+            raise VaultError(simulated_message())
 
         monkeypatch.setattr(afanes.core.vault.trash.TrashService, "delete_entry", fail)
 
@@ -600,9 +598,8 @@ class TestTrashRetention:
     def test_a_failed_stamp_keeps_the_entry_visible(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault, path = self._entry(tmp_path, None)
 
-        message = "read only"
-
         def fail(*_args: object, **_kwargs: object) -> None:
+            message = "disk full"
             raise OSError(message)
 
         monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail)
@@ -618,10 +615,8 @@ class TestTrashRetention:
     ) -> None:
         vault, path = self._entry(tmp_path, TODAY - datetime.timedelta(days=THIRTY_DAYS))
 
-        message = "no"
-
         def fail(_self: object, _entry: object) -> None:
-            raise VaultError(message)
+            raise VaultError(simulated_message())
 
         monkeypatch.setattr(afanes.core.vault.trash.TrashService, "delete_entry", fail)
 

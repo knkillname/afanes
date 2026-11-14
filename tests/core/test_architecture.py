@@ -18,6 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPO_ROOT / "src" / "afanes"
 MODEL_ROOT = SOURCE_ROOT / "models"
 CORE_ROOT = SOURCE_ROOT / "core"
+I18N_ROOT = SOURCE_ROOT / "i18n"
 CLI_ROOT = SOURCE_ROOT / "cli"
 UI_ROOT = SOURCE_ROOT / "ui"
 VIEW_ROOT = UI_ROOT / "views"
@@ -275,6 +276,39 @@ class TestImportBoundaries:
             )
         assert offenders == []
 
+    def test_core_does_not_import_i18n(self) -> None:
+        offenders: list[str] = []
+        for path in _python_files(CORE_ROOT):
+            offenders.extend(
+                f"{path.name}: {module}"
+                for module in _first_party_imports(path)
+                if module == "afanes.i18n" or module.startswith("afanes.i18n.")
+            )
+        assert offenders == []
+
+    def test_i18n_does_not_import_ui_cli_or_flet(self) -> None:
+        forbidden = ("afanes.ui", "afanes.cli")
+        offenders: list[str] = []
+        for path in _python_files(I18N_ROOT):
+            offenders.extend(
+                f"{path.name}: {module}" for module in _first_party_imports(path) if module.startswith(forbidden)
+            )
+            offenders.extend(
+                f"{path.name}: {module}"
+                for module, level in _imports(path)
+                if level == 0 and (module == "flet" or module.startswith("flet."))
+            )
+        assert offenders == []
+
+    def test_i18n_imports_only_the_standard_library_models_core_and_itself(self) -> None:
+        allowed = ("afanes.i18n", "afanes.models", "afanes.core")
+        offenders: list[str] = []
+        for path in _python_files(I18N_ROOT):
+            offenders.extend(
+                f"{path.name}: {module}" for module in _first_party_imports(path) if not module.startswith(allowed)
+            )
+        assert offenders == []
+
     def test_names_module_is_a_standard_library_leaf(self) -> None:
         path = CORE_ROOT / "names.py"
         assert path.is_file()
@@ -374,11 +408,9 @@ class TestUiLayering:
             )
         assert offenders == []
 
-    def test_theme_and_strings_are_import_leaves(self) -> None:
-        offenders: list[str] = []
-        for name in ("theme.py", "strings.py"):
-            path = UI_ROOT / name
-            offenders.extend(f"{path.name}: {module}" for module in _first_party_imports(path))
+    def test_theme_and_english_catalog_are_import_leaves(self) -> None:
+        paths = (UI_ROOT / "theme.py", I18N_ROOT / "ui" / "en.py")
+        offenders: list[str] = [f"{path.name}: {module}" for path in paths for module in _first_party_imports(path)]
         assert offenders == []
 
 

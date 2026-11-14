@@ -15,7 +15,7 @@ from enum import StrEnum
 
 import flet as ft
 
-import afanes.ui.strings
+import afanes.i18n.ui
 import afanes.ui.theme
 from afanes.core.template_cards import TemplateCard, TemplateCardIssue
 
@@ -77,8 +77,13 @@ class TemplateCardContext(StrEnum):
     PROCESSING = "processing"
     LOG = "log"
 
-    def phrases(self) -> TemplateCardPhrases:
+    def phrases(self, copy: afanes.i18n.ui.UiCopy | None = None) -> TemplateCardPhrases:
         """Return the copy for this context.
+
+        Parameters
+        ----------
+        copy : afanes.i18n.ui.UiCopy | None
+            Active catalog. ``None`` uses the English catalog.
 
         Returns
         -------
@@ -86,40 +91,41 @@ class TemplateCardContext(StrEnum):
             Label, Empty, description, warning, and option formats. The log
             context names a log entry instead of a reference category.
         """
+        active = afanes.i18n.ui.UiCopy.english() if copy is None else copy
         if self is TemplateCardContext.LOG:
             return TemplateCardPhrases(
-                label=afanes.ui.strings.LOG_CARD_LABEL,
-                empty=afanes.ui.strings.LOG_CARD_EMPTY,
-                empty_description=afanes.ui.strings.LOG_CARD_DESCRIPTION_EMPTY,
-                no_description=afanes.ui.strings.BROWSER_TEMPLATE_NO_DESCRIPTION,
-                warning=afanes.ui.strings.BROWSER_TEMPLATE_INVALID,
-                option=afanes.ui.strings.BROWSER_TEMPLATE_OPTION,
-                option_plain=afanes.ui.strings.BROWSER_TEMPLATE_OPTION_PLAIN,
-                option_duplicate=afanes.ui.strings.BROWSER_TEMPLATE_OPTION_DUPLICATE,
-                option_duplicate_plain=afanes.ui.strings.BROWSER_TEMPLATE_OPTION_DUPLICATE_PLAIN,
+                label=active.LOG_CARD_LABEL,
+                empty=active.LOG_CARD_EMPTY,
+                empty_description=active.LOG_CARD_DESCRIPTION_EMPTY,
+                no_description=active.BROWSER_TEMPLATE_NO_DESCRIPTION,
+                warning=active.BROWSER_TEMPLATE_INVALID,
+                option=active.BROWSER_TEMPLATE_OPTION,
+                option_plain=active.BROWSER_TEMPLATE_OPTION_PLAIN,
+                option_duplicate=active.BROWSER_TEMPLATE_OPTION_DUPLICATE,
+                option_duplicate_plain=active.BROWSER_TEMPLATE_OPTION_DUPLICATE_PLAIN,
             )
         if self is TemplateCardContext.PROCESSING:
             return TemplateCardPhrases(
-                label=afanes.ui.strings.PROCESSING_TEMPLATE_LABEL,
-                empty=afanes.ui.strings.PROCESSING_TEMPLATE_EMPTY,
-                empty_description=afanes.ui.strings.PROCESSING_TEMPLATE_DESCRIPTION_EMPTY,
-                no_description=afanes.ui.strings.PROCESSING_TEMPLATE_NO_DESCRIPTION,
-                warning=afanes.ui.strings.PROCESSING_TEMPLATE_INVALID,
-                option=afanes.ui.strings.PROCESSING_TEMPLATE_OPTION,
-                option_plain=afanes.ui.strings.PROCESSING_TEMPLATE_OPTION_PLAIN,
-                option_duplicate=afanes.ui.strings.PROCESSING_TEMPLATE_OPTION_DUPLICATE,
-                option_duplicate_plain=afanes.ui.strings.PROCESSING_TEMPLATE_OPTION_DUPLICATE_PLAIN,
+                label=active.PROCESSING_TEMPLATE_LABEL,
+                empty=active.PROCESSING_TEMPLATE_EMPTY,
+                empty_description=active.PROCESSING_TEMPLATE_DESCRIPTION_EMPTY,
+                no_description=active.PROCESSING_TEMPLATE_NO_DESCRIPTION,
+                warning=active.PROCESSING_TEMPLATE_INVALID,
+                option=active.PROCESSING_TEMPLATE_OPTION,
+                option_plain=active.PROCESSING_TEMPLATE_OPTION_PLAIN,
+                option_duplicate=active.PROCESSING_TEMPLATE_OPTION_DUPLICATE,
+                option_duplicate_plain=active.PROCESSING_TEMPLATE_OPTION_DUPLICATE_PLAIN,
             )
         return TemplateCardPhrases(
-            label=afanes.ui.strings.BROWSER_TEMPLATE_LABEL,
-            empty=afanes.ui.strings.BROWSER_TEMPLATE_EMPTY,
-            empty_description=afanes.ui.strings.BROWSER_TEMPLATE_DESCRIPTION_EMPTY,
-            no_description=afanes.ui.strings.BROWSER_TEMPLATE_NO_DESCRIPTION,
-            warning=afanes.ui.strings.BROWSER_TEMPLATE_INVALID,
-            option=afanes.ui.strings.BROWSER_TEMPLATE_OPTION,
-            option_plain=afanes.ui.strings.BROWSER_TEMPLATE_OPTION_PLAIN,
-            option_duplicate=afanes.ui.strings.BROWSER_TEMPLATE_OPTION_DUPLICATE,
-            option_duplicate_plain=afanes.ui.strings.BROWSER_TEMPLATE_OPTION_DUPLICATE_PLAIN,
+            label=active.BROWSER_TEMPLATE_LABEL,
+            empty=active.BROWSER_TEMPLATE_EMPTY,
+            empty_description=active.BROWSER_TEMPLATE_DESCRIPTION_EMPTY,
+            no_description=active.BROWSER_TEMPLATE_NO_DESCRIPTION,
+            warning=active.BROWSER_TEMPLATE_INVALID,
+            option=active.BROWSER_TEMPLATE_OPTION,
+            option_plain=active.BROWSER_TEMPLATE_OPTION_PLAIN,
+            option_duplicate=active.BROWSER_TEMPLATE_OPTION_DUPLICATE,
+            option_duplicate_plain=active.BROWSER_TEMPLATE_OPTION_DUPLICATE_PLAIN,
         )
 
 
@@ -153,6 +159,7 @@ class TemplateCardPicker:
         context: TemplateCardContext,
         prefix: str,
         on_change: Callable[[], None] | None = None,
+        copy: afanes.i18n.ui.UiCopy | None = None,
     ) -> None:
         """Build the picker controls for one context.
 
@@ -165,7 +172,7 @@ class TemplateCardPicker:
         on_change : Callable[[], None] | None
             Called after the selection changes.
         """
-        self._phrases = context.phrases()
+        self._phrases = context.phrases(copy)
         self._on_change = on_change
         self._choices: dict[str, TemplateCard | None] = {EMPTY_KEY: None}
         self.dropdown = ft.Dropdown(

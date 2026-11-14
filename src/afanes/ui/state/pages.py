@@ -16,7 +16,6 @@ import afanes.core.template_cards
 import afanes.core.vault.naming
 import afanes.core.vault.pages
 import afanes.core.vault.steps
-import afanes.ui.strings
 from afanes.core.editing import DraftMode, NormalDraft, PageDraft, PageDraftFactory, RawDraft
 from afanes.core.errors import AfanesError, ContentChangedError, NoteParseError, VaultError, VaultPathError
 from afanes.core.labels import PageLabels
@@ -154,13 +153,13 @@ class PageEditorState:
             persistent condition.
         """
         if self.conflict == "missing":
-            return afanes.ui.strings.PAGE_CONFLICT_MISSING
+            return self.status.copy.PAGE_CONFLICT_MISSING
         if self.conflict == "changed":
-            return afanes.ui.strings.PAGE_CONFLICT_CHANGED
+            return self.status.copy.PAGE_CONFLICT_CHANGED
         if self.blocking_message is not None:
             return self.blocking_message
         if self.repair_preview is not None:
-            return afanes.ui.strings.PAGE_REPAIR_PENDING
+            return self.status.copy.PAGE_REPAIR_PENDING
         return self.report
 
     async def follow_external_change(self, snapshot: VaultSnapshot) -> None:
@@ -343,7 +342,7 @@ class PageEditorState:
         if page is None:
             return ""
         if page.path is None:
-            return afanes.ui.strings.PAGE_NEW
+            return self.status.copy.PAGE_NEW
         root = self.session.vault_root
         if root is None:
             return page.path.as_posix()
@@ -515,7 +514,9 @@ class PageEditorState:
                         )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Step toggle failed", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.PAGE_STEP_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.PAGE_STEP_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return False
                 if not await self.load(page.path):
                     return False
@@ -569,7 +570,9 @@ class PageEditorState:
                         )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Step metadata edit failed", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.PAGE_STEP_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.PAGE_STEP_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return False
                 if not await self.load(page.path):
                     return False
@@ -631,7 +634,7 @@ class PageEditorState:
         try:
             text = page.to_text()
         except NoteParseError as exc:
-            self.status.show_notice(str(exc))
+            self.status.show_notice(self.status.copy.render_error(exc))
             return False
 
         self.saving = True
@@ -646,7 +649,7 @@ class PageEditorState:
         """Write an existing page with the conflict guard."""
         path = page.path
         if path is None:
-            self.status.show_notice(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail="The page has no path"))
+            self.status.show_notice(self.status.copy.PAGE_SAVE_FAILED.format(detail="The page has no path"))
             return False
         try:
             new_hash = await asyncio.to_thread(
@@ -660,7 +663,7 @@ class PageEditorState:
             return False
         except (AfanesError, OSError) as exc:
             logger.debug("Page save failed", exc_info=True)
-            self.status.show_notice(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
+            self.status.show_notice(self.status.copy.PAGE_SAVE_FAILED.format(detail=self.status.copy.render_error(exc)))
             return False
         self.page = page.after_write(text, content_hash=new_hash)
         return True
@@ -679,7 +682,7 @@ class PageEditorState:
             if labels.note_type is NoteType.LOG:
                 entry_date = labels.date
                 if entry_date is None:
-                    self.status.show_notice(afanes.ui.strings.PAGE_LOG_DATE_REQUIRED)
+                    self.status.show_notice(self.status.copy.PAGE_LOG_DATE_REQUIRED)
                     return False
                 path = await asyncio.to_thread(
                     afanes.core.vault.pages.VaultPages(vault).create_log_page,
@@ -697,11 +700,11 @@ class PageEditorState:
         except (AfanesError, OSError) as exc:
             logger.debug("New page could not be created", exc_info=True)
             notice = (
-                afanes.ui.strings.LOG_WRITE_FAILED
+                self.status.copy.LOG_WRITE_FAILED
                 if labels.note_type is NoteType.LOG
-                else afanes.ui.strings.PAGE_SAVE_FAILED
+                else self.status.copy.PAGE_SAVE_FAILED
             )
-            self.status.show_notice(notice.format(detail=str(exc)))
+            self.status.show_notice(notice.format(detail=self.status.copy.render_error(exc)))
             return False
         new_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
         updated = page.after_write(text, content_hash=new_hash, path=path)
@@ -729,7 +732,9 @@ class PageEditorState:
                 return False
             except (AfanesError, OSError) as exc:
                 logger.debug("Raw page save failed", exc_info=True)
-                self.status.show_notice(afanes.ui.strings.PAGE_SAVE_FAILED.format(detail=str(exc)))
+                self.status.show_notice(
+                    self.status.copy.PAGE_SAVE_FAILED.format(detail=self.status.copy.render_error(exc))
+                )
                 return False
             updated = page.after_write(page.raw_text, content_hash=new_hash)
             self.page = updated
@@ -749,7 +754,7 @@ class PageEditorState:
             snapshot = await asyncio.to_thread(vault.scan)
         except (VaultError, OSError) as exc:
             logger.debug("Snapshot refresh after creating a page failed", exc_info=True)
-            self.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
+            self.session.banner = self.status.copy.REFRESH_FAILED.format(detail=self.status.copy.render_error(exc))
             return
         self.session.apply_snapshot(snapshot)
         await self._plan_repair(reference, snapshot, vault)
@@ -763,7 +768,7 @@ class PageEditorState:
             snapshot = await asyncio.to_thread(vault.scan)
         except (VaultError, OSError) as exc:
             logger.debug("Snapshot refresh before a reference repair failed", exc_info=True)
-            self.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail=str(exc))
+            self.session.banner = self.status.copy.REFRESH_FAILED.format(detail=self.status.copy.render_error(exc))
             return
         self.session.apply_snapshot(snapshot)
         await self._plan_repair(reference, snapshot, vault)
@@ -785,7 +790,9 @@ class PageEditorState:
             )
         except (AfanesError, OSError) as exc:
             logger.debug("Reference repair could not be planned", exc_info=True)
-            self.status.show_notice(afanes.ui.strings.PAGE_REPAIR_FAILED.format(detail=str(exc)))
+            self.status.show_notice(
+                self.status.copy.PAGE_REPAIR_FAILED.format(detail=self.status.copy.render_error(exc))
+            )
             return
         if preview.sites:
             self.repair_preview = preview
@@ -817,7 +824,9 @@ class PageEditorState:
             draft = PageDraftFactory.from_page(content)
         except (AfanesError, OSError, UnicodeError) as exc:
             logger.debug("Trashed note could not be read", exc_info=True)
-            self.status.show_notice(afanes.ui.strings.TRASH_OPEN_FAILED.format(detail=str(exc)))
+            self.status.show_notice(
+                self.status.copy.TRASH_OPEN_FAILED.format(detail=self.status.copy.render_error(exc))
+            )
             return False
         self.page = draft
         self.trash_entry = entry
@@ -889,7 +898,7 @@ class PageEditorState:
             draft = PageDraftFactory.from_page(content)
         except (AfanesError, OSError, UnicodeError) as exc:
             logger.debug("Page could not be read", exc_info=True)
-            self.status.show_notice(afanes.ui.strings.PAGE_OPEN_FAILED.format(detail=str(exc)))
+            self.status.show_notice(self.status.copy.PAGE_OPEN_FAILED.format(detail=self.status.copy.render_error(exc)))
             return False
         self.page = draft
         self.trash_entry = None
@@ -960,7 +969,7 @@ class PageEditorState:
         The draft is clean until its body or labels change, so leaving it
         untouched writes nothing. Only log cards from the listing are kept.
         """
-        title = afanes.core.log.LogTitle.for_date(date).text
+        title = afanes.core.log.LogTitle.for_date(date, self.status.copy.locale).text
         cards = listing.for_type(NoteType.LOG) if listing is not None else ()
         issues = listing.issues if listing is not None else ()
         self.page = NormalDraft.for_log(date, title)

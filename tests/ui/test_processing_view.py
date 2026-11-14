@@ -8,15 +8,18 @@ from pathlib import Path
 import flet as ft
 import pytest
 
+import afanes.core.errors
+import afanes.core.localization
 import afanes.core.settings
 import afanes.core.template_cards
 import afanes.core.vault.pages
 import afanes.core.vault.processing
 import afanes.core.vault.service
 import afanes.core.vault.snapshot
+import afanes.i18n.ui
+import afanes.i18n.ui.en
 import afanes.ui.state
 import afanes.ui.state.processing
-import afanes.ui.strings
 import afanes.ui.views.processing
 from afanes.core.processing import ProcessingOutcome, ProcessingPlan
 from afanes.models.note import CategoryLabel, NoteType, Status
@@ -135,7 +138,7 @@ class TestProcessingView:
             "later",
             "trash",
         ]
-        labels = afanes.ui.strings.PROCESSING_OUTCOME_LABELS
+        labels = afanes.i18n.ui.en.PROCESSING_OUTCOME_LABELS
         assert [option.text for option in view.outcome.options] == [
             labels["project"],
             labels["done_now"],
@@ -435,7 +438,7 @@ class TestProcessingView:
 
         _select_outcome(view)
 
-        assert view.template_description.value == afanes.ui.strings.PROCESSING_TEMPLATE_DESCRIPTION_EMPTY
+        assert view.template_description.value == afanes.i18n.ui.en.PROCESSING_TEMPLATE_DESCRIPTION_EMPTY
 
     def test_a_card_without_a_description_says_so(self) -> None:
         state = _open_capture()
@@ -447,7 +450,7 @@ class TestProcessingView:
 
         _select_outcome(view)
 
-        assert view.template_description.value == afanes.ui.strings.PROCESSING_TEMPLATE_NO_DESCRIPTION
+        assert view.template_description.value == afanes.i18n.ui.en.PROCESSING_TEMPLATE_NO_DESCRIPTION
 
     def test_duplicate_titles_show_the_card_path(self) -> None:
         state = _open_capture()
@@ -465,7 +468,14 @@ class TestProcessingView:
     def test_invalid_cards_show_a_warning(self) -> None:
         state = _open_capture()
         state.processing.card_issues = (
-            afanes.core.template_cards.TemplateCardIssue(relative_path=Path("broken.md"), message="bad"),
+            afanes.core.template_cards.TemplateCardIssue(
+                relative_path=Path("broken.md"),
+                message=afanes.core.errors.DomainMessage.of(
+                    afanes.core.errors.MessageCode.CARD_READ_FAILED,
+                    path="broken.md",
+                    detail="bad",
+                ),
+            ),
         )
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
         view.outcome.value = ProcessingOutcome.REFERENCE.value
@@ -515,8 +525,8 @@ class TestProcessingView:
         state.processing.plan = plan
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
-        assert afanes.ui.strings.PROCESSING_PLAN_OWNER.format(name="Sam Rivera") in view.plan_details.value
-        assert afanes.ui.strings.PROCESSING_PLAN_ASKED_BY.format(name="Priya Nair") in view.plan_details.value
+        assert afanes.i18n.ui.en.PROCESSING_PLAN_OWNER.format(name="Sam Rivera") in view.plan_details.value
+        assert afanes.i18n.ui.en.PROCESSING_PLAN_ASKED_BY.format(name="Priya Nair") in view.plan_details.value
 
     def test_plan_preview_names_the_category_and_starter_body(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -542,7 +552,7 @@ class TestProcessingView:
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
         assert "Category: process" in view.plan_details.value
-        assert afanes.ui.strings.PROCESSING_PLAN_SCAFFOLD in view.plan_details.value
+        assert afanes.i18n.ui.en.PROCESSING_PLAN_SCAFFOLD in view.plan_details.value
 
     def test_plan_preview_names_general_for_empty(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -559,7 +569,7 @@ class TestProcessingView:
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
         assert "Category: general" in view.plan_details.value
-        assert afanes.ui.strings.PROCESSING_PLAN_SCAFFOLD not in view.plan_details.value
+        assert afanes.i18n.ui.en.PROCESSING_PLAN_SCAFFOLD not in view.plan_details.value
 
     def test_plan_preview_shows_the_scheme_warning(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
@@ -606,7 +616,7 @@ class TestProcessingView:
 
         plan = afanes.ui.state.app_state.processing.plan
         assert isinstance(plan, ProcessingPlan)
-        assert afanes.ui.strings.PROCESSING_OUTCOME_LABELS["log"] in view.plan_details.value
+        assert afanes.i18n.ui.en.PROCESSING_OUTCOME_LABELS["log"] in view.plan_details.value
         assert str(plan.target_path) in view.plan_destination.value
 
     def test_append_preview_shows_the_project_and_step(self, tmp_path: Path) -> None:
@@ -650,7 +660,7 @@ class TestProcessingView:
         asyncio.run(_click(view.preview_button.on_click))
 
         assert view.form_error.visible is True
-        assert view.form_error.value == afanes.ui.strings.PROCESSING_INVALID_DATE
+        assert view.form_error.value == afanes.i18n.ui.en.PROCESSING_INVALID_DATE
         assert afanes.ui.state.app_state.processing.plan is None
 
     def test_preview_passes_parsed_values_to_the_controller(
@@ -866,7 +876,7 @@ class TestTrashProcessingCopy:
         state.processing.plan = plan
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
-        assert view.plan_destination.value == afanes.ui.strings.PROCESSING_DESTINATION_TRASH
+        assert view.plan_destination.value == afanes.i18n.ui.en.PROCESSING_DESTINATION_TRASH
         assert plan.target_path.stem not in (view.plan_destination.value or "")
 
     def test_success_message_hides_the_trash_uuid(self) -> None:
@@ -876,5 +886,18 @@ class TestTrashProcessingCopy:
 
         view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
 
-        assert view.success_text.value == afanes.ui.strings.PROCESSING_SUCCESS_TRASH
+        assert view.success_text.value == afanes.i18n.ui.en.PROCESSING_SUCCESS_TRASH
         assert "7e1f9c2a" not in (view.success_text.value or "")
+
+
+class TestSpanishProcessing:
+    def test_processing_renders_spanish(self) -> None:
+        state = afanes.ui.state.app_state
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        state.status.set_copy(copy)
+
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async)
+
+        assert view.title.value == copy.PROCESSING_TITLE
+        assert view.outcome.label == copy.PROCESSING_OUTCOME_LABEL
+        assert view.title.value != afanes.i18n.ui.en.PROCESSING_TITLE

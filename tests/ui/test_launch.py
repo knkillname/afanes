@@ -14,12 +14,23 @@ import afanes.__main__
 import afanes.core.settings
 import afanes.core.vault.schema
 import afanes.core.vault.service
-import afanes.ui.strings
+import afanes.i18n.cli
+import afanes.i18n.cli.en
+from afanes.core.preferences import Preferences, PreferencesStore
 from tests.support import access_readable, constant
 
 USAGE_EXIT_CODE = 2
 TEST_PORT = 8765
 PROJECT_ROOT = Path(__file__).parents[2]
+_ENGLISH_COPY = afanes.i18n.cli.CliCopy.english()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_launch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("LANG", "en_US.UTF-8")
+    monkeypatch.delenv("LC_ALL", raising=False)
+    monkeypatch.delenv("LC_MESSAGES", raising=False)
+    _use_settings_file(monkeypatch, tmp_path / "launch-settings.json")
 
 
 class TestConsoleEntryPoint:
@@ -36,36 +47,36 @@ class TestConsoleEntryPoint:
 
 class TestLaunchOptions:
     def test_defaults_to_the_desktop_presentation(self) -> None:
-        options = afanes.__main__.LaunchOptions.parse([])
+        options = afanes.__main__.LaunchOptions.parse([], _ENGLISH_COPY)
 
         assert options.web is False
         assert options.vault is None
         assert options.port == 0
 
     def test_web_option_selects_the_browser_presentation(self) -> None:
-        options = afanes.__main__.LaunchOptions.parse(["--web"])
+        options = afanes.__main__.LaunchOptions.parse(["--web"], _ENGLISH_COPY)
 
         assert options.web is True
 
     def test_port_option_is_read(self) -> None:
-        options = afanes.__main__.LaunchOptions.parse(["--web", "--port", str(TEST_PORT)])
+        options = afanes.__main__.LaunchOptions.parse(["--web", "--port", str(TEST_PORT)], _ENGLISH_COPY)
 
         assert options.port == TEST_PORT
 
     def test_vault_option_is_read(self, tmp_path: Path) -> None:
-        options = afanes.__main__.LaunchOptions.parse(["--vault", str(tmp_path)])
+        options = afanes.__main__.LaunchOptions.parse(["--vault", str(tmp_path)], _ENGLISH_COPY)
 
         assert options.vault == tmp_path
 
     def test_unknown_option_is_a_usage_error(self) -> None:
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.LaunchOptions.parse(["--unknown"])
+            afanes.__main__.LaunchOptions.parse(["--unknown"], _ENGLISH_COPY)
 
         assert excinfo.value.code == USAGE_EXIT_CODE
 
     def test_out_of_range_port_is_a_usage_error(self) -> None:
         with pytest.raises(SystemExit) as excinfo:
-            afanes.__main__.LaunchOptions.parse(["--port", "70000"])
+            afanes.__main__.LaunchOptions.parse(["--port", "70000"], _ENGLISH_COPY)
 
         assert excinfo.value.code == USAGE_EXIT_CODE
 
@@ -123,7 +134,41 @@ class TestRuntimeGuards:
             afanes.__main__.Launcher.main(*[])
 
         assert excinfo.value.code == 1
-        assert afanes.ui.strings.LAUNCH_MISSING_SDK in capsys.readouterr().err
+        assert afanes.i18n.cli.en.LAUNCH_MISSING_SDK in capsys.readouterr().err
+        assert calls == []
+
+
+class TestSpanishLaunch:
+    def test_spanish_help_is_printed(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        PreferencesStore(tmp_path / "preferences.json").save(Preferences(language="es"))
+
+        with pytest.raises(SystemExit) as excinfo:
+            afanes.__main__.Launcher.main("--help")
+
+        assert excinfo.value.code == 0
+        output = capsys.readouterr().out
+        assert "Abre Afanes" in output
+        assert "Open Afanes" not in output
+
+    def test_missing_runtime_is_reported_in_spanish(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        PreferencesStore(tmp_path / "preferences.json").save(Preferences(language="es"))
+        _block_runtime(monkeypatch, afanes.__main__.DESKTOP_RUNTIME_MODULE)
+        calls = _record_run(monkeypatch)
+
+        with pytest.raises(SystemExit) as excinfo:
+            afanes.__main__.Launcher.main(*[])
+
+        assert excinfo.value.code == 1
+        assert "El entorno de escritorio no está instalado" in capsys.readouterr().err
         assert calls == []
 
 

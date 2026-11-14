@@ -1,0 +1,998 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: afanes 0.9.0\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/afanes/i18n/messages/en.py TECHNICAL_FAILURE
+msgctxt "technical-failure"
+msgid "{detail}"
+msgstr "{detail}"
+
+#: src/afanes/i18n/messages/en.py UI_VAULT_MISSING
+msgctxt "ui-vault-missing"
+msgid "That folder does not exist. Choose a vault to continue"
+msgstr "Esa carpeta no existe. Elige una bóveda para continuar"
+
+#: src/afanes/i18n/messages/en.py UI_VAULT_NOT_DIRECTORY
+msgctxt "ui-vault-not-directory"
+msgid "That path is not a folder. Choose a vault to continue"
+msgstr "Esa ruta no es una carpeta. Elige una bóveda para continuar"
+
+#: src/afanes/i18n/messages/en.py UI_VAULT_UNREADABLE
+msgctxt "ui-vault-unreadable"
+msgid "That folder cannot be read. Choose a vault to continue"
+msgstr "Esa carpeta no se puede leer. Elige una bóveda para continuar"
+
+#: src/afanes/i18n/messages/en.py UI_VAULT_NOT_EMPTY
+msgctxt "ui-vault-not-empty"
+msgid "That folder is not empty. Choose an empty folder or an existing vault"
+msgstr "Esa carpeta no está vacía. Elige una carpeta vacía o una bóveda existente"
+
+#: src/afanes/i18n/messages/en.py UI_NEW_VAULT_TEMPLATE_FAILED
+msgctxt "ui-new-vault-template-failed"
+msgid "Could not write the starter content: {detail}"
+msgstr "No se pudo escribir el contenido inicial: {detail}"
+
+#: src/afanes/i18n/messages/en.py UI_VAULT_NOT_OPEN
+msgctxt "ui-vault-not-open"
+msgid "No vault is open"
+msgstr "No hay una bóveda abierta"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_NOT_OBJECT
+msgctxt "settings-not-object"
+msgid "Settings must be a JSON object: {source}"
+msgstr "La configuración debe ser un objeto JSON: {source}"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_VERSION_UNSUPPORTED
+msgctxt "settings-version-unsupported"
+msgid "Unsupported settings version in {source}"
+msgstr "Versión de configuración no admitida en {source}"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_VAULT_MISSING
+msgctxt "settings-vault-missing"
+msgid "Settings do not contain a vault path: {source}"
+msgstr "La configuración no contiene una ruta de bóveda: {source}"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_VAULT_RELATIVE
+msgctxt "settings-vault-relative"
+msgid "Settings vault path must be absolute: {source}"
+msgstr "La ruta de la bóveda en la configuración debe ser absoluta: {source}"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_LOG_MODES_NOT_OBJECT
+msgctxt "settings-log-modes-not-object"
+msgid "Settings Log modes must be a JSON object: {source}"
+msgstr "Los modos de registro de la configuración deben ser un objeto JSON: {source}"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_LOG_MODES_INVALID
+msgctxt "settings-log-modes-invalid"
+msgid "Settings Log modes must map paths to strings: {source}"
+msgstr "Los modos de registro de la configuración deben asignar rutas a cadenas: {source}"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_READ_FAILED
+msgctxt "settings-read-failed"
+msgid "Could not read settings: {source}"
+msgstr "No se pudo leer la configuración: {source}"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_JSON_INVALID
+msgctxt "settings-json-invalid"
+msgid "Settings are not valid JSON: {source}"
+msgstr "La configuración no es JSON válido: {source}"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_DIRECTORY_FAILED
+msgctxt "settings-directory-failed"
+msgid "Could not create the settings directory: {source}"
+msgstr "No se pudo crear el directorio de configuración: {source}"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_VAULT_NOT_DIRECTORY
+msgctxt "settings-vault-not-directory"
+msgid "Vault is not a directory: {source}"
+msgstr "La bóveda no es un directorio: {source}"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_WRITE_FAILED
+msgctxt "settings-write-failed"
+msgid "Could not write settings: {source}"
+msgstr "No se pudo escribir la configuración: {source}"
+
+#: src/afanes/i18n/messages/en.py SETTINGS_REMOVE_FAILED
+msgctxt "settings-remove-failed"
+msgid "Could not remove settings: {source}"
+msgstr "No se pudo eliminar la configuración: {source}"
+
+#: src/afanes/i18n/messages/en.py PREFERENCES_NOT_OBJECT
+msgctxt "preferences-not-object"
+msgid "Preferences must be a JSON object: {source}"
+msgstr "Las preferencias deben ser un objeto JSON: {source}"
+
+#: src/afanes/i18n/messages/en.py PREFERENCES_VERSION_UNSUPPORTED
+msgctxt "preferences-version-unsupported"
+msgid "Unsupported preferences version in {source}"
+msgstr "Versión de preferencias no admitida en {source}"
+
+#: src/afanes/i18n/messages/en.py PREFERENCES_LANGUAGE_INVALID
+msgctxt "preferences-language-invalid"
+msgid "Preferences name an unsupported language: {source}"
+msgstr "Las preferencias indican un idioma no admitido: {source}"
+
+#: src/afanes/i18n/messages/en.py PREFERENCES_READ_FAILED
+msgctxt "preferences-read-failed"
+msgid "Could not read preferences: {source}"
+msgstr "No se pudieron leer las preferencias: {source}"
+
+#: src/afanes/i18n/messages/en.py PREFERENCES_JSON_INVALID
+msgctxt "preferences-json-invalid"
+msgid "Preferences are not valid JSON: {source}"
+msgstr "Las preferencias no son JSON válido: {source}"
+
+#: src/afanes/i18n/messages/en.py PREFERENCES_DIRECTORY_FAILED
+msgctxt "preferences-directory-failed"
+msgid "Could not create the preferences directory: {source}"
+msgstr "No se pudo crear el directorio de preferencias: {source}"
+
+#: src/afanes/i18n/messages/en.py PREFERENCES_WRITE_FAILED
+msgctxt "preferences-write-failed"
+msgid "Could not write preferences: {source}"
+msgstr "No se pudieron escribir las preferencias: {source}"
+
+#: src/afanes/i18n/messages/en.py DESTINATION_DIRECTORY_MISSING
+msgctxt "destination-directory-missing"
+msgid "Destination directory does not exist: {path}"
+msgstr "El directorio de destino no existe: {path}"
+
+#: src/afanes/i18n/messages/en.py NOTE_MISSING
+msgctxt "note-missing"
+msgid "Note does not exist: {path}"
+msgstr "La nota no existe: {path}"
+
+#: src/afanes/i18n/messages/en.py NOT_A_NOTE_FILE
+msgctxt "not-a-note-file"
+msgid "Not a note file: {path}"
+msgstr "No es un archivo de nota: {path}"
+
+#: src/afanes/i18n/messages/en.py NOTE_NOT_IN_VAULT
+msgctxt "note-not-in-vault"
+msgid "Note is not part of the vault: {path}"
+msgstr "La nota no forma parte de la bóveda: {path}"
+
+#: src/afanes/i18n/messages/en.py DESTINATION_EXISTS
+msgctxt "destination-exists"
+msgid "Destination already exists: {path}"
+msgstr "El destino ya existe: {path}"
+
+#: src/afanes/i18n/messages/en.py NOTE_NAME_EXISTS
+msgctxt "note-name-exists"
+msgid "A {scheme} note named {name} already exists"
+msgstr "Ya existe una nota {scheme} llamada {name}"
+
+#: src/afanes/i18n/messages/en.py NOTE_CHANGED_ON_DISK
+msgctxt "note-changed-on-disk"
+msgid "Note changed on disk: {path}"
+msgstr "La nota cambió en el disco: {path}"
+
+#: src/afanes/i18n/messages/en.py NOTE_ALREADY_HAS_TYPE
+msgctxt "note-already-has-type"
+msgid "The note already has that type"
+msgstr "La nota ya tiene ese tipo"
+
+#: src/afanes/i18n/messages/en.py LOG_DATE_REQUIRED
+msgctxt "log-date-required"
+msgid "Set a date before changing this note to a log entry"
+msgstr "Establece una fecha antes de cambiar esta nota a una entrada de registro"
+
+#: src/afanes/i18n/messages/en.py LOG_ENTRY_DATE_REQUIRED
+msgctxt "log-entry-date-required"
+msgid "A log entry needs a date"
+msgstr "Una entrada de registro necesita una fecha"
+
+#: src/afanes/i18n/messages/en.py ONLY_REFERENCE_CATEGORIES
+msgctxt "only-reference-categories"
+msgid "Only reference notes can declare a category"
+msgstr "Solo las notas de referencia pueden declarar una categoría"
+
+#: src/afanes/i18n/messages/en.py NOTE_DIRECTORY_NOT_DIRECTORY
+msgctxt "note-directory-not-directory"
+msgid "Note directory is not a directory: {path}"
+msgstr "El directorio de la nota no es un directorio: {path}"
+
+#: src/afanes/i18n/messages/en.py NOTE_ALREADY_EXISTS
+msgctxt "note-already-exists"
+msgid "Note already exists: {path}"
+msgstr "La nota ya existe: {path}"
+
+#: src/afanes/i18n/messages/en.py NOTE_TEXT_MISMATCH
+msgctxt "note-text-mismatch"
+msgid "Note text does not match the requested type and category"
+msgstr "El texto de la nota no coincide con el tipo y la categoría solicitados"
+
+#: src/afanes/i18n/messages/en.py LOG_TEXT_TYPE
+msgctxt "log-text-type"
+msgid "Log page text must declare type log"
+msgstr "El texto de la página de registro debe declarar el tipo log"
+
+#: src/afanes/i18n/messages/en.py LOG_TEXT_DATE
+msgctxt "log-text-date"
+msgid "Log page text must declare date {date}"
+msgstr "El texto de la página de registro debe declarar la fecha {date}"
+
+#: src/afanes/i18n/messages/en.py LOG_TITLE_REQUIRED
+msgctxt "log-title-required"
+msgid "A log entry needs a title"
+msgstr "Una entrada de registro necesita un título"
+
+#: src/afanes/i18n/messages/en.py LOG_ENTRY_EXISTS
+msgctxt "log-entry-exists"
+msgid "A log entry already exists for {date}"
+msgstr "Ya existe una entrada de registro para {date}"
+
+#: src/afanes/i18n/messages/en.py ONLY_PROJECT_STEPS
+msgctxt "only-project-steps"
+msgid "Only project notes contain steps"
+msgstr "Solo las notas de proyecto contienen pasos"
+
+#: src/afanes/i18n/messages/en.py STEP_LINE_MISSING
+msgctxt "step-line-missing"
+msgid "The step line no longer exists in this project"
+msgstr "La línea del paso ya no existe en este proyecto"
+
+#: src/afanes/i18n/messages/en.py STEP_CONFIRMATION_REQUIRED
+msgctxt "step-confirmation-required"
+msgid "Changing a step requires explicit confirmation"
+msgstr "Cambiar un paso requiere confirmación explícita"
+
+#: src/afanes/i18n/messages/en.py STATUS_CONFIRMATION_REQUIRED
+msgctxt "status-confirmation-required"
+msgid "Changing a status requires explicit confirmation"
+msgstr "Cambiar un estado requiere confirmación explícita"
+
+#: src/afanes/i18n/messages/en.py CAPTURE_EMPTY
+msgctxt "capture-empty"
+msgid "A captured thought must contain text"
+msgstr "Una idea capturada debe contener texto"
+
+#: src/afanes/i18n/messages/en.py VAULT_PATH_NOT_DIRECTORY
+msgctxt "vault-path-not-directory"
+msgid "Vault path is not a directory: {path}"
+msgstr "La ruta de la bóveda no es un directorio: {path}"
+
+#: src/afanes/i18n/messages/en.py VAULT_PATH_NOT_EMPTY
+msgctxt "vault-path-not-empty"
+msgid "Vault path is not empty: {path}"
+msgstr "La ruta de la bóveda no está vacía: {path}"
+
+#: src/afanes/i18n/messages/en.py VAULT_INSPECT_FAILED
+msgctxt "vault-inspect-failed"
+msgid "Could not inspect the vault directory: {path}"
+msgstr "No se pudo inspeccionar el directorio de la bóveda: {path}"
+
+#: src/afanes/i18n/messages/en.py VAULT_CREATE_FAILED
+msgctxt "vault-create-failed"
+msgid "Could not create the vault directory: {path}"
+msgstr "No se pudo crear el directorio de la bóveda: {path}"
+
+#: src/afanes/i18n/messages/en.py VAULT_SEED_FAILED
+msgctxt "vault-seed-failed"
+msgid "Could not seed the vault directory: {path}"
+msgstr "No se pudo inicializar el directorio de la bóveda: {path}"
+
+#: src/afanes/i18n/messages/en.py TEMPLATE_WRITE_FAILED
+msgctxt "template-write-failed"
+msgid "Could not write bundled note {note}; notes already written: {already}"
+msgstr "No se pudo escribir la nota incluida {note}; notas ya escritas: {already}"
+
+#: src/afanes/i18n/messages/en.py TEMPLATE_CARD_WRITE_FAILED
+msgctxt "template-card-write-failed"
+msgid "Could not write template card {card}; cards already written: {already}"
+msgstr "No se pudo escribir la tarjeta de plantilla {card}; tarjetas ya escritas: {already}"
+
+#: src/afanes/i18n/messages/en.py VAULT_PATH_ESCAPES
+msgctxt "vault-path-escapes"
+msgid "Path escapes the vault: {path}"
+msgstr "La ruta se sale de la bóveda: {path}"
+
+#: src/afanes/i18n/messages/en.py VAULT_ROOT_MISSING
+msgctxt "vault-root-missing"
+msgid "Vault root does not exist: {path}"
+msgstr "La raíz de la bóveda no existe: {path}"
+
+#: src/afanes/i18n/messages/en.py VAULT_ROOT_NOT_DIRECTORY
+msgctxt "vault-root-not-directory"
+msgid "Vault root is not a directory: {path}"
+msgstr "La raíz de la bóveda no es un directorio: {path}"
+
+#: src/afanes/i18n/messages/en.py VAULT_ROOT_UNREADABLE
+msgctxt "vault-root-unreadable"
+msgid "Vault root cannot be read: {path}"
+msgstr "La raíz de la bóveda no se puede leer: {path}"
+
+#: src/afanes/i18n/messages/en.py LOG_DIRECTORY_SELECTED
+msgctxt "log-directory-selected"
+msgid "Log directories are selected by date; use log_directory"
+msgstr "Los directorios de registro se eligen por fecha; usa log_directory"
+
+#: src/afanes/i18n/messages/en.py NOTE_HAS_NO_TYPE
+msgctxt "note-has-no-type"
+msgid "Note has no type"
+msgstr "La nota no tiene tipo"
+
+#: src/afanes/i18n/messages/en.py STATUS_INVALID_FOR_NOTE
+msgctxt "status-invalid-for-note"
+msgid "Status {status} is not valid for a {note_type} note"
+msgstr "El estado {status} no es válido para una nota {note_type}"
+
+#: src/afanes/i18n/messages/en.py NOTE_NO_TITLE
+msgctxt "note-no-title"
+msgid "Note has no level-1 heading"
+msgstr "La nota no tiene un encabezado de nivel 1"
+
+#: src/afanes/i18n/messages/en.py NOTE_PARSE_FAILED
+msgctxt "note-parse-failed"
+msgid "The note cannot be parsed: {detail}"
+msgstr "La nota no se puede analizar: {detail}"
+
+#: src/afanes/i18n/messages/en.py NOTE_READ_FAILED
+msgctxt "note-read-failed"
+msgid "Could not read note {path}: {detail}"
+msgstr "No se pudo leer la nota {path}: {detail}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_VERSION_POSITIVE
+msgctxt "schema-version-positive"
+msgid "Schema version must be a positive integer"
+msgstr "La versión de esquema debe ser un número entero positivo"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_INSPECT_FAILED
+msgctxt "schema-inspect-failed"
+msgid "Could not inspect afanes.yaml: {path}"
+msgstr "No se pudo inspeccionar afanes.yaml: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_SYMLINK
+msgctxt "schema-symlink"
+msgid "afanes.yaml is a symbolic link and cannot be used: {path}"
+msgstr "afanes.yaml es un enlace simbólico y no se puede usar: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_NOT_FILE
+msgctxt "schema-not-file"
+msgid "afanes.yaml is not a regular file: {path}"
+msgstr "afanes.yaml no es un archivo regular: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_TOO_LARGE
+msgctxt "schema-too-large"
+msgid "afanes.yaml is too large to be a settings file: {path}"
+msgstr "afanes.yaml es demasiado grande para ser un archivo de configuración: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_READ_FAILED
+msgctxt "schema-read-failed"
+msgid "Could not read afanes.yaml: {path}"
+msgstr "No se pudo leer afanes.yaml: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_MISSING
+msgctxt "schema-missing"
+msgid "Vault has no afanes.yaml settings file: {path}"
+msgstr "La bóveda no tiene un archivo de configuración afanes.yaml: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_WRITE_FAILED
+msgctxt "schema-write-failed"
+msgid "Could not write afanes.yaml in {path}: {detail}"
+msgstr "No se pudo escribir afanes.yaml en {path}: {detail}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_INVALID_UTF8
+msgctxt "schema-invalid-utf8"
+msgid "afanes.yaml is not valid UTF-8: {path}"
+msgstr "afanes.yaml no es UTF-8 válido: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_INVALID_YAML
+msgctxt "schema-invalid-yaml"
+msgid "afanes.yaml is not valid YAML: {path}"
+msgstr "afanes.yaml no es YAML válido: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_VERSION_NOT_INT
+msgctxt "schema-version-not-int"
+msgid "afanes.yaml schema_version is not an integer: {path}"
+msgstr "afanes.yaml schema_version no es un número entero: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_SHAPE
+msgctxt "schema-shape"
+msgid "afanes.yaml must contain exactly schema_version: {version}: {path}"
+msgstr "afanes.yaml debe contener exactamente schema_version: {version}: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_NEWER
+msgctxt "schema-newer"
+msgid "afanes.yaml declares schema version {declared}, which is newer than this Afanes supports ({supported}); update Afanes: {path}"
+msgstr "afanes.yaml declara la versión de esquema {declared}, que es más reciente que la que admite este Afanes ({supported}); actualiza Afanes: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_OLDER
+msgctxt "schema-older"
+msgid "afanes.yaml declares schema version {declared}, which this Afanes does not migrate; this version supports schema {supported}: {path}"
+msgstr "afanes.yaml declara la versión de esquema {declared}, que este Afanes no migra; esta versión admite el esquema {supported}: {path}"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_NOT_WRITABLE
+msgctxt "schema-not-writable"
+msgid "{path} cannot be adopted: the folder is not writable and needs afanes.yaml or write access"
+msgstr "{path} no se puede adoptar: la carpeta no tiene permiso de escritura y necesita afanes.yaml o acceso de escritura"
+
+#: src/afanes/i18n/messages/en.py SCHEMA_MISSING_FOLDERS
+msgctxt "schema-missing-folders"
+msgid "{path} cannot be adopted: it is missing default folders: {folders}"
+msgstr "{path} no se puede adoptar: faltan carpetas predeterminadas: {folders}"
+
+#: src/afanes/i18n/messages/en.py NOTE_DATE_FORMAT
+msgctxt "note-date-format"
+msgid "A note date must be a date written as YYYY, YYYY-MM, or YYYY-MM-DD"
+msgstr "Una fecha de nota debe ser una fecha escrita como YYYY, YYYY-MM o YYYY-MM-DD"
+
+#: src/afanes/i18n/messages/en.py NOTE_DATE_TIMESTAMP
+msgctxt "note-date-timestamp"
+msgid "A note date is a calendar date, not a timestamp"
+msgstr "Una fecha de nota es una fecha de calendario, no una marca de tiempo"
+
+#: src/afanes/i18n/messages/en.py INVALID_NOTE_DATE
+msgctxt "invalid-note-date"
+msgid "Invalid note date: {value}; use YYYY, YYYY-MM, or YYYY-MM-DD"
+msgstr "Fecha de nota no válida: {value}; usa YYYY, YYYY-MM o YYYY-MM-DD"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_UNCLOSED
+msgctxt "frontmatter-unclosed"
+msgid "Frontmatter opening fence is never closed"
+msgstr "El bloque de frontmatter no se cierra"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_INVALID_YAML
+msgctxt "frontmatter-invalid-yaml"
+msgid "Frontmatter is not valid YAML"
+msgstr "El frontmatter no es YAML válido"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_NOT_MAPPING
+msgctxt "frontmatter-not-mapping"
+msgid "Frontmatter must be a YAML mapping"
+msgstr "El frontmatter debe ser un mapeo YAML"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_KEYS_NOT_STRINGS
+msgctxt "frontmatter-keys-not-strings"
+msgid "Frontmatter keys must be strings"
+msgstr "Las claves del frontmatter deben ser cadenas"
+
+#: src/afanes/i18n/messages/en.py RETIRED_PEOPLE_KEY
+msgctxt "retired-people-key"
+msgid "The “people” key was retired; link people in the body with [Name](<note:Name>) or list them as step owners"
+msgstr "La clave “people” se retiró; enlaza a las personas en el cuerpo con [Nombre](<note:Nombre>) o indícalas como responsables de pasos"
+
+#: src/afanes/i18n/messages/en.py RETIRED_PROJECT_KEY
+msgctxt "retired-project-key"
+msgid "The “project” key was retired; move the work into the project body as a step or link it in the body"
+msgstr "La clave “project” se retiró; mueve el trabajo al cuerpo del proyecto como un paso o enlázalo en el cuerpo"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_TYPE_NOT_STRING
+msgctxt "frontmatter-type-not-string"
+msgid "Frontmatter type must be a string"
+msgstr "El tipo del frontmatter debe ser una cadena"
+
+#: src/afanes/i18n/messages/en.py RETIRED_ACTION_TYPE
+msgctxt "retired-action-type"
+msgid "The “action” note type was retired; make a one-step project instead"
+msgstr "El tipo de nota “action” se retiró; crea un proyecto de un paso"
+
+#: src/afanes/i18n/messages/en.py RETIRED_PERSON_TYPE
+msgctxt "retired-person-type"
+msgid "The “person” note type was retired; create a reference with a category label instead"
+msgstr "El tipo de nota “person” se retiró; crea una referencia con una etiqueta de categoría"
+
+#: src/afanes/i18n/messages/en.py UNKNOWN_NOTE_TYPE
+msgctxt "unknown-note-type"
+msgid "Unknown note type: {value}"
+msgstr "Tipo de nota desconocido: {value}"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_CATEGORY_NOT_STRING
+msgctxt "frontmatter-category-not-string"
+msgid "Frontmatter category must be a non-empty string"
+msgstr "La categoría del frontmatter debe ser una cadena no vacía"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_CATEGORY_ONLY_REFERENCE
+msgctxt "frontmatter-category-only-reference"
+msgid "Frontmatter category is only valid on reference notes"
+msgstr "La categoría del frontmatter solo es válida en notas de referencia"
+
+#: src/afanes/i18n/messages/en.py INVALID_CATEGORY
+msgctxt "invalid-category"
+msgid "Invalid reference category: {value}"
+msgstr "Categoría de referencia no válida: {value}"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_STATUS_NOT_STRING
+msgctxt "frontmatter-status-not-string"
+msgid "Frontmatter status must be a string"
+msgstr "El estado del frontmatter debe ser una cadena"
+
+#: src/afanes/i18n/messages/en.py UNKNOWN_NOTE_STATUS
+msgctxt "unknown-note-status"
+msgid "Unknown note status: {value}"
+msgstr "Estado de nota desconocido: {value}"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_STATUS_WITHOUT_TYPE
+msgctxt "frontmatter-status-without-type"
+msgid "Frontmatter status requires a note type"
+msgstr "El estado del frontmatter requiere un tipo de nota"
+
+#: src/afanes/i18n/messages/en.py STATUS_INVALID_FOR_TYPE
+msgctxt "status-invalid-for-type"
+msgid "Status {status} is not valid for {note_type} notes"
+msgstr "El estado {status} no es válido para notas {note_type}"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_DUE_ONLY_PROJECT
+msgctxt "frontmatter-due-only-project"
+msgid "Frontmatter due_date is only valid on project notes"
+msgstr "La fecha de vencimiento del frontmatter solo es válida en notas de proyecto"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_ASSIGNMENT_NOT_STRING
+msgctxt "frontmatter-assignment-not-string"
+msgid "Frontmatter {field} must be a string"
+msgstr "El campo {field} del frontmatter debe ser una cadena"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_ASSIGNMENT_EMPTY
+msgctxt "frontmatter-assignment-empty"
+msgid "Frontmatter {field} must be a non-empty string"
+msgstr "El campo {field} del frontmatter debe ser una cadena no vacía"
+
+#: src/afanes/i18n/messages/en.py FRONTMATTER_ASSIGNMENT_ONLY_PROJECT
+msgctxt "frontmatter-assignment-only-project"
+msgid "Frontmatter {field} is only valid on project notes"
+msgstr "El campo {field} del frontmatter solo es válido en notas de proyecto"
+
+#: src/afanes/i18n/messages/en.py DUE_DATE_NOT_TIMESTAMP
+msgctxt "due-date-not-timestamp"
+msgid "A due date is a calendar date, not a timestamp"
+msgstr "Una fecha de vencimiento es una fecha de calendario, no una marca de tiempo"
+
+#: src/afanes/i18n/messages/en.py DUE_DATE_INPUT_INVALID
+msgctxt "due-date-input-invalid"
+msgid "Enter the due date as YYYY-MM-DD or leave it empty"
+msgstr "Introduce la fecha de vencimiento como YYYY-MM-DD o deja el campo vacío"
+
+#: src/afanes/i18n/messages/en.py INVALID_DUE_DATE
+msgctxt "invalid-due-date"
+msgid "Invalid due date: {value}; use YYYY-MM-DD"
+msgstr "Fecha de vencimiento no válida: {value}; usa YYYY-MM-DD"
+
+#: src/afanes/i18n/messages/en.py DUE_DATE_NOT_DATE
+msgctxt "due-date-not-date"
+msgid "Frontmatter due_date must be a date written as YYYY-MM-DD"
+msgstr "La fecha de vencimiento del frontmatter debe ser una fecha escrita como YYYY-MM-DD"
+
+#: src/afanes/i18n/messages/en.py NOT_SCHEME_REFERENCE
+msgctxt "not-scheme-reference"
+msgid "Not a scheme reference: {destination}"
+msgstr "No es una referencia de esquema: {destination}"
+
+#: src/afanes/i18n/messages/en.py RETIRED_PERSON_SCHEME
+msgctxt "retired-person-scheme"
+msgid "The person scheme was retired; link people as note:Name instead"
+msgstr "El esquema person se retiró; enlaza a las personas como note:Nombre"
+
+#: src/afanes/i18n/messages/en.py UNKNOWN_REFERENCE_SCHEME
+msgctxt "unknown-reference-scheme"
+msgid "Unknown reference scheme: {scheme}"
+msgstr "Esquema de referencia desconocido: {scheme}"
+
+#: src/afanes/i18n/messages/en.py REFERENCE_NAME_EMPTY
+msgctxt "reference-name-empty"
+msgid "Reference name is empty: {destination}"
+msgstr "El nombre de la referencia está vacío: {destination}"
+
+#: src/afanes/i18n/messages/en.py REWRITE_INVALID_MARKDOWN
+msgctxt "rewrite-invalid-markdown"
+msgid "Rewritten body is no longer valid Markdown"
+msgstr "El cuerpo reescrito ya no es Markdown válido"
+
+#: src/afanes/i18n/messages/en.py REWRITE_OLD_REFERENCE
+msgctxt "rewrite-old-reference"
+msgid "Rewritten body still contains the old reference"
+msgstr "El cuerpo reescrito todavía contiene la referencia antigua"
+
+#: src/afanes/i18n/messages/en.py LOG_DATE_CHANGE_VIA_FIELD
+msgctxt "log-date-change-via-field"
+msgid "Change a log entry’s date from the Date field"
+msgstr "Cambia la fecha de una entrada de registro desde el campo Fecha"
+
+#: src/afanes/i18n/messages/en.py STEP_TEXT_REQUIRED
+msgctxt "step-text-required"
+msgid "A step needs text"
+msgstr "Un paso necesita texto"
+
+#: src/afanes/i18n/messages/en.py STEP_LINE_CHANGED
+msgctxt "step-line-changed"
+msgid "The line changed and is no longer a task list item"
+msgstr "La línea cambió y ya no es un elemento de lista de tareas"
+
+#: src/afanes/i18n/messages/en.py STEP_METADATA_INVALID_YAML
+msgctxt "step-metadata-invalid-yaml"
+msgid "The step metadata could not be written as YAML"
+msgstr "Los metadatos del paso no se pudieron escribir como YAML"
+
+#: src/afanes/i18n/messages/en.py STEP_VALUE_DOUBLE_DASH
+msgctxt "step-value-double-dash"
+msgid "A step value contains “--”, which cannot appear inside an HTML comment; rename the value first"
+msgstr "Un valor de paso contiene “--”, que no puede aparecer dentro de un comentario HTML; cambia el valor primero"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_PLAN_INVALID
+msgctxt "processing-plan-invalid"
+msgid "The processing plan is invalid: {detail}"
+msgstr "El plan de procesamiento no es válido: {detail}"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_PROJECT_ASSIGNMENT
+msgctxt "processing-project-assignment"
+msgid "Only projects accept owner and requester names"
+msgstr "Solo los proyectos aceptan nombres de responsable y solicitante"
+
+#: src/afanes/i18n/messages/en.py APPEND_PLAN_INVALID
+msgctxt "append-plan-invalid"
+msgid "The append plan is invalid: {detail}"
+msgstr "El plan para añadir un paso no es válido: {detail}"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_CARD_ONLY
+msgctxt "processing-card-only"
+msgid "Only Reference and Later accept a template card"
+msgstr "Solo Referencia y Más tarde aceptan una tarjeta de plantilla"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_CARD_REQUIRED
+msgctxt "processing-card-required"
+msgid "Reference and Later need a reference card"
+msgstr "Referencia y Más tarde necesitan una tarjeta de referencia"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_CAPTURE_REQUIRED
+msgctxt "processing-capture-required"
+msgid "Processing needs an inbox capture path"
+msgstr "El procesamiento necesita una ruta de captura de la bandeja de entrada"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_DUE_ONLY_PROJECT
+msgctxt "processing-due-only-project"
+msgid "Only projects accept a due date"
+msgstr "Solo los proyectos aceptan una fecha de vencimiento"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_PROJECT_REQUIRED
+msgctxt "processing-project-required"
+msgid "Append step needs a target project"
+msgstr "Añadir un paso necesita un proyecto de destino"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_PROJECT_UNKNOWN
+msgctxt "processing-project-unknown"
+msgid "No project is named {name}"
+msgstr "Ningún proyecto se llama {name}"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_PROJECT_AMBIGUOUS
+msgctxt "processing-project-ambiguous"
+msgid "More than one project is named {name}"
+msgstr "Más de un proyecto se llama {name}"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_CONFIRMATION
+msgctxt "processing-confirmation"
+msgid "Processing requires explicit confirmation"
+msgstr "El procesamiento requiere confirmación explícita"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_CAPTURE_GONE
+msgctxt "processing-capture-gone"
+msgid "Capture no longer exists: {path}"
+msgstr "La captura ya no existe: {path}"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_TRASH_FAILED
+msgctxt "processing-trash-failed"
+msgid "Could not move the capture to Trash: {detail}"
+msgstr "No se pudo mover la captura a la papelera: {detail}"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_SOURCE_CHANGED
+msgctxt "processing-source-changed"
+msgid "Source note changed after planning"
+msgstr "La nota de origen cambió después de la planificación"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_TARGET_GONE
+msgctxt "processing-target-gone"
+msgid "Target project no longer exists: {path}"
+msgstr "El proyecto de destino ya no existe: {path}"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_TARGET_CHANGED
+msgctxt "processing-target-changed"
+msgid "Target project changed after planning"
+msgstr "El proyecto de destino cambió después de la planificación"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_PARTIAL_TRASH
+msgctxt "processing-partial-trash"
+msgid "The step was written, but the capture could not be moved to trash; retry the same plan"
+msgstr "El paso se escribió, pero la captura no se pudo mover a la papelera; repite el mismo plan"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_NOTE_MISMATCH
+msgctxt "processing-note-mismatch"
+msgid "Processed note does not match the plan"
+msgstr "La nota procesada no coincide con el plan"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_MOVE_FAILED
+msgctxt "processing-move-failed"
+msgid "Could not move the note to its destination: {path}"
+msgstr "No se pudo mover la nota a su destino: {path}"
+
+#: src/afanes/i18n/messages/en.py PROCESSING_INBOX_ONLY
+msgctxt "processing-inbox-only"
+msgid "Only notes in the inbox can be processed"
+msgstr "Solo se pueden procesar notas de la bandeja de entrada"
+
+#: src/afanes/i18n/messages/en.py UNKNOWN_TEMPLATE
+msgctxt "unknown-template"
+msgid "Unknown template {identifier}; choose one of: {valid}"
+msgstr "Plantilla desconocida {identifier}; elige una de: {valid}"
+
+#: src/afanes/i18n/messages/en.py TEMPLATE_NO_LABEL
+msgctxt "template-no-label"
+msgid "Bundled template {identifier} has no localized label"
+msgstr "La plantilla incluida {identifier} no tiene una etiqueta localizada"
+
+#: src/afanes/i18n/messages/en.py TEMPLATE_LOCALES_MISSING
+msgctxt "template-locales-missing"
+msgid "Bundled content for {identifier} is missing the {locale} and {base} locales"
+msgstr "El contenido incluido para {identifier} no tiene las configuraciones regionales {locale} ni {base}"
+
+#: src/afanes/i18n/messages/en.py TEMPLATE_NOTE_READ_FAILED
+msgctxt "template-note-read-failed"
+msgid "Bundled note {path} cannot be read: {detail}"
+msgstr "La nota incluida {path} no se puede leer: {detail}"
+
+#: src/afanes/i18n/messages/en.py TEMPLATE_NOTE_BRACE
+msgctxt "template-note-brace"
+msgid "Bundled note {path} has a brace expression that cannot be resolved"
+msgstr "La nota incluida {path} tiene una expresión entre llaves que no se puede resolver"
+
+#: src/afanes/i18n/messages/en.py TEMPLATE_NOTE_PARSE_FAILED
+msgctxt "template-note-parse-failed"
+msgid "Bundled note {path} cannot be parsed: {detail}"
+msgstr "La nota incluida {path} no se puede analizar: {detail}"
+
+#: src/afanes/i18n/messages/en.py TEMPLATE_NO_LOCALE_FOLDER
+msgctxt "template-no-locale-folder"
+msgid "Bundled template {identifier} has no locale folder"
+msgstr "La plantilla incluida {identifier} no tiene carpeta de configuración regional"
+
+#: src/afanes/i18n/messages/en.py TEMPLATE_LOCALE_SHAPE
+msgctxt "template-locale-shape"
+msgid "Bundled template {identifier} locale {locale} does not match the shape of its base locale"
+msgstr "La configuración regional {locale} de la plantilla incluida {identifier} no coincide con la forma de su configuración base"
+
+#: src/afanes/i18n/messages/en.py TEMPLATE_INVALID
+msgctxt "template-invalid"
+msgid "Bundled {subject} is invalid: {detail}"
+msgstr "El contenido incluido {subject} no es válido: {detail}"
+
+#: src/afanes/i18n/messages/en.py CARD_INVALID
+msgctxt "card-invalid"
+msgid "Bundled template card {path} is invalid: {detail}"
+msgstr "La tarjeta de plantilla incluida {path} no es válida: {detail}"
+
+#: src/afanes/i18n/messages/en.py CARD_READ_FAILED
+msgctxt "card-read-failed"
+msgid "Bundled template card {path} cannot be read: {detail}"
+msgstr "La tarjeta de plantilla incluida {path} no se puede leer: {detail}"
+
+#: src/afanes/i18n/messages/en.py CARD_FOLDER_READ_FAILED
+msgctxt "card-folder-read-failed"
+msgid "The templates folder cannot be read: {detail}"
+msgstr "La carpeta de plantillas no se puede leer: {detail}"
+
+#: src/afanes/i18n/messages/en.py CARDS_MISSING
+msgctxt "cards-missing"
+msgid "Bundled template cards are missing"
+msgstr "Faltan las tarjetas de plantilla incluidas"
+
+#: src/afanes/i18n/messages/en.py CARD_LOCALE_SHAPE
+msgctxt "card-locale-shape"
+msgid "Bundled template cards do not match the English set: {detail}"
+msgstr "Las tarjetas de plantilla incluidas no coinciden con el conjunto en inglés: {detail}"
+
+#: src/afanes/i18n/messages/en.py CARD_FRONTMATTER_PARSE
+msgctxt "card-frontmatter-parse"
+msgid "Bundled template card {path} cannot be parsed: {detail}"
+msgstr "La tarjeta de plantilla incluida {path} no se puede analizar: {detail}"
+
+#: src/afanes/i18n/messages/en.py CARD_TYPE_REQUIRED
+msgctxt "card-type-required"
+msgid "Bundled template card {path} must declare type: reference or log"
+msgstr "La tarjeta de plantilla incluida {path} debe declarar el tipo reference o log"
+
+#: src/afanes/i18n/messages/en.py CARD_CATEGORY_REQUIRED
+msgctxt "card-category-required"
+msgid "Bundled template card {path} must declare a category"
+msgstr "La tarjeta de plantilla incluida {path} debe declarar una categoría"
+
+#: src/afanes/i18n/messages/en.py CARD_LOG_NO_CATEGORY
+msgctxt "card-log-no-category"
+msgid "Bundled template card {path} must not declare a category for a log card"
+msgstr "La tarjeta de plantilla incluida {path} no debe declarar una categoría para una tarjeta de registro"
+
+#: src/afanes/i18n/messages/en.py CARD_BODY_HEADING
+msgctxt "card-body-heading"
+msgid "Bundled template card {path} must not contain a level-1 heading in its starter body"
+msgstr "La tarjeta de plantilla incluida {path} no debe contener un encabezado de nivel 1 en su cuerpo inicial"
+
+#: src/afanes/i18n/messages/en.py CARD_STATUS_NOT_ALLOWED
+msgctxt "card-status-not-allowed"
+msgid "Bundled template card {path} must not declare a status"
+msgstr "La tarjeta de plantilla incluida {path} no debe declarar un estado"
+
+#: src/afanes/i18n/messages/en.py CARD_DUE_NOT_ALLOWED
+msgctxt "card-due-not-allowed"
+msgid "Bundled template card {path} must not declare a due date"
+msgstr "La tarjeta de plantilla incluida {path} no debe declarar una fecha de vencimiento"
+
+#: src/afanes/i18n/messages/en.py CARD_TITLE_NOT_STRING
+msgctxt "card-title-not-string"
+msgid "Bundled template card {path} must declare a text title"
+msgstr "La tarjeta de plantilla incluida {path} debe declarar un título de texto"
+
+#: src/afanes/i18n/messages/en.py CARD_DESCRIPTION_NOT_STRING
+msgctxt "card-description-not-string"
+msgid "Bundled template card {path} must declare a text description"
+msgstr "La tarjeta de plantilla incluida {path} debe declarar una descripción de texto"
+
+#: src/afanes/i18n/messages/en.py TRASH_CONFIRMATION
+msgctxt "trash-confirmation"
+msgid "Trashing requires explicit confirmation"
+msgstr "Mover a la papelera requiere confirmación explícita"
+
+#: src/afanes/i18n/messages/en.py TRASH_METADATA_WRITE_FAILED
+msgctxt "trash-metadata-write-failed"
+msgid "Could not add trash metadata to the note: {path}"
+msgstr "No se pudieron añadir los metadatos de la papelera a la nota: {path}"
+
+#: src/afanes/i18n/messages/en.py TRASH_MOVE_FAILED
+msgctxt "trash-move-failed"
+msgid "Could not move the note to trash: {path}"
+msgstr "No se pudo mover la nota a la papelera: {path}"
+
+#: src/afanes/i18n/messages/en.py TRASH_RESTORE_CONFIRMATION
+msgctxt "trash-restore-confirmation"
+msgid "Restoring a trashed note requires explicit confirmation"
+msgstr "Restaurar una nota de la papelera requiere confirmación explícita"
+
+#: src/afanes/i18n/messages/en.py TRASH_DELETE_FAILED
+msgctxt "trash-delete-failed"
+msgid "Could not delete the trashed note"
+msgstr "No se pudo eliminar la nota de la papelera"
+
+#: src/afanes/i18n/messages/en.py TRASH_RESTORE_UNSUPPORTED
+msgctxt "trash-restore-unsupported"
+msgid "The trashed note cannot be restored"
+msgstr "La nota de la papelera no se puede restaurar"
+
+#: src/afanes/i18n/messages/en.py TRASH_ENTRY_MISSING
+msgctxt "trash-entry-missing"
+msgid "The trashed note no longer exists"
+msgstr "La nota de la papelera ya no existe"
+
+#: src/afanes/i18n/messages/en.py TRASH_METADATA_UNREADABLE
+msgctxt "trash-metadata-unreadable"
+msgid "The trashed note metadata cannot be read"
+msgstr "Los metadatos de la nota de la papelera no se pueden leer"
+
+#: src/afanes/i18n/messages/en.py TRASH_BIRTHPLACE_NOT_FILE
+msgctxt "trash-birthplace-not-file"
+msgid "The birthplace is not a regular note file"
+msgstr "El lugar de origen no es un archivo de nota regular"
+
+#: src/afanes/i18n/messages/en.py TRASH_RESTORE_FAILED
+msgctxt "trash-restore-failed"
+msgid "Could not restore the trashed note"
+msgstr "No se pudo restaurar la nota de la papelera"
+
+#: src/afanes/i18n/messages/en.py TRASH_RESTORE_PARTIAL
+msgctxt "trash-restore-partial"
+msgid "The note was restored, but the trashed copy could not be removed"
+msgstr "La nota se restauró, pero la copia de la papelera no se pudo eliminar"
+
+#: src/afanes/i18n/messages/en.py TRASH_NO_BIRTHPLACE
+msgctxt "trash-no-birthplace"
+msgid "The trashed note has no usable birthplace"
+msgstr "La nota de la papelera no tiene un lugar de origen utilizable"
+
+#: src/afanes/i18n/messages/en.py TRASH_NOT_MANAGED
+msgctxt "trash-not-managed"
+msgid "The file is not a managed trash entry"
+msgstr "El archivo no es una entrada de papelera gestionada"
+
+#: src/afanes/i18n/messages/en.py TRASH_NOT_REGULAR
+msgctxt "trash-not-regular"
+msgid "The trashed note is not a regular file"
+msgstr "La nota de la papelera no es un archivo regular"
+
+#: src/afanes/i18n/messages/en.py LOG_DATE_IDENTITY_ONLY
+msgctxt "log-date-identity-only"
+msgid "Only log notes use a date identity"
+msgstr "Solo las notas de registro usan una identidad de fecha"
+
+#: src/afanes/i18n/messages/en.py LOG_NAME_EXISTS
+msgctxt "log-name-exists"
+msgid "A log note named {date} already exists"
+msgstr "Ya existe una nota de registro llamada {date}"
+
+#: src/afanes/i18n/messages/en.py DIRECTORY_MOVE_CONFIRMATION
+msgctxt "directory-move-confirmation"
+msgid "Directory moves require explicit confirmation"
+msgstr "Mover directorios requiere confirmación explícita"
+
+#: src/afanes/i18n/messages/en.py MOVE_DESTINATION_NOT_DIRECTORY
+msgctxt "move-destination-not-directory"
+msgid "Move destination is not a directory: {path}"
+msgstr "El destino del movimiento no es un directorio: {path}"
+
+#: src/afanes/i18n/messages/en.py MOVE_NAME_CONFLICT
+msgctxt "move-name-conflict"
+msgid "Destination already contains a note named {name}"
+msgstr "El destino ya contiene una nota llamada {name}"
+
+#: src/afanes/i18n/messages/en.py CATEGORY_ONLY_REFERENCE
+msgctxt "category-only-reference"
+msgid "Only reference notes use a category folder"
+msgstr "Solo las notas de referencia usan una carpeta de categoría"
+
+#: src/afanes/i18n/messages/en.py CATEGORY_MOVE_CONFIRMATION
+msgctxt "category-move-confirmation"
+msgid "Moving a category requires explicit confirmation"
+msgstr "Mover una categoría requiere confirmación explícita"
+
+#: src/afanes/i18n/messages/en.py CATEGORY_MOVE_FAILED
+msgctxt "category-move-failed"
+msgid "Could not move the note to its category folder: {path}"
+msgstr "No se pudo mover la nota a su carpeta de categoría: {path}"
+
+#: src/afanes/i18n/messages/en.py RENAME_CONFIRMATION
+msgctxt "rename-confirmation"
+msgid "Renames require explicit confirmation"
+msgstr "Renombrar requiere confirmación explícita"
+
+#: src/afanes/i18n/messages/en.py RENAME_DIRECTORY_FAILED
+msgctxt "rename-directory-failed"
+msgid "Could not create the destination directory: {path}"
+msgstr "No se pudo crear el directorio de destino: {path}"
+
+#: src/afanes/i18n/messages/en.py RENAME_NOTE_GONE
+msgctxt "rename-note-gone"
+msgid "Note no longer exists: {path}"
+msgstr "La nota ya no existe: {path}"
+
+#: src/afanes/i18n/messages/en.py RENAME_INSPECT_FAILED
+msgctxt "rename-inspect-failed"
+msgid "Could not inspect the note before renaming: {path}"
+msgstr "No se pudo inspeccionar la nota antes de renombrarla: {path}"
+
+#: src/afanes/i18n/messages/en.py REFERENCE_REPAIR_SCHEME
+msgctxt "reference-repair-scheme"
+msgid "Reference repair must stay within one scheme"
+msgstr "La reparación de referencias debe mantenerse dentro de un solo esquema"
+
+#: src/afanes/i18n/messages/en.py REFERENCE_REPAIR_CONFIRMATION
+msgctxt "reference-repair-confirmation"
+msgid "Reference repairs require explicit confirmation"
+msgstr "Reparar referencias requiere confirmación explícita"
+
+#: src/afanes/i18n/templates/en.py TEMPLATE_PERSONAL_LABEL
+msgctxt "TEMPLATE_PERSONAL_LABEL"
+msgid "Personal"
+msgstr "Personal"
+
+#: src/afanes/i18n/templates/en.py TEMPLATE_PERSONAL_DESCRIPTION
+msgctxt "TEMPLATE_PERSONAL_DESCRIPTION"
+msgid "Life administration for the home, the car, and the paperwork that arrives each year"
+msgstr "Administración de la vida doméstica: la casa, el coche y el papeleo que llega cada año"
+
+#: src/afanes/i18n/templates/en.py TEMPLATE_WORK_LABEL
+msgctxt "TEMPLATE_WORK_LABEL"
+msgid "Work"
+msgstr "Trabajo"
+
+#: src/afanes/i18n/templates/en.py TEMPLATE_WORK_DESCRIPTION
+msgctxt "TEMPLATE_WORK_DESCRIPTION"
+msgid "Shared outcomes, the groups that own them, and the processes that carry them"
+msgstr "Resultados compartidos, los grupos que los poseen y los procesos que los sostienen"
+
+#: src/afanes/i18n/templates/en.py TEMPLATE_STUDY_LABEL
+msgctxt "TEMPLATE_STUDY_LABEL"
+msgid "Study"
+msgstr "Estudio"
+
+#: src/afanes/i18n/templates/en.py TEMPLATE_STUDY_DESCRIPTION
+msgctxt "TEMPLATE_STUDY_DESCRIPTION"
+msgid "Course and research work, with the topics and sources kept beside it"
+msgstr "Trabajo de cursos e investigación, con los temas y las fuentes junto a ellos"

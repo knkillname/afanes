@@ -16,7 +16,7 @@ from pathlib import Path
 import afanes.core.atomic
 import afanes.core.steps
 import afanes.models.step
-from afanes.core.errors import VaultError
+from afanes.core.errors import DomainMessage, MessageCode, VaultError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.vault.service import Vault
 from afanes.models.note import NoteType
@@ -234,13 +234,13 @@ class VaultSteps:
             If metadata cannot be written as one valid comment.
         """
         if not confirm:
-            message = "Changing a step requires explicit confirmation"
+            message = DomainMessage.of(MessageCode.STEP_CONFIRMATION_REQUIRED)
             raise VaultError(message)
         source = self.vault.contained(note_path)
         source_text = source.read_text(encoding="utf-8")
         document = NoteDocument.from_text(source_text)
         if document.note_type is not NoteType.PROJECT:
-            message = "Only project notes contain steps"
+            message = DomainMessage.of(MessageCode.ONLY_PROJECT_STEPS)
             raise VaultError(message)
         step_document = afanes.core.steps.StepDocument(document.body)
         body = step_document.append(text, detail)
@@ -281,18 +281,18 @@ class VaultSteps:
     ) -> str:
         """Apply one line-level step transformation atomically."""
         if not confirm:
-            message = "Changing a step requires explicit confirmation"
+            message = DomainMessage.of(MessageCode.STEP_CONFIRMATION_REQUIRED)
             raise VaultError(message)
         source = self.vault.contained(note_path)
         text = source.read_text(encoding="utf-8")
         document = NoteDocument.from_text(text)
         if document.note_type is not NoteType.PROJECT:
-            message = "Only project notes contain steps"
+            message = DomainMessage.of(MessageCode.ONLY_PROJECT_STEPS)
             raise VaultError(message)
         step_document = afanes.core.steps.StepDocument(document.body)
         step = next((value for value in step_document.steps if value.line_index == line_index), None)
         if step is None:
-            message = "The step line no longer exists in this project"
+            message = DomainMessage.of(MessageCode.STEP_LINE_MISSING)
             raise VaultError(message)
         body = transform(step_document, step)
         text_out = self._with_body_text(text, document, body)

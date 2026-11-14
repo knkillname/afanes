@@ -5,12 +5,32 @@ import os
 import typing
 from pathlib import Path
 
+import afanes.core.errors
 import afanes.core.template_cards
 import afanes.core.vault.processing
 import afanes.core.vault.schema
 import afanes.core.vault.snapshot
 from afanes.core.processing import ProcessingOutcome
 from afanes.models.note import Status
+
+
+def simulated_message(detail: str = "simulated") -> afanes.core.errors.DomainMessage:
+    """Build a structured message for tests that simulate a failure.
+
+    Parameters
+    ----------
+    detail : str
+        Technical detail attached to the message.
+
+    Returns
+    -------
+    afanes.core.errors.DomainMessage
+        Domain message carrying the detail.
+    """
+    return afanes.core.errors.DomainMessage.of(
+        afanes.core.errors.MessageCode.TECHNICAL_FAILURE,
+        detail=detail,
+    )
 
 
 def constant[T](value: T) -> typing.Callable[..., T]:

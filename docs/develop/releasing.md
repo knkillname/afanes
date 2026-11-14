@@ -8,8 +8,9 @@ cross-platform desktop build.
 :::{admonition} tl;dr
 :class: note
 
-Build with `flet build <platform> --build-version "$(hatch version)"` on the host OS. Attach the
-Linux build and the wheel to the GitHub release by hand. Linux is the only release gate; run its
+Build with `hatch run package <platform> --build-version "$(hatch version)"` on the host OS. The
+`package` script compiles the gettext `.mo` catalogs before invoking `flet build`. Attach the Linux
+build and the wheel to the GitHub release by hand. Linux is the only release gate; run its
 offline-start check before publishing.
 :::
 
@@ -20,9 +21,9 @@ The native build tools are also required: Xcode command line tools on macOS, Vis
 on Windows, and `clang`, CMake, Ninja, and the GTK 3 development libraries on Linux.
 
 ```console
-hatch run flet build linux --build-version "$(hatch version)"
-hatch run flet build macos --build-version "$(hatch version)"
-hatch run flet build windows --build-version "$(hatch version)"
+hatch run package linux --build-version "$(hatch version)"
+hatch run package macos --build-version "$(hatch version)"
+hatch run package windows --build-version "$(hatch version)"
 ```
 
 Run only the command for the machine you are on. The artifact is written under `build/<platform>/`.

@@ -18,10 +18,10 @@ import flet as ft
 import afanes.core.connections
 import afanes.core.search
 import afanes.core.vault.snapshot
+import afanes.models.note
 import afanes.ui.components.field_flow
 import afanes.ui.components.page_panels
 import afanes.ui.state
-import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.editing import DraftMode, PageDraft
 from afanes.core.vault.snapshot import LinkOutcome
@@ -110,7 +110,7 @@ class PageView:
         """Build the toolbar and its actions."""
         self.back_button = ft.IconButton(
             icon=ft.Icons.ARROW_BACK_OUTLINED,
-            tooltip=afanes.ui.strings.PAGE_BACK,
+            tooltip=self._state.status.copy.PAGE_BACK,
             on_click=self.go_back,
         )
         self.title = ft.Text(
@@ -131,65 +131,65 @@ class PageView:
             width=16,
             height=16,
             visible=False,
-            semantics_label=afanes.ui.strings.WORKING,
+            semantics_label=self._state.status.copy.WORKING,
         )
         self.status_text = ft.Text(
             "",
             style=afanes.ui.theme.TEXT_ROLES["caption"],
         )
         self.process_button = ft.TextButton(
-            content=afanes.ui.strings.PROCESS_ACTION,
+            content=self._state.status.copy.PROCESS_ACTION,
             icon=ft.Icons.PLAY_ARROW_OUTLINED,
             on_click=self.process_current,
             visible=False,
             key="process-note",
         )
         self.edit_button = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_EDIT,
+            content=self._state.status.copy.PAGE_EDIT,
             icon=ft.Icons.EDIT_OUTLINED,
             on_click=self.start_edit,
             key="page-edit-action",
         )
         self.done_button = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_DONE,
+            content=self._state.status.copy.PAGE_DONE,
             icon=ft.Icons.CHECK_OUTLINED,
             on_click=self.finish_edit,
             visible=False,
             key="page-done-action",
         )
         self.restore_button = ft.FilledButton(
-            content=afanes.ui.strings.TRASH_RESTORE,
+            content=self._state.status.copy.TRASH_RESTORE,
             icon=ft.Icons.RESTORE_OUTLINED,
             on_click=self.restore_trash,
             visible=False,
             key="trash-restore-action",
         )
         self.edit_item = ft.PopupMenuItem(
-            content=afanes.ui.strings.PAGE_EDIT,
+            content=self._state.status.copy.PAGE_EDIT,
             on_click=self.start_edit,
             key="page-edit",
         )
         self.rename_item = ft.PopupMenuItem(
-            content=afanes.ui.strings.PAGE_RENAME,
+            content=self._state.status.copy.PAGE_RENAME,
             icon=ft.Icons.DRIVE_FILE_RENAME_OUTLINE,
             on_click=self.begin_rename,
             key="page-rename",
         )
         self.trash_item = ft.PopupMenuItem(
-            content=afanes.ui.strings.PAGE_TRASH,
+            content=self._state.status.copy.PAGE_TRASH,
             icon=ft.Icons.DELETE_OUTLINE,
             on_click=self.trash_page,
             key="page-trash",
         )
         self.delete_item = ft.PopupMenuItem(
-            content=afanes.ui.strings.TRASH_DELETE_PERMANENTLY,
+            content=self._state.status.copy.TRASH_DELETE_PERMANENTLY,
             icon=ft.Icons.DELETE_FOREVER_OUTLINED,
             on_click=self.begin_delete_trash,
             key="page-delete-permanently",
         )
         self.menu_button = ft.PopupMenuButton(
             icon=ft.Icons.MORE_VERT_OUTLINED,
-            tooltip=afanes.ui.strings.PAGE_ACTIONS,
+            tooltip=self._state.status.copy.PAGE_ACTIONS,
             items=[self.edit_item, self.rename_item, self.trash_item, self.delete_item],
             key="page-menu",
         )
@@ -216,7 +216,7 @@ class PageView:
         self.meta_owner = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.meta_owner_button = ft.IconButton(
             icon=ft.Icons.PERSON_ADD_OUTLINED,
-            tooltip=afanes.ui.strings.PAGE_OWNER_SET,
+            tooltip=self._state.status.copy.PAGE_OWNER_SET,
             icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
             on_click=self.choose_owner,
             style=ft.ButtonStyle(
@@ -230,7 +230,7 @@ class PageView:
         self.meta_asked = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.meta_asked_button = ft.IconButton(
             icon=ft.Icons.PERSON_SEARCH_OUTLINED,
-            tooltip=afanes.ui.strings.PAGE_ASKED_BY_SET,
+            tooltip=self._state.status.copy.PAGE_ASKED_BY_SET,
             icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
             on_click=self.choose_asked_by,
             style=ft.ButtonStyle(
@@ -245,7 +245,7 @@ class PageView:
         self.meta_date = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.meta_due_button = ft.IconButton(
             icon=ft.Icons.CALENDAR_MONTH_OUTLINED,
-            tooltip=afanes.ui.strings.PAGE_PROJECT_DUE_ADD,
+            tooltip=self._state.status.copy.PAGE_PROJECT_DUE_ADD,
             icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
             on_click=self.choose_due_date,
             style=ft.ButtonStyle(
@@ -257,7 +257,7 @@ class PageView:
         )
         self.meta_due_clear = ft.IconButton(
             icon=ft.Icons.EVENT_BUSY_OUTLINED,
-            tooltip=afanes.ui.strings.PAGE_PROJECT_DUE_CLEAR,
+            tooltip=self._state.status.copy.PAGE_PROJECT_DUE_CLEAR,
             icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
             on_click=self.clear_due_date,
             style=ft.ButtonStyle(
@@ -289,7 +289,7 @@ class PageView:
         """Build the read-mode content and connections panel."""
         self.banners = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
         self.empty_text = ft.Text(
-            afanes.ui.strings.PAGE_EMPTY,
+            self._state.status.copy.PAGE_EMPTY,
             color=afanes.ui.theme.MUTED_TEXT_COLOR,
         )
         self.read_body = ft.Markdown(
@@ -304,13 +304,13 @@ class PageView:
         self._show_finished_projects = False
         self._connections_page: Path | None = None
         self.connections_steps_toggle = ft.Checkbox(
-            label=afanes.ui.strings.PAGE_CONNECTIONS_SHOW_COMPLETED_STEPS,
+            label=self._state.status.copy.PAGE_CONNECTIONS_SHOW_COMPLETED_STEPS,
             value=False,
             on_change=self.toggle_completed_steps,
             key="connections-completed-steps",
         )
         self.connections_projects_toggle = ft.Checkbox(
-            label=afanes.ui.strings.PAGE_CONNECTIONS_SHOW_FINISHED_PROJECTS,
+            label=self._state.status.copy.PAGE_CONNECTIONS_SHOW_FINISHED_PROJECTS,
             value=False,
             on_change=self.toggle_finished_projects,
             key="connections-finished-projects",
@@ -321,7 +321,7 @@ class PageView:
             key="connections-body",
         )
         self.connections_panel = Panel(
-            afanes.ui.strings.PAGE_CONNECTIONS_TITLE,
+            self._state.status.copy.PAGE_CONNECTIONS_TITLE,
             self.connections_body,
             [self.connections_steps_toggle, self.connections_projects_toggle],
         ).build()
@@ -334,6 +334,7 @@ class PageView:
             TemplateCardContext.LOG,
             "log-draft",
             self._starter_changed,
+            copy=self._state.status.copy,
         )
         self.log_starter_picker.dropdown.height = afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
         self.log_starter_picker.dropdown.visible = False
@@ -346,7 +347,7 @@ class PageView:
             visible=False,
         )
         self.body_field = ft.TextField(
-            label=afanes.ui.strings.PAGE_BODY_LABEL,
+            label=self._state.status.copy.PAGE_BODY_LABEL,
             multiline=True,
             fit_parent_size=True,
             text_vertical_align=ft.VerticalAlignment.START,
@@ -354,17 +355,17 @@ class PageView:
             on_change=self.change_body,
         )
         self.type_dropdown = ft.Dropdown(
-            label=afanes.ui.strings.PAGE_TYPE_LABEL,
+            label=self._state.status.copy.PAGE_TYPE_LABEL,
             options=[
-                ft.dropdown.Option(key=note_type.value, text=afanes.ui.strings.PAGE_TYPE_LABELS[note_type.value])
+                ft.dropdown.Option(key=note_type.value, text=self._state.status.copy.PAGE_TYPE_LABELS[note_type.value])
                 for note_type in NoteType
             ],
             on_select=self.change_type,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.category_field = ft.Dropdown(
-            label=afanes.ui.strings.PAGE_CATEGORY_LABEL,
-            hint_text=afanes.ui.strings.PAGE_CATEGORY_HINT,
+            label=self._state.status.copy.PAGE_CATEGORY_LABEL,
+            hint_text=self._state.status.copy.PAGE_CATEGORY_HINT,
             options=[],
             editable=True,
             enable_filter=True,
@@ -380,19 +381,19 @@ class PageView:
             selectable=True,
         )
         self.status_dropdown = ft.Dropdown(
-            label=afanes.ui.strings.PAGE_STATUS_LABEL,
+            label=self._state.status.copy.PAGE_STATUS_LABEL,
             options=[],
             on_select=self.change_status,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.due_field = ft.TextField(
-            label=afanes.ui.strings.PAGE_DUE_DATE_LABEL,
+            label=self._state.status.copy.PAGE_DUE_DATE_LABEL,
             hint_text="2026-11-20",
             on_change=self.change_due_date,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.date_field = ft.TextField(
-            label=afanes.ui.strings.PAGE_DATE_LABEL,
+            label=self._state.status.copy.PAGE_DATE_LABEL,
             hint_text="2025-10-12",
             on_blur=self.commit_date,
             on_submit=self.commit_date,
@@ -406,14 +407,14 @@ class PageView:
             selectable=True,
         )
         self.asked_by_field = ft.TextField(
-            label=afanes.ui.strings.PAGE_ASKED_BY_LABEL,
-            hint_text=afanes.ui.strings.PAGE_ASKED_BY_HINT,
+            label=self._state.status.copy.PAGE_ASKED_BY_LABEL,
+            hint_text=self._state.status.copy.PAGE_ASKED_BY_HINT,
             on_change=self.change_asked_by,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.owner_field = ft.TextField(
-            label=afanes.ui.strings.PAGE_OWNER_LABEL,
-            hint_text=afanes.ui.strings.PAGE_OWNER_HINT,
+            label=self._state.status.copy.PAGE_OWNER_LABEL,
+            hint_text=self._state.status.copy.PAGE_OWNER_HINT,
             on_change=self.change_owner,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
@@ -457,12 +458,12 @@ class PageView:
     def _build_raw_panel(self) -> None:
         """Build the raw rescue panel."""
         self.raw_warning = ft.Text(
-            afanes.ui.strings.PAGE_RAW_WARNING,
+            self._state.status.copy.PAGE_RAW_WARNING,
             color=afanes.ui.theme.ERROR_TEXT_COLOR,
             selectable=True,
         )
         self.raw_field = ft.TextField(
-            label=afanes.ui.strings.PAGE_BODY_LABEL,
+            label=self._state.status.copy.PAGE_BODY_LABEL,
             multiline=True,
             fit_parent_size=True,
             text_vertical_align=ft.VerticalAlignment.START,
@@ -470,7 +471,7 @@ class PageView:
             on_change=self.change_raw_text,
         )
         self.raw_save_button = ft.FilledButton(
-            content=afanes.ui.strings.PAGE_RAW_SAVE,
+            content=self._state.status.copy.PAGE_RAW_SAVE,
             on_click=self.save_raw,
         )
         self.raw_panel = ft.Column(
@@ -488,6 +489,7 @@ class PageView:
             self.overwrite_page,
             self.recreate_page,
             self.discard_draft,
+            copy=self._state.status.copy,
         )
         self.conflict_text = self.conflict.text
         self.reload_button = self.conflict.reload
@@ -495,7 +497,10 @@ class PageView:
         self.recreate_button = self.conflict.recreate
         self.discard_button = self.conflict.discard
         self.conflict_panel = self.conflict.panel
-        self.ambiguous = afanes.ui.components.page_panels.AmbiguousPanel(self.clear_ambiguous)
+        self.ambiguous = afanes.ui.components.page_panels.AmbiguousPanel(
+            self.clear_ambiguous,
+            copy=self._state.status.copy,
+        )
         self.ambiguous_list = self.ambiguous.list
         self.ambiguous_cancel_button = self.ambiguous.cancel
         self.ambiguous_panel = self.ambiguous.panel
@@ -503,6 +508,7 @@ class PageView:
             self.rewrite_links,
             self.keep_links,
             self.cancel_repair,
+            copy=self._state.status.copy,
         )
         self.repair_text = self.repair.text
         self.repair_rewrite_button = self.repair.rewrite
@@ -512,6 +518,7 @@ class PageView:
         self.type_change = afanes.ui.components.page_panels.TypeChangePanel(
             self.confirm_type_change,
             self.cancel_type_change,
+            copy=self._state.status.copy,
         )
         self.type_change_text = self.type_change.text
         self.type_change_confirm_button = self.type_change.confirm
@@ -520,6 +527,7 @@ class PageView:
         self.category_move = afanes.ui.components.page_panels.CategoryMovePanel(
             self.confirm_category_move,
             self.cancel_category_move,
+            copy=self._state.status.copy,
         )
         self.category_move_text = self.category_move.text
         self.category_move_confirm_button = self.category_move.confirm
@@ -530,6 +538,7 @@ class PageView:
             self.preview_rename,
             self.confirm_rename,
             self.cancel_rename,
+            copy=self._state.status.copy,
         )
         self.rename_field = self.rename.field
         self.rename_error = self.rename.error
@@ -541,11 +550,13 @@ class PageView:
         self.overwrite_trash = afanes.ui.components.page_panels.DestructiveConfirmPanel(
             self.confirm_trash_overwrite,
             self.cancel_trash_overwrite,
+            copy=self._state.status.copy,
         )
         self.overwrite_trash_panel = self.overwrite_trash.panel
         self.delete_trash = afanes.ui.components.page_panels.DestructiveConfirmPanel(
             self.confirm_trash_delete,
             self.cancel_trash_delete,
+            copy=self._state.status.copy,
         )
         self.delete_trash_panel = self.delete_trash.panel
         self.dialogs = ft.Column(
@@ -746,9 +757,9 @@ class PageView:
         broken = outcome in (LinkOutcome.MISSING, LinkOutcome.BROKEN)
         style = afanes.ui.theme.ROLE_BROKEN_TEXT_STYLE if broken else afanes.ui.theme.ROLE_LINK_TEXT_STYLE
         if broken:
-            tooltip = afanes.ui.strings.ROLE_LINK_MISSING
+            tooltip = self._state.status.copy.ROLE_LINK_MISSING
         elif outcome is LinkOutcome.AMBIGUOUS:
-            tooltip = afanes.ui.strings.ROLE_LINK_AMBIGUOUS
+            tooltip = self._state.status.copy.ROLE_LINK_AMBIGUOUS
         else:
             tooltip = None
         return ft.TextSpan(
@@ -811,9 +822,9 @@ class PageView:
         self.menu_button.visible = page is not None and not editing
         self.progress.visible = state.status.busy or state.pages.saving
         if state.pages.saving:
-            self.status_text.value = afanes.ui.strings.PAGE_SAVING
+            self.status_text.value = self._state.status.copy.PAGE_SAVING
         elif page is not None and editing and state.pages.page_is_dirty:
-            self.status_text.value = afanes.ui.strings.PAGE_UNSAVED
+            self.status_text.value = self._state.status.copy.PAGE_UNSAVED
         else:
             self.status_text.value = ""
 
@@ -836,12 +847,14 @@ class PageView:
         self.trash_info.visible = entry is not None and visible
         if entry is not None:
             self.trash_info.value = (
-                afanes.ui.strings.TRASH_INFO.format(
+                self._state.status.copy.TRASH_INFO.format(
                     path=entry.birthplace_text,
-                    date=entry.trashed_on.isoformat(),
+                    date=self._state.status.copy.locale_format.short_date(
+                        afanes.models.note.NoteDate.from_date(entry.trashed_on)
+                    ),
                 )
                 if entry.trashed_on is not None
-                else afanes.ui.strings.TRASH_INFO_NO_DATE.format(path=entry.birthplace_text)
+                else self._state.status.copy.TRASH_INFO_NO_DATE.format(path=entry.birthplace_text)
             )
 
     def _refresh_connections(self, page: PageDraft | None, *, editing: bool) -> None:
@@ -876,20 +889,24 @@ class PageView:
         sections: list[ft.Control] = []
         linked_from = self._linked_from_controls(result)
         if linked_from:
-            sections.append(self._connection_subsection(afanes.ui.strings.PAGE_CONNECTIONS_LINKED_FROM, linked_from))
+            sections.append(
+                self._connection_subsection(self._state.status.copy.PAGE_CONNECTIONS_LINKED_FROM, linked_from)
+            )
         owned_projects = self._owned_project_controls(result)
         if owned_projects:
             sections.append(
-                self._connection_subsection(afanes.ui.strings.PAGE_CONNECTIONS_OWNED_PROJECTS, owned_projects)
+                self._connection_subsection(self._state.status.copy.PAGE_CONNECTIONS_OWNED_PROJECTS, owned_projects)
             )
         owned_steps = self._owned_step_controls(result)
         if owned_steps:
-            sections.append(self._connection_subsection(afanes.ui.strings.PAGE_CONNECTIONS_OWNED_STEPS, owned_steps))
+            sections.append(
+                self._connection_subsection(self._state.status.copy.PAGE_CONNECTIONS_OWNED_STEPS, owned_steps)
+            )
         requested_projects = self._requested_project_controls(result)
         if requested_projects:
             sections.append(
                 self._connection_subsection(
-                    afanes.ui.strings.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
+                    self._state.status.copy.PAGE_CONNECTIONS_REQUESTED_PROJECTS,
                     requested_projects,
                 )
             )
@@ -981,11 +998,16 @@ class PageView:
             self.meta_asked.visible = False
             self.meta_asked_button.visible = False
             return
-        self.meta_date.value = (
-            afanes.ui.strings.PAGE_DATE.format(date=labels.date_text)
-            if labels.date_text.strip()
-            else afanes.ui.strings.PAGE_NO_DATE
-        )
+        if labels.date_text.strip():
+            try:
+                formatted_date = self._state.status.copy.locale_format.short_date(
+                    afanes.models.note.NoteDate.from_text(labels.date_text)
+                )
+            except ValueError:
+                formatted_date = labels.date_text.strip()
+            self.meta_date.value = self._state.status.copy.PAGE_DATE.format(date=formatted_date)
+        else:
+            self.meta_date.value = self._state.status.copy.PAGE_NO_DATE
         is_project = labels.note_type is NoteType.PROJECT
         self.meta_status.visible = is_project
         self.meta_due.visible = is_project
@@ -998,15 +1020,15 @@ class PageView:
             self.meta_asked.visible = False
             return
         status_label = (
-            afanes.ui.strings.PROCESSING_STATUS_LABELS[labels.status.value]
+            self._state.status.copy.PROCESSING_STATUS_LABELS[labels.status.value]
             if labels.status is not None
-            else afanes.ui.strings.PAGE_PROJECT_NO_STATUS
+            else self._state.status.copy.PAGE_PROJECT_NO_STATUS
         )
-        self.meta_status.value = afanes.ui.strings.PROJECT_STATUS.format(status=status_label)
+        self.meta_status.value = self._state.status.copy.PROJECT_STATUS.format(status=status_label)
         owner = labels.owner_text.strip()
         self.meta_owner.spans = (
             [
-                ft.TextSpan(f"{afanes.ui.strings.PAGE_OWNER_LABEL} "),
+                ft.TextSpan(f"{self._state.status.copy.PAGE_OWNER_LABEL} "),
                 self._role_span(owner),
             ]
             if owner
@@ -1016,7 +1038,7 @@ class PageView:
         asked_by = labels.asked_by_text.strip()
         self.meta_asked.spans = (
             [
-                ft.TextSpan(f"{afanes.ui.strings.PAGE_ASKED_BY_LABEL} "),
+                ft.TextSpan(f"{self._state.status.copy.PAGE_ASKED_BY_LABEL} "),
                 self._role_span(asked_by),
             ]
             if asked_by
@@ -1025,9 +1047,11 @@ class PageView:
         self.meta_asked.visible = bool(asked_by)
         due_date = labels.due_date
         self.meta_due.value = (
-            afanes.ui.strings.PROJECT_DUE.format(date=due_date.isoformat())
+            self._state.status.copy.PROJECT_DUE.format(
+                date=self._state.status.copy.locale_format.short_date(afanes.models.note.NoteDate.from_date(due_date))
+            )
             if due_date is not None
-            else afanes.ui.strings.PAGE_PROJECT_NO_DUE
+            else self._state.status.copy.PAGE_PROJECT_NO_DUE
         )
 
     def _refresh_edit(self, page: PageDraft | None, *, editing: bool) -> None:
@@ -1044,7 +1068,7 @@ class PageView:
         body = state.pages.page_body
         if self.body_field.value != body:
             self.body_field.value = body
-        self.identity_text.value = f"{afanes.ui.strings.PAGE_IDENTITY_LABEL}: {page.identity}"
+        self.identity_text.value = f"{self._state.status.copy.PAGE_IDENTITY_LABEL}: {page.identity}"
         self.type_dropdown.value = labels.note_type.value
         self.category_field.visible = labels.note_type is NoteType.REFERENCE
         category_value = labels.category.value if labels.category is not None else ""
@@ -1053,11 +1077,11 @@ class PageView:
             self.category_field.value = category_value
         allowed = labels.note_type.allowed_statuses
         self.status_dropdown.options = [
-            ft.dropdown.Option(key="", text=afanes.ui.strings.PAGE_NONE),
+            ft.dropdown.Option(key="", text=self._state.status.copy.PAGE_NONE),
             *[
                 ft.dropdown.Option(
                     key=status.value,
-                    text=afanes.ui.strings.PROCESSING_STATUS_LABELS[status.value],
+                    text=self._state.status.copy.PROCESSING_STATUS_LABELS[status.value],
                 )
                 for status in Status
                 if status in allowed
@@ -1068,7 +1092,9 @@ class PageView:
         self.date_field.visible = True
         if self.date_field.value != labels.date_text:
             self.date_field.value = labels.date_text
-        self.date_error.value = labels.date_error or ""
+        self.date_error.value = (
+            self._state.status.copy.messages.render(labels.date_error) if labels.date_error is not None else ""
+        )
         self.date_error.visible = labels.date_error is not None
         self.due_field.visible = labels.note_type is NoteType.PROJECT
         if self.due_field.value != labels.due_date_text:
@@ -1079,7 +1105,9 @@ class PageView:
         self.owner_field.visible = labels.note_type is NoteType.PROJECT
         if self.owner_field.value != labels.owner_text:
             self.owner_field.value = labels.owner_text
-        self.due_error.value = labels.due_date_error or ""
+        self.due_error.value = (
+            self._state.status.copy.messages.render(labels.due_date_error) if labels.due_date_error is not None else ""
+        )
         self.due_error.visible = labels.due_date_error is not None
         self._refresh_log_starter()
         self._refresh_role_suggestions()
@@ -1116,7 +1144,7 @@ class PageView:
         self.conflict_panel.visible = conflict is not None
         changed = conflict == "changed"
         self.conflict_text.value = (
-            afanes.ui.strings.PAGE_CONFLICT_CHANGED if changed else afanes.ui.strings.PAGE_CONFLICT_MISSING
+            self._state.status.copy.PAGE_CONFLICT_CHANGED if changed else self._state.status.copy.PAGE_CONFLICT_MISSING
         )
         self.reload_button.visible = changed
         self.overwrite_button.visible = changed
@@ -1145,10 +1173,10 @@ class PageView:
         count = sum(site.reference_count for site in preview.sites)
         notes = len(preview.sites)
         self.repair_text.value = (
-            afanes.ui.strings.PAGE_REPAIR_BODY.format(old=preview.old.name, new=preview.new.name)
+            self._state.status.copy.PAGE_REPAIR_BODY.format(old=preview.old.name, new=preview.new.name)
             + " "
-            + afanes.ui.strings.PAGE_REPAIR_COUNT.format(
-                detail=afanes.ui.strings.CopyFormatter.reference_count(count, notes)
+            + self._state.status.copy.PAGE_REPAIR_COUNT.format(
+                detail=self._state.status.copy.formatter.reference_count(count, notes)
             )
         )
 
@@ -1160,8 +1188,8 @@ class PageView:
         if labels is None or not sites:
             return
         count = sum(site.reference_count for site in sites)
-        self.type_change_text.value = afanes.ui.strings.PAGE_TYPE_CHANGE_BODY.format(
-            detail=afanes.ui.strings.CopyFormatter.reference_count(count, len(sites))
+        self.type_change_text.value = self._state.status.copy.PAGE_TYPE_CHANGE_BODY.format(
+            detail=self._state.status.copy.formatter.reference_count(count, len(sites))
         )
 
     def _refresh_rename(self) -> None:
@@ -1178,8 +1206,8 @@ class PageView:
             self.rename_preview_text.value = ""
             return
         count = preview.reference_count
-        self.rename_preview_text.value = afanes.ui.strings.PAGE_RENAME_PREVIEW.format(
-            detail=afanes.ui.strings.CopyFormatter.reference_count(count, len(preview.affected))
+        self.rename_preview_text.value = self._state.status.copy.PAGE_RENAME_PREVIEW.format(
+            detail=self._state.status.copy.formatter.reference_count(count, len(preview.affected))
         )
 
     def _set_rename_available(self) -> None:
@@ -1194,7 +1222,7 @@ class PageView:
         self.category_move_panel.visible = preview is not None
         if preview is None:
             return
-        self.category_move_text.value = afanes.ui.strings.PAGE_CATEGORY_MOVE_BODY.format(
+        self.category_move_text.value = self._state.status.copy.PAGE_CATEGORY_MOVE_BODY.format(
             path=preview.target_path,
         )
 
@@ -1204,17 +1232,17 @@ class PageView:
         overwrite = pending.overwrite_entry
         self.overwrite_trash_panel.visible = overwrite is not None
         if overwrite is not None:
-            self.overwrite_trash.title.value = afanes.ui.strings.TRASH_OVERWRITE_TITLE
-            self.overwrite_trash.body.value = afanes.ui.strings.TRASH_OVERWRITE_BODY.format(
+            self.overwrite_trash.title.value = self._state.status.copy.TRASH_OVERWRITE_TITLE
+            self.overwrite_trash.body.value = self._state.status.copy.TRASH_OVERWRITE_BODY.format(
                 path=overwrite.birthplace_text,
             )
-            self.overwrite_trash.confirm.content = afanes.ui.strings.TRASH_OVERWRITE_CONFIRM
+            self.overwrite_trash.confirm.content = self._state.status.copy.TRASH_OVERWRITE_CONFIRM
         delete = pending.delete_entry
         self.delete_trash_panel.visible = delete is not None
         if delete is not None:
-            self.delete_trash.title.value = afanes.ui.strings.TRASH_DELETE_TITLE
-            self.delete_trash.body.value = afanes.ui.strings.TRASH_DELETE_BODY
-            self.delete_trash.confirm.content = afanes.ui.strings.TRASH_DELETE_CONFIRM
+            self.delete_trash.title.value = self._state.status.copy.TRASH_DELETE_TITLE
+            self.delete_trash.body.value = self._state.status.copy.TRASH_DELETE_BODY
+            self.delete_trash.confirm.content = self._state.status.copy.TRASH_DELETE_CONFIRM
 
     def _is_inbox_page(self, page: PageDraft) -> bool:
         """Return whether the open page is an Inbox capture."""
@@ -1346,7 +1374,7 @@ class PageView:
         try:
             category = CategoryLabel(value) if value else None
         except ValueError:
-            self.category_error.value = afanes.ui.strings.PAGE_CATEGORY_INVALID
+            self.category_error.value = self._state.status.copy.PAGE_CATEGORY_INVALID
             self.category_error.visible = True
             self._update()
             return
@@ -1626,7 +1654,7 @@ class PageView:
         """Plan the rename and show its reference counts."""
         title = (self.rename_field.value or "").strip()
         if not title:
-            self._rename_error = afanes.ui.strings.PAGE_RENAME_LABEL
+            self._rename_error = self._state.status.copy.PAGE_RENAME_LABEL
             self.refresh()
             self._update()
             return

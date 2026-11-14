@@ -11,7 +11,6 @@ from typing import Self
 import afanes.core.search
 import afanes.core.vault.pages
 import afanes.core.vault.steps
-import afanes.ui.strings
 from afanes.core.errors import AfanesError
 from afanes.core.search import (
     ProjectSummary,
@@ -314,7 +313,9 @@ class ReviewState:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Review step creation failed", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.REVIEW_STEP_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.REVIEW_STEP_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return None
                 await self.session.refresh_snapshot()
                 self._replace_review_project(item.path)
@@ -492,7 +493,9 @@ class ReviewState:
                     await asyncio.to_thread(action, vault)
                 except (AfanesError, OSError) as exc:
                     logger.debug("Review step write failed", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.REVIEW_STEP_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.REVIEW_STEP_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return False
                 await self.session.refresh_snapshot()
                 session = self.review_session
@@ -525,7 +528,9 @@ class ReviewState:
                 await self.processing.load(item.path)
             except (AfanesError, OSError, UnicodeError) as exc:
                 logger.debug("Review capture could not be read", exc_info=True)
-                self.status.show_notice(afanes.ui.strings.REVIEW_CAPTURE_READ_FAILED.format(detail=str(exc)))
+                self.status.show_notice(
+                    self.status.copy.REVIEW_CAPTURE_READ_FAILED.format(detail=self.status.copy.render_error(exc))
+                )
                 self.review_session = session.record_skipped()
                 continue
             return
@@ -549,7 +554,9 @@ class ReviewState:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Review project status change failed", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.REVIEW_PROJECT_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.REVIEW_PROJECT_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return False
                 await self.session.refresh_snapshot()
                 session = self.review_session

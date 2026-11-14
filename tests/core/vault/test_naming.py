@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 import afanes.core.atomic
+import afanes.core.localization
 import afanes.core.steps
 import afanes.core.vault.log_conversions
 import afanes.core.vault.naming
@@ -1424,6 +1425,77 @@ class TestLogDateChange:
         assert preview.new_heading is None
         assert NoteDocument.from_text(target.read_text(encoding="utf-8")).title == "2025-10-12"
 
+    def test_an_english_heading_becomes_spanish_in_a_spanish_session(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root, body="# October 12, 2025\n")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(
+            source,
+            NoteDate.from_text("2025-10-13"),
+            locale=afanes.core.localization.LocaleTag.parse("es"),
+        )
+        naming.apply(preview)
+
+        target = root / "log" / "2025" / "10" / "2025-10-13.md"
+        assert preview.new_heading == "13 de octubre de 2025"
+        assert NoteDocument.from_text(target.read_text(encoding="utf-8")).title == "13 de octubre de 2025"
+
+    def test_a_spanish_heading_becomes_english_in_an_english_session(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root, body="# 12 de octubre de 2025\n")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(
+            source,
+            NoteDate.from_text("2025-10-13"),
+            locale=afanes.core.localization.LocaleTag.parse("en"),
+        )
+
+        assert preview.new_heading == "October 13, 2025"
+
+    def test_a_spanish_precision_change_writes_spanish(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root, "2025-10", body="# octubre de 2025\n")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(
+            source,
+            NoteDate.from_text("2025-11"),
+            locale=afanes.core.localization.LocaleTag.parse("es"),
+        )
+
+        assert preview.new_heading == "noviembre de 2025"
+
+    def test_a_spanish_custom_heading_is_preserved(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = self._log(root, body="# Un martes tranquilo\n")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(
+            source,
+            NoteDate.from_text("2025-10-13"),
+            locale=afanes.core.localization.LocaleTag.parse("es"),
+        )
+        naming.apply(preview)
+
+        target = root / "log" / "2025" / "10" / "2025-10-13.md"
+        assert preview.new_heading is None
+        assert NoteDocument.from_text(target.read_text(encoding="utf-8")).title == "Un martes tranquilo"
+
+    def test_a_year_title_is_unchanged_across_locales(self, tmp_path: Path) -> None:
+        root = tmp_path / "vault"
+        source = _write_note(root / "log" / "2025" / "2025.md", "log", body="# 2025\n", date="2025")
+        naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
+
+        preview = naming.plan_log_date_change(
+            source,
+            NoteDate.from_text("2025-10"),
+            locale=afanes.core.localization.LocaleTag.parse("es"),
+        )
+
+        assert preview.new_heading == "octubre de 2025"
+
     def test_rejects_an_occupied_date(self, tmp_path: Path) -> None:
         root = tmp_path / "vault"
         source = self._log(root)
@@ -1591,7 +1663,7 @@ class TestLogTypeChange:
         source = _write_note(root / "reference" / "No date.md", "reference")
         naming = afanes.core.vault.log_conversions.LogConversions(afanes.core.vault.service.Vault(root))
 
-        with pytest.raises(VaultError, match="Set a date"):
+        with pytest.raises(VaultError, match="log-date-required"):
             naming.plan_type_change(source, NoteType.LOG)
 
     def test_an_occupied_date_refuses_the_change(self, tmp_path: Path) -> None:

@@ -15,8 +15,8 @@ from collections.abc import Awaitable, Callable
 import flet as ft
 
 import afanes.core.vault.snapshot
+import afanes.models.note
 import afanes.ui.state
-import afanes.ui.strings
 import afanes.ui.theme
 from afanes.core.editing import DraftMode
 from afanes.core.project_body import ProseBlock, StepEntry, StepListBlock
@@ -78,8 +78,8 @@ class ProjectBodyView:
             selectable=True,
         )
         self._owner_field = ft.TextField(
-            label=afanes.ui.strings.PAGE_STEP_OWNER_ADD,
-            hint_text=afanes.ui.strings.PAGE_STEP_OWNER_HINT,
+            label=self._state.status.copy.PAGE_STEP_OWNER_ADD,
+            hint_text=self._state.status.copy.PAGE_STEP_OWNER_HINT,
             expand=True,
             on_submit=self._add_owner_from_field,
             on_change=self._change_owner_query,
@@ -128,7 +128,7 @@ class ProjectBodyView:
         if not blocks:
             controls.append(
                 ft.Text(
-                    afanes.ui.strings.PAGE_PROJECT_EMPTY_BODY,
+                    self._state.status.copy.PAGE_PROJECT_EMPTY_BODY,
                     color=afanes.ui.theme.MUTED_TEXT_COLOR,
                     selectable=True,
                 )
@@ -203,14 +203,14 @@ class ProjectBodyView:
                 ).build(),
                 self._step_action(
                     ft.Icons.CALENDAR_MONTH_OUTLINED,
-                    afanes.ui.strings.PAGE_STEP_PLAN_ACTION,
+                    self._state.status.copy.PAGE_STEP_PLAN_ACTION,
                     self._plan_handler(step),
                 ),
                 *(
                     [
                         self._step_action(
                             ft.Icons.EVENT_BUSY_OUTLINED,
-                            afanes.ui.strings.PAGE_STEP_CLEAR_PLAN,
+                            self._state.status.copy.PAGE_STEP_CLEAR_PLAN,
                             self._clear_plan_handler(step),
                         )
                     ]
@@ -219,7 +219,7 @@ class ProjectBodyView:
                 ),
                 self._step_action(
                     ft.Icons.PERSON_OUTLINE,
-                    afanes.ui.strings.PAGE_STEP_OWNER_ACTION,
+                    self._state.status.copy.PAGE_STEP_OWNER_ACTION,
                     self._owner_handler(step),
                 ),
             ],
@@ -254,16 +254,32 @@ class ProjectBodyView:
         if step.owners:
             details.append(self._owner_detail(step))
         if step.plan is not None:
-            details.append(self._detail(afanes.ui.strings.PAGE_STEP_PLAN.format(date=step.plan.isoformat())))
+            details.append(
+                self._detail(
+                    self._state.status.copy.PAGE_STEP_PLAN.format(
+                        date=self._state.status.copy.locale_format.short_date(
+                            afanes.models.note.NoteDate.from_date(step.plan)
+                        )
+                    )
+                )
+            )
         if step.actual is not None:
-            details.append(self._detail(afanes.ui.strings.PAGE_STEP_ACTUAL.format(date=step.actual.isoformat())))
+            details.append(
+                self._detail(
+                    self._state.status.copy.PAGE_STEP_ACTUAL.format(
+                        date=self._state.status.copy.locale_format.short_date(
+                            afanes.models.note.NoteDate.from_date(step.actual)
+                        )
+                    )
+                )
+            )
         if step.tags:
-            details.append(self._detail(afanes.ui.strings.PAGE_STEP_TAGS.format(tags=", ".join(step.tags))))
+            details.append(self._detail(self._state.status.copy.PAGE_STEP_TAGS.format(tags=", ".join(step.tags))))
         return details
 
     def _owner_detail(self, step: ProjectStep) -> ft.Control:
         """Render the step owners as individually clickable names."""
-        spans: list[ft.TextSpan] = [ft.TextSpan(afanes.ui.strings.PAGE_STEP_OWNERS_LABEL)]
+        spans: list[ft.TextSpan] = [ft.TextSpan(self._state.status.copy.PAGE_STEP_OWNERS_LABEL)]
         for index, owner in enumerate(step.owners):
             if index:
                 spans.append(ft.TextSpan(", "))
@@ -307,9 +323,9 @@ class ProjectBodyView:
         """Return the hover explanation for one role name."""
         outcome = self._role_outcome(name)
         if outcome in (afanes.core.vault.snapshot.LinkOutcome.MISSING, afanes.core.vault.snapshot.LinkOutcome.BROKEN):
-            return afanes.ui.strings.ROLE_LINK_MISSING
+            return self._state.status.copy.ROLE_LINK_MISSING
         if outcome is afanes.core.vault.snapshot.LinkOutcome.AMBIGUOUS:
-            return afanes.ui.strings.ROLE_LINK_AMBIGUOUS
+            return self._state.status.copy.ROLE_LINK_AMBIGUOUS
         return None
 
     @staticmethod
@@ -397,7 +413,7 @@ class ProjectBodyView:
                 label_text_style=self._role_label_style(owner),
                 tooltip=self._role_tooltip(owner),
                 on_click=self._role_handler(owner),
-                delete_icon_tooltip=afanes.ui.strings.PAGE_STEP_OWNER_REMOVE.format(owner=owner),
+                delete_icon_tooltip=self._state.status.copy.PAGE_STEP_OWNER_REMOVE.format(owner=owner),
                 on_delete=self._remove_owner_handler(step, owner),
             )
             for owner in step.owners
@@ -408,7 +424,7 @@ class ProjectBodyView:
             content=ft.Column(
                 controls=[
                     ft.Text(
-                        afanes.ui.strings.PAGE_STEP_OWNER_TITLE,
+                        self._state.status.copy.PAGE_STEP_OWNER_TITLE,
                         style=afanes.ui.theme.TEXT_ROLES["heading"],
                         color=afanes.ui.theme.STEP_TEXT_COLOR,
                     ),
@@ -418,7 +434,7 @@ class ProjectBodyView:
                             self._owner_field,
                             ft.IconButton(
                                 icon=ft.Icons.PERSON_ADD_OUTLINED,
-                                tooltip=afanes.ui.strings.PAGE_STEP_OWNER_ADD,
+                                tooltip=self._state.status.copy.PAGE_STEP_OWNER_ADD,
                                 on_click=self._add_owner_from_field,
                                 icon_color=afanes.ui.theme.STEP_TEXT_COLOR,
                             ),
@@ -479,7 +495,7 @@ class ProjectBodyView:
         if not cleaned:
             return
         if cleaned in step.owners:
-            self._show_error(afanes.ui.strings.PAGE_STEP_OWNER_DUPLICATE.format(owner=cleaned))
+            self._show_error(self._state.status.copy.PAGE_STEP_OWNER_DUPLICATE.format(owner=cleaned))
             return
         if await self._write_edit(
             StepEdit(
@@ -518,7 +534,7 @@ class ProjectBodyView:
             self._update()
         else:
             notice = self._state.status.take_notice()
-            message = afanes.ui.strings.PAGE_STEP_FAILED.format(detail="") if notice is None else notice.message
+            message = self._state.status.copy.PAGE_STEP_FAILED.format(detail="") if notice is None else notice.message
             self._show_error(message)
         return written
 

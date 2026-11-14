@@ -10,7 +10,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Self
 
-from afanes.core.errors import ProcessingError
+from afanes.core.errors import DomainMessage, MessageCode, ProcessingError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.labels import PageLabels
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
@@ -52,14 +52,6 @@ _FIXED_OUTCOME_STATUS = MappingProxyType(
         ProcessingOutcome.REFERENCE: None,
         ProcessingOutcome.DONE_NOW: Status.DONE,
         ProcessingOutcome.LOG: None,
-    }
-)
-_FIXED_STATUS_MESSAGE = MappingProxyType(
-    {
-        ProcessingOutcome.LATER: "Later uses the later status",
-        ProcessingOutcome.REFERENCE: "Reference outcomes do not accept a status",
-        ProcessingOutcome.DONE_NOW: "Done now uses the done status",
-        ProcessingOutcome.LOG: "Log outcomes do not accept a status",
     }
 )
 
@@ -111,7 +103,7 @@ class ProcessingTarget:
             return cls(note_type=NoteType.PROJECT, status=cls._validate_status(outcome, status))
         if outcome is ProcessingOutcome.LOG:
             return cls(note_type=NoteType.LOG, status=cls._validate_status(outcome, status))
-        message = f"Outcome {outcome.value!r} does not target a note"
+        message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
         raise ProcessingError(message)
 
     @staticmethod
@@ -138,15 +130,16 @@ class ProcessingTarget:
         if outcome is ProcessingOutcome.PROJECT:
             target_status = status or Status.ACTIVE
             if target_status not in NoteType.PROJECT.allowed_statuses:
-                message = "Status is not valid for a project"
+                message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
                 raise ProcessingError(message)
             return target_status
         if outcome not in _FIXED_OUTCOME_STATUS:
-            message = f"Outcome {outcome.value!r} does not target a note"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         expected = _FIXED_OUTCOME_STATUS[outcome]
         if status not in (None, expected):
-            raise ProcessingError(_FIXED_STATUS_MESSAGE[outcome])
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail=outcome.value)
+            raise ProcessingError(message)
         return expected
 
 
@@ -291,34 +284,34 @@ class ProcessingPlan:
     def _validate_common(self) -> None:
         """Validate path, hash, and count invariants."""
         if not self.source_path.is_absolute() or not self.target_path.is_absolute():
-            message = "Processing plan paths must be absolute"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.source_path == self.target_path:
-            message = "Processing source and destination must differ"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if not self.source_hash or not self.processed_hash:
-            message = "Processing plan hashes must not be empty"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.reference_count < 0:
-            message = "Processing reference count must not be negative"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
 
     def _validate_outcome(self) -> None:
         """Validate metadata against the selected outcome."""
         if self.outcome is ProcessingOutcome.APPEND_STEP:
-            message = "Append step uses an append plan"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.outcome not in (ProcessingOutcome.PROJECT, ProcessingOutcome.DONE_NOW) and (
             self.owner is not None or self.asked_by is not None
         ):
-            message = "Only projects accept owner and requester names"
+            message = DomainMessage.of(MessageCode.PROCESSING_PROJECT_ASSIGNMENT)
             raise ProcessingError(message)
         if self.outcome is ProcessingOutcome.TRASH:
             if self.due_date is not None:
-                message = "Trash does not accept assignment metadata"
+                message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
                 raise ProcessingError(message)
             if self.category is not None or self.scaffold is not None:
-                message = "Trash does not accept a category or starter body"
+                message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
                 raise ProcessingError(message)
             return
         if self.outcome in (ProcessingOutcome.LATER, ProcessingOutcome.REFERENCE):
@@ -332,56 +325,56 @@ class ProcessingPlan:
     def _validate_log_outcome(self) -> None:
         """Validate Log entry metadata."""
         if self.target_type is not NoteType.LOG:
-            message = "Log outcomes must target a log note"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.target_status is not None:
-            message = "Log outcomes do not accept a status"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.target_date is None:
-            message = "Log outcomes need a date"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.due_date is not None:
-            message = "Log outcomes do not accept a due date"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.category is not None or self.scaffold is not None:
-            message = "Log outcomes do not accept a category or starter body"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
 
     def _validate_reference_outcome(self) -> None:
         """Validate Later and Reference metadata."""
         if self.target_type is not NoteType.REFERENCE:
-            message = "Reference outcomes must target a reference note"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.due_date is not None:
-            message = "Reference outcomes do not accept a due date"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.category is None:
-            message = "Reference outcomes need a category"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         expected_status = Status.LATER if self.outcome is ProcessingOutcome.LATER else None
         if self.target_status is not expected_status:
-            message = "Reference outcome status does not match the outcome"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
 
     def _validate_project_outcome(self) -> None:
         """Validate Project and Done now metadata."""
         if self.target_type is not NoteType.PROJECT:
-            message = "Project outcomes must target a project note"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.target_status is None or self.target_status not in self.target_type.allowed_statuses:
-            message = "Processing status is not valid for the target type"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.outcome is ProcessingOutcome.DONE_NOW and self.target_status is not Status.DONE:
-            message = "Done now must complete the project"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.category is not None or self.scaffold is not None:
-            message = "Project outcomes do not accept a category or starter body"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.owner is not None and not self.owner.strip():
-            message = "Project owner must be a non-empty name"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.asked_by is not None and not self.asked_by.strip():
-            message = "Project requester must be a non-empty name"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
 
 
@@ -427,14 +420,14 @@ class AppendStepPlan:
             the capture and project are the same file.
         """
         if not self.capture_path.is_absolute() or not self.project_path.is_absolute():
-            message = "Append plan paths must be absolute"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if self.capture_path == self.project_path:
-            message = "Append plan capture and project must differ"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if not self.step_text.strip():
-            message = "An appended step needs text"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)
         if not self.capture_hash or not self.project_hash:
-            message = "Append plan hashes must not be empty"
+            message = DomainMessage.of(MessageCode.PROCESSING_PLAN_INVALID, detail="invalid-plan")
             raise ProcessingError(message)

@@ -1,33 +1,17 @@
 # SPDX-FileCopyrightText: 2026-present Mario Abarca <knkillname@gmail.com>
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Centralized user-facing copy for the Afanes interface.
+"""English source messages for the Afanes interface.
 
-Views and state read text from this module so the interface stays consistent
-and can be localized later. No UI copy belongs inline in a view.
+Every public constant is a gettext source message. The constant name is the
+message context, so identical English values can translate independently. Views
+read localized values from ``afanes.i18n.ui.UiCopy``; no UI copy belongs inline
+in a view.
 """
 
 from types import MappingProxyType
 
 APP_TITLE = "Afanes"
-
-LAUNCH_DESCRIPTION = "Open Afanes, an offline Markdown vault"
-LAUNCH_WEB_HELP = "Serve the interface in a browser instead of a desktop window"
-LAUNCH_VAULT_HELP = "Open DIR for this run without replacing the remembered vault"
-LAUNCH_PORT_HELP = "Port for the browser presentation. 0 chooses a free port"
-LAUNCH_PORT_NOT_NUMBER = "Port must be a whole number"
-LAUNCH_PORT_OUT_OF_RANGE = "Port must be between 0 and {limit}"
-LAUNCH_MISSING_SDK = (
-    'Afanes needs the Flet SDK, which is not installed. Install it with "pip install afanes[desktop]" '
-    'or "pip install afanes[web]"'
-)
-LAUNCH_MISSING_DESKTOP = (
-    'The desktop runtime is not installed. Install it with "pip install afanes[desktop]", '
-    "or run with --web for the browser presentation"
-)
-LAUNCH_MISSING_WEB = 'The web runtime is not installed. Install it with "pip install afanes[web]"'
-LAUNCH_DESKTOP_FAILED = "The desktop window could not start: {detail}\nRun with --web for the browser presentation"
-LAUNCH_VAULT_INVALID = "Cannot open {path}: {detail}"
 
 WELCOME_TITLE = "Welcome to Afanes"
 WELCOME_BODY = (
@@ -188,6 +172,7 @@ PROCESSING_OUTCOME_LABEL = "Outcome"
 PROCESSING_STATUS_LABEL = "Status"
 PROCESSING_DUE_DATE_LABEL = "Due date (YYYY-MM-DD)"
 PROCESSING_PROJECT_LABEL = "Project"
+PROCESSING_PROJECT_HINT = "Launch"
 PROCESSING_TEMPLATE_LABEL = "Template"
 PROCESSING_TEMPLATE_EMPTY = "Empty - General Category, No Starter Body"
 PROCESSING_TEMPLATE_OPTION = "{title} - {description}"
@@ -197,6 +182,7 @@ PROCESSING_TEMPLATE_OPTION_DUPLICATE_PLAIN = "{title} ({path})"
 PROCESSING_TEMPLATE_DESCRIPTION_EMPTY = "Empty creates a reference in the general category with no starter body"
 PROCESSING_TEMPLATE_NO_DESCRIPTION = "No description"
 PROCESSING_TEMPLATE_INVALID = "Some template cards could not be read and will be skipped: {paths}"
+PROCESSING_PLAN_STEP = "Step: {text}"
 PROCESSING_PLAN_CATEGORY = "Category: {category}"
 PROCESSING_PLAN_OWNER = "Owner: {name}"
 PROCESSING_PLAN_ASKED_BY = "Asked by: {name}"
@@ -472,134 +458,18 @@ PAGE_TYPE_LABELS = MappingProxyType(
     }
 )
 
-
-class CopyFormatter:
-    """Format user-facing counts and labels for the interface.
-
-    Notes
-    -----
-    The copy constants remain the single catalog; this class owns the
-    formatting rules. Call the classmethods directly.
-    """
-
-    @classmethod
-    def log_entry_count(cls, count: int) -> str:
-        """Return a compact entry count for a tree row.
-
-        Parameters
-        ----------
-        count : int
-            Number of notes at or below the row.
-
-        Returns
-        -------
-        str
-            Parenthesized count.
-        """
-        return f"({count})"
-
-    @classmethod
-    def log_day_tooltip(cls, day: int, count: int) -> str:
-        """Return the calendar day tooltip for an entry count.
-
-        Parameters
-        ----------
-        day : int
-            Calendar day.
-        count : int
-            Number of entries on that day.
-
-        Returns
-        -------
-        str
-            Tooltip naming the date and entry count.
-        """
-        if count == 0:
-            return f"{day}: no entries"
-        if count == 1:
-            return f"{day}: 1 entry"
-        return f"{day}: {count} entries"
-
-    @classmethod
-    def reference_count(cls, count: int, notes: int) -> str:
-        """Return a short reference-count phrase for a page dialog.
-
-        Parameters
-        ----------
-        count : int
-            Number of references affected.
-        notes : int
-            Number of notes containing those references.
-
-        Returns
-        -------
-        str
-            Phrase such as ``2 references in 1 note``.
-        """
-        reference_label = "reference" if count == 1 else "references"
-        note_label = "note" if notes == 1 else "notes"
-        return f"{count} {reference_label} in {notes} {note_label}"
-
-    @classmethod
-    def trash_entry_count(cls, count: int) -> str:
-        """Return the trashed-note count used by the Empty Trash confirmation.
-
-        Parameters
-        ----------
-        count : int
-            Number of managed entries that will be deleted.
-
-        Returns
-        -------
-        str
-            Singular or plural phrase such as ``3 trashed notes``.
-        """
-        return TRASH_ENTRY_ONE if count == 1 else TRASH_ENTRY_MANY.format(count=count)
-
-    @classmethod
-    def note_count(cls, count: int) -> str:
-        """Return the note-count label for the Inbox heading.
-
-        Parameters
-        ----------
-        count : int
-            Number of notes currently shown.
-
-        Returns
-        -------
-        str
-            Singular or plural count label.
-        """
-        return NOTE_COUNT_ONE if count == 1 else NOTE_COUNT_MANY.format(count=count)
-
-    @classmethod
-    def open_step_count(cls, count: int) -> str:
-        """Return the open-step count label for a project row.
-
-        Parameters
-        ----------
-        count : int
-            Number of open steps.
-
-        Returns
-        -------
-        str
-            Singular or plural label.
-        """
-        return PROJECT_OPEN_STEPS_ONE if count == 1 else PROJECT_OPEN_STEPS_MANY.format(count=count)
-
-    @classmethod
-    def review_pending(cls, count: int) -> str:
-        """Return the review badge label.
-
-        Parameters
-        ----------
-        count : int
-            Number of captures and stalled projects awaiting review.
-
-        Returns
-        -------
-        str
-            Singular or plural pending label, including zero.
-        """
-        return REVIEW_PENDING_ONE if count == 1 else REVIEW_PENDING_MANY.format(count=count)
+LOG_DAY_TOOLTIP_NONE = "{day}: no entries"
+LOG_DAY_TOOLTIP_ONE = "{day}: 1 entry"
+LOG_DAY_TOOLTIP_MANY = "{day}: {count} entries"
+REFERENCE_WORD_ONE = "reference"
+REFERENCE_WORD_MANY = "references"
+NOTE_WORD_ONE = "note"
+NOTE_WORD_MANY = "notes"
+REFERENCE_COUNT = "{references} {reference_word} in {notes} {note_word}"
+LANGUAGE_ENGLISH = "English"
+LANGUAGE_SPANISH = "Español"
+LANGUAGE_SYSTEM = "System Language"
+LANGUAGE_MENU = "Language…"
+LANGUAGE_MENU_TITLE = "Language"
+LANGUAGE_RESTART = "The language change applies after a restart"
+PREFERENCES_CORRUPT = "Saved language preferences could not be read. The system language is used"

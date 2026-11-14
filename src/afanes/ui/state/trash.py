@@ -7,7 +7,6 @@ from pathlib import Path
 
 import afanes.core.vault.trash
 import afanes.core.vault.trash_catalog
-import afanes.ui.strings
 from afanes.core.errors import AfanesError, NameCollisionError
 from afanes.core.vault.trash_catalog import TrashEntry
 from afanes.ui.state.lock import CommandLock
@@ -107,11 +106,13 @@ class TrashDialogs:
                     )
                 except NameCollisionError:
                     self.overwrite_entry = entry
-                    self.pages.blocking_message = afanes.ui.strings.TRASH_CONFIRM_LEAVE
+                    self.pages.blocking_message = self.status.copy.TRASH_CONFIRM_LEAVE
                     return False
                 except (AfanesError, OSError) as exc:
                     logger.debug("Trash restore failed", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.TRASH_RESTORE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.TRASH_RESTORE_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return False
                 await self._finish_restore(target)
                 return True
@@ -142,7 +143,9 @@ class TrashDialogs:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Trash overwrite restore failed", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.TRASH_RESTORE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.TRASH_RESTORE_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return False
                 await self._finish_restore(target)
                 return True
@@ -168,7 +171,7 @@ class TrashDialogs:
             if entry is None:
                 return False
             self.delete_entry = entry
-            self.pages.blocking_message = afanes.ui.strings.TRASH_CONFIRM_LEAVE
+            self.pages.blocking_message = self.status.copy.TRASH_CONFIRM_LEAVE
             return True
 
     async def cancel_delete(self) -> None:
@@ -199,13 +202,15 @@ class TrashDialogs:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Trash delete failed", exc_info=True)
-                    self.status.show_notice(afanes.ui.strings.TRASH_DELETE_FAILED.format(detail=str(exc)))
+                    self.status.show_notice(
+                        self.status.copy.TRASH_DELETE_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return False
                 self.delete_entry = None
                 self.pages.blocking_message = None
                 self.pages.clear()
                 await self.session.refresh_trash()
-                self.status.show_notice(afanes.ui.strings.TRASH_DELETED)
+                self.status.show_notice(self.status.copy.TRASH_DELETED)
                 return True
             finally:
                 self.status.set_busy(busy=False)
@@ -249,19 +254,21 @@ class TrashDialogs:
                     )
                 except (AfanesError, OSError) as exc:
                     logger.debug("Empty Trash failed", exc_info=True)
-                    self.session.trash_banner = afanes.ui.strings.TRASH_MAINTENANCE_FAILED
-                    self.status.show_notice(afanes.ui.strings.TRASH_EMPTY_FAILED.format(detail=str(exc)))
+                    self.session.trash_banner = self.status.copy.TRASH_MAINTENANCE_FAILED
+                    self.status.show_notice(
+                        self.status.copy.TRASH_EMPTY_FAILED.format(detail=self.status.copy.render_error(exc))
+                    )
                     return False
                 self.empty_open = False
                 await self.session.refresh_trash()
                 if report.failed:
-                    self.session.trash_banner = afanes.ui.strings.TRASH_MAINTENANCE_FAILED
-                    self.status.show_notice(afanes.ui.strings.TRASH_EMPTY_FAILED.format(detail=""))
+                    self.session.trash_banner = self.status.copy.TRASH_MAINTENANCE_FAILED
+                    self.status.show_notice(self.status.copy.TRASH_EMPTY_FAILED.format(detail=""))
                     return False
                 self.session.trash_banner = None
                 if self.pages.trash_entry is not None:
                     self.pages.clear()
-                self.status.show_notice(afanes.ui.strings.TRASH_EMPTY_DONE)
+                self.status.show_notice(self.status.copy.TRASH_EMPTY_DONE)
                 return True
             finally:
                 self.status.set_busy(busy=False)
@@ -274,4 +281,4 @@ class TrashDialogs:
         await self.session.refresh_snapshot()
         await self.session.refresh_trash()
         await self.pages.load(target)
-        self.status.show_notice(afanes.ui.strings.PAGE_TRASH_RESTORED)
+        self.status.show_notice(self.status.copy.PAGE_TRASH_RESTORED)

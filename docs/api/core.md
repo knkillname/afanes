@@ -26,6 +26,20 @@ settings, and templates. It imports `models` and the runtime libraries, never Fl
    :members:
 ```
 
+### 🧩 afanes.core.localization
+
+```{eval-rst}
+.. automodule:: afanes.core.localization
+   :members:
+```
+
+### 🧩 afanes.core.preferences
+
+```{eval-rst}
+.. automodule:: afanes.core.preferences
+   :members:
+```
+
 ### 🧩 afanes.core.settings
 
 ```{eval-rst}

@@ -55,19 +55,24 @@ shape.
 
 Every new vault receives eight editable cards:
 
-| File | Category | Title |
-| --- | --- | --- |
-| `person.md` | `person` | Person |
-| `team.md` | `team` | Team |
-| `organization.md` | `organization` | Organization |
-| `place.md` | `place` | Place |
-| `process.md` | `process` | Process |
-| `topic.md` | `topic` | Topic |
-| `source.md` | `source` | Source |
-| `daily.md` | — | Daily entry |
+| File | Category | English title | Spanish title |
+| --- | --- | --- | --- |
+| `person.md` | `person` | Person | Persona |
+| `team.md` | `team` | Team | Equipo |
+| `organization.md` | `organization` | Organization | Organización |
+| `place.md` | `place` | Place | Lugar |
+| `process.md` | `process` | Process | Proceso |
+| `topic.md` | `topic` | Topic | Tema |
+| `source.md` | `source` | Source | Fuente |
+| `daily.md` | — | Daily entry | Entrada diaria |
 
-The Daily entry card declares `type: log` and supplies the `## What happened`, `## What I learned`, and
-`## Next` prompts. It does not set a date or a category.
+The filenames and categories stay the same in both languages, so the seeded path is always
+`templates/person.md`, never `templates/es/person.md`. The title, description, and starter body come
+from the active language; a missing Spanish card set falls back to English.
+
+The daily card declares `type: log`. In English it supplies the `## What happened`, `## What I
+learned`, and `## Next` prompts; in Spanish it supplies `## Qué pasó`, `## Qué aprendí`, and `##
+Siguiente`. It does not set a date or a category.
 
 The seeded files are ordinary files from that point on. Edit them, replace them, or delete the ones
 you do not use. A new vault is the only time they are written; existing vaults are never seeded on

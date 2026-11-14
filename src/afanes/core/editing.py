@@ -16,7 +16,7 @@ from typing import Self
 
 import afanes.core.links
 import afanes.core.names
-from afanes.core.errors import AfanesError, NoteParseError
+from afanes.core.errors import AfanesError, DomainMessage, MessageCode, NoteParseError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.labels import PageLabels
 from afanes.core.vault.snapshot import PageContent, ParsedPage, UnparsedPage
@@ -185,7 +185,7 @@ class NormalDraft:
         """
         display_title = title.strip()
         if not display_title:
-            message = "A log entry needs a title"
+            message = DomainMessage.of(MessageCode.LOG_TITLE_REQUIRED)
             raise NoteParseError(message)
         body = f"# {display_title}\n\n"
         document = NoteDocument(
@@ -387,10 +387,10 @@ class NormalDraft:
         note_date = self.labels.date
         if self.source.note_type is NoteType.LOG:
             if note_date is None:
-                message = "A log entry needs a date"
+                message = DomainMessage.of(MessageCode.LOG_ENTRY_DATE_REQUIRED)
                 raise NoteParseError(message)
             if self.source.date is not None and note_date != self.source.date:
-                message = "Change a log entry's date from the Date field"
+                message = DomainMessage.of(MessageCode.LOG_DATE_CHANGE_VIA_FIELD)
                 raise NoteParseError(message)
 
     def after_write(self, text: str, *, content_hash: str, path: Path | None = None) -> Self:

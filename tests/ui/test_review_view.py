@@ -9,9 +9,11 @@ from pathlib import Path
 import flet as ft
 import pytest
 
+import afanes.core.localization
 import afanes.core.settings
+import afanes.i18n.ui
+import afanes.i18n.ui.en
 import afanes.ui.state
-import afanes.ui.strings
 import afanes.ui.views.review
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.steps import StepDocument
@@ -140,7 +142,7 @@ class TestReviewEntry:
         view = afanes.ui.views.review.ReviewView(_noop)
 
         assert state.review.review_session is None
-        assert afanes.ui.strings.REVIEW_ZERO_TITLE in _texts(view.root)
+        assert afanes.i18n.ui.en.REVIEW_ZERO_TITLE in _texts(view.root)
 
     def test_start_card_shows_the_pending_count(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -149,7 +151,7 @@ class TestReviewEntry:
 
         view = afanes.ui.views.review.ReviewView(_noop)
 
-        assert afanes.ui.strings.CopyFormatter.review_pending(1) in _texts(view.root)
+        assert afanes.i18n.ui.UiCopy.english().formatter.review_pending(1) in _texts(view.root)
         assert _find_by_key(view.root, "review-start") is not None
 
     def test_capture_card_processes_and_skips(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -159,7 +161,7 @@ class TestReviewEntry:
 
         view = afanes.ui.views.review.ReviewView(_noop)
 
-        assert afanes.ui.strings.REVIEW_CAPTURE_TITLE in _texts(view.root)
+        assert afanes.i18n.ui.en.REVIEW_CAPTURE_TITLE in _texts(view.root)
         skip = _find_by_key(view.root, "review-skip")
         assert skip is not None
         asyncio.run(_handler(skip)())
@@ -184,9 +186,9 @@ class TestDueStepCard:
         view = afanes.ui.views.review.ReviewView(_noop)
         texts = _texts(view.root)
 
-        assert afanes.ui.strings.REVIEW_DUE_STEP_TITLE in texts
+        assert afanes.i18n.ui.en.REVIEW_DUE_STEP_TITLE in texts
         assert "Call the plumber" in texts
-        assert afanes.ui.strings.PAGE_STEP_PLAN.format(date=TODAY.isoformat()) in texts
+        assert afanes.i18n.ui.en.PAGE_STEP_PLAN.format(date="Nov 14, 2026") in texts
 
     def test_card_renders_step_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -252,7 +254,7 @@ class TestDueStepCard:
         asyncio.run(_change_handler(field)())
         asyncio.run(_handler(_find_by_key(view.root, "review-form-submit"))())
 
-        assert afanes.ui.strings.REVIEW_INVALID_DATE in _texts(view.root)
+        assert afanes.i18n.ui.en.REVIEW_INVALID_DATE in _texts(view.root)
 
     def test_postpone_action_waits_for_a_valid_date(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._due_step(tmp_path, monkeypatch)
@@ -300,7 +302,7 @@ class TestDueStepCard:
         asyncio.run(_handler(_find_by_key(view.root, "review-delegate"))())
         asyncio.run(_handler(_find_by_key(view.root, "review-form-submit"))())
 
-        assert afanes.ui.strings.REVIEW_TITLE_REQUIRED in _texts(view.root)
+        assert afanes.i18n.ui.en.REVIEW_TITLE_REQUIRED in _texts(view.root)
 
     def test_skip_changes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._due_step(tmp_path, monkeypatch)
@@ -327,8 +329,8 @@ class TestWaitingStepCard:
 
         view = afanes.ui.views.review.ReviewView(_noop)
 
-        assert afanes.ui.strings.REVIEW_WAITING_STEP_TITLE in _texts(view.root)
-        assert afanes.ui.strings.REVIEW_STEP_OWNERS.format(owners="Ada") in _texts(view.root)
+        assert afanes.i18n.ui.en.REVIEW_WAITING_STEP_TITLE in _texts(view.root)
+        assert afanes.i18n.ui.en.REVIEW_STEP_OWNERS.format(owners="Ada") in _texts(view.root)
 
     def test_card_renders_step_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -386,10 +388,10 @@ class TestProjectReviewCard:
 
         assert "Launch" in texts
         assert "Status: Active" in texts
-        assert "Due 2026-11-20" in texts
-        assert afanes.ui.strings.REVIEW_NEXT_STEP in texts
+        assert "Due Nov 20, 2026" in texts
+        assert afanes.i18n.ui.en.REVIEW_NEXT_STEP in texts
         assert "Write copy" in texts
-        assert afanes.ui.strings.REVIEW_OTHER_STEPS in texts
+        assert afanes.i18n.ui.en.REVIEW_OTHER_STEPS in texts
         assert "Update site" in texts
 
     def test_next_and_other_steps_render_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -455,7 +457,7 @@ class TestStalledProject:
 
         document = NoteDocument.from_text((tmp_path / "vault" / "projects" / "Launch.md").read_text(encoding="utf-8"))
         assert [step.text for step in StepDocument(document.body).steps] == ["Call the plumber"]
-        assert afanes.ui.strings.REVIEW_NEXT_STEP in _texts(view.root)
+        assert afanes.i18n.ui.en.REVIEW_NEXT_STEP in _texts(view.root)
 
     def test_blank_step_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._stalled(tmp_path, monkeypatch)
@@ -464,7 +466,7 @@ class TestStalledProject:
         asyncio.run(_handler(_find_by_key(view.root, "review-create"))())
         asyncio.run(_handler(_find_by_key(view.root, "review-form-submit"))())
 
-        assert afanes.ui.strings.REVIEW_TITLE_REQUIRED in _texts(view.root)
+        assert afanes.i18n.ui.en.REVIEW_TITLE_REQUIRED in _texts(view.root)
         assert (tmp_path / "vault" / "projects" / "Launch.md").read_bytes() == before
 
     def test_add_step_action_tracks_the_text(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -530,3 +532,16 @@ class TestLayout:
 
         assert isinstance(view.root, ft.Column)
         assert view.root.horizontal_alignment == ft.CrossAxisAlignment.STRETCH
+
+
+class TestSpanishReview:
+    def test_review_renders_spanish(self) -> None:
+        state = afanes.ui.state.app_state
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        state.status.set_copy(copy)
+
+        view = afanes.ui.views.review.ReviewView(_noop)
+
+        texts = _texts(view.root)
+        assert copy.REVIEW_ZERO_TITLE in texts
+        assert afanes.i18n.ui.en.REVIEW_ZERO_TITLE not in texts

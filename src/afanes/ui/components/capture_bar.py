@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 
 import flet as ft
 
-import afanes.ui.strings
+import afanes.i18n.ui
 import afanes.ui.theme
 
 
@@ -26,6 +26,8 @@ class CaptureBar:
         self,
         on_capture: Callable[[], Awaitable[None]],
         on_change: Callable[[], Awaitable[None]],
+        *,
+        copy: afanes.i18n.ui.UiCopy | None = None,
     ) -> None:
         """Build the capture controls.
 
@@ -36,11 +38,12 @@ class CaptureBar:
         on_change : collections.abc.Callable[[], collections.abc.Awaitable[None]]
             Update the capture action availability as the text changes.
         """
+        self._copy = afanes.i18n.ui.UiCopy.english() if copy is None else copy
         # Flet 1.1.2 ignores a focus request on a field built with
         # shift_enter=True, so the composer keeps Enter for new lines and the
         # Capture button submits.
         self.field = ft.TextField(
-            hint_text=afanes.ui.strings.COMPOSER_HINT,
+            hint_text=self._copy.COMPOSER_HINT,
             multiline=True,
             min_lines=1,
             max_lines=4,
@@ -49,7 +52,7 @@ class CaptureBar:
             key="workspace-capture-field",
         )
         self.button = ft.FilledButton(
-            content=afanes.ui.strings.CAPTURE_ACTION,
+            content=self._copy.CAPTURE_ACTION,
             on_click=on_capture,
             disabled=True,
             key="workspace-capture-button",
@@ -60,7 +63,7 @@ class CaptureBar:
             key="workspace-capture-actions",
         )
         self.label = ft.Text(
-            afanes.ui.strings.COMPOSER_LABEL,
+            self._copy.COMPOSER_LABEL,
             style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
         )
         self.section = ft.Column(

@@ -12,6 +12,7 @@ import pytest
 
 import afanes.core.connections
 import afanes.core.editing
+import afanes.core.localization
 import afanes.core.search
 import afanes.core.settings
 import afanes.core.template_cards
@@ -27,6 +28,8 @@ import afanes.core.vault.snapshot
 import afanes.core.vault.trash
 import afanes.core.vault.trash_catalog
 import afanes.core.vault.trash_metadata
+import afanes.i18n.ui
+import afanes.i18n.ui.en
 import afanes.ui.state
 import afanes.ui.state.browser
 import afanes.ui.state.controller
@@ -34,7 +37,6 @@ import afanes.ui.state.lock
 import afanes.ui.state.navigation
 import afanes.ui.state.session
 import afanes.ui.state.status
-import afanes.ui.strings
 from afanes.core.editing import NormalDraft
 from afanes.core.errors import (
     ConfigurationError,
@@ -51,7 +53,7 @@ from afanes.core.steps import StepDocument
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 from afanes.models.step import ProjectStep, StepEdit, StepEditKind
-from tests.support import access_readable, constant
+from tests.support import access_readable, constant, simulated_message
 from tests.support import ensure_vault as _ensure_vault
 from tests.support import versioned as _versioned
 
@@ -218,7 +220,7 @@ class TestProcessingState:
         opened = asyncio.run(scenario())
 
         assert opened is False
-        assert _notice_message(state) == afanes.ui.strings.PROCESSING_MISSING
+        assert _notice_message(state) == afanes.i18n.ui.en.PROCESSING_MISSING
 
     def test_begin_processing_performs_no_writes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -458,8 +460,7 @@ class TestProcessingState:
         asyncio.run(scenario())
 
         def fail_apply(_vault: object, _plan: object, **_kwargs: object) -> Path:
-            message = "write failed"
-            raise VaultError(message)
+            raise VaultError(simulated_message())
 
         monkeypatch.setattr(afanes.core.vault.processing.VaultProcessing, "apply_processing", fail_apply)
         result = asyncio.run(state.processing.apply())
@@ -488,14 +489,13 @@ class TestProcessingState:
         asyncio.run(scenario())
 
         def fail_scan(_self: afanes.core.vault.service.Vault) -> None:
-            message = "disk full"
-            raise VaultError(message)
+            raise VaultError(simulated_message("disk full"))
 
         monkeypatch.setattr(afanes.core.vault.service.Vault, "scan", fail_scan)
         result = asyncio.run(state.processing.apply())
 
         assert result is not None
-        assert state.processing.banner == afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail="disk full")
+        assert state.processing.banner == afanes.i18n.ui.en.PROCESSING_REFRESH_FAILED.format(detail="disk full")
 
     def test_cancel_processing_clears_the_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -657,7 +657,7 @@ class TestCreateReference:
 
         assert created is False
         assert not (vault / "reference" / "general").exists()
-        assert _notice_message(state) == afanes.ui.strings.BROWSER_NAME_REQUIRED
+        assert _notice_message(state) == afanes.i18n.ui.en.BROWSER_NAME_REQUIRED
 
     def test_a_collision_writes_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -706,8 +706,7 @@ class TestCreateReference:
 
         def failing_scan(current: afanes.core.vault.service.Vault) -> afanes.core.vault.snapshot.VaultSnapshot:
             if (current.root / "reference" / "person" / "Priya.md").exists():
-                message = "scan failed"
-                raise VaultError(message)
+                raise VaultError(simulated_message())
             return original(current)
 
         async def scenario() -> bool:
@@ -784,7 +783,7 @@ class TestStartup:
         asyncio.run(state.workspace.start())
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.SETTINGS_UNREADABLE
+        assert state.workspace.banner == afanes.i18n.ui.en.SETTINGS_UNREADABLE
         assert settings.read_text(encoding="utf-8") == "{not json"
 
     def test_missing_vault_shows_a_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -797,7 +796,7 @@ class TestStartup:
         asyncio.run(state.workspace.start())
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_MISSING
         assert not missing.exists()
 
     def test_file_vault_shows_a_message(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -811,7 +810,7 @@ class TestStartup:
         asyncio.run(state.workspace.start())
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_NOT_DIRECTORY
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_NOT_DIRECTORY
 
     def test_valid_settings_opens_the_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -886,7 +885,7 @@ class TestChooseVault:
         asyncio.run(state.workspace.choose_vault(missing))
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_MISSING
         assert not settings.exists()
 
     def test_choose_vault_rejects_a_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -898,7 +897,7 @@ class TestChooseVault:
         asyncio.run(state.workspace.choose_vault(vault))
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_NOT_DIRECTORY
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_NOT_DIRECTORY
 
     def test_choose_vault_reports_a_save_failure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -907,15 +906,14 @@ class TestChooseVault:
         state = afanes.ui.state.app_state
 
         def fail_save(_store: SettingsStore, _settings: Settings) -> None:
-            message = "simulated"
-            raise ConfigurationError(message)
+            raise ConfigurationError(simulated_message())
 
         monkeypatch.setattr(afanes.core.settings.SettingsStore, "save", fail_save)
 
         asyncio.run(state.workspace.choose_vault(vault))
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_SELECTION_FAILED.format(detail="simulated")
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_SELECTION_FAILED.format(detail="simulated")
 
     def test_choose_vault_does_not_write_to_the_vault(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -972,7 +970,7 @@ class TestChangeVault:
         asyncio.run(scenario())
 
         assert state.session.vault_root == first.resolve()
-        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_MISSING
         assert json.loads(settings.read_text(encoding="utf-8"))["vault"] == str(first.resolve())
 
 
@@ -992,7 +990,7 @@ class TestAdoption:
 
         assert state.session.vault_root is None
         assert state.session.adoption_target == vault.resolve()
-        assert state.workspace.banner == afanes.ui.strings.VAULT_SCHEMA_ADOPT_MESSAGE
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_SCHEMA_ADOPT_MESSAGE
         assert not (vault / "afanes.yaml").exists()
 
     def test_welcome_refuses_a_folder_without_the_defaults(
@@ -1011,7 +1009,7 @@ class TestAdoption:
 
         assert state.session.vault_root is None
         assert state.session.adoption_target is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_SCHEMA_UNAVAILABLE
         assert list(vault.iterdir()) == []
 
     def test_change_vault_offers_adoption_and_keeps_the_current_vault(
@@ -1097,8 +1095,7 @@ class TestAdoption:
         state = afanes.ui.state.app_state
 
         def fail_adopt(_store: afanes.core.vault.schema.VaultSchemaStore) -> None:
-            message = "disk full"
-            raise VaultSchemaWriteError(message)
+            raise VaultSchemaWriteError(simulated_message("disk full"))
 
         monkeypatch.setattr(afanes.core.vault.schema.VaultSchemaStore, "adopt", fail_adopt)
 
@@ -1125,8 +1122,7 @@ class TestAdoption:
         state = afanes.ui.state.app_state
 
         def fail_save(_store: SettingsStore, _settings: Settings) -> None:
-            message = "settings are read-only"
-            raise ConfigurationError(message)
+            raise ConfigurationError(simulated_message("settings are read-only"))
 
         monkeypatch.setattr(SettingsStore, "save", fail_save)
 
@@ -1139,7 +1135,7 @@ class TestAdoption:
 
         assert state.session.vault_root == second.resolve()
         assert state.session.adoption_target is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED.format(
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_SCHEMA_ADOPTED_NOT_REMEMBERED.format(
             detail="settings are read-only",
         )
 
@@ -1202,7 +1198,7 @@ class TestAdoption:
 
         assert state.session.vault_root is None
         assert state.session.adoption_target is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_SCHEMA_UNAVAILABLE
         assert not (vault / "afanes.yaml").exists()
 
     def test_an_unversioned_supplied_folder_is_not_offered_adoption(
@@ -1218,7 +1214,7 @@ class TestAdoption:
 
         assert state.session.vault_root is None
         assert state.session.adoption_target is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_SCHEMA_UNAVAILABLE
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_SCHEMA_UNAVAILABLE
         assert not (vault / "afanes.yaml").exists()
 
     def test_adoption_requires_a_pending_offer(self) -> None:
@@ -1299,6 +1295,26 @@ class TestLogDraftStart:
         assert state.pages.page.labels.note_type is NoteType.LOG
         assert state.pages.log_starter is not None
         assert not (vault / "log" / "2025" / "10" / "2025-10-12.md").exists()
+
+    def test_a_spanish_session_generates_a_spanish_heading(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        state.status.set_copy(copy)
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            listing = await state.session.template_cards()
+            return await state.navigation.start_log_draft(NoteDate.from_text("2025-10-12"), listing)
+
+        assert asyncio.run(scenario()) is True
+        assert state.pages.page is not None
+        assert state.pages.page.body == "# 12 de octubre de 2025\n\n"
+        assert state.pages.page.identity == "2025-10-12"
 
     def test_commits_the_previous_draft(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -1557,7 +1573,7 @@ class TestCapture:
         path = asyncio.run(scenario())
 
         assert path is None
-        assert _notice_message(state) == afanes.ui.strings.CAPTURE_EMPTY
+        assert _notice_message(state) == afanes.i18n.ui.en.CAPTURE_EMPTY
         assert state.session.notes == ()
 
     def test_successful_capture_adds_no_notice(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1584,8 +1600,7 @@ class TestCapture:
         state = afanes.ui.state.app_state
 
         def fail_capture(_self: afanes.core.vault.pages.VaultPages, _text: str) -> Path:
-            message = "disk full"
-            raise VaultError(message)
+            raise VaultError(simulated_message("disk full"))
 
         monkeypatch.setattr(afanes.core.vault.pages.VaultPages, "capture", fail_capture)
 
@@ -1596,7 +1611,7 @@ class TestCapture:
         path = asyncio.run(scenario())
 
         assert path is None
-        assert _notice_message(state) == afanes.ui.strings.CAPTURE_FAILED.format(detail="disk full")
+        assert _notice_message(state) == afanes.i18n.ui.en.CAPTURE_FAILED.format(detail="disk full")
         assert state.session.notes == ()
 
     def test_repeated_captures_get_distinct_names(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2065,7 +2080,7 @@ class TestRefreshWorkspace:
 
         assert state.pages.page_body == "Mine\n"
         assert state.pages.conflict == "changed"
-        assert state.pages.banner == afanes.ui.strings.PAGE_CONFLICT_CHANGED
+        assert state.pages.banner == afanes.i18n.ui.en.PAGE_CONFLICT_CHANGED
 
     def test_missing_file_raises_missing_and_keeps_the_draft(
         self,
@@ -2091,7 +2106,7 @@ class TestRefreshWorkspace:
 
         assert state.pages.page_body == "Mine\n"
         assert state.pages.conflict == "missing"
-        assert state.pages.banner == afanes.ui.strings.PAGE_CONFLICT_MISSING
+        assert state.pages.banner == afanes.i18n.ui.en.PAGE_CONFLICT_MISSING
 
     def test_conflict_resolves_with_the_existing_actions(
         self,
@@ -2866,8 +2881,7 @@ class TestPageSaving:
             _text: str,
             _expected_hash: str,
         ) -> str:
-            message = "disk full"
-            raise VaultError(message)
+            raise VaultError(simulated_message())
 
         monkeypatch.setattr(afanes.core.vault.pages.VaultPages, "write_page", failing_write)
 
@@ -3360,7 +3374,7 @@ class TestCreateRoleReference:
         created = asyncio.run(scenario())
 
         assert created is False
-        assert _notice_message(state) == afanes.ui.strings.BROWSER_NAME_REQUIRED
+        assert _notice_message(state) == afanes.i18n.ui.en.BROWSER_NAME_REQUIRED
 
 
 class TestPageRenameTrash:
@@ -3445,7 +3459,7 @@ class TestPageRenameTrash:
             assert state.dialogs.trash_undo is not None
             notice = state.status.take_notice()
             assert notice == afanes.ui.state.status.Notice(
-                message=afanes.ui.strings.PAGE_TRASH_MOVED,
+                message=afanes.i18n.ui.en.PAGE_TRASH_MOVED,
                 action=afanes.ui.state.status.NoticeAction.UNDO_TRASH,
             )
 
@@ -3482,7 +3496,7 @@ class TestPageRenameTrash:
         assert afanes.core.vault.trash_catalog.TrashCatalog(afanes.core.vault.service.Vault(vault)).load().count == 0
         assert state.dialogs.trash_undo is None
         notice = state.status.take_notice()
-        assert notice == afanes.ui.state.status.Notice(message=afanes.ui.strings.PAGE_TRASH_RESTORED)
+        assert notice == afanes.ui.state.status.Notice(message=afanes.i18n.ui.en.PAGE_TRASH_RESTORED)
 
     def test_trash_undo_reports_a_collision(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -3507,7 +3521,7 @@ class TestPageRenameTrash:
         assert state.dialogs.trash_undo is not None
         notice = state.status.take_notice()
         assert notice is not None
-        assert notice.message.startswith(afanes.ui.strings.PAGE_TRASH_RESTORE_FAILED.format(detail=""))
+        assert notice.message.startswith(afanes.i18n.ui.en.PAGE_TRASH_RESTORE_FAILED.format(detail=""))
 
     def test_a_second_trash_replaces_the_undo_record(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -4100,7 +4114,7 @@ class TestOpenVaultPath:
         asyncio.run(state.workspace.open_vault_path("   "))
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_PATH_REQUIRED
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_PATH_REQUIRED
         assert not settings.exists()
 
     def test_missing_path_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4110,7 +4124,7 @@ class TestOpenVaultPath:
         asyncio.run(state.workspace.open_vault_path(str(tmp_path / "missing")))
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_MISSING
 
     def test_file_path_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         target = tmp_path / "note.md"
@@ -4121,7 +4135,7 @@ class TestOpenVaultPath:
         asyncio.run(state.workspace.open_vault_path(str(target)))
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_NOT_DIRECTORY
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_NOT_DIRECTORY
 
     def test_unreadable_path_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -4137,7 +4151,7 @@ class TestOpenVaultPath:
         asyncio.run(state.workspace.open_vault_path(str(vault)))
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_UNREADABLE
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_UNREADABLE
 
 
 class TestCreateVault:
@@ -4182,8 +4196,7 @@ class TestCreateVault:
         target = tmp_path / "vault"
 
         def refuse(_cls: object) -> None:
-            message = "bundled content is broken"
-            raise TemplateContentError(message)
+            raise TemplateContentError(simulated_message("bundled content is broken"))
 
         monkeypatch.setattr(afanes.core.templates.TemplateCatalog, "bundled", classmethod(refuse))
 
@@ -4212,9 +4225,8 @@ class TestCreateVault:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         state = afanes.ui.state.app_state
 
-        def refuse(_cls: object) -> None:
-            message = "bundled content is broken"
-            raise TemplateContentError(message)
+        def refuse(_cls: object, _labels: object) -> None:
+            raise TemplateContentError(simulated_message("bundled content is broken"))
 
         monkeypatch.setattr(afanes.core.templates.TemplateCatalog, "summaries", refuse)
 
@@ -4231,7 +4243,7 @@ class TestCreateVault:
 
         assert opened is False
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_NOT_EMPTY
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_NOT_EMPTY
         assert sorted(path.name for path in target.iterdir()) == ["photo.jpg"]
 
     def test_refuses_a_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4243,7 +4255,7 @@ class TestCreateVault:
         opened = asyncio.run(state.workspace.create_vault(target))
 
         assert opened is False
-        assert state.workspace.banner == afanes.ui.strings.VAULT_NOT_DIRECTORY
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_NOT_DIRECTORY
 
     def test_opens_when_preferences_cannot_be_saved(
         self,
@@ -4253,8 +4265,7 @@ class TestCreateVault:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
 
         def fail_save(_self: SettingsStore, _settings: Settings) -> None:
-            message = "read only"
-            raise ConfigurationError(message)
+            raise ConfigurationError(simulated_message("read only"))
 
         monkeypatch.setattr(afanes.core.settings.SettingsStore, "save", fail_save)
         target = tmp_path / "vault"
@@ -4264,7 +4275,7 @@ class TestCreateVault:
 
         assert opened is True
         assert state.session.vault_root == target.resolve()
-        assert state.workspace.banner == afanes.ui.strings.VAULT_CREATED_NOT_REMEMBERED.format(detail="read only")
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_CREATED_NOT_REMEMBERED.format(detail="read only")
 
 
 class TestCloseVault:
@@ -4353,8 +4364,7 @@ class TestCloseVault:
         state = afanes.ui.state.app_state
 
         def fail_clear(_self: SettingsStore) -> None:
-            message = "read only"
-            raise ConfigurationError(message)
+            raise ConfigurationError(simulated_message("read only"))
 
         monkeypatch.setattr(afanes.core.settings.SettingsStore, "clear", fail_clear)
 
@@ -4366,15 +4376,15 @@ class TestCloseVault:
 
         assert closed is True
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_CLOSE_NOT_FORGOTTEN.format(detail="read only")
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_CLOSE_NOT_FORGOTTEN.format(detail="read only")
         assert settings.exists()
 
     @pytest.mark.parametrize(
         ("attribute", "message"),
         [
-            ("repair_preview", afanes.ui.strings.PAGE_REPAIR_PENDING),
-            ("pending_labels", afanes.ui.strings.PAGE_TYPE_CHANGE_LEAVE),
-            ("rename_preview", afanes.ui.strings.PAGE_PENDING_DIALOG),
+            ("repair_preview", afanes.i18n.ui.en.PAGE_REPAIR_PENDING),
+            ("pending_labels", afanes.i18n.ui.en.PAGE_TYPE_CHANGE_LEAVE),
+            ("rename_preview", afanes.i18n.ui.en.PAGE_PENDING_DIALOG),
         ],
     )
     def test_pending_page_action_blocks_the_close(
@@ -4485,7 +4495,7 @@ class TestOpenVaultForRun:
         asyncio.run(state.workspace.open_vault_for_run(tmp_path / "missing"))
 
         assert state.session.vault_root is None
-        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_MISSING
 
 
 class TestSessionGuard:
@@ -4861,7 +4871,7 @@ class TestRewriteReports:
                 failed=(
                     afanes.core.vault.naming_reports.RewriteFailure(
                         path=failed.resolve(),
-                        message="permission denied",
+                        message=simulated_message("permission denied"),
                     ),
                 ),
             )
@@ -4886,7 +4896,7 @@ class TestRewriteReports:
         assert "Updated: " in message
         assert "reference/people/Ada King.md" in message
         assert "notes/Ref.md" in message
-        assert f"notes/Skipped.md ({afanes.ui.strings.PAGE_REWRITE_CHANGED_ON_DISK})" in message
+        assert f"notes/Skipped.md ({afanes.i18n.ui.en.PAGE_REWRITE_CHANGED_ON_DISK})" in message
         assert "notes/Failed.md (permission denied)" in message
 
     def test_type_change_reports_updated_and_failed_notes(
@@ -4918,7 +4928,7 @@ class TestRewriteReports:
                 failed=(
                     afanes.core.vault.naming_reports.RewriteFailure(
                         path=failed.resolve(),
-                        message="permission denied",
+                        message=simulated_message("permission denied"),
                     ),
                 ),
             )
@@ -4941,7 +4951,7 @@ class TestRewriteReports:
         assert message is not None
         assert "Updated: " in message
         assert "notes/Ref.md" in message
-        assert f"notes/Skipped.md ({afanes.ui.strings.PAGE_REWRITE_CHANGED_ON_DISK})" in message
+        assert f"notes/Skipped.md ({afanes.i18n.ui.en.PAGE_REWRITE_CHANGED_ON_DISK})" in message
         assert "notes/Failed.md (permission denied)" in message
         assert (vault / "log" / "2025" / "10" / "2025-10-12.md").is_file()
         assert "log:2025-10-12" in referrer.read_text(encoding="utf-8")
@@ -4976,7 +4986,7 @@ class TestRewriteReports:
                 failed=(
                     afanes.core.vault.naming_reports.RewriteFailure(
                         path=failed.resolve(),
-                        message="permission denied",
+                        message=simulated_message("permission denied"),
                     ),
                 ),
             )
@@ -4999,7 +5009,7 @@ class TestRewriteReports:
         assert message is not None
         assert "Updated: " in message
         assert "notes/Ref.md" in message
-        assert f"notes/Skipped.md ({afanes.ui.strings.PAGE_REWRITE_CHANGED_ON_DISK})" in message
+        assert f"notes/Skipped.md ({afanes.i18n.ui.en.PAGE_REWRITE_CHANGED_ON_DISK})" in message
         assert "notes/Failed.md (permission denied)" in message
         assert (vault / "log" / "2025" / "10" / "2025-10-13.md").is_file()
         assert "log:2025-10-13" in referrer.read_text(encoding="utf-8")
@@ -5049,7 +5059,7 @@ class TestRewriteReports:
                 failed=(
                     afanes.core.vault.naming_reports.RewriteFailure(
                         path=failed.resolve(),
-                        message="permission denied",
+                        message=simulated_message("permission denied"),
                     ),
                 ),
             )
@@ -5074,9 +5084,34 @@ class TestRewriteReports:
         assert message is not None
         assert "Updated: " in message
         assert "notes/Source.md" in message
-        assert f"notes/Skipped.md ({afanes.ui.strings.PAGE_REWRITE_CHANGED_ON_DISK})" in message
+        assert f"notes/Skipped.md ({afanes.i18n.ui.en.PAGE_REWRITE_CHANGED_ON_DISK})" in message
         assert "notes/Failed.md (permission denied)" in message
         assert source.is_file()
+
+    def test_spanish_date_change_writes_a_spanish_heading(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        path = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            "---\ntype: log\ndate: 2025-10-12\n---\n\n# October 12, 2025\n\nBody.\n",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        state.status.set_copy(copy)
+
+        async def scenario() -> bool:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(path)
+            return await state.dialogs.save_page_date("2025-10-13")
+
+        assert asyncio.run(scenario()) is True
+        target = vault / "log" / "2025" / "10" / "2025-10-13.md"
+        document = NoteDocument.from_text(target.read_text(encoding="utf-8"))
+        assert document.title == "13 de octubre de 2025"
+        assert "Body." in document.body
 
 
 class TestUiStatusNotice:
@@ -5110,13 +5145,38 @@ class TestUiStatusNotice:
         assert status.notice is None
 
 
+class TestUiStatusCopy:
+    def test_english_is_the_default(self) -> None:
+        status = afanes.ui.state.status.UiStatus()
+
+        assert status.copy.locale.language == "en"
+        assert status.copy.WELCOME_TITLE == afanes.i18n.ui.en.WELCOME_TITLE
+
+    def test_set_copy_replaces_the_active_catalog(self) -> None:
+        status = afanes.ui.state.status.UiStatus()
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+
+        status.set_copy(copy)
+
+        assert status.copy is copy
+        assert status.copy.WELCOME_TITLE == "Bienvenido a Afanes"
+
+    def test_reset_restores_the_english_catalog(self) -> None:
+        status = afanes.ui.state.status.UiStatus()
+        status.set_copy(afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es")))
+
+        status.reset()
+
+        assert status.copy.locale.language == "en"
+
+
 class TestOwnedBanners:
     def test_workspace_banner_is_isolated(self) -> None:
         state = afanes.ui.state.app_state
 
-        state.workspace.banner = afanes.ui.strings.VAULT_MISSING
+        state.workspace.banner = afanes.i18n.ui.en.VAULT_MISSING
 
-        assert state.workspace.banner == afanes.ui.strings.VAULT_MISSING
+        assert state.workspace.banner == afanes.i18n.ui.en.VAULT_MISSING
         assert state.session.banner is None
         assert state.pages.banner is None
         assert state.processing.banner is None
@@ -5126,9 +5186,9 @@ class TestOwnedBanners:
     def test_session_banner_is_isolated(self) -> None:
         state = afanes.ui.state.app_state
 
-        state.session.banner = afanes.ui.strings.REFRESH_FAILED.format(detail="disk full")
+        state.session.banner = afanes.i18n.ui.en.REFRESH_FAILED.format(detail="disk full")
 
-        assert state.session.banner == afanes.ui.strings.REFRESH_FAILED.format(detail="disk full")
+        assert state.session.banner == afanes.i18n.ui.en.REFRESH_FAILED.format(detail="disk full")
         assert state.workspace.banner is None
         assert state.pages.banner is None
         assert state.processing.banner is None
@@ -5139,15 +5199,15 @@ class TestOwnedBanners:
         state = afanes.ui.state.app_state
 
         state.pages.conflict = "changed"
-        assert state.pages.banner == afanes.ui.strings.PAGE_CONFLICT_CHANGED
+        assert state.pages.banner == afanes.i18n.ui.en.PAGE_CONFLICT_CHANGED
         state.pages.conflict = "missing"
-        assert state.pages.banner == afanes.ui.strings.PAGE_CONFLICT_MISSING
+        assert state.pages.banner == afanes.i18n.ui.en.PAGE_CONFLICT_MISSING
         state.pages.conflict = None
-        state.pages.blocking_message = afanes.ui.strings.PAGE_PENDING_DIALOG
-        assert state.pages.banner == afanes.ui.strings.PAGE_PENDING_DIALOG
+        state.pages.blocking_message = afanes.i18n.ui.en.PAGE_PENDING_DIALOG
+        assert state.pages.banner == afanes.i18n.ui.en.PAGE_PENDING_DIALOG
         state.pages.blocking_message = None
-        state.pages.report = afanes.ui.strings.PAGE_RENAME_PARTIAL.format(report="partial")
-        assert state.pages.banner == afanes.ui.strings.PAGE_RENAME_PARTIAL.format(report="partial")
+        state.pages.report = afanes.i18n.ui.en.PAGE_RENAME_PARTIAL.format(report="partial")
+        assert state.pages.banner == afanes.i18n.ui.en.PAGE_RENAME_PARTIAL.format(report="partial")
         state.pages.report = None
         assert state.pages.banner is None
         assert state.workspace.banner is None
@@ -5157,9 +5217,9 @@ class TestOwnedBanners:
     def test_processing_banner_is_isolated(self) -> None:
         state = afanes.ui.state.app_state
 
-        state.processing.banner = afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail="disk full")
+        state.processing.banner = afanes.i18n.ui.en.PROCESSING_REFRESH_FAILED.format(detail="disk full")
 
-        assert state.processing.banner == afanes.ui.strings.PROCESSING_REFRESH_FAILED.format(detail="disk full")
+        assert state.processing.banner == afanes.i18n.ui.en.PROCESSING_REFRESH_FAILED.format(detail="disk full")
         assert state.workspace.banner is None
         assert state.session.banner is None
         assert state.pages.banner is None
@@ -5293,7 +5353,7 @@ class TestTrashDestination:
         assert state.pages.page_path_label == "notes/Ada.md"
         assert state.session.trash_count == 0
         notice = state.status.take_notice()
-        assert notice == afanes.ui.state.status.Notice(message=afanes.ui.strings.PAGE_TRASH_RESTORED)
+        assert notice == afanes.ui.state.status.Notice(message=afanes.i18n.ui.en.PAGE_TRASH_RESTORED)
 
     def test_an_occupied_birthplace_opens_the_overwrite_confirmation(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -5438,7 +5498,7 @@ class TestTrashDestination:
         assert asyncio.run(scenario()) is True
         assert state.pages.trash_entry is None
         notice = state.status.take_notice()
-        assert notice == afanes.ui.state.status.Notice(message=afanes.ui.strings.TRASH_PAGE_GONE)
+        assert notice == afanes.ui.state.status.Notice(message=afanes.i18n.ui.en.TRASH_PAGE_GONE)
 
     def test_a_maintenance_failure_is_reported_and_a_later_pass_clears_it(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -5450,24 +5510,34 @@ class TestTrashDestination:
         original = afanes.core.vault.trash.TrashService.maintain
         failures: list[datetime.date] = []
 
-        message = "read only"
-
         def fail_once(
             self: afanes.core.vault.trash.TrashService,
             today: datetime.date,
         ) -> afanes.core.vault.trash_catalog.TrashMaintenanceReport:
             if not failures:
                 failures.append(today)
-                raise VaultError(message)
+                raise VaultError(simulated_message())
             return original(self, today)
 
         monkeypatch.setattr(afanes.core.vault.trash.TrashService, "maintain", fail_once)
 
         async def scenario() -> None:
             await state.workspace.choose_vault(vault)
-            assert state.session.trash_banner == afanes.ui.strings.TRASH_MAINTENANCE_FAILED
+            assert state.session.trash_banner == afanes.i18n.ui.en.TRASH_MAINTENANCE_FAILED
             await state.session.maintain_trash(datetime.datetime.now(tz=datetime.UTC).astimezone().date())
 
         asyncio.run(scenario())
 
         assert state.session.trash_banner is None
+
+
+class TestSpanishStateCopy:
+    def test_a_controller_banner_uses_the_active_catalog(self) -> None:
+        state = afanes.ui.state.app_state
+        copy = afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es"))
+        state.status.set_copy(copy)
+
+        asyncio.run(state.workspace.open_vault_path(""))
+
+        assert state.workspace.banner == copy.VAULT_PATH_REQUIRED
+        assert state.workspace.banner != afanes.i18n.ui.en.VAULT_PATH_REQUIRED

@@ -13,8 +13,9 @@ import afanes.core.settings
 import afanes.core.vault.schema
 import afanes.core.vault.service
 from afanes.core.errors import ConfigurationError
+from afanes.core.preferences import Preferences, PreferencesStore
 from afanes.core.settings import Settings
-from tests.support import constant
+from tests.support import constant, simulated_message
 
 CLI_ROOT = Path(afanes.cli.__file__).parent
 FAILING_WRITE_CALL = 2
@@ -22,6 +23,14 @@ FAILING_WRITE_CALL = 2
 
 def _use_settings_file(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
     monkeypatch.setattr(afanes.core.settings.SettingsStore, "settings_path", classmethod(constant(path)))
+
+
+@pytest.fixture(autouse=True)
+def _isolate_command_line(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("LANG", "en_US.UTF-8")
+    monkeypatch.delenv("LC_ALL", raising=False)
+    monkeypatch.delenv("LC_MESSAGES", raising=False)
+    _use_settings_file(monkeypatch, tmp_path / "command-line-settings.json")
 
 
 def _adoptable(root: Path) -> Path:
@@ -189,8 +198,7 @@ class TestCreateCommand:
         target = tmp_path / "vault"
 
         def fail_save(_self: afanes.core.settings.SettingsStore, _settings: Settings) -> None:
-            message = "settings are read-only"
-            raise ConfigurationError(message)
+            raise ConfigurationError(simulated_message())
 
         monkeypatch.setattr(afanes.core.settings.SettingsStore, "save", fail_save)
 
@@ -259,7 +267,7 @@ class TestCreateCommand:
         def fail_after_the_guide(path: Path, text: str) -> None:
             calls.append(path)
             if len(calls) == FAILING_WRITE_CALL:
-                message = "disk full"
+                message = "write failed"
                 raise OSError(message)
             original(path, text)
 
@@ -431,8 +439,7 @@ class TestAdoptCommand:
         target = _adoptable(tmp_path / "vault")
 
         def fail_save(_self: afanes.core.settings.SettingsStore, _settings: Settings) -> None:
-            message = "settings are read-only"
-            raise ConfigurationError(message)
+            raise ConfigurationError(simulated_message())
 
         monkeypatch.setattr(afanes.core.settings.SettingsStore, "save", fail_save)
 
@@ -465,3 +472,150 @@ class TestTemplatesCommand:
         assert "study: Study" in captured.out
         assert "Life administration" in captured.out
         assert list(tmp_path.iterdir()) == []
+
+
+class TestSpanishCommandLine:
+    def _use_spanish(self, tmp_path: Path) -> None:
+        PreferencesStore(tmp_path / "preferences.json").save(Preferences(language="es"))
+
+    def test_spanish_help_is_printed(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._use_spanish(tmp_path)
+
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", "--help"])
+
+        assert status == 0
+        output = capsys.readouterr().out
+        assert "Crea e inicializa" in output
+        assert "--no-remember" in output
+        assert "Create and seed" not in output
+
+    def test_spanish_create_report_is_printed(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._use_spanish(tmp_path)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        target = tmp_path / "vault"
+
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", str(target)])
+
+        output = capsys.readouterr().out
+        assert status == 0
+        assert f"Bóveda creada en {target.resolve()}" in output
+        assert "Recordada como la bóveda" in output
+        assert "Created vault" not in output
+        assert (target / "reference" / "Primeros pasos.md").is_file()
+        assert not (target / "reference" / "Getting started.md").exists()
+
+    def test_spanish_template_creation_seeds_spanish_content(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._use_spanish(tmp_path)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        target = tmp_path / "vault"
+
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", str(target), "--template", "personal"])
+
+        capsys.readouterr()
+        assert status == 0
+        assert (target / "reference" / "Primeros pasos.md").is_file()
+        assert (target / "projects" / "Revisión del coche.md").is_file()
+        assert (target / "reference" / "place" / "El taller del barrio.md").is_file()
+        card = (target / "templates" / "person.md").read_text(encoding="utf-8")
+        assert "title: Persona" in card
+
+    def test_spanish_template_listing_is_printed(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._use_spanish(tmp_path)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        monkeypatch.chdir(tmp_path)
+        before = {path.name for path in tmp_path.iterdir()}
+
+        status = afanes.cli.main.CommandLine.main(*["vault", "templates"])
+
+        output = capsys.readouterr().out
+        assert status == 0
+        assert "personal: Personal - Administración de la vida doméstica" in output
+        assert "work: Trabajo - Resultados compartidos" in output
+        assert "study: Estudio - Trabajo de cursos" in output
+        assert "work: Work" not in output
+        assert {path.name for path in tmp_path.iterdir()} == before
+
+    def test_spanish_usage_error_is_printed(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._use_spanish(tmp_path)
+
+        status = afanes.cli.main.CommandLine.main(*[])
+
+        captured = capsys.readouterr()
+        assert status == afanes.cli.main.USAGE_EXIT_CODE
+        assert "Argumentos de línea de comandos no válidos" in captured.err
+        assert "Invalid command-line arguments" not in captured.err
+
+    def test_spanish_operational_failure_is_printed(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._use_spanish(tmp_path)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        target = tmp_path / "vault"
+        target.mkdir()
+        (target / "photo.jpg").write_text("data", encoding="utf-8")
+
+        status = afanes.cli.main.CommandLine.main(*["vault", "create", str(target)])
+
+        captured = capsys.readouterr()
+        assert status == 1
+        assert "No se pudo crear la bóveda" in captured.err
+        assert captured.out == ""
+
+    def test_exit_codes_do_not_depend_on_locale(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        target = tmp_path / "vault"
+
+        english_status = afanes.cli.main.CommandLine.main(*["vault", "create", str(target)])
+        capsys.readouterr()
+        self._use_spanish(tmp_path)
+        spanish_status = afanes.cli.main.CommandLine.main(*["vault", "templates"])
+        capsys.readouterr()
+
+        assert english_status == 0
+        assert spanish_status == 0
+
+    def test_corrupt_preferences_are_reported_and_the_command_runs(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        path = tmp_path / "preferences.json"
+        path.write_text("{not json", encoding="utf-8")
+
+        status = afanes.cli.main.CommandLine.main(*["vault", "templates"])
+
+        captured = capsys.readouterr()
+        assert status == 0
+        assert "not valid JSON" in captured.err
+        assert path.read_text(encoding="utf-8") == "{not json"

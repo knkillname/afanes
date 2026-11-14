@@ -12,6 +12,7 @@ first use, which an offline application must never do.
 
 import argparse
 import dataclasses
+import functools
 import importlib.util
 import logging
 import sys
@@ -20,8 +21,9 @@ from pathlib import Path
 from typing import NoReturn
 
 import afanes.cli.main
+import afanes.cli.vault
 import afanes.core.vault.service
-import afanes.ui.strings
+import afanes.i18n.cli
 from afanes.core.errors import VaultError
 
 WEB_RUNTIME_MODULE = "flet_web"
@@ -29,10 +31,6 @@ DESKTOP_RUNTIME_MODULE = "flet_desktop"
 LOOPBACK_HOST = "127.0.0.1"
 PORT_LIMIT = 65535
 SUBCOMMANDS = ("vault",)
-
-# Read before the interface import so the missing-SDK message is available even
-# when the import of ``afanes.ui.app`` fails.
-_SDK_MISSING_MESSAGE = afanes.ui.strings.LAUNCH_MISSING_SDK
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -56,7 +54,7 @@ class LaunchOptions:
     port: int
 
     @classmethod
-    def parse(cls, argv: Sequence[str]) -> "LaunchOptions":
+    def parse(cls, argv: Sequence[str], copy: afanes.i18n.cli.CliCopy) -> "LaunchOptions":
         """Parse command-line options for the graphical entry point.
 
         Parameters
@@ -64,6 +62,8 @@ class LaunchOptions:
         argv : collections.abc.Sequence[str]
             Arguments after the program name. The sequence is parsed, never
             modified.
+        copy : afanes.i18n.cli.CliCopy
+            Active command-line catalog used for help text.
 
         Returns
         -------
@@ -81,27 +81,30 @@ class LaunchOptions:
         Parsing is pure: it touches no filesystem path and imports no
         interface module, so tests can exercise it without a display.
         """
-        parser = argparse.ArgumentParser(prog="afanes", description=afanes.ui.strings.LAUNCH_DESCRIPTION)
-        parser.add_argument("--web", action="store_true", help=afanes.ui.strings.LAUNCH_WEB_HELP)
-        parser.add_argument("--vault", metavar="DIR", type=Path, help=afanes.ui.strings.LAUNCH_VAULT_HELP)
+        parser = argparse.ArgumentParser(prog="afanes", description=copy.LAUNCH_DESCRIPTION, add_help=False)
+        parser.add_argument("-h", "--help", action="help", help=copy.HELP_OPTION)
+        parser.add_argument("--web", action="store_true", help=copy.LAUNCH_WEB_HELP)
+        parser.add_argument("--vault", metavar="DIR", type=Path, help=copy.LAUNCH_VAULT_HELP)
         parser.add_argument(
             "--port",
             metavar="N",
-            type=cls.port_number,
+            type=functools.partial(cls.port_number, copy=copy),
             default=0,
-            help=afanes.ui.strings.LAUNCH_PORT_HELP,
+            help=copy.LAUNCH_PORT_HELP,
         )
         namespace = parser.parse_args(list(argv))
         return cls(web=bool(namespace.web), vault=namespace.vault, port=namespace.port)
 
     @staticmethod
-    def port_number(text: str) -> int:
+    def port_number(text: str, copy: afanes.i18n.cli.CliCopy) -> int:
         """Parse a TCP port number for ``argparse``.
 
         Parameters
         ----------
         text : str
             Raw command-line value.
+        copy : afanes.i18n.cli.CliCopy
+            Active command-line catalog used for the failure text.
 
         Returns
         -------
@@ -116,10 +119,10 @@ class LaunchOptions:
         try:
             port = int(text)
         except ValueError as exc:
-            raise argparse.ArgumentTypeError(afanes.ui.strings.LAUNCH_PORT_NOT_NUMBER) from exc
+            raise argparse.ArgumentTypeError(copy.LAUNCH_PORT_NOT_NUMBER) from exc
         if not 0 <= port <= PORT_LIMIT:
             raise argparse.ArgumentTypeError(
-                afanes.ui.strings.LAUNCH_PORT_OUT_OF_RANGE.format(limit=PORT_LIMIT),
+                copy.LAUNCH_PORT_OUT_OF_RANGE.format(limit=PORT_LIMIT),
             )
         return port
 
@@ -163,6 +166,9 @@ class Launcher:
         page entry point as :func:`main` and accepts no command-line arguments.
         """
         logging.basicConfig(level=logging.INFO)
+        copy, problem = afanes.cli.main.CommandLine.resolve_copy()
+        if problem is not None:
+            afanes.cli.vault.CommandOutput.error(copy.messages.render(problem))
         try:
             # Imported here so a broken artifact reports one actionable message
             # instead of an import traceback, matching the source entry point.
@@ -170,7 +176,7 @@ class Launcher:
 
             import afanes.ui.app as ui_app  # noqa: PLC0415
         except ModuleNotFoundError:
-            Launcher.fail(_SDK_MISSING_MESSAGE)
+            Launcher.fail(copy.LAUNCH_MISSING_SDK)
 
         async def entry(page: ft.Page) -> None:
             await ui_app.AppShell.main(page)
@@ -178,7 +184,7 @@ class Launcher:
         try:
             ft.run(entry)
         except (OSError, SystemExit) as exc:
-            Launcher.fail(afanes.ui.strings.LAUNCH_DESKTOP_FAILED.format(detail=exc))
+            Launcher.fail(copy.LAUNCH_DESKTOP_FAILED.format(detail=exc))
 
     @staticmethod
     def fail(message: str) -> NoReturn:
@@ -200,13 +206,15 @@ class Launcher:
         raise SystemExit(1)
 
     @staticmethod
-    def require_runtime(*, web: bool) -> None:
+    def require_runtime(*, web: bool, copy: afanes.i18n.cli.CliCopy) -> None:
         """Check the runtime package for the requested presentation.
 
         Parameters
         ----------
         web : bool
             Whether the browser presentation was requested.
+        copy : afanes.i18n.cli.CliCopy
+            Active command-line catalog used for the install message.
 
         Raises
         ------
@@ -217,21 +225,23 @@ class Launcher:
         """
         if web:
             module = WEB_RUNTIME_MODULE
-            message = afanes.ui.strings.LAUNCH_MISSING_WEB
+            message = copy.LAUNCH_MISSING_WEB
         else:
             module = DESKTOP_RUNTIME_MODULE
-            message = afanes.ui.strings.LAUNCH_MISSING_DESKTOP
+            message = copy.LAUNCH_MISSING_DESKTOP
         if importlib.util.find_spec(module) is None:
             Launcher.fail(message)
 
     @staticmethod
-    def checked_vault(path: Path | None) -> Path | None:
+    def checked_vault(path: Path | None, copy: afanes.i18n.cli.CliCopy) -> Path | None:
         """Validate a vault supplied on the command line.
 
         Parameters
         ----------
         path : pathlib.Path | None
             Candidate vault directory, or ``None`` when the option was omitted.
+        copy : afanes.i18n.cli.CliCopy
+            Active command-line catalog used for the failure text.
 
         Returns
         -------
@@ -249,7 +259,7 @@ class Launcher:
         try:
             return afanes.core.vault.service.Vault.open(path).root
         except (VaultError, OSError) as exc:
-            Launcher.fail(afanes.ui.strings.LAUNCH_VAULT_INVALID.format(path=path, detail=exc))
+            Launcher.fail(copy.LAUNCH_VAULT_INVALID.format(path=path, detail=copy.render_error(exc)))
 
     @classmethod
     def main(cls, *args: str) -> int:
@@ -283,10 +293,13 @@ class Launcher:
         status = cls.dispatch(arguments)
         if status is not None:
             return status
-        options = LaunchOptions.parse(arguments)
+        copy, problem = afanes.cli.main.CommandLine.resolve_copy()
+        if problem is not None:
+            afanes.cli.vault.CommandOutput.error(copy.messages.render(problem))
+        options = LaunchOptions.parse(arguments, copy)
         logging.basicConfig(level=logging.INFO)
-        cls.require_runtime(web=options.web)
-        launch_vault = cls.checked_vault(options.vault)
+        cls.require_runtime(web=options.web, copy=copy)
+        launch_vault = cls.checked_vault(options.vault, copy)
         try:
             # The interface is imported here on purpose: a missing SDK must be
             # reported as one message, not as an import traceback. This is a
@@ -295,7 +308,7 @@ class Launcher:
 
             import afanes.ui.app as ui_app  # noqa: PLC0415
         except ModuleNotFoundError:
-            cls.fail(_SDK_MISSING_MESSAGE)
+            cls.fail(copy.LAUNCH_MISSING_SDK)
 
         async def entry(page: ft.Page) -> None:
             await ui_app.AppShell.main(page, launch_vault=launch_vault)
@@ -312,7 +325,7 @@ class Launcher:
         try:
             ft.run(entry)
         except (OSError, SystemExit) as exc:
-            cls.fail(afanes.ui.strings.LAUNCH_DESKTOP_FAILED.format(detail=exc))
+            cls.fail(copy.LAUNCH_DESKTOP_FAILED.format(detail=exc))
         return 0
 
 

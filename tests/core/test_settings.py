@@ -11,7 +11,7 @@ import afanes.core.atomic
 import afanes.core.settings
 from afanes.core.errors import ConfigurationError, VaultError
 from afanes.core.settings import Settings, SettingsStore
-from tests.support import constant
+from tests.support import constant, simulated_message
 
 
 class TestConfigDirectory:
@@ -299,8 +299,7 @@ class TestSettingsStoreSave:
         before = path.read_text(encoding="utf-8")
 
         def fail_write(_destination: Path, _text: str) -> NoReturn:
-            message = "simulated failure"
-            raise VaultError(message)
+            raise VaultError(simulated_message())
 
         monkeypatch.setattr(afanes.core.atomic.AtomicWriter, "write_text_atomic", fail_write)
 

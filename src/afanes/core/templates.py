@@ -13,13 +13,14 @@ import dataclasses
 import datetime
 import importlib.resources
 import re
+from collections.abc import Sequence
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
 import afanes.core.links
 import afanes.core.names
 import afanes.core.steps
-from afanes.core.errors import AfanesError, TemplateContentError, UnknownTemplateError
+from afanes.core.errors import AfanesError, DomainMessage, MessageCode, TemplateContentError, UnknownTemplateError
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.labels import PageLabels
 from afanes.models.note import CategoryLabel, NoteDate, NoteType
@@ -33,8 +34,16 @@ TEMPLATES_PACKAGE = "templates"
 # Public identifier the guide fixture uses. The leading underscore keeps it out
 # of the selectable catalog.
 GUIDE_IDENTIFIER = "_guide"
-GUIDE_STEM = "Getting started"
-GUIDE_RELATIVE_PATH = Path("reference") / f"{GUIDE_STEM}.md"
+GUIDE_PATHS: dict[str, Path] = {
+    "en": Path("reference") / "Getting started.md",
+    "es": Path("reference") / "Primeros pasos.md",
+}
+
+# Public reserved guide stems, one per supported guide path.
+GUIDE_STEMS: dict[str, str] = {locale: path.stem for locale, path in GUIDE_PATHS.items()}
+
+GUIDE_STEM = GUIDE_STEMS[BASE_LOCALE]
+GUIDE_RELATIVE_PATH = GUIDE_PATHS[BASE_LOCALE]
 
 # Public canonical note extension shared with the vault layout.
 NOTE_SUFFIX = ".md"
@@ -60,6 +69,27 @@ class VaultTemplate:
     ----------
     identifier : str
         Stable kebab-case identifier used by the picker and the command line.
+    """
+
+    identifier: str
+
+
+# Public fixed catalog, in the order every presentation reports it.
+BUNDLED_TEMPLATES: tuple[VaultTemplate, ...] = (
+    VaultTemplate(identifier="personal"),
+    VaultTemplate(identifier="work"),
+    VaultTemplate(identifier="study"),
+)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class TemplateLabel:
+    """Localized label and description for one template identifier.
+
+    Attributes
+    ----------
+    identifier : str
+        Stable kebab-case identifier.
     label : str
         Short display name.
     description : str
@@ -69,26 +99,6 @@ class VaultTemplate:
     identifier: str
     label: str
     description: str
-
-
-# Public fixed catalog, in the order every presentation reports it.
-BUNDLED_TEMPLATES: tuple[VaultTemplate, ...] = (
-    VaultTemplate(
-        identifier="personal",
-        label="Personal",
-        description="Life administration for the home, the car, and the paperwork that arrives each year.",
-    ),
-    VaultTemplate(
-        identifier="work",
-        label="Work",
-        description="Shared outcomes, the groups that own them, and the processes that carry them.",
-    ),
-    VaultTemplate(
-        identifier="study",
-        label="Study",
-        description="Course and research work, with the topics and sources kept beside it.",
-    ),
-)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -342,11 +352,16 @@ class TemplateCatalog:
             if template.identifier.casefold() == key:
                 return template
         valid = ", ".join(self.identifiers)
-        message = f"Unknown template {identifier!r}; choose one of: {valid}"
+        message = DomainMessage.of(MessageCode.UNKNOWN_TEMPLATE, identifier=repr(identifier), valid=valid)
         raise UnknownTemplateError(message)
 
-    def summaries(self) -> tuple[TemplateSummary, ...]:
-        """Return every catalog entry with the notes it writes.
+    def summaries(self, labels: Sequence[TemplateLabel]) -> tuple[TemplateSummary, ...]:
+        """Return every catalog entry with its localized label and note count.
+
+        Parameters
+        ----------
+        labels : collections.abc.Sequence[TemplateLabel]
+            Localized labels and descriptions supplied by the presentation.
 
         Returns
         -------
@@ -356,21 +371,27 @@ class TemplateCatalog:
         Raises
         ------
         TemplateContentError
-            If a bundled tree is missing or invalid.
+            If a bundled tree is missing or invalid, or a template has no
+            localized label.
 
         Notes
         -----
         This method validates every tree it counts, so a broken bundle fails
         here instead of during creation.
         """
+        by_identifier = {label.identifier: label for label in labels}
         summaries: list[TemplateSummary] = []
         for template in self.templates:
+            label = by_identifier.get(template.identifier)
+            if label is None:
+                message = DomainMessage.of(MessageCode.TEMPLATE_NO_LABEL, identifier=repr(template.identifier))
+                raise TemplateContentError(message)
             bundle = self.bundle(template.identifier)
             summaries.append(
                 TemplateSummary(
                     identifier=template.identifier,
-                    label=template.label,
-                    description=template.description,
+                    label=label.label,
+                    description=label.description,
                     note_count=len(bundle.notes),
                 )
             )
@@ -415,7 +436,7 @@ class TemplateCatalog:
         requested = locale or BASE_LOCALE
         guide_root, resolved_locale = self._locale_root(GUIDE_IDENTIFIER, requested)
         guide = self._read_notes(guide_root, creation_date)
-        self._validate_guide(guide)
+        self._validate_guide(guide, resolved_locale)
         if identifier is None:
             self._validate_tree("the guide note", guide, creation_date)
             return TemplateBundle(template=None, locale=resolved_locale, guide=guide, notes=())
@@ -461,7 +482,12 @@ class TemplateCatalog:
         fallback = base.joinpath(BASE_LOCALE)
         if fallback.is_dir():
             return fallback, BASE_LOCALE
-        message = f"Bundled content for {identifier!r} is missing the {locale!r} and {BASE_LOCALE!r} locales"
+        message = DomainMessage.of(
+            MessageCode.TEMPLATE_LOCALES_MISSING,
+            identifier=repr(identifier),
+            locale=repr(locale),
+            base=repr(BASE_LOCALE),
+        )
         raise TemplateContentError(message)
 
     @classmethod
@@ -504,16 +530,24 @@ class TemplateCatalog:
             try:
                 text = child.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError) as exc:
-                message = f"Bundled note {relative.as_posix()!r} cannot be read: {exc}"
+                message = DomainMessage.of(
+                    MessageCode.TEMPLATE_NOTE_READ_FAILED,
+                    path=repr(relative.as_posix()),
+                    detail=str(exc),
+                )
                 raise TemplateContentError(message) from exc
             rendered = cls._render_dates(text, today)
             if _BRACE_PATTERN.search(rendered):
-                message = f"Bundled note {relative.as_posix()!r} has a brace expression that cannot be resolved"
+                message = DomainMessage.of(MessageCode.TEMPLATE_NOTE_BRACE, path=repr(relative.as_posix()))
                 raise TemplateContentError(message)
             try:
                 document = NoteDocument.from_text(rendered)
             except AfanesError as exc:
-                message = f"Bundled note {relative.as_posix()!r} cannot be parsed: {exc}"
+                message = DomainMessage.of(
+                    MessageCode.TEMPLATE_NOTE_PARSE_FAILED,
+                    path=repr(relative.as_posix()),
+                    detail=str(exc),
+                )
                 raise TemplateContentError(message) from exc
             if document.note_type is not None and document.date is None and document.date_error is None:
                 labels = PageLabels.from_document(document).with_date_text(NoteDate.from_date(today).text)
@@ -522,27 +556,31 @@ class TemplateCatalog:
             notes.append(TemplateNote(relative_path=relative, text=rendered, document=document))
         return tuple(notes)
 
-    def _validate_guide(self, guide: tuple[TemplateNote, ...]) -> None:
+    def _validate_guide(self, guide: tuple[TemplateNote, ...], locale: str) -> None:
         """Verify the guide fixture is the one canonical reference note.
 
         Parameters
         ----------
         guide : tuple[TemplateNote, ...]
             Notes read from the guide tree.
+        locale : str
+            Locale of the tree that supplied the guide. It selects the expected
+            path.
 
         Raises
         ------
         TemplateContentError
             If the tree does not hold exactly one reference note at the
-            canonical guide path.
+            canonical guide path for its locale.
         """
         if len(guide) != 1:
             self._refuse("the guide note", f"expected exactly one note, found {len(guide)}")
         note = guide[0]
-        if note.relative_path != GUIDE_RELATIVE_PATH:
+        expected = GUIDE_PATHS.get(locale, GUIDE_PATHS[BASE_LOCALE])
+        if note.relative_path != expected:
             self._refuse(
                 "the guide note",
-                f"expected {GUIDE_RELATIVE_PATH.as_posix()!r}, found {note.relative_path.as_posix()!r}",
+                f"expected {expected.as_posix()!r}, found {note.relative_path.as_posix()!r}",
             )
         if note.note_type is not NoteType.REFERENCE:
             self._refuse("the guide note", "must declare type: reference")
@@ -566,12 +604,12 @@ class TemplateCatalog:
         TemplateContentError
             If a template note uses the reserved guide stem.
         """
-        reserved = afanes.core.names.NamePolicy.normalize(GUIDE_STEM)
+        reserved = {afanes.core.names.NamePolicy.normalize(stem) for stem in GUIDE_STEMS.values()}
         for note in notes:
-            if afanes.core.names.NamePolicy.normalize(note.stem) == reserved:
+            if afanes.core.names.NamePolicy.normalize(note.stem) in reserved:
                 self._refuse(
                     subject,
-                    f"note {note.relative_path.as_posix()!r} uses the reserved guide name {GUIDE_STEM!r}",
+                    f"note {note.relative_path.as_posix()!r} uses a reserved guide name",
                 )
 
     def _validate_tree(
@@ -795,7 +833,7 @@ class TemplateCatalog:
         base = self.root.joinpath(identifier)
         locales = tuple(sorted((child for child in base.iterdir() if child.is_dir()), key=lambda item: item.name))
         if not locales:
-            message = f"Bundled template {identifier!r} has no locale folder"
+            message = DomainMessage.of(MessageCode.TEMPLATE_NO_LOCALE_FOLDER, identifier=repr(identifier))
             raise TemplateContentError(message)
         reference_root = next((child for child in locales if child.name == BASE_LOCALE), locales[0])
         reference_shape = self._shape(self._read_notes(reference_root, today))
@@ -804,9 +842,10 @@ class TemplateCatalog:
                 continue
             shape = self._shape(self._read_notes(locale_root, today))
             if shape != reference_shape:
-                message = (
-                    f"Bundled template {identifier!r} locale {locale_root.name!r} "
-                    "does not match the shape of its base locale"
+                message = DomainMessage.of(
+                    MessageCode.TEMPLATE_LOCALE_SHAPE,
+                    identifier=repr(identifier),
+                    locale=repr(locale_root.name),
                 )
                 raise TemplateContentError(message)
 
@@ -845,5 +884,5 @@ class TemplateCatalog:
         TemplateContentError
             Always.
         """
-        message = f"Bundled {subject} is invalid: {detail}"
+        message = DomainMessage.of(MessageCode.TEMPLATE_INVALID, subject=subject, detail=detail)
         raise TemplateContentError(message)
