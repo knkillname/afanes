@@ -61,7 +61,9 @@ The settings file SHALL contain a YAML mapping with exactly one key, `schema_ver
 
 ### Requirement: A vault requires a valid settings file
 
-Opening a folder without `afanes.yaml` SHALL be refused. Opening MUST NOT create the file. A vault with a valid file SHALL open without modifying any vault file, including when the vault is read-only.
+Opening a folder without `afanes.yaml` SHALL be refused. Opening MUST NOT create the file. A vault
+with a valid file SHALL pass schema validation without modifying any vault file, including when the
+vault is read-only.
 
 #### Scenario: A missing settings file is refused
 
@@ -75,8 +77,8 @@ Opening a folder without `afanes.yaml` SHALL be refused. Opening MUST NOT create
 
 #### Scenario: Opening a valid vault writes nothing
 
-- **WHEN** a vault with a valid settings file is opened
-- **THEN** no vault file is created, modified, or deleted
+- **WHEN** a vault with a valid settings file passes schema validation
+- **THEN** validation creates, modifies, or deletes no vault file
 
 #### Scenario: Scanning writes nothing
 

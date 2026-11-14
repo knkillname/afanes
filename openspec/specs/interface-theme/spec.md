@@ -484,8 +484,8 @@ remains true, and its surface SHALL come from the interface tokens in both appea
 ### Requirement: Reversible destructive actions offer undo
 
 When an action can be undone without data loss, the interface SHALL offer Undo in a toast instead of
-a confirmation. An irreversible action SHALL use a confirmation that places Cancel first. The undo
-opportunity SHALL be transient and SHALL end when the toast is dismissed or replaced.
+a confirmation. A user-invoked irreversible action SHALL use a confirmation that places Cancel first.
+The undo opportunity SHALL be transient and SHALL end when the toast is dismissed or replaced.
 
 #### Scenario: Trash offers Undo instead of a confirmation
 
@@ -506,6 +506,11 @@ opportunity SHALL be transient and SHALL end when the toast is dismissed or repl
 
 - **WHEN** the toast is dismissed or replaced before the user selects Undo
 - **THEN** the reversible action is no longer offered for undo
+
+#### Scenario: Scheduled retention is not user-invoked
+
+- **WHEN** a managed trashed note reaches its 30-day limit
+- **THEN** it is deleted without a confirmation dialog because no user action requested the deletion
 
 ### Requirement: Banners report persistent conditions only
 

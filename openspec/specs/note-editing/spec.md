@@ -517,11 +517,11 @@ SHALL belong to the current session and SHALL end when the toast is dismissed or
 
 ### Requirement: The page offers rename and trash actions
 
-The page SHALL offer Rename for notes, references, and projects, and SHALL hide it for log entries.
-The page SHALL offer Trash for every type. Rename SHALL use the existing preview, confirmation,
-atomic-write, and inbound-reference rules. Rename SHALL update a level-1 heading only when its text
-matches the old identity. After a rename or trash, the page history SHALL be updated so Back never
-returns to a path that no longer exists.
+The page SHALL offer Rename for active notes, references, and projects, and hide it for log entries.
+An active note SHALL offer Trash for every type; a trashed note is read-only and offers Restore and
+Delete Permanently instead. Rename SHALL use the preview, confirmation, atomic-write, and
+inbound-reference rules, and SHALL update a level-1 heading only when its text matches the old
+identity. After a rename or trash, the page history SHALL not return to a path that no longer exists.
 
 #### Scenario: Rename previews affected references
 
@@ -558,6 +558,11 @@ returns to a path that no longer exists.
 
 - **WHEN** a log entry is open
 - **THEN** the page offers the Trash action
+
+#### Scenario: A trashed note is not an active page
+
+- **WHEN** a trashed note is open
+- **THEN** the page offers Restore and Delete Permanently instead of Rename and Move to Trash
 
 ### Requirement: One history covers list clicks and link taps
 

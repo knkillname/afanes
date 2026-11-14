@@ -406,7 +406,9 @@ When the settings file is unreadable or malformed, the application SHALL start i
 
 ### Requirement: Opening a vault is read-only
 
-Opening or scanning a vault SHALL NOT create, modify, or delete any vault file. The `inbox/` directory SHALL be created only by a capture.
+Opening or scanning a vault SHALL NOT create or modify any vault file. After a vault opens,
+scheduled trash retention MAY delete expired managed trash entries before the workspace is shown.
+The `inbox/` directory SHALL be created only by a capture.
 
 #### Scenario: Opening does not create the inbox
 
@@ -422,6 +424,16 @@ Opening or scanning a vault SHALL NOT create, modify, or delete any vault file. 
 
 - **WHEN** the scan finds a note it cannot parse
 - **THEN** the note is left exactly as it was
+
+#### Scenario: Opening runs trash retention
+
+- **WHEN** a vault opens with a managed trash entry that is 30 or more days old
+- **THEN** the entry may be deleted after opening validation and before the workspace is shown
+
+#### Scenario: A failed retention still opens the vault
+
+- **WHEN** trash retention cannot delete an expired entry
+- **THEN** the vault still opens, the entry remains, and the failure is reported
 
 ### Requirement: The vault path is stable across launches
 

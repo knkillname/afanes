@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-13
+
+### Added
+
+- **Durable Trash browsing and retention.** Discarded notes now move to `trash/` as UUID files with
+  `trashed_from` and `trashed_on` frontmatter, and a new **Trash** destination lists managed entries by
+  title and birthplace. A trashed note opens read-only with its origin and trashed day; **Restore**
+  returns it to its birthplace, warns before replacing an occupied file, and **Delete Permanently…** and
+  **Empty Trash…** require confirmation. Managed entries expire after 30 days on vault open and when
+  Trash is selected, while files without a safe birthplace stay hidden and unmanaged. Global search
+  includes managed entries in a separate Trash group. The UUID is storage identity only and never
+  appears in the interface. This implements the `trash-browsing-and-retention` OpenSpec change.
+  `TrashService` gains `restore_entry`, `delete_entry`, `empty`, and `maintain`; `VaultNaming.trash`
+  returns a `TrashPreview` carrying `trashed_on` and `source_hash`, and
+  `VaultNaming.restore_from_trash` gains an `overwrite` parameter. Resolved runtime dependencies:
+  `flet==1.1.2`, `markdown-it-py==4.3.0`, `PyYAML==6.0.3`. README: updated. Docs: updated.
+
 ### Changed
 
 - **Strict type gate.** `hatch check` now fails on Pyrefly warning-level diagnostics by running
