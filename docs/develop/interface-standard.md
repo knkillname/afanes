@@ -256,6 +256,13 @@ about this convention; the supported Spanish convention is the Mexican one.
 ISO input and filenames never follow the display locale. A log entry titled **13 de noviembre de 2026**
 is still stored as `2026-11-13.md`.
 
+Reminder cards use relative time from `LocaleFormat`: **just now**, **5 minutes ago**, **2 hours
+ago**, **yesterday**, and **3 days ago** in English; **ahora mismo**, **hace 5 minutos**, **hace 2
+horas**, **ayer**, and **hace 3 días** in Spanish. The editor and summary use the full Monday-first
+weekday names: **Monday** through **Sunday** in English and **lunes** through **domingo** in Spanish.
+The stored IANA zone is data, not copy: the summary shows the exact name such as
+**America/Mexico_City** and never translates it.
+
 ## 📋 Lists and rows
 
 Browser lists follow the reference list view rather than a card grid: a row keeps a heading title,

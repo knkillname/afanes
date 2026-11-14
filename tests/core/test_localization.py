@@ -190,6 +190,43 @@ class TestLocaleFormat:
         assert LocaleFormat.for_language("en").weekday_labels() == ("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
         assert LocaleFormat.for_language("es").weekday_labels() == ("Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do")
 
+    def test_full_weekday_names_are_localized_and_monday_first(self) -> None:
+        assert LocaleFormat.for_language("en").weekday_names() == (
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        )
+        assert LocaleFormat.for_language("es").weekday_names() == (
+            "lunes",
+            "martes",
+            "miércoles",
+            "jueves",
+            "viernes",
+            "sábado",
+            "domingo",
+        )
+
+    def test_relative_times_are_localized(self) -> None:
+        reference = datetime.datetime(2026, 11, 14, 12, 0, tzinfo=datetime.UTC)
+        english = LocaleFormat.for_language("en")
+        spanish = LocaleFormat.for_language("es")
+
+        assert english.relative_time(reference, reference) == "just now"
+        assert spanish.relative_time(reference, reference) == "ahora mismo"
+        assert english.relative_time(reference - datetime.timedelta(minutes=1), reference) == "1 minute ago"
+        assert english.relative_time(reference - datetime.timedelta(minutes=5), reference) == "5 minutes ago"
+        assert spanish.relative_time(reference - datetime.timedelta(minutes=5), reference) == "hace 5 minutos"
+        assert english.relative_time(reference - datetime.timedelta(hours=2), reference) == "2 hours ago"
+        assert spanish.relative_time(reference - datetime.timedelta(hours=2), reference) == "hace 2 horas"
+        assert english.relative_time(reference - datetime.timedelta(days=1), reference) == "yesterday"
+        assert spanish.relative_time(reference - datetime.timedelta(days=1), reference) == "ayer"
+        assert english.relative_time(reference - datetime.timedelta(days=3), reference) == "3 days ago"
+        assert spanish.relative_time(reference - datetime.timedelta(days=3), reference) == "hace 3 días"
+
     def test_english_time_uses_a_twelve_hour_clock(self) -> None:
         assert LocaleFormat.for_language("en").time(datetime.time(14, 30)) == "2:30 PM"
         assert LocaleFormat.for_language("en").time(datetime.time(0, 5)) == "12:05 AM"

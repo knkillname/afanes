@@ -48,10 +48,10 @@
 
 ## 7. Localization and copy
 
-- [ ] 7.1 Add relative-time formatting and full weekday names to `LocaleFormat`; verify English and Spanish unit tests for minutes, hours, yesterday, days, and weekday names.
-- [ ] 7.2 Add every reminder constant to the English source modules and the Spanish `.po` catalogs; classify each constant in the copy gate; verify `hatch test tests/i18n/test_copy.py`.
-- [ ] 7.3 Update `docs/develop/interface-standard.md` for relative time, full weekday names, and the stored zone display; verify the documented examples match the formatter.
-- [ ] 7.4 Run `hatch run i18n-compile` and verify the compiled catalogs match the tracked `.po` sources and remain untracked.
+- [x] 7.1 Add relative-time formatting and full weekday names to `LocaleFormat`; verify English and Spanish unit tests for minutes, hours, yesterday, days, and weekday names.
+- [x] 7.2 Add every reminder constant to the English source modules and the Spanish `.po` catalogs; classify each constant in the copy gate; verify `hatch test tests/i18n/test_copy.py`.
+- [x] 7.3 Update `docs/develop/interface-standard.md` for relative time, full weekday names, and the stored zone display; verify the documented examples match the formatter.
+- [x] 7.4 Run `hatch run i18n-compile` and verify the compiled catalogs match the tracked `.po` sources and remain untracked.
 
 ## 8. Starter content and templates
 
