@@ -342,6 +342,8 @@ class TestTheme:
         assert afanes.ui.theme.HEADER_HEIGHT == HEADER_HEIGHT_VALUE
         assert not hasattr(afanes.ui.theme, "BROWSER_MAX_WIDTH")
         assert not hasattr(afanes.ui.theme, "CONTENT_MAX_WIDTH")
+        assert not hasattr(afanes.ui.theme, "PAGE_FIELD_WIDTH")
+        assert not hasattr(afanes.ui.theme, "PAGE_DUE_WIDTH")
         assert not hasattr(afanes.ui.theme, "LIST_WIDTH")
 
     def test_shell_width_relationships_hold(self) -> None:

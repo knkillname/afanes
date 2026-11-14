@@ -337,12 +337,13 @@ class TestEditMode:
         assert view.date_field.height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
         assert view.owner_field.height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
         assert view.edit_form.spacing == afanes.ui.theme.SECTION_GAP
-        assert view.form_fields.wrap is True
-        assert view.form_fields.controls == [
+        assert view.form_fields.row.columns == afanes.ui.theme.FIELD_FLOW_COLUMNS
+        assert view.form_fields.row.controls == [
             view.type_dropdown,
             view.category_field,
             view.status_dropdown,
             view.date_field,
+            view.log_starter_picker.dropdown,
             view.due_field,
             view.owner_field,
             view.asked_by_field,
@@ -2096,8 +2097,38 @@ class TestLogStarter:
         _state, _card, view = self._open(tmp_path, monkeypatch)
 
         assert view.log_starter_panel.visible is True
+        assert view.log_starter_picker.dropdown.visible is True
+        assert view.log_starter_picker.dropdown in view.form_fields.row.controls
         assert view.log_starter_picker.dropdown.value == "empty"
         assert view.log_starter_picker.dropdown.options[-1].text == afanes.ui.strings.LOG_CARD_EMPTY
+
+    def test_the_starter_control_sits_in_the_label_flow(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _state, _card, view = self._open(tmp_path, monkeypatch)
+
+        assert view.log_starter_picker.dropdown in view.form_fields.row.controls
+        assert view.log_starter_picker.dropdown not in view.log_starter_panel.controls
+        flow_index = view.edit_form.controls.index(view.form_fields.row)
+        panel_index = view.edit_form.controls.index(view.log_starter_panel)
+        body_index = view.edit_form.controls.index(view.body_field)
+        assert flow_index < panel_index < body_index
+
+    def test_a_wide_log_draft_shares_the_label_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _state, _card, view = self._open(tmp_path, monkeypatch)
+
+        view.form_fields.layout(1200)
+
+        assert [view.type_dropdown.col, view.date_field.col, view.log_starter_picker.dropdown.col] == [4, 4, 4]
+
+    def test_a_narrow_log_draft_stacks_the_label_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _state, _card, view = self._open(tmp_path, monkeypatch)
+
+        view.form_fields.layout(300)
+
+        assert [view.type_dropdown.col, view.date_field.col, view.log_starter_picker.dropdown.col] == [
+            12,
+            12,
+            12,
+        ]
 
     def test_selecting_a_card_fills_the_body(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         state, _card, view = self._open(tmp_path, monkeypatch)
@@ -2129,6 +2160,9 @@ class TestLogStarter:
         asyncio.run(view.change_body())
 
         assert view.log_starter_panel.visible is False
+        assert view.log_starter_picker.dropdown.visible is False
+        assert view.type_dropdown.col == 6
+        assert view.date_field.col == 6
 
     def test_invalid_cards_are_named_beside_the_starter(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         issue = afanes.core.template_cards.TemplateCardIssue(relative_path=Path("broken.md"), message="bad")
@@ -2156,6 +2190,7 @@ class TestLogStarter:
         asyncio.run(view.start_edit())
 
         assert view.log_starter_panel.visible is False
+        assert view.log_starter_picker.dropdown.visible is False
         assert state.pages.log_starter is None
 
 
@@ -2201,7 +2236,7 @@ class TestPageWidth:
         view = PageView(PageActions(update=lambda: None))
 
         assert not hasattr(view, "fit_width")
-        assert view.root.on_size_change is None
+        assert view.root.on_size_change is not None
 
 
 class TestConflictActions:

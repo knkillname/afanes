@@ -79,7 +79,7 @@ BASELINE: dict[str, dict[str, int]] = {
         "views/project_body.py": 2,
         "views/projects.py": 2,
         "views/review.py": 1,
-        "views/workspace.py": 9,
+        "views/workspace.py": 8,
     },
     "suggested_or_destructive_buttons": {
         "app.py::AppShell": 5,

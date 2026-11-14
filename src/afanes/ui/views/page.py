@@ -18,6 +18,7 @@ import flet as ft
 import afanes.core.connections
 import afanes.core.search
 import afanes.core.vault.snapshot
+import afanes.ui.components.field_flow
 import afanes.ui.components.page_panels
 import afanes.ui.state
 import afanes.ui.strings
@@ -95,6 +96,7 @@ class PageView:
         self._rename_error: str | None = None
         self._starter_task: asyncio.Task[None] | None = None
         self._role_suggestion_field: str | None = None
+        self._field_flow_width = float(afanes.ui.theme.SHELL_WIDE_MIN)
         self._build_header()
         self._build_meta()
         self._build_read_content()
@@ -333,9 +335,10 @@ class PageView:
             "log-draft",
             self._starter_changed,
         )
+        self.log_starter_picker.dropdown.height = afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
+        self.log_starter_picker.dropdown.visible = False
         self.log_starter_panel = ft.Column(
             controls=[
-                self.log_starter_picker.dropdown,
                 self.log_starter_picker.description,
                 self.log_starter_picker.warning,
             ],
@@ -357,7 +360,6 @@ class PageView:
                 for note_type in NoteType
             ],
             on_select=self.change_type,
-            width=afanes.ui.theme.PAGE_FIELD_WIDTH,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.category_field = ft.Dropdown(
@@ -368,7 +370,6 @@ class PageView:
             enable_filter=True,
             on_select=self.change_category,
             on_blur=self._commit_category_on_blur,
-            width=afanes.ui.theme.PAGE_FIELD_WIDTH,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.category_error = ft.Text(
@@ -382,14 +383,12 @@ class PageView:
             label=afanes.ui.strings.PAGE_STATUS_LABEL,
             options=[],
             on_select=self.change_status,
-            width=afanes.ui.theme.PAGE_FIELD_WIDTH,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.due_field = ft.TextField(
             label=afanes.ui.strings.PAGE_DUE_DATE_LABEL,
             hint_text="2026-11-20",
             on_change=self.change_due_date,
-            width=afanes.ui.theme.PAGE_DUE_WIDTH,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.date_field = ft.TextField(
@@ -397,7 +396,6 @@ class PageView:
             hint_text="2025-10-12",
             on_blur=self.commit_date,
             on_submit=self.commit_date,
-            width=afanes.ui.theme.PAGE_DUE_WIDTH,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.date_error = ft.Text(
@@ -411,14 +409,12 @@ class PageView:
             label=afanes.ui.strings.PAGE_ASKED_BY_LABEL,
             hint_text=afanes.ui.strings.PAGE_ASKED_BY_HINT,
             on_change=self.change_asked_by,
-            width=afanes.ui.theme.PAGE_FIELD_WIDTH,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.owner_field = ft.TextField(
             label=afanes.ui.strings.PAGE_OWNER_LABEL,
             hint_text=afanes.ui.strings.PAGE_OWNER_HINT,
             on_change=self.change_owner,
-            width=afanes.ui.theme.PAGE_FIELD_WIDTH,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.name_suggestions = ft.Column(controls=[], spacing=0, visible=False)
@@ -429,24 +425,22 @@ class PageView:
             visible=False,
             selectable=True,
         )
-        self.form_fields = ft.Row(
-            controls=[
+        self.form_fields = afanes.ui.components.field_flow.FieldFlow(
+            [
                 self.type_dropdown,
                 self.category_field,
                 self.status_dropdown,
                 self.date_field,
+                self.log_starter_picker.dropdown,
                 self.due_field,
                 self.owner_field,
                 self.asked_by_field,
-            ],
-            spacing=afanes.ui.theme.ITEM_GAP,
-            run_spacing=afanes.ui.theme.ITEM_GAP,
-            wrap=True,
+            ]
         )
         self.edit_form = ft.Column(
             controls=[
                 self.identity_text,
-                self.form_fields,
+                self.form_fields.row,
                 self.name_suggestions,
                 self.category_error,
                 self.date_error,
@@ -615,6 +609,7 @@ class PageView:
             bgcolor=afanes.ui.theme.CARD_SURFACE_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
             border_radius=afanes.ui.theme.SURFACE_RADIUS,
+            on_size_change=self._resize_field_flow,
             content=ft.Row(
                 controls=[self.page_column],
                 spacing=afanes.ui.theme.ITEM_GAP,
@@ -658,6 +653,22 @@ class PageView:
             expand=True,
             key="page-view",
         )
+
+    def _resize_field_flow(self, event: ft.LayoutSizeChangeEvent[ft.LayoutControl]) -> None:
+        """Reflow the label controls for one rendered card width.
+
+        Parameters
+        ----------
+        event : flet.LayoutSizeChangeEvent[flet.LayoutControl]
+            Size event whose width is the rendered page card width.
+        """
+        width = max(0.0, event.width - 2 * afanes.ui.theme.ITEM_GAP)
+        self._field_flow_width = width
+        self.form_fields.layout(width)
+        try:
+            self.form_fields.row.update()
+        except RuntimeError:
+            return
 
     async def scroll_to_top(self) -> None:
         """Move the reusable page pane to its starting scroll position.
@@ -767,6 +778,7 @@ class PageView:
         self._refresh_read(page, editing=editing)
         self._refresh_connections(page, editing=editing)
         self._refresh_edit(page, editing=editing)
+        self.form_fields.layout(self._field_flow_width)
         self._refresh_raw(page)
         self._refresh_banners()
         self._refresh_conflict()
@@ -1076,6 +1088,7 @@ class PageView:
         """Show the Starter control while a new log draft is otherwise empty."""
         starter = self._state.pages.log_starter
         visible = self._state.pages.log_starter_visible and starter is not None
+        self.log_starter_picker.dropdown.visible = visible
         self.log_starter_panel.visible = visible
         if not visible or starter is None:
             return

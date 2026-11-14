@@ -34,8 +34,9 @@ tree. An empty day opens an unsaved draft for that date.
 
 The draft starts with a long date title: `November 13, 2026`, `November 2026`, or `2026`. The heading is
 editable; the filename stays the ISO date. While the draft has no content beyond that heading, a
-**Starter** control above the body offers every valid log card and Empty. The Daily entry card adds the
-`## What happened`, `## What I learned`, and `## Next` prompts; Empty leaves only the heading.
+**Starter** control in the label row beside Type and Date offers every valid log card and Empty. The
+Daily entry card adds the `## What happened`, `## What I learned`, and `## Next` prompts; Empty leaves
+only the heading.
 
 The draft is written the first time its body or labels change, or when a starter card is selected.
 Leaving an untouched draft creates no file.
