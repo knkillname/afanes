@@ -663,6 +663,53 @@ class TestProcessingView:
         assert view.form_error.value == afanes.i18n.ui.en.PROCESSING_INVALID_DATE
         assert afanes.ui.state.app_state.processing.plan is None
 
+    def test_due_date_picker_fills_the_field_and_invalidates_the_plan(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        root = tmp_path / "vault"
+        versioned(root)
+        capture = afanes.core.vault.pages.VaultPages(afanes.core.vault.service.Vault(root)).capture("Buy milk")
+        _open_vault_capture(root, capture, monkeypatch)
+        calls: list[datetime.date | None] = []
+
+        async def pick(current: datetime.date | None) -> datetime.date | None:
+            calls.append(current)
+            return datetime.date(2026, 12, 1)
+
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async, pick_date=pick)
+        view.outcome.value = ProcessingOutcome.PROJECT.value
+        _select_outcome(view)
+        assert view.preview_button.on_click is not None
+        asyncio.run(_click(view.preview_button.on_click))
+        assert view.plan_panel.visible is True
+        suffix = view.due_date.suffix
+        assert isinstance(suffix, ft.IconButton)
+
+        asyncio.run(_click(suffix.on_click))
+
+        assert calls == [None]
+        assert view.due_date.value == "2026-12-01"
+        assert not view.plan_panel.visible
+
+    def test_cancelling_the_due_date_picker_keeps_the_value(self) -> None:
+        _open_capture()
+
+        async def pick(_current: datetime.date | None) -> datetime.date | None:
+            return None
+
+        view = afanes.ui.views.processing.ProcessingView(_noop, _noop_async, _noop_async, pick_date=pick)
+        view.outcome.value = ProcessingOutcome.PROJECT.value
+        _select_outcome(view)
+        view.due_date.value = "2026-11-20"
+        suffix = view.due_date.suffix
+        assert isinstance(suffix, ft.IconButton)
+
+        asyncio.run(_click(suffix.on_click))
+
+        assert view.due_date.value == "2026-11-20"
+
     def test_preview_passes_parsed_values_to_the_controller(
         self,
         monkeypatch: pytest.MonkeyPatch,

@@ -22,6 +22,7 @@ import afanes.core.search
 import afanes.core.vault.trash_catalog
 import afanes.ui.components.calendar
 import afanes.ui.components.capture_bar
+import afanes.ui.components.date_entry
 import afanes.ui.components.frozen
 import afanes.ui.components.language
 import afanes.ui.components.log_tree
@@ -68,7 +69,7 @@ class WorkspaceActions:
         Command that closes the current vault.
     on_new_reference : collections.abc.Callable[[], collections.abc.Awaitable[None]] | None
         Command that opens the new-reference dialog.
-    pick_date : afanes.ui.views.page.PickDate | None
+    pick_date : afanes.ui.components.date_entry.PickDate | None
         Command that opens the date picker for step and project dates.
     on_log_entry : collections.abc.Callable[[afanes.models.note.NoteDate], collections.abc.Awaitable[None]] | None
         Command that opens or creates a log entry for a date.
@@ -81,6 +82,9 @@ class WorkspaceActions:
     on_notice : collections.abc.Callable[[afanes.ui.state.status.Notice], None] | None
         Command that shows one transient notice, or ``None`` when the view is
         used without a toast presenter.
+    pick_note_date : afanes.ui.components.date_entry.PickNoteDate | None
+        Command that opens the precision-aware date picker, or ``None`` when
+        the host does not provide one.
     """
 
     update: Callable[[], None]
@@ -88,13 +92,14 @@ class WorkspaceActions:
     on_create_vault: Callable[[], Awaitable[None]]
     on_close_vault: Callable[[], Awaitable[None]]
     on_new_reference: Callable[[], Awaitable[None]] | None = None
-    pick_date: afanes.ui.views.page.PickDate | None = None
+    pick_date: afanes.ui.components.date_entry.PickDate | None = None
     on_log_entry: Callable[[NoteDate], Awaitable[None]] | None = None
     on_missing_role: Callable[[str], Awaitable[None]] | None = None
     pick_role: afanes.ui.views.page.PickRole | None = None
     on_about: Callable[[], Awaitable[None]] | None = None
     on_notice: Callable[[afanes.ui.state.status.Notice], None] | None = None
     on_language: Callable[[str | None], Awaitable[None] | None] | None = None
+    pick_note_date: afanes.ui.components.date_entry.PickNoteDate | None = None
 
 
 class WorkspaceView:
@@ -123,6 +128,7 @@ class WorkspaceView:
         self._on_log_entry = actions.on_log_entry
         self._on_about = actions.on_about
         self._pick_date = actions.pick_date
+        self._pick_note_date = actions.pick_note_date
         self._on_missing_role = actions.on_missing_role
         self._pick_role = actions.pick_role
         self._on_notice = actions.on_notice
@@ -398,6 +404,7 @@ class WorkspaceView:
                 update=self._on_page_update,
                 on_process=self._process_note,
                 pick_date=self._pick_date,
+                pick_note_date=self._pick_note_date,
                 on_missing_role=self._on_missing_role,
                 pick_role=self._pick_role,
                 on_back=self._back_to_browser_if_empty,
@@ -1580,6 +1587,7 @@ class WorkspaceView:
                     self._on_processing_update,
                     self._cancel_processing,
                     self._finish_processing,
+                    pick_date=self._pick_date,
                 )
                 self._processing_key = key
             self.detail_title.value = self._state.status.copy.PROCESSING_TITLE
@@ -1590,7 +1598,10 @@ class WorkspaceView:
         self._processing_key = None
         if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
             if self._review_view is None:
-                self._review_view = afanes.ui.views.review.ReviewView(self._on_review_update)
+                self._review_view = afanes.ui.views.review.ReviewView(
+                    self._on_review_update,
+                    pick_date=self._pick_date,
+                )
             self._review_view.refresh()
             self.detail_title.value = self._state.status.copy.REVIEW_TITLE
             self._show_flow_toolbar()

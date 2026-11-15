@@ -21,6 +21,7 @@ import afanes.core.connections
 import afanes.core.search
 import afanes.core.vault.snapshot
 import afanes.models.note
+import afanes.ui.components.date_entry
 import afanes.ui.components.field_flow
 import afanes.ui.components.page_panels
 import afanes.ui.state
@@ -29,16 +30,17 @@ from afanes.core.editing import DraftMode, NormalDraft, PageDraft
 from afanes.core.labels import PageLabels, ReminderEdit
 from afanes.core.vault.snapshot import LinkOutcome
 from afanes.models.link import NoteReference, ReferenceScheme
-from afanes.models.note import CategoryLabel, NoteType, Status
+from afanes.models.note import CategoryLabel, NoteDate, NoteType, Status
 from afanes.models.reminder import Recurrence, Reminder
 from afanes.ui.components.banner import Banner
+from afanes.ui.components.date_entry import DatePickerActions, DatePickerButton, PickDate
 from afanes.ui.components.frozen import FrozenControlRecovery
 from afanes.ui.components.panel import Panel
 from afanes.ui.components.reminder import ReminderEditor
 from afanes.ui.components.template_cards import TemplateCardContext, TemplateCardPicker
 from afanes.ui.state.navigation import RoleFollowOutcome
 from afanes.ui.state.status import NoticeAction
-from afanes.ui.views.project_body import PickDate, ProjectBodyView
+from afanes.ui.views.project_body import ProjectBodyView
 
 type PickRole = Callable[[str, str | None], Awaitable[str | None]]
 
@@ -64,6 +66,9 @@ class PageActions:
     on_back : collections.abc.Callable[[], collections.abc.Awaitable[bool]] | None
         Optional fallback tried before the page history. It returns ``True``
         when the host handled the back request itself.
+    pick_note_date : afanes.ui.components.date_entry.PickNoteDate | None
+        Command that opens the precision-aware date picker, or ``None`` when
+        the host does not provide one.
     """
 
     update: Callable[[], None]
@@ -72,6 +77,7 @@ class PageActions:
     on_missing_role: Callable[[str], Awaitable[None]] | None = None
     pick_role: PickRole | None = None
     on_back: Callable[[], Awaitable[bool]] | None = None
+    pick_note_date: afanes.ui.components.date_entry.PickNoteDate | None = None
 
 
 class PageView:
@@ -95,6 +101,7 @@ class PageView:
         self._update = actions.update
         self._on_process = actions.on_process
         self._pick_date = actions.pick_date
+        self._pick_note_date = actions.pick_note_date
         self._on_missing_role = actions.on_missing_role
         self._pick_role = actions.pick_role
         self._on_back = actions.on_back
@@ -251,6 +258,19 @@ class PageView:
         )
         self.meta_due = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
         self.meta_date = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption"])
+        self.meta_date_button = ft.IconButton(
+            icon=ft.Icons.CALENDAR_MONTH_OUTLINED,
+            tooltip=self._state.status.copy.PAGE_DATE_ADD,
+            icon_color=afanes.ui.theme.MUTED_ACTION_COLOR,
+            on_click=self.choose_note_date,
+            style=ft.ButtonStyle(
+                icon_color={
+                    ft.ControlState.HOVERED: afanes.ui.theme.TEXT_COLOR,
+                    ft.ControlState.FOCUSED: afanes.ui.theme.TEXT_COLOR,
+                },
+            ),
+            key="page-date-action",
+        )
         self.meta_due_button = ft.IconButton(
             icon=ft.Icons.CALENDAR_MONTH_OUTLINED,
             tooltip=self._state.status.copy.PAGE_PROJECT_DUE_ADD,
@@ -278,6 +298,7 @@ class PageView:
         self.meta_row = ft.Row(
             controls=[
                 self.meta_date,
+                self.meta_date_button,
                 self.meta_status,
                 self.meta_owner,
                 self.meta_owner_button,
@@ -326,6 +347,7 @@ class PageView:
             self.remove_reminder,
             self.cancel_reminder,
             copy=self._state.status.copy,
+            pick_date=self._pick_date,
         )
         self._show_completed_steps = False
         self._show_finished_projects = False
@@ -415,17 +437,18 @@ class PageView:
         )
         self.due_field = ft.TextField(
             label=self._state.status.copy.PAGE_DUE_DATE_LABEL,
-            hint_text="2026-11-20",
+            hint_text=self._state.status.copy.DATE_HINT,
             on_change=self.change_due_date,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.date_field = ft.TextField(
             label=self._state.status.copy.PAGE_DATE_LABEL,
-            hint_text="2025-10-12",
+            hint_text=self._state.status.copy.DATE_HINT,
             on_blur=self.commit_date,
             on_submit=self.commit_date,
             height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
+        self._attach_date_field_actions()
         self.date_error = ft.Text(
             "",
             style=afanes.ui.theme.TEXT_ROLES["caption"],
@@ -1027,6 +1050,7 @@ class PageView:
             self.meta_owner_button.visible = False
             self.meta_asked.visible = False
             self.meta_asked_button.visible = False
+            self.meta_date_button.visible = False
             return
         if labels.date_text.strip():
             try:
@@ -1038,6 +1062,12 @@ class PageView:
             self.meta_date.value = self._state.status.copy.PAGE_DATE.format(date=formatted_date)
         else:
             self.meta_date.value = self._state.status.copy.PAGE_NO_DATE
+        self.meta_date_button.visible = self._pick_note_date is not None
+        self.meta_date_button.tooltip = (
+            self._state.status.copy.PAGE_DATE_CHANGE
+            if labels.date_text.strip()
+            else self._state.status.copy.PAGE_DATE_ADD
+        )
         is_project = labels.note_type is NoteType.PROJECT
         self.meta_status.visible = is_project
         self.meta_due.visible = is_project
@@ -1075,6 +1105,11 @@ class PageView:
             else []
         )
         self.meta_asked.visible = bool(asked_by)
+        self.meta_due_button.tooltip = (
+            self._state.status.copy.PAGE_PROJECT_DUE_CHANGE
+            if labels.due_date is not None
+            else self._state.status.copy.PAGE_PROJECT_DUE_ADD
+        )
         due_date = labels.due_date
         self.meta_due.value = (
             self._state.status.copy.PROJECT_DUE.format(
@@ -1651,6 +1686,76 @@ class PageView:
         if chosen is None:
             return
         await self._state.dialogs.set_page_asked_by(chosen, save=True)
+        self.refresh()
+        self._update()
+
+    def _attach_date_field_actions(self) -> None:
+        """Attach the calendar suffix to the Date and Due date fields."""
+        copy = self._state.status.copy
+        if self._pick_note_date is not None:
+            DatePickerButton(
+                DatePickerActions(self._pick_page_date, self._apply_page_date),
+                copy=copy,
+            ).attach(self.date_field)
+        if self._pick_date is not None:
+            DatePickerButton(
+                DatePickerActions(self._pick_due_date, self._apply_due_date),
+                copy=copy,
+            ).attach(self.due_field)
+
+    def _field_note_date(self) -> NoteDate | None:
+        """Return the Date field value, or ``None`` when empty or invalid."""
+        text = (self.date_field.value or "").strip()
+        if not text:
+            return None
+        try:
+            return NoteDate.from_text(text)
+        except ValueError:
+            return None
+
+    async def _pick_page_date(self) -> NoteDate | None:
+        """Open the precision-aware picker for the Date field."""
+        if self._pick_note_date is None:
+            return None
+        return await self._pick_note_date(self._field_note_date(), afanes.ui.components.date_entry.ALL_PRECISIONS)
+
+    async def _apply_page_date(self, value: NoteDate) -> None:
+        """Write a picked Date value through the existing commit path."""
+        self.date_field.value = value.text
+        await self.commit_date()
+
+    async def _pick_due_date(self) -> NoteDate | None:
+        """Open the day-only picker for the Due date field."""
+        if self._pick_date is None:
+            return None
+        text = (self.due_field.value or "").strip()
+        try:
+            current = datetime.date.fromisoformat(text)
+        except ValueError:
+            current = None
+        chosen = await self._pick_date(current)
+        return None if chosen is None else NoteDate.from_date(chosen)
+
+    async def _apply_due_date(self, value: NoteDate) -> None:
+        """Write a picked Due date through the existing draft path."""
+        self.due_field.value = value.text
+        await self.change_due_date()
+
+    async def choose_note_date(self) -> None:
+        """Open the precision-aware picker for the read-mode note date."""
+        if self._pick_note_date is None:
+            return
+        labels = self._state.pages.page_labels
+        current: NoteDate | None = None
+        if labels is not None and labels.date_text.strip():
+            try:
+                current = NoteDate.from_text(labels.date_text)
+            except ValueError:
+                current = None
+        chosen = await self._pick_note_date(current, afanes.ui.components.date_entry.ALL_PRECISIONS)
+        if chosen is None:
+            return
+        await self._state.dialogs.save_page_date(chosen.text)
         self.refresh()
         self._update()
 

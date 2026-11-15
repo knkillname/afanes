@@ -324,6 +324,54 @@ class TestDueStepCard:
         document = NoteDocument.from_text((tmp_path / "vault" / "projects" / "Home.md").read_text(encoding="utf-8"))
         assert StepDocument(document.body).steps[0].plan == datetime.date(2026, 12, 1)
 
+    def test_postpone_field_offers_the_day_picker(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._due_step(tmp_path, monkeypatch)
+        calls: list[datetime.date | None] = []
+
+        async def pick(current: datetime.date | None) -> datetime.date | None:
+            calls.append(current)
+            return datetime.date(2026, 12, 1)
+
+        view = afanes.ui.views.review.ReviewView(_noop, pick_date=pick)
+        asyncio.run(_handler(_find_by_key(view.root, "review-postpone"))())
+        field = _find_by_key(view.root, "review-form-field")
+        assert isinstance(field, ft.TextField)
+        suffix = field.suffix
+        assert isinstance(suffix, ft.IconButton)
+
+        asyncio.run(_handler(suffix)())
+
+        assert calls == [None]
+        refreshed = _find_by_key(view.root, "review-form-field")
+        assert isinstance(refreshed, ft.TextField)
+        assert refreshed.value == "2026-12-01"
+        submit = _find_by_key(view.root, "review-form-submit")
+        assert isinstance(submit, ft.FilledButton)
+        assert not submit.disabled
+
+    def test_cancelling_the_postpone_picker_keeps_the_typed_date(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._due_step(tmp_path, monkeypatch)
+
+        async def pick(_current: datetime.date | None) -> datetime.date | None:
+            return None
+
+        view = afanes.ui.views.review.ReviewView(_noop, pick_date=pick)
+        asyncio.run(_handler(_find_by_key(view.root, "review-postpone"))())
+        field = _find_by_key(view.root, "review-form-field")
+        assert isinstance(field, ft.TextField)
+        field.value = "2026-11-20"
+        asyncio.run(_change_handler(field)())
+        suffix = field.suffix
+        assert isinstance(suffix, ft.IconButton)
+
+        asyncio.run(_handler(suffix)())
+
+        refreshed = _find_by_key(view.root, "review-form-field")
+        assert isinstance(refreshed, ft.TextField)
+        assert refreshed.value == "2026-11-20"
+
     def test_invalid_postpone_date_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._due_step(tmp_path, monkeypatch)
         view = afanes.ui.views.review.ReviewView(_noop)

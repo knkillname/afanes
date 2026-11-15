@@ -16,9 +16,11 @@ import flet as ft
 
 import afanes.core.search
 import afanes.models.note
+import afanes.ui.components.date_entry
 import afanes.ui.state
 import afanes.ui.theme
 from afanes.core.search import ProjectSummary, ReviewItem
+from afanes.ui.components.date_entry import DatePickerActions, DatePickerButton, PickDate
 from afanes.ui.components.panel import Card
 from afanes.ui.components.status import StatusLabel
 from afanes.ui.components.step_text import StepText, StepTextOptions
@@ -31,18 +33,25 @@ class ReviewView:
     ----------
     update : Callable[[], None]
         Requests a repaint of the page and its surrounding workspace.
+    pick_date : PickDate | None
+        Command that opens the day-only date picker, or ``None`` when the host
+        does not provide one.
     """
 
-    def __init__(self, update: Callable[[], None]) -> None:
+    def __init__(self, update: Callable[[], None], *, pick_date: PickDate | None = None) -> None:
         """Build review controls against the shared application state.
 
         Parameters
         ----------
         update : Callable[[], None]
             Requests a repaint of the page and its surrounding workspace.
+        pick_date : PickDate | None
+            Command that opens the day-only date picker, or ``None`` when the
+            host does not provide one.
         """
         self._state = afanes.ui.state.app_state
         self._update = update
+        self._pick_date = pick_date
         self._form_mode: str | None = None
         self._typed = ""
         self._form_error: str | None = None
@@ -440,11 +449,16 @@ class ReviewView:
         label = self._form_label()
         field = ft.TextField(
             label=label,
-            hint_text="2026-11-20" if self._form_mode == "postpone" else "Ada",
+            hint_text=self._state.status.copy.DATE_HINT if self._form_mode == "postpone" else "Ada",
             value=self._typed,
             on_change=self._change_typed,
             key="review-form-field",
         )
+        if self._form_mode == "postpone" and self._pick_date is not None:
+            DatePickerButton(
+                DatePickerActions(self._pick_postpone_date, self._apply_postpone_date),
+                copy=self._state.status.copy,
+            ).attach(field)
         self._form_submit = ft.FilledButton(
             content=self._state.status.copy.REVIEW_CONFIRM,
             on_click=self._submit_form,
@@ -623,6 +637,24 @@ class ReviewView:
         self._form_mode = None
         self._typed = ""
         self._form_error = None
+        self.refresh()
+        self._update()
+
+    async def _pick_postpone_date(self) -> afanes.models.note.NoteDate | None:
+        """Open the day-only picker for the postpone form."""
+        if self._pick_date is None:
+            return None
+        text = (self._typed or "").strip()
+        try:
+            current = datetime.date.fromisoformat(text)
+        except ValueError:
+            current = None
+        chosen = await self._pick_date(current)
+        return None if chosen is None else afanes.models.note.NoteDate.from_date(chosen)
+
+    async def _apply_postpone_date(self, value: afanes.models.note.NoteDate) -> None:
+        """Write a picked postpone date and refresh the form state."""
+        self._typed = value.text
         self.refresh()
         self._update()
 

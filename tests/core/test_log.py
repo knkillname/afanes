@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 import afanes.core.localization
 import afanes.core.log
 import afanes.core.vault.service
@@ -11,6 +13,8 @@ YEAR = 2025
 MONTH = 10
 DAY = 12
 OCTOBER_DAYS = 31
+OCTOBER_FIRST_WEEKDAY = 2
+LEAP_FEBRUARY_DAYS = 29
 TWO_ENTRIES = 2
 ENGLISH = afanes.core.localization.LocaleTag.parse("en")
 SPANISH = afanes.core.localization.LocaleTag.parse("es")
@@ -167,6 +171,30 @@ class TestCalendar:
         assert all(day.count == 0 for day in calendar.days)
         assert calendar.has_month_entry is False
         assert calendar.has_year_entry is False
+
+
+class TestCalendarMonthForMonth:
+    def test_builds_an_unmarked_month(self) -> None:
+        calendar = afanes.core.log.CalendarMonth.for_month(YEAR, MONTH)
+
+        assert calendar.year == YEAR
+        assert calendar.month == MONTH
+        assert calendar.first_weekday == OCTOBER_FIRST_WEEKDAY
+        assert calendar.days_in_month == OCTOBER_DAYS
+        assert [day.day for day in calendar.days] == list(range(1, OCTOBER_DAYS + 1))
+        assert all(day.count == 0 for day in calendar.days)
+        assert calendar.has_month_entry is False
+        assert calendar.has_year_entry is False
+
+    def test_builds_a_leap_february(self) -> None:
+        calendar = afanes.core.log.CalendarMonth.for_month(2028, 2)
+
+        assert calendar.days_in_month == LEAP_FEBRUARY_DAYS
+        assert len(calendar.days) == LEAP_FEBRUARY_DAYS
+
+    def test_rejects_an_invalid_month(self) -> None:
+        with pytest.raises(ValueError, match="month"):
+            afanes.core.log.CalendarMonth.for_month(YEAR, 13)
 
 
 class TestSearch:

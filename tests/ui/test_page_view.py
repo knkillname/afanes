@@ -16,6 +16,8 @@ import afanes.core.vault.service
 import afanes.core.vault.trash_catalog
 import afanes.i18n.ui
 import afanes.i18n.ui.en
+import afanes.models.note
+import afanes.ui.components.date_entry
 import afanes.ui.state
 import afanes.ui.state.browser
 import afanes.ui.state.controller
@@ -2197,6 +2199,215 @@ class TestPageDates:
         assert path.is_file()
 
 
+class TestDateEntryActions:
+    def _open(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        path: Path,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(versioned(tmp_path / "vault"))
+            await state.navigation.open_page(path)
+
+        asyncio.run(scenario())
+
+    def _invoke(self, control: ft.IconButton) -> None:
+        handler = control.on_click
+        assert handler is not None
+        asyncio.run(typing.cast("typing.Callable[[], typing.Coroutine[typing.Any, typing.Any, None]]", handler)())
+
+    def test_the_date_field_offers_the_precision_picker(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
+        self._open(tmp_path, monkeypatch, path)
+        calls: list[tuple[NoteDate | None, frozenset[afanes.models.note.DatePrecision]]] = []
+
+        async def pick(
+            current: NoteDate | None,
+            precisions: frozenset[afanes.models.note.DatePrecision],
+        ) -> NoteDate | None:
+            calls.append((current, precisions))
+            return NoteDate.from_text("2026-02")
+
+        view = PageView(PageActions(update=lambda: None, pick_note_date=pick))
+        asyncio.run(view.start_edit())
+
+        self._invoke(typing.cast("ft.IconButton", view.date_field.suffix))
+
+        assert calls == [(None, afanes.ui.components.date_entry.ALL_PRECISIONS)]
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.date is not None
+        assert document.date.text == "2026-02"
+
+    def test_a_month_selection_keeps_a_custom_log_heading(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            _typed_note("log", "# A quiet Tuesday\n", extra="date: 2025-10-12"),
+        )
+        self._open(tmp_path, monkeypatch, path)
+
+        async def pick(
+            _current: NoteDate | None,
+            _precisions: frozenset[afanes.models.note.DatePrecision],
+        ) -> NoteDate | None:
+            return NoteDate.from_text("2025-10")
+
+        view = PageView(PageActions(update=lambda: None, pick_note_date=pick))
+        asyncio.run(view.start_edit())
+
+        self._invoke(typing.cast("ft.IconButton", view.date_field.suffix))
+
+        target = vault / "log" / "2025" / "10" / "2025-10.md"
+        assert target.is_file()
+        assert not path.exists()
+        assert "# A quiet Tuesday" in target.read_text(encoding="utf-8")
+
+    def test_a_year_selection_moves_and_updates_a_generated_heading(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            _typed_note("log", "# October 12, 2025\n", extra="date: 2025-10-12"),
+        )
+        self._open(tmp_path, monkeypatch, path)
+
+        async def pick(
+            _current: NoteDate | None,
+            _precisions: frozenset[afanes.models.note.DatePrecision],
+        ) -> NoteDate | None:
+            return NoteDate.from_text("2025")
+
+        view = PageView(PageActions(update=lambda: None, pick_note_date=pick))
+        asyncio.run(view.start_edit())
+
+        self._invoke(typing.cast("ft.IconButton", view.date_field.suffix))
+
+        target = vault / "log" / "2025" / "2025.md"
+        assert target.is_file()
+        assert not path.exists()
+        content = target.read_text(encoding="utf-8")
+        document = NoteDocument.from_text(content)
+        assert document.date is not None
+        assert document.date.text == "2025"
+        assert "# 2025" in content
+
+    def test_the_due_field_offers_the_day_picker(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "projects" / "Launch.md",
+            _typed_note("project", "# Launch\n", extra="due_date: 2026-01-02"),
+        )
+        self._open(tmp_path, monkeypatch, path)
+        calls: list[datetime.date | None] = []
+
+        async def pick(current: datetime.date | None) -> datetime.date | None:
+            calls.append(current)
+            return datetime.date(2026, 12, 1)
+
+        view = PageView(PageActions(update=lambda: None, pick_date=pick))
+        asyncio.run(view.start_edit())
+
+        self._invoke(typing.cast("ft.IconButton", view.due_field.suffix))
+
+        assert calls == [datetime.date(2026, 1, 2)]
+        labels = afanes.ui.state.app_state.pages.page_labels
+        assert labels is not None
+        assert labels.due_date == datetime.date(2026, 12, 1)
+
+    def test_read_mode_note_date_action_uses_the_precision_picker(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "notes" / "Ada.md",
+            _typed_note("note", "# Ada\n", extra="date: 2025-10"),
+        )
+        self._open(tmp_path, monkeypatch, path)
+        calls: list[NoteDate | None] = []
+
+        async def pick(
+            current: NoteDate | None,
+            _precisions: frozenset[afanes.models.note.DatePrecision],
+        ) -> NoteDate | None:
+            calls.append(current)
+            return NoteDate.from_text("2026-03")
+
+        view = PageView(PageActions(update=lambda: None, pick_note_date=pick))
+
+        asyncio.run(view.choose_note_date())
+
+        assert calls == [NoteDate.from_text("2025-10")]
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.date is not None
+        assert document.date.text == "2026-03"
+        assert view.meta_date_button.tooltip == afanes.i18n.ui.en.PAGE_DATE_CHANGE
+
+    def test_read_mode_offers_the_add_date_action_for_a_missing_date(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(vault / "notes" / "Ada.md", _typed_note("note", "# Ada\n"))
+        self._open(tmp_path, monkeypatch, path)
+        calls: list[NoteDate | None] = []
+
+        async def pick(
+            current: NoteDate | None,
+            _precisions: frozenset[afanes.models.note.DatePrecision],
+        ) -> NoteDate | None:
+            calls.append(current)
+            return NoteDate.from_text("2026-01-01")
+
+        view = PageView(PageActions(update=lambda: None, pick_note_date=pick))
+
+        assert view.meta_date_button.visible is True
+        assert view.meta_date_button.tooltip == afanes.i18n.ui.en.PAGE_DATE_ADD
+        asyncio.run(view.choose_note_date())
+
+        assert calls == [None]
+        document = NoteDocument.from_text(path.read_text(encoding="utf-8"))
+        assert document.date is not None
+        assert document.date.text == "2026-01-01"
+
+    def test_the_due_tooltip_distinguishes_add_and_change(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        vault = tmp_path / "vault"
+        path = _write_note(
+            vault / "projects" / "Launch.md",
+            _typed_note("project", "# Launch\n", extra="due_date: 2026-01-02"),
+        )
+        self._open(tmp_path, monkeypatch, path)
+        view = PageView(PageActions(update=lambda: None))
+
+        assert view.meta_due_button.tooltip == afanes.i18n.ui.en.PAGE_PROJECT_DUE_CHANGE
+
+
 class TestLogStarter:
     @staticmethod
     def _card() -> afanes.core.template_cards.TemplateCard:
@@ -2715,4 +2926,4 @@ class TestSpanishPage:
         asyncio.run(view.start_edit())
 
         assert view.date_field.value == "2025-10-12"
-        assert view.date_field.hint_text == "2025-10-12"
+        assert view.date_field.hint_text == copy.DATE_HINT

@@ -59,8 +59,9 @@ mode for each vault. Search filters both the tree and the calendar.
 ## 📅 Changing a date
 
 A log entry's date is its identity. Change it in the page's Date field or with the date picker, which
-opens in the active language. Afanes writes the new date, renames the file, moves it to the matching
-`log/<year>/<month>/` folder, and rewrites inbound `log:` links. Metadata rows show the compact date
+opens in the active language. The picker offers Day, Month, and Year modes, so an entry can name a
+whole month or year as well as a day. Afanes writes the new date, renames the file, moves it to the
+matching `log/<year>/<month>/` or `log/<year>/` folder, and rewrites inbound `log:` links. Metadata rows show the compact date
 for the active language, such as `Nov 13, 2026` or `13 nov 2026`; the Date field, links, and the
 filename keep the ISO value.
 

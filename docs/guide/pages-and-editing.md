@@ -23,6 +23,12 @@ from the browser, a link, a connection entry, or **Back**.
 A project renders as one step-aware body. Prose stays Markdown, and task lists become interactive step
 rows. See [Projects and steps](projects-and-steps.md) for the step actions.
 
+Under the title, the metadata row shows the note date and, for a project, its status and due date. The
+calendar action beside the note date opens the shared picker in Day, Month, or Year mode; a missing
+date shows **Add Date…** instead. The project due date keeps its own day-only action. Both write
+through the page's existing save path, and cancelling writes nothing. See [Dates](dates.md) for the
+picker itself.
+
 ## 🔗 Connections
 
 Read mode ends with a **Connections** section when the page has at least one connection. The section
@@ -67,7 +73,8 @@ rescue pages, and trashed pages do not offer editing; a trashed page still shows
 
 The editor is a separate panel, not part of the label form. It offers six recurrence kinds, one or
 more `HH:MM` times, a searchable IANA time-zone list that defaults to the computer's zone, and a
-one-shot date and time. A project with a due date also offers **Due Date**, **One Day Before**, and
+one-shot date and time. The date portion opens the day-only calendar action; the time stays typed.
+A project with a due date also offers **Due Date**, **One Day Before**, and
 **One Week Before** shortcuts for a one-shot; the shortcut keeps the first chosen time. Choosing the
 29th, 30th, or 31st for a monthly reminder, or the fifth weekday, shows an inline warning and suggests
 the last-day or last-weekday choice. Invalid times, weekdays, dates, or zones keep the panel open with
@@ -89,13 +96,15 @@ unreadable reminder stays in the file until it is replaced or removed. See
 Choose **Edit** to change the raw Markdown body and the labels:
 
 - **Type**: `note`, `reference`, `project`, or `log`.
-- **Date**: offered for every note. Use `YYYY`, `YYYY-MM`, or `YYYY-MM-DD`. For a log entry, changing
-  the date renames and moves the entry, updates its `log:` links, and follows the new date only when
-  the heading still equals the old generated date title.
+- **Date**: offered for every note. Use `YYYY`, `YYYY-MM`, or `YYYY-MM-DD`, or open the calendar
+  action, which offers Day, Month, and Year modes. For a log entry, changing the date renames and
+  moves the entry, updates its `log:` links, and follows the new date only when the heading still
+  equals the old generated date title.
 - **Category**: offered only for references; pick an existing label from the combobox or type a new
   one.
 - **Status**: choices follow the selected type.
-- **Due date**: offered only for projects.
+- **Due date**: offered only for projects. The calendar action offers day precision; a typed ISO
+  day remains valid.
 - **Owner** and **Asked by**: offered only for projects. Both accept free text and suggest matching
   note names from the vault.
 

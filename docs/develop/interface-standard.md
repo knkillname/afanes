@@ -2,7 +2,7 @@
 
 Afanes follows the GNOME Human Interface Guidelines strictly, using libadwaita 1.8.0 as the
 reference implementation. The guidelines assume GTK and libadwaita; Afanes runs on Flet and
-Flutter, so five toolkit limits are declared rather than treated as design choices. Everything
+Flutter, so six toolkit limits are declared rather than treated as design choices. Everything
 else — palette, depth, selection, typography, icon treatment, and layout — follows the reference.
 
 :::{admonition} tl;dr
@@ -158,6 +158,25 @@ inline panel counts on its own. A reversible action uses Undo in a toast instead
 An irreversible confirmation puts Cancel before the affirmative action, and the affirmative action
 names the operation.
 
+## 📅 Date entry
+
+Every date field embeds a calendar action in its suffix, and every read-mode date action uses the
+same dialog. The calendar is Monday-first in both languages through `LocaleFormat`, so English and
+Spanish share one grid.
+
+The dialog shows the pending value as a caption, a mode switch when the field accepts more than one
+precision, month and year navigation, and Cancel before Select. A day click selects; Select confirms.
+Cancel, Esc, and an outside click discard. A Page Date field offers Day, Month, and Year precision; a
+due date, step plan, Processing date, Review postpone date, and reminder one-shot date offer Day
+only. Changing modes keeps the day-of-month and clamps it to the month length.
+
+A month or year selection writes the matching ISO precision. The text field stays the source of
+truth: it keeps ISO text and runs its existing validation and save path. The dialog never writes the
+vault. Selection uses the neutral selected-row fill, today uses an accent outline as well as a text
+cue, and focus uses the accent ring.
+
+The calendar is a dialog rather than an anchored popover; the bounded-differences table records why.
+
 ## 💬 Feedback
 
 Feedback is chosen by the lifetime of the event, not by severity:
@@ -282,7 +301,7 @@ Material icon set stands in for Adwaita's symbolic set; no custom SVG icon set s
 
 ## 🔀 Bounded differences
 
-These five differences are toolkit limits, not design preferences. Adding another one requires a
+These six differences are toolkit limits, not design preferences. Adding another one requires a
 change that updates this table and the `interface-theme` spec.
 
 | Reference behavior | Afanes | Status | Why |
@@ -292,6 +311,7 @@ change that updates this table and the `interface-theme` spec.
 | Access-key mnemonics | No underlined Alt shortcuts | Permanent, Flet limit | Flet exposes no mnemonic API |
 | High-contrast style | No separate high-contrast input | Permanent, Flet limit | Flet exposes no high-contrast input; Flutter exposes one |
 | Header bar with window controls | Native title bar plus in-window headers | Permanent, Flet limit | Flet desktop windows use native decorations and expose no title-bar control API |
+| Anchored calendar popover | Date-picker dialog opened by the field calendar action | Permanent, Flet limit | Flet exposes no anchored popover and no anchor geometry for page overlays |
 
 The platform typeface is **not** a difference: the typography guideline requires the system font.
 The remaining obligation is to confirm the resolved family on each platform. If Flutter resolves to
@@ -384,7 +404,7 @@ WAVE 7  identity: app icon, placeholder pages, final palette pass, empty
         baseline
 ```
 
-Waves are ordering, not exemptions. The target remains strict conformance; the five Flet limits
+Waves are ordering, not exemptions. The target remains strict conformance; the six Flet limits
 above are the only permanent exceptions.
 
 ## ✅ Changing the standard

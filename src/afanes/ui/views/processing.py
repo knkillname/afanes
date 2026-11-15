@@ -10,12 +10,14 @@ import flet as ft
 
 import afanes.core.vault.processing
 import afanes.models.note
+import afanes.ui.components.date_entry
 import afanes.ui.state
 import afanes.ui.theme
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
 from afanes.core.vault.note import VaultNote
 from afanes.models.link import ReferenceScheme
 from afanes.models.note import Status
+from afanes.ui.components.date_entry import DatePickerActions, DatePickerButton, PickDate
 from afanes.ui.components.template_cards import TemplateCardContext, TemplateCardPicker
 
 
@@ -30,6 +32,9 @@ class ProcessingView:
         Command that closes the wizard without writing.
     on_finish : Callable[[], Awaitable[None]]
         Command that closes the success state and returns to the Inbox.
+    pick_date : PickDate | None
+        Command that opens the day-only date picker, or ``None`` when the host
+        does not provide one.
     """
 
     def __init__(
@@ -37,6 +42,8 @@ class ProcessingView:
         update: Callable[[], None],
         on_cancel: Callable[[], Awaitable[None]],
         on_finish: Callable[[], Awaitable[None]],
+        *,
+        pick_date: PickDate | None = None,
     ) -> None:
         """Build the wizard controls against the shared application state.
 
@@ -53,6 +60,7 @@ class ProcessingView:
         self._update = update
         self._on_cancel = on_cancel
         self._on_finish = on_finish
+        self._pick_date = pick_date
         self._working = False
         self._plan_hidden = self._state.processing.plan is None
         self._suppress_suggestions = False
@@ -136,11 +144,16 @@ class ProcessingView:
         )
         self.due_date = ft.TextField(
             label=self._state.status.copy.PROCESSING_DUE_DATE_LABEL,
-            hint_text="2026-11-20",
+            hint_text=self._state.status.copy.DATE_HINT,
             on_change=self._invalidate_plan,
             width=260,
             visible=False,
         )
+        if self._pick_date is not None:
+            DatePickerButton(
+                DatePickerActions(self._pick_due_date, self._apply_due_date),
+                copy=self._state.status.copy,
+            ).attach(self.due_date)
         self.owner = ft.TextField(
             label=self._state.status.copy.PAGE_OWNER_LABEL,
             hint_text=self._state.status.copy.PAGE_OWNER_HINT,
@@ -319,6 +332,23 @@ class ProcessingView:
     def _refresh_template(self) -> None:
         """Rebuild the template options and keep the selection valid."""
         self._template_picker.refresh(self._state.processing.cards, self._state.processing.card_issues)
+
+    async def _pick_due_date(self) -> afanes.models.note.NoteDate | None:
+        """Open the day-only picker for the optional project due date."""
+        if self._pick_date is None:
+            return None
+        text = (self.due_date.value or "").strip()
+        try:
+            current = datetime.date.fromisoformat(text)
+        except ValueError:
+            current = None
+        chosen = await self._pick_date(current)
+        return None if chosen is None else afanes.models.note.NoteDate.from_date(chosen)
+
+    async def _apply_due_date(self, value: afanes.models.note.NoteDate) -> None:
+        """Write a picked due date and invalidate the stale plan preview."""
+        self.due_date.value = value.text
+        self._invalidate_plan()
 
     def _invalidate_plan(self) -> None:
         """Hide stale plan details after the form changes."""

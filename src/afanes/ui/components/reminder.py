@@ -16,8 +16,10 @@ import flet as ft
 import tzlocal
 
 import afanes.i18n.ui
+import afanes.models.note
 import afanes.ui.theme
 from afanes.models.reminder import ClockTime, OneShot, Recurrence, Reminder, ReminderKind, Weekday
+from afanes.ui.components.date_entry import DatePickerActions, DatePickerButton, PickDate
 from afanes.ui.components.panel import Panel
 
 _ENGLISH_COPY = afanes.i18n.ui.UiCopy.english()
@@ -40,6 +42,9 @@ class ReminderEditor:
         Command that closes the editor without writing.
     copy : afanes.i18n.ui.UiCopy
         Active interface catalog.
+    pick_date : afanes.ui.components.date_entry.PickDate | None
+        Command that opens the day-only date picker, or ``None`` when the host
+        does not provide one.
 
     Notes
     -----
@@ -55,6 +60,7 @@ class ReminderEditor:
         on_cancel: Callable[[], Awaitable[None]],
         *,
         copy: afanes.i18n.ui.UiCopy = _ENGLISH_COPY,
+        pick_date: PickDate | None = None,
     ) -> None:
         """Build the reminder controls.
 
@@ -68,8 +74,12 @@ class ReminderEditor:
             Close without writing.
         copy : afanes.i18n.ui.UiCopy
             Active interface catalog.
+        pick_date : afanes.ui.components.date_entry.PickDate | None
+            Command that opens the day-only date picker, or ``None`` when the
+            host does not provide one.
         """
         self._copy = copy
+        self._pick_date = pick_date
         self._on_save = on_save
         self._on_remove = on_remove
         self._on_cancel = on_cancel
@@ -273,6 +283,11 @@ class ReminderEditor:
             hint_text=self._copy.REMINDER_ONCE_HINT,
             key="reminder-once",
         )
+        if self._pick_date is not None:
+            DatePickerButton(
+                DatePickerActions(self._pick_once_date, self._apply_once_date),
+                copy=self._copy,
+            ).attach(self.once_field)
         self.shortcut_due = ft.TextButton(
             content=self._copy.REMINDER_SHORTCUT_DUE,
             on_click=self._due_shortcut,
@@ -442,6 +457,33 @@ class ReminderEditor:
     def _week_before_shortcut(self, _event: object = None) -> None:
         """Fill the one-shot with one week before the project due date."""
         self._fill_shortcut(7)
+
+    async def _pick_once_date(self) -> afanes.models.note.NoteDate | None:
+        """Open the day-only picker for the one-shot date portion."""
+        if self._pick_date is None:
+            return None
+        text = (self.once_field.value or "").strip()
+        date_text = text[:10]
+        try:
+            current = datetime.date.fromisoformat(date_text)
+        except ValueError:
+            current = None
+        chosen = await self._pick_date(current)
+        return None if chosen is None else afanes.models.note.NoteDate.from_date(chosen)
+
+    async def _apply_once_date(self, value: afanes.models.note.NoteDate) -> None:
+        """Write a picked one-shot date and keep the typed time."""
+        self.once_field.value = f"{value.text}T{self._once_time().text}"
+        self.error_text.visible = False
+
+    def _once_time(self) -> ClockTime:
+        """Return the typed one-shot time, or the first chosen time."""
+        text = (self.once_field.value or "").strip()
+        _date, _separator, time_text = text.partition("T")
+        try:
+            return ClockTime.from_text(time_text.strip())
+        except ValueError:
+            return self._times[0] if self._times else ClockTime(hour=9, minute=0)
 
     def _fill_shortcut(self, days_before: int) -> None:
         """Write one shortcut date at the first chosen time."""

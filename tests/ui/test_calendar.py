@@ -1,5 +1,6 @@
 """Tests for the Log month calendar component."""
 
+import datetime
 import typing
 
 import flet as ft
@@ -98,6 +99,100 @@ class TestLogCalendar:
         typing.cast("typing.Callable[[], None]", upcoming)()
 
         assert calls == ["previous", "next"]
+
+
+class TestCalendarGrid:
+    def test_selected_day_uses_the_neutral_fill(self) -> None:
+        grid = calendar_component.CalendarGrid(
+            lambda _day: None,
+            selected=datetime.date(2025, 10, 12),
+        )
+
+        grid.build(_month())
+
+        style = grid.day_buttons[12].style
+        assert style is not None
+        assert style.bgcolor == afanes.ui.theme.CALENDAR_SELECTED_COLOR
+        assert afanes.ui.theme.CALENDAR_SELECTED_COLOR == afanes.ui.theme.SELECTED_ROW_COLOR
+
+    def test_today_uses_an_accent_outline_and_text(self) -> None:
+        grid = calendar_component.CalendarGrid(
+            lambda _day: None,
+            today=datetime.date(2025, 10, 13),
+        )
+
+        grid.build(_month())
+
+        style = grid.day_buttons[13].style
+        assert style is not None
+        assert style.side == afanes.ui.theme.CALENDAR_TODAY_SIDE
+        assert style.color == afanes.ui.theme.CALENDAR_TODAY_COLOR
+
+    def test_selected_today_keeps_the_neutral_fill(self) -> None:
+        today = datetime.date(2025, 10, 12)
+        grid = calendar_component.CalendarGrid(lambda _day: None, selected=today, today=today)
+
+        grid.build(_month())
+
+        style = grid.day_buttons[12].style
+        assert style is not None
+        assert style.bgcolor == afanes.ui.theme.CALENDAR_SELECTED_COLOR
+        assert style.side == afanes.ui.theme.CALENDAR_TODAY_SIDE
+
+    def test_set_marks_moves_the_selection_and_today(self) -> None:
+        grid = calendar_component.CalendarGrid(lambda _day: None)
+        grid.build(_month())
+        selected = datetime.date(2025, 10, 20)
+        today = datetime.date(2025, 10, 21)
+
+        grid.set_marks(selected, today)
+
+        selected_style = grid.day_buttons[20].style
+        today_style = grid.day_buttons[21].style
+        assert selected_style is not None
+        assert today_style is not None
+        assert selected_style.bgcolor == afanes.ui.theme.CALENDAR_SELECTED_COLOR
+        assert today_style.side == afanes.ui.theme.CALENDAR_TODAY_SIDE
+        assert grid.day_buttons[12].style is not None
+        assert grid.day_buttons[12].style.bgcolor is None
+
+    def test_a_custom_tooltip_names_the_day(self) -> None:
+        grid = calendar_component.CalendarGrid(
+            lambda _day: None,
+            day_tooltip=lambda cell: f"day {cell.day}",
+        )
+
+        grid.build(_month())
+
+        assert grid.day_buttons[12].tooltip == "day 12"
+
+    def test_day_focus_and_blur_report_the_day(self) -> None:
+        events: list[tuple[str, int]] = []
+        grid = calendar_component.CalendarGrid(
+            lambda _day: None,
+            on_day_focus=lambda day: events.append(("focus", day)),
+            on_day_blur=lambda day: events.append(("blur", day)),
+        )
+        grid.build(_month())
+        focus = grid.day_buttons[12].on_focus
+        blur = grid.day_buttons[12].on_blur
+        assert focus is not None
+        assert blur is not None
+
+        typing.cast("typing.Callable[[], None]", focus)()
+        typing.cast("typing.Callable[[], None]", blur)()
+
+        assert events == [("focus", 12), ("blur", 12)]
+
+    def test_grid_keys_carry_the_prefix(self) -> None:
+        grid = calendar_component.CalendarGrid(lambda _day: None, key_prefix="picker")
+
+        control = grid.build(_month())
+
+        assert control.key == "picker-grid-root"
+        assert grid.weekdays.key == "picker-weekdays"
+        assert grid.grid.key == "picker-grid"
+        assert grid.day_buttons[12].key == "picker-day-12"
 
 
 class TestSpanishCalendar:

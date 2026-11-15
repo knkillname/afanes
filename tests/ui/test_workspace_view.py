@@ -18,6 +18,8 @@ import afanes.core.settings
 import afanes.core.vault.service
 import afanes.i18n.ui
 import afanes.i18n.ui.en
+import afanes.models.note
+import afanes.ui.components.date_entry
 import afanes.ui.state
 import afanes.ui.state.browser
 import afanes.ui.state.status
@@ -697,6 +699,49 @@ class TestDatePickerWiring:
         assert calls == [None]
         document = afanes.core.frontmatter.NoteDocument.from_text(project.read_text(encoding="utf-8"))
         assert document.due_date == chosen
+
+    def test_note_date_picker_callback_reaches_the_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        reference = _write_note(
+            vault / "reference" / "Ada.md",
+            note_type="reference",
+            body="# Ada\n",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+        calls: list[tuple[NoteDate | None, frozenset[afanes.models.note.DatePrecision]]] = []
+
+        async def pick(
+            current: NoteDate | None,
+            precisions: frozenset[afanes.models.note.DatePrecision],
+        ) -> NoteDate | None:
+            calls.append((current, precisions))
+            return NoteDate.from_text("2026-03")
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(reference)
+
+        asyncio.run(scenario())
+        view = afanes.ui.views.workspace.WorkspaceView(
+            afanes.ui.views.workspace.WorkspaceActions(
+                _noop,
+                _change_vault,
+                _create_vault,
+                _close_vault,
+                pick_note_date=pick,
+            )
+        )
+        asyncio.run(view.page_view.start_edit())
+        suffix = view.page_view.date_field.suffix
+        assert isinstance(suffix, ft.IconButton)
+
+        asyncio.run(_handler(suffix)())
+
+        assert calls == [(None, afanes.ui.components.date_entry.ALL_PRECISIONS)]
+        document = afanes.core.frontmatter.NoteDocument.from_text(reference.read_text(encoding="utf-8"))
+        assert document.date is not None
+        assert document.date.text == "2026-03"
 
 
 class TestBrowserCreationAction:

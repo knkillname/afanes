@@ -21,7 +21,9 @@ import afanes.core.vault.service
 import afanes.core.vault.snapshot
 import afanes.i18n.ui
 import afanes.i18n.ui.en
+import afanes.models.note
 import afanes.ui.app
+import afanes.ui.components.date_entry
 import afanes.ui.state
 import afanes.ui.theme
 import afanes.ui.views.page
@@ -384,7 +386,7 @@ class TestLocaleStartup:
         content = typing.cast("ft.Text", snackbar.content)
         assert content.value == afanes.i18n.ui.en.LANGUAGE_RESTART
 
-    def test_the_date_picker_receives_the_active_locale(
+    def test_the_date_dialog_receives_the_active_locale(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -392,9 +394,9 @@ class TestLocaleStartup:
         state = afanes.ui.state.app_state
         state.status.set_copy(afanes.i18n.ui.UiCopy.for_locale(afanes.core.localization.LocaleTag.parse("es")))
         shell = afanes.ui.app.AppShell(typing.cast("ft.Page", page), None)
-        shown: list[ft.DatePicker] = []
+        shown: list[ft.AlertDialog] = []
 
-        def show_dialog(dialog: ft.DatePicker) -> None:
+        def show_dialog(dialog: ft.AlertDialog) -> None:
             shown.append(dialog)
             dismiss = typing.cast("typing.Callable[[], None] | None", dialog.on_dismiss)
             assert dismiss is not None
@@ -405,8 +407,110 @@ class TestLocaleStartup:
         result = asyncio.run(shell.pick_date(None))
 
         assert result is None
-        assert shown[0].locale is not None
-        assert shown[0].locale.language_code == "es"
+        assert shown[0].key == "date-picker-dialog"
+        title = _typed(typing.cast("ft.Control | None", shown[0].title), ft.Text)
+        select = _typed(_find_by_key(shown[0], "date-picker-select"), ft.OutlinedButton)
+        assert title.value == "Elegir fecha"
+        assert select.content == "Seleccionar"
+
+
+class TestDatePickerAPI:
+    def test_pick_note_date_returns_the_confirmed_value(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        page = FakePage()
+        shell = afanes.ui.app.AppShell(typing.cast("ft.Page", page), None)
+        current = afanes.models.note.NoteDate.from_text("2026-11-14")
+        tasks: list[asyncio.Task[None]] = []
+
+        def show_dialog(_dialog: ft.AlertDialog) -> None:
+            target = shell.date_dialog
+            assert target is not None
+            target.select_day(20)
+            tasks.append(asyncio.create_task(target.confirm()))
+
+        monkeypatch.setattr(page, "show_dialog", show_dialog)
+
+        result = asyncio.run(shell.pick_note_date(current, frozenset({afanes.models.note.DatePrecision.DAY})))
+
+        assert result == afanes.models.note.NoteDate.from_text("2026-11-20")
+
+    def test_pick_date_returns_a_day(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        page = FakePage()
+        shell = afanes.ui.app.AppShell(typing.cast("ft.Page", page), None)
+        tasks: list[asyncio.Task[None]] = []
+
+        def show_dialog(_dialog: ft.AlertDialog) -> None:
+            target = shell.date_dialog
+            assert target is not None
+            target.select_day(20)
+            tasks.append(asyncio.create_task(target.confirm()))
+
+        monkeypatch.setattr(page, "show_dialog", show_dialog)
+
+        result = asyncio.run(shell.pick_date(datetime.date(2026, 11, 14)))
+
+        assert result == datetime.date(2026, 11, 20)
+
+    def test_cancelling_returns_none(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        page = FakePage()
+        shell = afanes.ui.app.AppShell(typing.cast("ft.Page", page), None)
+        tasks: list[asyncio.Task[None]] = []
+
+        def show_dialog(_dialog: ft.AlertDialog) -> None:
+            target = shell.date_dialog
+            assert target is not None
+            tasks.append(asyncio.create_task(target.cancel()))
+
+        monkeypatch.setattr(page, "show_dialog", show_dialog)
+
+        result = asyncio.run(shell.pick_date(None))
+
+        assert result is None
+
+    def test_keyboard_escape_cancels_an_open_dialog(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        page = FakePage()
+        shell = afanes.ui.app.AppShell(typing.cast("ft.Page", page), None)
+        cancelled: list[bool] = []
+
+        async def confirm(_value: afanes.models.note.NoteDate) -> None:
+            return None
+
+        async def cancel() -> None:
+            cancelled.append(True)
+
+        dialog = afanes.ui.components.date_entry.DatePickerDialog(
+            None,
+            frozenset({afanes.models.note.DatePrecision.DAY}),
+            confirm,
+            cancel,
+            update=page.update,
+        )
+
+        async def scenario() -> None:
+            await shell.start()
+            shell.date_dialog = dialog
+            keyboard = typing.cast(
+                "typing.Callable[[ft.KeyboardEvent], typing.Awaitable[None]]",
+                page.on_keyboard_event,
+            )
+            await keyboard(_keyboard("Escape", ctrl=False))
+
+        asyncio.run(scenario())
+
+        assert cancelled == [True]
 
 
 class TestLogEntryDirectDraft:

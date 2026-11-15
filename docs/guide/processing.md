@@ -35,6 +35,10 @@ in the vault and accept a new name typed as-is; the new name is saved on the pro
 later by clicking it on the project page. Append Step keeps its current behavior: the appended step gets
 no owner, and the project's owner is not copied to it.
 
+The optional project due date offers the shared calendar action with day precision. A typed
+`YYYY-MM-DD` value remains valid. Choosing a new date hides a preview built from the previous value,
+so **Preview** is used again before confirming. Cancelling the picker leaves the field unchanged.
+
 The preview shows the destination and, when the outcome changes scheme, how many inbound references
 will be affected. **Preview** stays insensitive until an outcome is chosen and its required project
 or date is valid. A Log Entry outcome rewrites `note:` links to the new `log:<date>` destination; an

@@ -8,6 +8,7 @@ from collections.abc import Callable, Coroutine
 import flet as ft
 
 import afanes.i18n.ui
+import afanes.ui.components.date_entry
 import afanes.ui.components.reminder
 from afanes.models.reminder import ClockTime, OneShot, Recurrence, Reminder, ReminderKind, Weekday
 
@@ -20,6 +21,8 @@ def _editor(
     saved: list[Reminder],
     removed: list[bool],
     cancelled: list[bool],
+    *,
+    pick_date: afanes.ui.components.date_entry.PickDate | None = None,
 ) -> afanes.ui.components.reminder.ReminderEditor:
     async def save(reminder: Reminder) -> bool:
         saved.append(reminder)
@@ -32,7 +35,7 @@ def _editor(
     async def cancel() -> None:
         cancelled.append(True)
 
-    return afanes.ui.components.reminder.ReminderEditor(save, remove, cancel, copy=COPY)
+    return afanes.ui.components.reminder.ReminderEditor(save, remove, cancel, copy=COPY, pick_date=pick_date)
 
 
 def _click(control: ft.Control) -> Callable[[], object]:
@@ -74,6 +77,58 @@ class TestReminderEditor:
         assert len(saved) == 1
         assert isinstance(saved[0].schedule, OneShot)
         assert saved[0].schedule.text == "2026-11-20T09:00"
+
+    def test_one_shot_date_picker_preserves_the_typed_time(self) -> None:
+        calls: list[datetime.date | None] = []
+
+        async def pick(current: datetime.date | None) -> datetime.date | None:
+            calls.append(current)
+            return datetime.date(2026, 12, 1)
+
+        editor = _editor([], [], [], pick_date=pick)
+        editor.load(None, None, allow_remove=False)
+        editor.mode_radio.value = "once"
+        typing.cast("typing.Any", editor.mode_radio.on_change)(_event(editor.mode_radio))
+        editor.once_field.value = "2026-11-20T17:30"
+        suffix = editor.once_field.suffix
+        assert isinstance(suffix, ft.IconButton)
+
+        asyncio.run(_async_click(suffix)())
+
+        assert calls == [datetime.date(2026, 11, 20)]
+        assert editor.once_field.value == "2026-12-01T17:30"
+
+    def test_one_shot_date_picker_uses_the_first_time_when_the_time_is_missing(self) -> None:
+        async def pick(_current: datetime.date | None) -> datetime.date | None:
+            return datetime.date(2026, 12, 1)
+
+        editor = _editor([], [], [], pick_date=pick)
+        editor.load(None, None, allow_remove=False)
+        editor.mode_radio.value = "once"
+        typing.cast("typing.Any", editor.mode_radio.on_change)(_event(editor.mode_radio))
+        editor.once_field.value = ""
+        suffix = editor.once_field.suffix
+        assert isinstance(suffix, ft.IconButton)
+
+        asyncio.run(_async_click(suffix)())
+
+        assert editor.once_field.value == "2026-12-01T09:00"
+
+    def test_cancelling_the_one_shot_date_picker_keeps_the_value(self) -> None:
+        async def pick(_current: datetime.date | None) -> datetime.date | None:
+            return None
+
+        editor = _editor([], [], [], pick_date=pick)
+        editor.load(None, None, allow_remove=False)
+        editor.mode_radio.value = "once"
+        typing.cast("typing.Any", editor.mode_radio.on_change)(_event(editor.mode_radio))
+        editor.once_field.value = "2026-11-20T17:30"
+        suffix = editor.once_field.suffix
+        assert isinstance(suffix, ft.IconButton)
+
+        asyncio.run(_async_click(suffix)())
+
+        assert editor.once_field.value == "2026-11-20T17:30"
 
     def test_saves_selected_weekdays(self) -> None:
         saved: list[Reminder] = []

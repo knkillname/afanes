@@ -9,13 +9,13 @@ state, step text, metadata, and the plan and owner actions. The view performs
 no Markdown parsing and no vault I/O.
 """
 
-import datetime
 from collections.abc import Awaitable, Callable
 
 import flet as ft
 
 import afanes.core.vault.snapshot
 import afanes.models.note
+import afanes.ui.components.date_entry
 import afanes.ui.state
 import afanes.ui.theme
 from afanes.core.editing import DraftMode
@@ -24,8 +24,6 @@ from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import NoteType
 from afanes.models.step import ProjectStep, StepEdit, StepEditKind
 from afanes.ui.components.step_text import StepText, StepTextOptions
-
-type PickDate = Callable[[datetime.date | None], Awaitable[datetime.date | None]]
 
 
 class ProjectBodyView:
@@ -37,7 +35,7 @@ class ProjectBodyView:
         Requests a repaint of the page.
     on_follow_link : Callable[[str], Awaitable[None]]
         Command that resolves one link destination.
-    pick_date : PickDate | None
+    pick_date : afanes.ui.components.date_entry.PickDate | None
         Command that opens the date picker and returns the chosen date, or
         ``None`` when the presentation has no picker.
     """
@@ -46,7 +44,7 @@ class ProjectBodyView:
         self,
         update: Callable[[], None],
         on_follow_link: Callable[[str], Awaitable[None]],
-        pick_date: PickDate | None = None,
+        pick_date: afanes.ui.components.date_entry.PickDate | None = None,
         on_follow_role: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         """Build the project body controls against the shared application state.
@@ -57,7 +55,7 @@ class ProjectBodyView:
             Requests a repaint of the page.
         on_follow_link : Callable[[str], Awaitable[None]]
             Command that resolves one link destination.
-        pick_date : PickDate | None
+        pick_date : afanes.ui.components.date_entry.PickDate | None
             Command that opens the date picker.
         on_follow_role : Callable[[str], Awaitable[None]] | None
             Command that opens or creates the page for a role name, or ``None``

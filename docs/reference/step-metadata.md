@@ -35,7 +35,8 @@ Owners are step-level. A project has its own single `owner` key, not an `owners`
 ## ✅ Ticking a step
 
 Ticking a step writes `[x]` and adds `actual: <today>`. Unticking removes `actual` and keeps `plan`.
-The calendar action sets or clears `plan`; the person action manages the full owner list.
+The calendar action opens the shared day-only picker and sets or clears `plan`; the person action
+manages the full owner list. Typing an ISO day remains valid.
 
 Ticking, unticking, planning, or reassigning a step rewrites only that line atomically and leaves every
 other byte of the file unchanged.

@@ -251,6 +251,39 @@ class CalendarMonth:
     month_count: int
     year_count: int
 
+    @classmethod
+    def for_month(cls, year: int, month: int) -> Self:
+        """Build an unmarked calendar month for date entry.
+
+        Parameters
+        ----------
+        year : int
+            Calendar year.
+        month : int
+            Calendar month, 1-12.
+
+        Returns
+        -------
+        CalendarMonth
+            A month whose day cells all carry a zero count.
+
+        Raises
+        ------
+        ValueError
+            If the year or month is outside the calendar range.
+        """
+        first_weekday, days_in_month = calendar.monthrange(year, month)
+        days = tuple(CalendarDay(day=day, count=0) for day in range(1, days_in_month + 1))
+        return cls(
+            year=year,
+            month=month,
+            first_weekday=first_weekday,
+            days_in_month=days_in_month,
+            days=days,
+            month_count=0,
+            year_count=0,
+        )
+
     @property
     def has_month_entry(self) -> bool:
         """Return whether the month itself has an entry.

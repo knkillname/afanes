@@ -70,7 +70,6 @@ BASELINE: dict[str, dict[str, int]] = {
     "icon_size_literals": {},
     "filled_icon_glyphs": {},
     "numeric_layout_literals": {
-        "components/calendar.py": 16,
         "components/capture_bar.py": 2,
         "components/log_tree.py": 4,
         "views/inbox.py": 3,

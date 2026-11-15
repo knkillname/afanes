@@ -44,6 +44,7 @@ guide/projects-and-steps
 guide/references-and-categories
 guide/log
 guide/pages-and-editing
+guide/dates
 guide/processing
 guide/review
 guide/browser-mode

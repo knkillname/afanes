@@ -77,6 +77,10 @@ A due step card offers:
 - **Open Project**: shows the project page;
 - **Skip**: changes nothing.
 
+The postpone field offers the shared calendar action with day precision, and a typed `YYYY-MM-DD`
+value remains valid. A picked date updates the form and enables **Confirm**; cancelling the picker
+leaves the field as it was.
+
 A waiting step card shows its owners and offers **Reassign…**, **Open Project**, and **Skip**. Reassign
 replaces the owners.
 

@@ -60,7 +60,8 @@ date: "2025-10"       # the whole month
 date: "2025-10-12"    # one day
 ```
 
-A date is a calendar value, not a timestamp. It never carries a time or timezone. A malformed value
+The page's calendar action writes the same ISO values and never stores a localized form. A date is a
+calendar value, not a timestamp. It never carries a time or timezone. A malformed value
 stays in the file, keeps the note visible as **Undated**, and shows a warning in the editor until it
 is corrected. `date` is independent of a project's `due_date`: the date says where the note belongs
 in the archive, while the due date says when the work is due.
@@ -78,7 +79,8 @@ A project without a status is active. `done`, `cancelled`, and `archived` projec
 
 ## 📅 Due date
 
-`due_date` is valid only on projects and must be a calendar date written as `YYYY-MM-DD`. It is not
+`due_date` is valid only on projects and must be a calendar date written as `YYYY-MM-DD`. The page's
+calendar action writes that day-only form. It is not
 tied to any step. A project may have a due date without steps, and a step may have a plan date without
 the project having a due date.
 
@@ -113,6 +115,9 @@ reminder:
   zone: America/Mexico_City
   once: 2026-11-20T09:00
 ```
+
+The one-shot date portion offers the shared day-only calendar action. The time stays typed, and
+choosing a new date keeps it. The stored value remains an ISO date followed by a 24-hour time.
 
 `zone` is an IANA time-zone name such as `America/Mexico_City`, `Europe/Madrid`, or `Asia/Tokyo`. When
 the key is absent, the computer's current zone is used. An unknown zone is a warning. A daylight-saving

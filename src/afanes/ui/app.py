@@ -17,6 +17,7 @@ import afanes.core.localization
 import afanes.core.preferences
 import afanes.core.vault.service
 import afanes.i18n.ui
+import afanes.ui.components.date_entry
 import afanes.ui.components.toast
 import afanes.ui.state
 import afanes.ui.state.session
@@ -26,7 +27,7 @@ import afanes.ui.views.inbox
 import afanes.ui.views.workspace
 from afanes.core.template_cards import TemplateCardListing
 from afanes.models.link import ReferenceScheme
-from afanes.models.note import CategoryLabel, NoteDate, NoteType
+from afanes.models.note import CategoryLabel, DatePrecision, NoteDate, NoteType
 from afanes.ui.components.panel import Panel
 from afanes.ui.components.role_name import RoleNameDialog
 from afanes.ui.components.role_reference import RoleReferenceDialog
@@ -100,6 +101,7 @@ class AppShell:
         self.is_desktop = not page.web
         self.picker: ft.FilePicker | None = None
         self.workspace: afanes.ui.views.workspace.WorkspaceView | None = None
+        self.date_dialog: afanes.ui.components.date_entry.DatePickerDialog | None = None
         self.toast = afanes.ui.components.toast.ToastPresenter(page, self._handle_notice_action, copy=self.copy)
         self.refresh_task: asyncio.Task[None] | None = None
 
@@ -239,6 +241,9 @@ class AppShell:
 
     async def _on_keyboard(self, event: ft.KeyboardEvent) -> None:
         """Route the workspace shortcuts from the page keyboard event."""
+        if self.date_dialog is not None:
+            await self.date_dialog.handle_key(event)
+            return
         key = (event.key or "").upper()
         if key == "ESCAPE":
             if self.workspace is not None:
@@ -379,6 +384,7 @@ class AppShell:
                     self.close_vault,
                     on_new_reference=self.show_new_reference_dialog,
                     pick_date=self.pick_date,
+                    pick_note_date=self.pick_note_date,
                     on_log_entry=self.open_log_date,
                     on_missing_role=self.show_role_reference_dialog,
                     pick_role=self.pick_role,
@@ -556,6 +562,63 @@ class AppShell:
         elif self.state.session.vault_root is not None:
             self._start_refresh_loop()
 
+    async def pick_note_date(
+        self,
+        current: NoteDate | None,
+        precisions: frozenset[DatePrecision],
+    ) -> NoteDate | None:
+        """Ask for a precision-aware note date and return it.
+
+        Parameters
+        ----------
+        current : afanes.models.note.NoteDate | None
+            Date to show in the picker, or ``None`` for today.
+        precisions : frozenset[afanes.models.note.DatePrecision]
+            Precisions the calling field accepts.
+
+        Returns
+        -------
+        afanes.models.note.NoteDate | None
+            Chosen date, or ``None`` when the picker was cancelled or dismissed.
+        """
+        if self.date_dialog is not None:
+            return None
+        loop = asyncio.get_running_loop()
+        result: asyncio.Future[NoteDate | None] = loop.create_future()
+
+        def settle(value: NoteDate | None) -> None:
+            if not result.done():
+                result.set_result(value)
+
+        async def confirm(value: NoteDate) -> None:
+            settle(value)
+
+        async def cancel() -> None:
+            settle(None)
+
+        def dismiss(_event: object = None) -> None:
+            settle(None)
+
+        dialog = afanes.ui.components.date_entry.DatePickerDialog(
+            current,
+            precisions,
+            confirm,
+            cancel,
+            copy=self.copy,
+            update=self.page.update,
+        )
+        dialog.dialog.on_dismiss = dismiss
+        self.date_dialog = dialog
+        self.page.show_dialog(dialog.dialog)
+        self.page.update()
+        try:
+            await dialog.open()
+            return await result
+        finally:
+            self.date_dialog = None
+            self.page.pop_dialog()
+            self.page.update()
+
     async def pick_date(self, current: datetime.date | None) -> datetime.date | None:
         """Ask for a calendar date and return it, or ``None`` when cancelled.
 
@@ -569,33 +632,13 @@ class AppShell:
         datetime.date | None
             Chosen date, or ``None`` when the picker was dismissed.
         """
-        loop = asyncio.get_running_loop()
-        result: asyncio.Future[datetime.date | None] = loop.create_future()
-
-        def settle(value: datetime.date | None) -> None:
-            if not result.done():
-                result.set_result(value)
-
-        def on_change(_event: object = None) -> None:
-            value = picker.value
-            if isinstance(value, datetime.datetime):
-                value = value.date()
-            settle(value if isinstance(value, datetime.date) else None)
-
-        def on_dismiss(_event: object = None) -> None:
-            settle(None)
-
-        picker = ft.DatePicker(
-            value=current,
-            first_date=datetime.date(1900, 1, 1),
-            last_date=datetime.date(2100, 12, 31),
-            locale=ft.Locale(language_code=self.copy.locale.language),
-            on_change=on_change,
-            on_dismiss=on_dismiss,
+        picked = await self.pick_note_date(
+            None if current is None else NoteDate.from_date(current),
+            frozenset({DatePrecision.DAY}),
         )
-        self.page.show_dialog(picker)
-        self.page.update()
-        return await result
+        if picked is None:
+            return None
+        return datetime.date(picked.year, picked.month, picked.day)
 
     async def show_create_dialog(self) -> None:
         """Ask for the vault path and starter content, then create the vault.

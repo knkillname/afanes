@@ -64,13 +64,15 @@ list becomes an accent card of step rows with the step text, checked state, owne
 dates, and tags. Metadata comments are hidden from the rendered text.
 
 Every step row keeps a calendar action and a person action visible. They are understated until hover or
-keyboard focus and remain reachable with touch. The calendar action sets or clears the step's plan date;
-the person action adds or removes owners, suggesting names from notes in the vault.
+keyboard focus and remain reachable with touch. The calendar action opens the shared day-only date
+picker and sets or clears the step's plan date; the person action adds or removes owners, suggesting
+names from notes in the vault. Typing an ISO day remains valid.
 
 Ticking or unticking a step, or editing its plan or owners, rewrites only that line atomically and
 leaves every other byte of the file unchanged. A project's own due date is not tied to any step: read
-mode shows the status and due date under the title, and its calendar action sets or clears `due_date`
-in the frontmatter without touching the body.
+mode shows the status and due date under the title, and its calendar action opens the day-only picker
+and sets or clears `due_date` in the frontmatter without touching the body. The edit-mode Due date
+field offers the same picker.
 
 A body shape that cannot be split safely, such as a mixed list or a task list inside a blockquote,
 stays ordinary Markdown, so nothing is dropped or rewritten.

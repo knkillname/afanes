@@ -474,7 +474,7 @@ msgstr "Día de la semana"
 
 #: src/afanes/i18n/ui/en.py REMINDER_ONCE_LABEL
 msgctxt "REMINDER_ONCE_LABEL"
-msgid "Date and Time"
+msgid "Date and time"
 msgstr "Fecha y hora"
 
 #: src/afanes/i18n/ui/en.py REMINDER_ONCE_HINT
@@ -1357,6 +1357,16 @@ msgctxt "PAGE_DATE_LABEL"
 msgid "Date"
 msgstr "Fecha"
 
+#: src/afanes/i18n/ui/en.py PAGE_DATE_ADD
+msgctxt "PAGE_DATE_ADD"
+msgid "Add Date…"
+msgstr "Añadir fecha…"
+
+#: src/afanes/i18n/ui/en.py PAGE_DATE_CHANGE
+msgctxt "PAGE_DATE_CHANGE"
+msgid "Change Date…"
+msgstr "Cambiar fecha…"
+
 #: src/afanes/i18n/ui/en.py PAGE_DATE
 msgctxt "PAGE_DATE"
 msgid "Date: {date}"
@@ -2017,6 +2027,11 @@ msgctxt "PAGE_PROJECT_DUE_ADD"
 msgid "Add Due Date…"
 msgstr "Añadir fecha de vencimiento…"
 
+#: src/afanes/i18n/ui/en.py PAGE_PROJECT_DUE_CHANGE
+msgctxt "PAGE_PROJECT_DUE_CHANGE"
+msgid "Change Due Date…"
+msgstr "Cambiar fecha de vencimiento…"
+
 #: src/afanes/i18n/ui/en.py PAGE_PROJECT_DUE_CLEAR
 msgctxt "PAGE_PROJECT_DUE_CLEAR"
 msgid "Clear Due Date"
@@ -2141,6 +2156,81 @@ msgstr "{count} pasos vencidos requieren atención"
 msgctxt "REVIEW_LAUNCH_DIGEST_ACTION"
 msgid "Start Review"
 msgstr "Iniciar revisión"
+
+#: src/afanes/i18n/ui/en.py DATE_HINT
+msgctxt "DATE_HINT"
+msgid "YYYY-MM-DD"
+msgstr "YYYY-MM-DD"
+
+#: src/afanes/i18n/ui/en.py DATE_PICKER_TITLE
+msgctxt "DATE_PICKER_TITLE"
+msgid "Choose Date"
+msgstr "Elegir fecha"
+
+#: src/afanes/i18n/ui/en.py DATE_PICKER_OPEN
+msgctxt "DATE_PICKER_OPEN"
+msgid "Choose Date…"
+msgstr "Elegir fecha…"
+
+#: src/afanes/i18n/ui/en.py DATE_PICKER_SELECTED
+msgctxt "DATE_PICKER_SELECTED"
+msgid "Selected: {date}"
+msgstr "Selección: {date}"
+
+#: src/afanes/i18n/ui/en.py DATE_MODE_DAY
+msgctxt "DATE_MODE_DAY"
+msgid "Day"
+msgstr "Día"
+
+#: src/afanes/i18n/ui/en.py DATE_MODE_MONTH
+msgctxt "DATE_MODE_MONTH"
+msgid "Month"
+msgstr "Mes"
+
+#: src/afanes/i18n/ui/en.py DATE_MODE_YEAR
+msgctxt "DATE_MODE_YEAR"
+msgid "Year"
+msgstr "Año"
+
+#: src/afanes/i18n/ui/en.py DATE_PICKER_TODAY
+msgctxt "DATE_PICKER_TODAY"
+msgid "Today"
+msgstr "Hoy"
+
+#: src/afanes/i18n/ui/en.py DATE_PICKER_THIS_MONTH
+msgctxt "DATE_PICKER_THIS_MONTH"
+msgid "This Month"
+msgstr "Este mes"
+
+#: src/afanes/i18n/ui/en.py DATE_PICKER_THIS_YEAR
+msgctxt "DATE_PICKER_THIS_YEAR"
+msgid "This Year"
+msgstr "Este año"
+
+#: src/afanes/i18n/ui/en.py DATE_PICKER_PREVIOUS_YEAR
+msgctxt "DATE_PICKER_PREVIOUS_YEAR"
+msgid "Previous Year"
+msgstr "Año anterior"
+
+#: src/afanes/i18n/ui/en.py DATE_PICKER_NEXT_YEAR
+msgctxt "DATE_PICKER_NEXT_YEAR"
+msgid "Next Year"
+msgstr "Año siguiente"
+
+#: src/afanes/i18n/ui/en.py DATE_PICKER_PREVIOUS_DECADE
+msgctxt "DATE_PICKER_PREVIOUS_DECADE"
+msgid "Previous Decade"
+msgstr "Década anterior"
+
+#: src/afanes/i18n/ui/en.py DATE_PICKER_NEXT_DECADE
+msgctxt "DATE_PICKER_NEXT_DECADE"
+msgid "Next Decade"
+msgstr "Década siguiente"
+
+#: src/afanes/i18n/ui/en.py DATE_PICKER_SELECT
+msgctxt "DATE_PICKER_SELECT"
+msgid "Select"
+msgstr "Seleccionar"
 
 #: src/afanes/i18n/ui/en.py LOG_DAY_TOOLTIP_NONE
 msgctxt "LOG_DAY_TOOLTIP_NONE"
