@@ -14,6 +14,7 @@ import afanes.core.search
 import afanes.core.settings
 import afanes.i18n.ui
 import afanes.i18n.ui.en
+import afanes.models.note
 import afanes.ui.state
 import afanes.ui.views.review
 from afanes.core.frontmatter import NoteDocument
@@ -268,7 +269,10 @@ class TestDueStepCard:
 
         assert afanes.i18n.ui.en.REVIEW_DUE_STEP_TITLE in texts
         assert "Call the plumber" in texts
-        assert afanes.i18n.ui.en.PAGE_STEP_PLAN.format(date="Nov 14, 2026") in texts
+        formatted_today = afanes.i18n.ui.UiCopy.english().locale_format.short_date(
+            afanes.models.note.NoteDate.from_date(TODAY)
+        )
+        assert afanes.i18n.ui.en.PAGE_STEP_PLAN.format(date=formatted_today) in texts
 
     def test_card_renders_step_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

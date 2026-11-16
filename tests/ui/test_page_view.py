@@ -2742,12 +2742,14 @@ class TestTrashPage:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         view, state, _source = self._open_trashed(tmp_path, monkeypatch)
+        today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+        formatted_today = afanes.i18n.ui.UiCopy.english().locale_format.short_date(NoteDate.from_date(today))
 
         assert state.pages.trash_entry is not None
         assert view.trash_info.visible is True
         assert afanes.i18n.ui.en.TRASH_INFO.format(
             path="notes/Ada.md",
-            date="Nov 14, 2026",
+            date=formatted_today,
         ) in (view.trash_info.value or "")
         assert view.restore_button.visible is True
         assert view.edit_button.visible is False
