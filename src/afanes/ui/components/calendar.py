@@ -8,8 +8,9 @@ The component is presentational: it receives a
 intent. It performs no vault access and never derives dates from files.
 """
 
+import calendar
 import datetime
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 import flet as ft
 
@@ -92,6 +93,28 @@ class CalendarGrid:
             key=f"{key_prefix}-grid-root",
         )
         self._key_prefix = key_prefix
+
+    @property
+    def focused_day(self) -> int | None:
+        """Return the day that owns the accent focus ring, if any.
+
+        Returns
+        -------
+        int | None
+            Focused day number, or ``None`` when no cell has focus.
+        """
+        return self._focused_day
+
+    @property
+    def month(self) -> afanes.core.log.CalendarMonth | None:
+        """Return the rendered month.
+
+        Returns
+        -------
+        afanes.core.log.CalendarMonth | None
+            Rendered month, or ``None`` before the first build.
+        """
+        return self._month
 
     def build(self, calendar: afanes.core.log.CalendarMonth) -> ft.Control:
         """Render one month and return the root control.
@@ -289,6 +312,9 @@ class LogCalendar:
         Called when the next-month control is clicked.
     copy : afanes.i18n.ui.UiCopy | None
         Active interface catalog. English is used when omitted.
+    on_move : collections.abc.Callable[[datetime.date], collections.abc.Awaitable[None]] | None
+        Called with the target date when a keyboard move crosses a month
+        boundary. ``None`` keeps the move inside the rendered month.
     """
 
     def __init__(
@@ -298,11 +324,16 @@ class LogCalendar:
         on_next: Callable[[], object],
         *,
         copy: afanes.i18n.ui.UiCopy | None = None,
+        on_move: Callable[[datetime.date], Awaitable[None]] | None = None,
     ) -> None:
         """Store the calendar actions."""
         self._copy = afanes.i18n.ui.UiCopy.english() if copy is None else copy
+        self._on_select = on_select
         self._on_previous = on_previous
         self._on_next = on_next
+        self._on_move = on_move
+        self._keyboard_active = False
+        self._focus_date: datetime.date | None = None
         self.title = ft.Text("", style=afanes.ui.theme.TEXT_ROLES["caption-heading"])
         self.month_dot = ft.Container(
             width=afanes.ui.theme.CALENDAR_HEADER_DOT_SIZE,
@@ -332,7 +363,13 @@ class LogCalendar:
             on_click=self._next,
             key="log-calendar-next",
         )
-        self._days = CalendarGrid(on_select, copy=self._copy, key_prefix="log-calendar")
+        self._days = CalendarGrid(
+            on_select,
+            copy=self._copy,
+            key_prefix="log-calendar",
+            on_day_focus=self._day_focused,
+            on_day_blur=self._day_blurred,
+        )
         self.root = ft.Column(
             controls=[
                 ft.Row(
@@ -379,6 +416,62 @@ class LogCalendar:
         """
         return self._days.day_buttons
 
+    @property
+    def focused_day(self) -> int | None:
+        """Return the day that owns the accent focus ring.
+
+        Returns
+        -------
+        int | None
+            Focused day number, or ``None`` when the grid has no focus.
+        """
+        return self._days.focused_day
+
+    async def handle_key(self, event: ft.KeyboardEvent) -> bool:
+        """Apply one day-view key while the calendar owns focus.
+
+        Parameters
+        ----------
+        event : flet.KeyboardEvent
+            Key-down event routed by the application shell.
+
+        Returns
+        -------
+        bool
+            ``True`` when the calendar handled the event.
+        """
+        if not self._keyboard_active or event.ctrl:
+            return False
+        key = self._key_name(event)
+        if key == "TAB":
+            return False
+        if key == "ENTER":
+            target = self._focus_date
+            if target is None:
+                return False
+            self._on_select(target.day)
+            return True
+        target = self._moved_date(key)
+        if target is None:
+            return False
+        await self._move_to(target)
+        return True
+
+    async def focus_date(self, value: datetime.date) -> None:
+        """Move keyboard focus to one visible day.
+
+        Parameters
+        ----------
+        value : datetime.date
+            Day to focus. A date outside the rendered month is ignored.
+        """
+        month = self._days.month
+        if month is None or (value.year, value.month) != (month.year, month.month):
+            return
+        self._keyboard_active = True
+        self._focus_date = value
+        await self._days.focus_day(value.day)
+
     def build(self, calendar: afanes.core.log.CalendarMonth) -> ft.Control:
         """Render one month and return the root control.
 
@@ -406,3 +499,59 @@ class LogCalendar:
     def _next(self, _event: object = None) -> None:
         """Forward the next-month action."""
         self._on_next()
+
+    def _day_focused(self, day: int) -> None:
+        """Record keyboard ownership and the focused date."""
+        month = self._days.month
+        self._keyboard_active = True
+        if month is not None:
+            self._focus_date = datetime.date(month.year, month.month, day)
+
+    def _day_blurred(self, _day: int) -> None:
+        """Release keyboard ownership when the grid loses focus."""
+        self._keyboard_active = False
+
+    def _moved_date(self, key: str) -> datetime.date | None:
+        """Return the target date for one movement key."""
+        base = self._focus_date
+        if base is None:
+            return None
+        deltas = {
+            "ARROWLEFT": -1,
+            "ARROWRIGHT": 1,
+            "ARROWUP": -DAYS_PER_WEEK,
+            "ARROWDOWN": DAYS_PER_WEEK,
+        }
+        if key in deltas:
+            return base + datetime.timedelta(days=deltas[key])
+        if key in {"HOME", "END"}:
+            offset = -base.weekday() if key == "HOME" else DAYS_PER_WEEK - 1 - base.weekday()
+            return base + datetime.timedelta(days=offset)
+        if key in {"PAGEUP", "PAGEDOWN"}:
+            return self._shift_months(base, -1 if key == "PAGEUP" else 1)
+        return None
+
+    async def _move_to(self, target: datetime.date) -> None:
+        """Focus a target date, rebuilding the month when it crosses a boundary."""
+        month = self._days.month
+        if month is not None and (target.year, target.month) == (month.year, month.month):
+            self._focus_date = target
+            await self._days.focus_day(target.day)
+            return
+        self._focus_date = target
+        if self._on_move is not None:
+            await self._on_move(target)
+
+    @staticmethod
+    def _shift_months(value: datetime.date, delta: int) -> datetime.date:
+        """Shift one date by months, clamping its day to the target month."""
+        index = value.year * 12 + (value.month - 1) + delta
+        year, month_index = divmod(index, 12)
+        month = month_index + 1
+        day = min(value.day, calendar.monthrange(year, month)[1])
+        return datetime.date(year, month, day)
+
+    @staticmethod
+    def _key_name(event: ft.KeyboardEvent) -> str:
+        """Return a normalized key name."""
+        return (event.key or "").upper().replace("_", "").replace(" ", "")

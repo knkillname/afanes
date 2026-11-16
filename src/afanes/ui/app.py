@@ -253,6 +253,8 @@ class AppShell:
         if key == "ESCAPE":
             await self._handle_escape()
             return
+        if self.workspace is not None and await self.workspace.handle_key(event):
+            return
         await self._handle_global_shortcut(event, key)
 
     def _close_shortcut_for_key(self, event: ft.KeyboardEvent) -> None:

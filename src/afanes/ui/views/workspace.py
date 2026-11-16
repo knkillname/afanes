@@ -149,6 +149,7 @@ class WorkspaceView:
         self._breakpoint = "wide"
         self._drawer_open = False
         self._show_detail = False
+        self._log_focus_date: datetime.date | None = None
         self._viewport_width = afanes.ui.theme.SHELL_WIDE_MIN
         self._build_header()
         self._build_navigation()
@@ -742,6 +743,25 @@ class WorkspaceView:
     async def focus_search(self) -> None:
         """Focus the permanent browser search entry."""
         await self._focus(self.search_field)
+
+    async def handle_key(self, event: ft.KeyboardEvent) -> bool:
+        """Offer one key event to the focused Log calendar.
+
+        Parameters
+        ----------
+        event : flet.KeyboardEvent
+            Key-down event routed by the application shell.
+
+        Returns
+        -------
+        bool
+            ``True`` when the Log calendar handled the event.
+        """
+        if self._state.browser.active_section is not afanes.ui.state.browser.WorkspaceSection.LOG:
+            return False
+        if self.log_calendar is None:
+            return False
+        return await self.log_calendar.handle_key(event)
 
     async def clear_search(self) -> bool:
         """Clear the browser search query.
@@ -1366,6 +1386,7 @@ class WorkspaceView:
             lambda: asyncio.create_task(self._log_previous_month()),
             lambda: asyncio.create_task(self._log_next_month()),
             copy=self._state.status.copy,
+            on_move=self._log_move_focus,
         )
         self.log_tree = afanes.ui.components.log_tree.LogTree(
             lambda path: asyncio.create_task(self._select(path)),
@@ -1504,6 +1525,21 @@ class WorkspaceView:
         self._state.browser.show_log_month(year, month)
         self._refresh_dynamic()
         self._update()
+
+    async def _log_move_focus(self, target: datetime.date) -> None:
+        """Show the target date's month and keep focus on the day.
+
+        Parameters
+        ----------
+        target : datetime.date
+            Date reached with a keyboard move.
+        """
+        self._log_focus_date = target
+        self._state.browser.show_log_month(target.year, target.month)
+        self._refresh_dynamic()
+        self._update()
+        if self.log_calendar is not None:
+            await self.log_calendar.focus_date(target)
 
     def _note_row(self, note: VaultNote) -> ft.Control:
         """Build one clickable browser entry."""

@@ -1797,6 +1797,35 @@ class TestAdaptiveShell:
 
         assert page.dialogs[-1].key == "shortcuts-dialog"
 
+    def test_the_workspace_receives_keys_before_global_shortcuts(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        page = FakePage()
+        calls: list[str] = []
+
+        async def handle_key(_self: afanes.ui.views.workspace.WorkspaceView, _event: ft.KeyboardEvent) -> bool:
+            calls.append("workspace")
+            return True
+
+        async def focus_search(_self: afanes.ui.views.workspace.WorkspaceView) -> None:
+            calls.append("search")
+
+        monkeypatch.setattr(afanes.ui.views.workspace.WorkspaceView, "handle_key", handle_key)
+        monkeypatch.setattr(afanes.ui.views.workspace.WorkspaceView, "focus_search", focus_search)
+
+        async def scenario() -> None:
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
+            assert page.on_keyboard_event is not None
+            await page.on_keyboard_event(_keyboard("f", ctrl=True))
+
+        asyncio.run(scenario())
+
+        assert calls == ["workspace"]
+
     def test_escape_closes_the_shortcut_sheet(
         self,
         tmp_path: Path,

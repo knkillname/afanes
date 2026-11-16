@@ -38,6 +38,10 @@ TWO_ENTRIES = 2
 FIRST_DAY = 1
 SECOND_DAY = 2
 THIRD_DAY = 3
+DEFAULT_LOG_DAY = 10
+NEXT_LOG_DAY = 11
+MONTH_LAST_DAY = 31
+NOVEMBER = 11
 
 
 def _today() -> datetime.date:
@@ -117,6 +121,18 @@ def _open_workspace(
 
 def _handler(control: ft.Control) -> Handler:
     return typing.cast("Handler", control.__getattribute__("on_click"))
+
+
+def _keyboard(key: str, *, ctrl: bool = False) -> ft.KeyboardEvent:
+    return ft.KeyboardEvent(
+        name="key_down",
+        control=typing.cast("ft.Page", None),
+        key=key,
+        shift=False,
+        ctrl=ctrl,
+        alt=False,
+        meta=False,
+    )
 
 
 def _freeze(control: ft.Control) -> None:
@@ -1507,6 +1523,50 @@ class TestLogSection:
         assert isinstance(row, ft.Row)
         assert row.wrap is True
         assert row.run_spacing == afanes.ui.theme.ITEM_GAP
+
+    def test_the_calendar_handles_day_keys_from_the_workspace(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view = self._open_log(tmp_path, monkeypatch)
+        afanes.ui.state.app_state.browser.show_log_month(2025, 10)
+        view.refresh()
+        assert view.log_calendar is not None
+        asyncio.run(view.log_calendar.focus_date(datetime.date(2025, 10, DEFAULT_LOG_DAY)))
+
+        handled = asyncio.run(view.handle_key(_keyboard("ArrowRight")))
+
+        assert handled is True
+        assert view.log_calendar is not None
+        assert view.log_calendar.focused_day == NEXT_LOG_DAY
+        assert afanes.ui.state.app_state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.LOG
+
+    def test_a_month_boundary_move_rebuilds_the_calendar(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = self._open_log(tmp_path, monkeypatch)
+        afanes.ui.state.app_state.browser.show_log_month(2025, 10)
+        view.refresh()
+        assert view.log_calendar is not None
+        asyncio.run(view.log_calendar.focus_date(datetime.date(2025, 10, MONTH_LAST_DAY)))
+
+        handled = asyncio.run(view.handle_key(_keyboard("ArrowRight")))
+
+        assert handled is True
+        assert afanes.ui.state.app_state.browser.log_month == NOVEMBER
+        assert view.log_calendar is not None
+        assert view.log_calendar.focused_day == 1
+
+    def test_tab_and_other_destinations_leave_the_calendar_keys_alone(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view = self._open_log(tmp_path, monkeypatch)
+        assert view.log_calendar is not None
+        asyncio.run(view.log_calendar.focus_date(_today()))
+
+        assert asyncio.run(view.handle_key(_keyboard("Tab"))) is False
+
+        asyncio.run(afanes.ui.state.app_state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.INBOX))
+        view.refresh()
+
+        assert asyncio.run(view.handle_key(_keyboard("ArrowRight"))) is False
 
     def test_mode_switch_changes_the_state(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

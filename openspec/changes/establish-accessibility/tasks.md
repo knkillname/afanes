@@ -9,9 +9,9 @@
 
 ## 2. Log calendar keyboard
 
-- [ ] 2.1 Add the day-only Log-calendar keyboard adapter for arrows, Page Up/Page Down, Home/End, and Enter; wire it through the workspace and shell; verify tests cover each key and the existing pointer behavior.
-- [ ] 2.2 Cover month-boundary focus, focus-ring visibility, Tab escape, and Enter parity with a pointer click; verify the calendar and workspace tests pass.
-- [ ] 2.3 Document the Log calendar keys and the shared day-view contract in `docs/guide/log.md` and `docs/guide/dates.md`; verify `hatch run docs:build` passes.
+- [x] 2.1 Add the day-only Log-calendar keyboard adapter for arrows, Page Up/Page Down, Home/End, and Enter; wire it through the workspace and shell; verify tests cover each key and the existing pointer behavior.
+- [x] 2.2 Cover month-boundary focus, focus-ring visibility, Tab escape, and Enter parity with a pointer click; verify the calendar and workspace tests pass.
+- [x] 2.3 Document the Log calendar keys and the shared day-view contract in `docs/guide/log.md` and `docs/guide/dates.md`; verify `hatch run docs:build` passes.
 
 ## 3. Review cards and focus after trash
 

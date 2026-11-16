@@ -27,6 +27,21 @@ Su** in English, and **octubre de 2025** with **Lu Ma Mi Ju Vi Sá Do** in Spani
 Clicking a day with one entry opens it in read mode. A day with several entries expands the day in the
 tree. An empty day opens an unsaved draft for that date.
 
+## ⌨️ Keyboard
+
+When a day cell has focus, the calendar follows the date picker's day-view contract:
+
+| Key | Effect |
+| --- | --- |
+| Arrow keys | Move one day, or one week vertically |
+| **Page Up** / **Page Down** | Move one month, keeping the day where possible |
+| **Home** / **End** | Move to the first or last day of the visible week |
+| **Enter** | Open the focused day exactly like a click |
+| **Tab** | Leave the calendar without being trapped |
+
+A move across a month boundary renders that month and keeps focus on the selected day. The accent focus
+ring stays visible over selection and today marks.
+
 ## ✍️ Creating an entry
 
 - **Today’s Entry** opens today's entry in read mode, or an unsaved draft when the day is free.

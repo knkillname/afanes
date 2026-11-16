@@ -1,5 +1,6 @@
 """Tests for the Log month calendar component."""
 
+import asyncio
 import datetime
 import typing
 
@@ -11,6 +12,14 @@ import afanes.i18n.ui
 import afanes.ui.components.calendar as calendar_component
 import afanes.ui.theme
 
+START_DAY = 12
+NEXT_DAY = 13
+PREVIOUS_DAY = 19
+NEXT_WEEK_DAY = 20
+MID_MONTH = 15
+WEEK_START_DAY = 6
+NOVEMBER = 11
+
 
 def _day_text(grid: calendar_component.CalendarGrid, day: int) -> ft.Text:
     content = grid.day_buttons[day].content
@@ -18,6 +27,18 @@ def _day_text(grid: calendar_component.CalendarGrid, day: int) -> ft.Text:
     number = content.controls[0]
     assert isinstance(number, ft.Text)
     return number
+
+
+def _keyboard(key: str, *, ctrl: bool = False) -> ft.KeyboardEvent:
+    return ft.KeyboardEvent(
+        name="key_down",
+        control=typing.cast("ft.Page", None),
+        key=key,
+        shift=False,
+        ctrl=ctrl,
+        alt=False,
+        meta=False,
+    )
 
 
 def _month(
@@ -50,10 +71,10 @@ class TestLogCalendar:
         assert calendar.year_dot.bgcolor == afanes.ui.theme.LOG_ENTRY_DOT_COLOR
         assert afanes.ui.theme.LOG_ENTRY_DOT_COLOR == afanes.ui.theme.ACCENT_FILL
         assert calendar.day_buttons[12].data == {"day": 12, "count": 2}
-        style = calendar.day_buttons[12].style
+        style = calendar.day_buttons[START_DAY].style
         assert style is not None
         assert style.bgcolor == afanes.ui.theme.LOG_ENTRY_TINT
-        plain_style = calendar.day_buttons[13].style
+        plain_style = calendar.day_buttons[NEXT_DAY].style
         assert plain_style is None or plain_style.bgcolor is None
 
     def test_day_dots_follow_the_filtered_counts(self) -> None:
@@ -83,7 +104,7 @@ class TestLogCalendar:
         selected: list[int] = []
         calendar = calendar_component.LogCalendar(selected.append, lambda: None, lambda: None)
         calendar.build(_month())
-        handler = calendar.day_buttons[12].on_click
+        handler = calendar.day_buttons[START_DAY].on_click
         assert handler is not None
 
         typing.cast("typing.Callable[[], None]", handler)()
@@ -107,6 +128,84 @@ class TestLogCalendar:
         typing.cast("typing.Callable[[], None]", upcoming)()
 
         assert calls == ["previous", "next"]
+
+    def test_arrows_move_focus_by_day_and_week(self) -> None:
+        calendar = calendar_component.LogCalendar(lambda _day: None, lambda: None, lambda: None)
+        calendar.build(_month())
+
+        asyncio.run(calendar.focus_date(datetime.date(2025, 10, START_DAY)))
+        assert asyncio.run(calendar.handle_key(_keyboard("ArrowRight"))) is True
+        assert calendar.focused_day == NEXT_DAY
+        assert asyncio.run(calendar.handle_key(_keyboard("ArrowDown"))) is True
+        assert calendar.focused_day == NEXT_WEEK_DAY
+        assert asyncio.run(calendar.handle_key(_keyboard("ArrowLeft"))) is True
+        assert calendar.focused_day == PREVIOUS_DAY
+        assert asyncio.run(calendar.handle_key(_keyboard("ArrowUp"))) is True
+        assert calendar.focused_day == START_DAY
+
+    def test_page_keys_move_by_month(self) -> None:
+        moved: list[datetime.date] = []
+
+        async def record(value: datetime.date) -> None:
+            moved.append(value)
+
+        calendar = calendar_component.LogCalendar(
+            lambda _day: None,
+            lambda: None,
+            lambda: None,
+            on_move=record,
+        )
+        calendar.build(_month())
+        asyncio.run(calendar.focus_date(datetime.date(2025, 10, MID_MONTH)))
+
+        assert asyncio.run(calendar.handle_key(_keyboard("PageDown"))) is True
+        assert asyncio.run(calendar.handle_key(_keyboard("PageUp"))) is True
+
+        assert moved == [datetime.date(2025, NOVEMBER, MID_MONTH)]
+        assert calendar.focused_day == MID_MONTH
+
+    def test_home_and_end_reach_the_week_bounds(self) -> None:
+        calendar = calendar_component.LogCalendar(lambda _day: None, lambda: None, lambda: None)
+        calendar.build(_month())
+        asyncio.run(calendar.focus_date(datetime.date(2025, 10, START_DAY)))
+
+        assert asyncio.run(calendar.handle_key(_keyboard("Home"))) is True
+        assert calendar.focused_day == WEEK_START_DAY
+        assert asyncio.run(calendar.handle_key(_keyboard("End"))) is True
+        assert calendar.focused_day == START_DAY
+
+    def test_enter_matches_a_pointer_click(self) -> None:
+        selected: list[int] = []
+        calendar = calendar_component.LogCalendar(selected.append, lambda: None, lambda: None)
+        calendar.build(_month())
+        asyncio.run(calendar.focus_date(datetime.date(2025, 10, START_DAY)))
+
+        assert asyncio.run(calendar.handle_key(_keyboard("Enter"))) is True
+        typing.cast("typing.Callable[[], None]", calendar.day_buttons[START_DAY].on_click)()
+
+        assert selected == [12, 12]
+
+    def test_tab_and_control_chords_leave_the_calendar(self) -> None:
+        calendar = calendar_component.LogCalendar(lambda _day: None, lambda: None, lambda: None)
+        calendar.build(_month())
+        asyncio.run(calendar.focus_date(datetime.date(2025, 10, START_DAY)))
+
+        assert asyncio.run(calendar.handle_key(_keyboard("Tab"))) is False
+        assert asyncio.run(calendar.handle_key(_keyboard("F", ctrl=True))) is False
+        assert calendar.focused_day == START_DAY
+
+    def test_the_focus_ring_follows_a_keyboard_move(self) -> None:
+        calendar = calendar_component.LogCalendar(lambda _day: None, lambda: None, lambda: None)
+        calendar.build(_month())
+        asyncio.run(calendar.focus_date(datetime.date(2025, 10, START_DAY)))
+
+        asyncio.run(calendar.handle_key(_keyboard("ArrowRight")))
+
+        focused = calendar.day_buttons[NEXT_DAY].style
+        previous = calendar.day_buttons[START_DAY].style
+        assert focused is not None
+        assert focused.side == afanes.ui.theme.CALENDAR_FOCUS_SIDE
+        assert previous is None or previous.side is None
 
 
 class TestCalendarGrid:

@@ -44,6 +44,10 @@ common year.
 | Enter | Confirm a focused day | Confirm a focused month | Confirm a focused year |
 | Esc | Cancel | Cancel | Cancel |
 
+The Log calendar shares the Day-mode keys: arrows move by day or week, **Page Up** / **Page Down** by
+month, **Home** / **End** to the week bounds, and **Enter** opens the focused day. See
+[Log](log.md) for its selection behavior.
+
 ## 🌍 Language
 
 Month names, weekday labels, the selected caption, the mode switch, and the period action follow the
