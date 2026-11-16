@@ -6,6 +6,7 @@
 import asyncio
 import contextlib
 import datetime
+import logging
 import os
 from pathlib import Path
 
@@ -37,6 +38,8 @@ from afanes.ui.components.template_cards import TemplateCardContext, TemplateCar
 
 # Public task name so the shell can be observed without exposing its fields.
 REFRESH_TASK_NAME = "workspace-refresh"
+
+logger = logging.getLogger(__name__)
 
 
 class AppShell:
@@ -98,6 +101,7 @@ class AppShell:
         self.page = page
         self.launch_vault = launch_vault
         self.state = afanes.ui.state.app_state
+        self.semantics: ft.SemanticsService | None = None
         self.copy = self.state.status.copy
         self.preferences_problem = preferences_problem
         self.is_desktop = not page.web
@@ -111,6 +115,8 @@ class AppShell:
     async def start(self) -> None:
         """Configure the page, claim the session, and open the first state."""
         self._configure()
+        self.page.update()
+        await self._refresh_contrast()
         if not self.state.status.begin_session():
             self.page.add(afanes.ui.views.inbox.SessionNotice(self.retry_session, copy=self.copy).build())
             self.page.update()
@@ -128,6 +134,9 @@ class AppShell:
         self.page.on_disconnect = self.release_session
         self.page.on_resize = self._on_resize
         self.page.on_keyboard_event = self._on_keyboard
+        self.page.on_app_lifecycle_state_change = self._on_lifecycle
+        self.semantics = ft.SemanticsService()
+        self.page.services.append(self.semantics)
         if not self.is_desktop:
             return
         self.page.window.width = 1100
@@ -136,6 +145,44 @@ class AppShell:
         self.page.window.min_height = afanes.ui.theme.WINDOW_MIN_HEIGHT
         self.picker = ft.FilePicker()
         self.page.services.append(self.picker)
+
+    async def _refresh_contrast(self) -> None:
+        """Apply the platform high-contrast palette.
+
+        Notes
+        -----
+        The accessibility feature report is read at startup and again when the
+        application resumes. A failed report keeps the standard palette and
+        never blocks the workspace.
+        """
+        self._apply_contrast(high_contrast=await self._high_contrast_enabled())
+        self.page.update()
+
+    async def _high_contrast_enabled(self) -> bool:
+        """Return whether the platform reports high contrast."""
+        if self.semantics is None:
+            return False
+        try:
+            features = await self.semantics.get_accessibility_features()
+        except (RuntimeError, TimeoutError, ValueError, TypeError, ft.FletException) as exc:
+            logger.debug("Could not read accessibility features: %s", exc)
+            return False
+        return features.high_contrast
+
+    def _apply_contrast(self, *, high_contrast: bool) -> None:
+        """Apply the standard or high-contrast light and dark themes."""
+        if high_contrast:
+            self.page.theme = afanes.ui.theme.HIGH_CONTRAST_LIGHT_THEME
+            self.page.dark_theme = afanes.ui.theme.HIGH_CONTRAST_DARK_THEME
+            return
+        self.page.theme = afanes.ui.theme.LIGHT_THEME
+        self.page.dark_theme = afanes.ui.theme.DARK_THEME
+
+    async def _on_lifecycle(self, event: ft.AppLifecycleStateChangeEvent) -> None:
+        """Re-read the accessibility features when the app resumes."""
+        if event.state is not ft.AppLifecycleState.RESUME:
+            return
+        await self._refresh_contrast()
 
     async def _start_workspace(self) -> None:
         """Open the launch or remembered vault and render the result."""

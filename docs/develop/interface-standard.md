@@ -318,7 +318,7 @@ header.
 
 ## 🔀 Bounded differences
 
-These six differences are toolkit limits, not design preferences. Adding another one requires a
+These five differences are toolkit limits, not design preferences. Adding another one requires a
 change that updates this table and the `interface-theme` spec.
 
 | Reference behavior | Afanes | Status | Why |
@@ -326,7 +326,6 @@ change that updates this table and the `interface-theme` spec.
 | Adwaita symbolic icons | Material symbolic/outlined glyphs, tinted in code | Permanent, asset-free | no bundled SVG set; platform parity |
 | libadwaita widget rendering | Flet/Material widget internals: field labels, ink feedback, scrollbars, overlay chrome | Temporary, shrinking | Flet boundary; feedback colors, radii, and density are set centrally |
 | Access-key mnemonics | No underlined Alt shortcuts | Permanent, Flet limit | Flet exposes no mnemonic API |
-| High-contrast style | No separate high-contrast input | Permanent, Flet limit | Flet exposes no high-contrast input; Flutter exposes one |
 | Header bar with window controls | Native title bar plus in-window headers | Permanent, Flet limit | Flet desktop windows use native decorations and expose no title-bar control API |
 | Anchored calendar popover | Date-picker dialog opened by the field calendar action | Permanent, Flet limit | Flet exposes no anchored popover and no anchor geometry for page overlays |
 
@@ -345,8 +344,10 @@ are documented rather than hidden:
 - the Red 4 dark destructive fill is 2.75:1 against the dark note view; the white label on it is
   6.1:1, and the action is identified by its label and shape as well as its fill.
 
-High-contrast mode and access keys cannot be exercised through Flet today; both are declared
-limits above. Wave 5 adds the keyboard and accessibility contract:
+High contrast follows the platform accessibility flag at startup and on resume. The standard
+palettes keep body and muted text at 4.5:1; the high-contrast light and dark palettes keep body and
+muted text at 7:1 on every surface, with boundaries and focus at 4.5:1 or better. Access keys remain
+a declared limit above. Wave 5 adds the keyboard and accessibility contract:
 
 - every workspace shortcut has one discoverable reference, opened from the primary menu or
   `Ctrl+?` and grouped as General, Calendar, and Navigation;
@@ -457,7 +458,7 @@ WAVE 7  identity: app icon, placeholder pages, final palette pass, empty
         baseline
 ```
 
-Waves are ordering, not exemptions. The target remains strict conformance; the six Flet limits
+Waves are ordering, not exemptions. The target remains strict conformance; the five Flet limits
 above are the only permanent exceptions.
 
 ## ✅ Changing the standard

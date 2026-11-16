@@ -69,7 +69,7 @@ class TestLogCalendar:
         assert calendar.year_dot.visible is True
         assert calendar.month_dot.bgcolor == afanes.ui.theme.LOG_ENTRY_DOT_COLOR
         assert calendar.year_dot.bgcolor == afanes.ui.theme.LOG_ENTRY_DOT_COLOR
-        assert afanes.ui.theme.LOG_ENTRY_DOT_COLOR == afanes.ui.theme.ACCENT_FILL
+        assert afanes.ui.theme.LOG_ENTRY_DOT_COLOR == ft.Colors.PRIMARY
         assert calendar.day_buttons[12].data == {"day": 12, "count": 2}
         style = calendar.day_buttons[START_DAY].style
         assert style is not None

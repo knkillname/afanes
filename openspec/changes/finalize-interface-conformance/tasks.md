@@ -17,10 +17,10 @@
 
 ## 3. Platform high contrast
 
-- [ ] 3.1 Refactor `ui/theme.py` into a theme builder shared by standard and high-contrast palettes, add light and dark high-contrast palettes, and verify tests cover 7:1 body contrast, visible boundaries, focus, and hue-independent state.
-- [ ] 3.2 Add `SemanticsService.get_accessibility_features()` detection to `AppShell` at startup and on application resume; verify tests cover true, false, and query-failure fallback without blocking the workspace.
-- [ ] 3.3 Apply the selected high-contrast light and dark themes to `page.theme` and `page.dark_theme`; verify tests cover standard light, standard dark, high-contrast light, high-contrast dark, and resume.
-- [ ] 3.4 Remove the high-contrast row from the bounded-differences table, update the count and accessibility notes, and verify `hatch run docs:build` and the conformance tests pass.
+- [x] 3.1 Refactor `ui/theme.py` into a theme builder shared by standard and high-contrast palettes, add light and dark high-contrast palettes, and verify tests cover 7:1 body contrast, visible boundaries, focus, and hue-independent state.
+- [x] 3.2 Add `SemanticsService.get_accessibility_features()` detection to `AppShell` at startup and on application resume; verify tests cover true, false, and query-failure fallback without blocking the workspace.
+- [x] 3.3 Apply the selected high-contrast light and dark themes to `page.theme` and `page.dark_theme`; verify tests cover standard light, standard dark, high-contrast light, high-contrast dark, and resume.
+- [x] 3.4 Remove the high-contrast row from the bounded-differences table, update the count and accessibility notes, and verify `hatch run docs:build` and the conformance tests pass.
 
 ## 4. Final conformance and evidence
 

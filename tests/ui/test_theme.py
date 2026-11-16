@@ -90,6 +90,8 @@ SELECTION_TINT = 0.10
 LOG_TINT = 0.18
 BASE_FONT_SIZE_VALUE = 15
 SUGGESTED_LABEL_CONTRAST = 3.77
+HIGH_CONTRAST_TEXT_CONTRAST = 7.0
+HIGH_CONTRAST_NON_TEXT_CONTRAST = 4.5
 TITLE_1_RATIO = 1.81
 TITLE_2_RATIO = 1.36
 TITLE_3_RATIO = 1.36
@@ -184,6 +186,82 @@ class TestPalette:
         for palette in (afanes.ui.theme.LIGHT_PALETTE, afanes.ui.theme.DARK_PALETTE):
             assert _contrast(palette["on_error_container"], palette["card"]) >= TEXT_CONTRAST
             assert _contrast(palette["on_error_container"], palette["error_container"]) >= TEXT_CONTRAST
+
+
+class TestHighContrast:
+    def test_every_required_role_exists_in_both_high_contrast_palettes(self) -> None:
+        for palette in (
+            afanes.ui.theme.HIGH_CONTRAST_LIGHT_PALETTE,
+            afanes.ui.theme.HIGH_CONTRAST_DARK_PALETTE,
+        ):
+            assert set(palette) >= REQUIRED_PALETTE_ROLES
+
+    def test_body_text_meets_seven_to_one_on_every_surface(self) -> None:
+        for palette in (
+            afanes.ui.theme.HIGH_CONTRAST_LIGHT_PALETTE,
+            afanes.ui.theme.HIGH_CONTRAST_DARK_PALETTE,
+        ):
+            for surface in SURFACES:
+                assert _contrast(palette["text"], palette[surface]) >= HIGH_CONTRAST_TEXT_CONTRAST
+                assert _contrast(palette["muted_text"], palette[surface]) >= HIGH_CONTRAST_TEXT_CONTRAST
+
+    def test_boundaries_and_focus_stay_visible(self) -> None:
+        for palette in (
+            afanes.ui.theme.HIGH_CONTRAST_LIGHT_PALETTE,
+            afanes.ui.theme.HIGH_CONTRAST_DARK_PALETTE,
+        ):
+            for surface in SURFACES:
+                assert _contrast(palette["border"], palette[surface]) >= HIGH_CONTRAST_NON_TEXT_CONTRAST
+                assert _contrast(palette["control_border"], palette[surface]) >= HIGH_CONTRAST_NON_TEXT_CONTRAST
+                assert _contrast(palette["accent_fill"], palette[surface]) >= HIGH_CONTRAST_NON_TEXT_CONTRAST
+
+    def test_the_high_contrast_themes_use_their_palettes(self) -> None:
+        pairs = (
+            (afanes.ui.theme.HIGH_CONTRAST_LIGHT_THEME, afanes.ui.theme.HIGH_CONTRAST_LIGHT_PALETTE),
+            (afanes.ui.theme.HIGH_CONTRAST_DARK_THEME, afanes.ui.theme.HIGH_CONTRAST_DARK_PALETTE),
+        )
+
+        for theme, palette in pairs:
+            scheme = theme.color_scheme
+            assert scheme is not None
+            assert scheme.surface == palette["page"]
+            assert scheme.on_surface == palette["text"]
+            assert scheme.on_surface_variant == palette["muted_text"]
+            assert scheme.primary == palette["accent_fill"]
+            assert scheme.on_primary == palette["on_accent"]
+            assert scheme.error == palette["error"]
+            assert scheme.on_error == palette["on_error"]
+            assert theme.focus_color == afanes.ui.theme.FOCUS_COLOR
+
+    def test_high_contrast_themes_are_distinct_from_the_standard_themes(self) -> None:
+        assert afanes.ui.theme.HIGH_CONTRAST_LIGHT_THEME is not afanes.ui.theme.LIGHT_THEME
+        assert afanes.ui.theme.HIGH_CONTRAST_DARK_THEME is not afanes.ui.theme.DARK_THEME
+        assert afanes.ui.theme.HIGH_CONTRAST_LIGHT_THEME is not afanes.ui.theme.HIGH_CONTRAST_DARK_THEME
+
+    def test_suggested_actions_use_the_palette_fill_and_text(self) -> None:
+        pairs = (
+            (afanes.ui.theme.HIGH_CONTRAST_LIGHT_THEME, afanes.ui.theme.HIGH_CONTRAST_LIGHT_PALETTE),
+            (afanes.ui.theme.HIGH_CONTRAST_DARK_THEME, afanes.ui.theme.HIGH_CONTRAST_DARK_PALETTE),
+        )
+
+        for theme, palette in pairs:
+            filled = theme.filled_button_theme
+            assert filled is not None
+            assert filled.style is not None
+            bgcolor = filled.style.bgcolor
+            color = filled.style.color
+            assert isinstance(bgcolor, dict)
+            assert isinstance(color, dict)
+            assert bgcolor[ft.ControlState.DEFAULT] == palette["accent_fill"]
+            assert color[ft.ControlState.DEFAULT] == palette["on_accent"]
+
+    def test_state_survives_without_hue(self) -> None:
+        assert ft.Colors.with_opacity(SELECTION_TINT, ft.Colors.ON_SURFACE) == afanes.ui.theme.SELECTED_ROW_COLOR
+        assert afanes.ui.theme.CALENDAR_TODAY_TEXT.weight == ft.FontWeight.W_700
+        destructive = afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE.color
+        assert isinstance(destructive, dict)
+        assert destructive[ft.ControlState.DEFAULT] == ft.Colors.ON_ERROR
+        assert afanes.ui.theme.FOCUS_RING_WIDTH > 0
 
 
 class TestTheme:
@@ -389,8 +467,8 @@ class TestTheme:
             assert not hasattr(afanes.ui.theme, name)
 
         assert afanes.ui.theme.SECTION_ICON_COLOR == afanes.ui.theme.MUTED_TEXT_COLOR
-        assert afanes.ui.theme.LOG_ENTRY_DOT_COLOR == afanes.ui.theme.ACCENT_FILL
-        assert ft.Colors.with_opacity(LOG_TINT, afanes.ui.theme.ACCENT_FILL) == afanes.ui.theme.LOG_ENTRY_TINT
+        assert afanes.ui.theme.LOG_ENTRY_DOT_COLOR == ft.Colors.PRIMARY
+        assert ft.Colors.with_opacity(LOG_TINT, ft.Colors.PRIMARY) == afanes.ui.theme.LOG_ENTRY_TINT
 
 
 class TestTextRoles:

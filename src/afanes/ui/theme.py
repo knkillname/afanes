@@ -131,6 +131,64 @@ DARK_PALETTE = {
     "inverse_primary": "#1C71D8",
 }
 
+HIGH_CONTRAST_LIGHT_PALETTE = {
+    "page": "#FFFFFF",
+    "region": "#F2F2F2",
+    "card": "#FFFFFF",
+    "container": "#E9E9E9",
+    "container_high": "#D9D9D9",
+    "container_highest": "#C9C9C9",
+    "page_dim": "#F2F2F2",
+    "page_bright": "#FFFFFF",
+    "text": "#000000",
+    "muted_text": "#1F1F1F",
+    "accent_fill": "#005A9C",
+    "accent_text": "#004A80",
+    "on_accent": "#FFFFFF",
+    "accent_container": "#D6E8F8",
+    "on_accent_container": "#001F35",
+    "destructive": "#A40000",
+    "border": "#5C5C5C",
+    "control_border": "#333333",
+    "notice": "#6B4E00",
+    "error": "#A40000",
+    "on_error": "#FFFFFF",
+    "error_container": "#FBE0E1",
+    "on_error_container": "#3A0000",
+    "inverse_surface": "#000000",
+    "on_inverse_surface": "#FFFFFF",
+    "inverse_primary": "#9CCBFF",
+}
+
+HIGH_CONTRAST_DARK_PALETTE = {
+    "page": "#000000",
+    "region": "#141414",
+    "card": "#0A0A0A",
+    "container": "#1C1C1C",
+    "container_high": "#282828",
+    "container_highest": "#343434",
+    "page_dim": "#0A0A0A",
+    "page_bright": "#1C1C1C",
+    "text": "#FFFFFF",
+    "muted_text": "#E0E0E0",
+    "accent_fill": "#8CC4FF",
+    "accent_text": "#9CCBFF",
+    "on_accent": "#000000",
+    "accent_container": "#003A66",
+    "on_accent_container": "#E0F0FF",
+    "destructive": "#FF8A80",
+    "border": "#9A9A9A",
+    "control_border": "#C0C0C0",
+    "notice": "#FFD166",
+    "error": "#FF8A80",
+    "on_error": "#000000",
+    "error_container": "#4A0000",
+    "on_error_container": "#FFE0DE",
+    "inverse_surface": "#FFFFFF",
+    "on_inverse_surface": "#000000",
+    "inverse_primary": "#005A9C",
+}
+
 ACCENT_FILL = LIGHT_PALETTE["accent_fill"]
 ACCENT_TEXT = ft.Colors.TERTIARY
 ON_ACCENT = LIGHT_PALETTE["on_accent"]
@@ -149,8 +207,8 @@ NOTICE_SURFACE_COLOR = ft.Colors.with_opacity(0.15, NOTICE_COLOR)
 NOTICE_BORDER_COLOR = ft.Colors.with_opacity(0.55, NOTICE_COLOR)
 
 SECTION_ICON_COLOR = ft.Colors.ON_SURFACE_VARIANT
-LOG_ENTRY_TINT = ft.Colors.with_opacity(0.18, ACCENT_FILL)
-LOG_ENTRY_DOT_COLOR = ACCENT_FILL
+LOG_ENTRY_TINT = ft.Colors.with_opacity(0.18, ft.Colors.PRIMARY)
+LOG_ENTRY_DOT_COLOR = ft.Colors.PRIMARY
 CALENDAR_SELECTED_COLOR = SELECTED_ROW_COLOR
 CALENDAR_TODAY_COLOR = ACCENT_TEXT
 CALENDAR_CELL_SHAPE = ft.RoundedRectangleBorder(radius=CONTROL_RADIUS)
@@ -286,7 +344,7 @@ DESTRUCTIVE_BUTTON_STYLE = ft.ButtonStyle(
         ft.ControlState.DISABLED: DISABLED_FILL_COLOR,
     },
     color={
-        ft.ControlState.DEFAULT: ON_ACCENT,
+        ft.ControlState.DEFAULT: ft.Colors.ON_ERROR,
         ft.ControlState.DISABLED: DISABLED_TEXT_COLOR,
     },
     shape=BUTTON_SHAPE,
@@ -307,103 +365,109 @@ LIST_TILE_THEME = ft.ListTileTheme(
 
 ICON_THEME = ft.IconTheme(size=ICON_SIZE)
 
-LIGHT_THEME = ft.Theme(
-    color_scheme=ft.ColorScheme(
-        primary=LIGHT_PALETTE["accent_fill"],
-        on_primary=LIGHT_PALETTE["on_accent"],
-        primary_container=LIGHT_PALETTE["accent_container"],
-        on_primary_container=LIGHT_PALETTE["on_accent_container"],
-        secondary=LIGHT_PALETTE["muted_text"],
-        on_secondary=LIGHT_PALETTE["card"],
-        secondary_container=LIGHT_PALETTE["region"],
-        on_secondary_container=LIGHT_PALETTE["text"],
-        tertiary=LIGHT_PALETTE["accent_text"],
-        on_tertiary=LIGHT_PALETTE["on_accent"],
-        error=LIGHT_PALETTE["error"],
-        on_error=LIGHT_PALETTE["on_error"],
-        error_container=LIGHT_PALETTE["error_container"],
-        on_error_container=LIGHT_PALETTE["on_error_container"],
-        surface=LIGHT_PALETTE["page"],
-        on_surface=LIGHT_PALETTE["text"],
-        on_surface_variant=LIGHT_PALETTE["muted_text"],
-        outline=LIGHT_PALETTE["control_border"],
-        outline_variant=LIGHT_PALETTE["border"],
-        surface_container=LIGHT_PALETTE["region"],
-        surface_container_low=LIGHT_PALETTE["container"],
-        surface_container_lowest=LIGHT_PALETTE["card"],
-        surface_container_high=LIGHT_PALETTE["container_high"],
-        surface_container_highest=LIGHT_PALETTE["container_highest"],
-        surface_dim=LIGHT_PALETTE["page_dim"],
-        surface_bright=LIGHT_PALETTE["page_bright"],
-        inverse_surface=LIGHT_PALETTE["inverse_surface"],
-        on_inverse_surface=LIGHT_PALETTE["on_inverse_surface"],
-        inverse_primary=LIGHT_PALETTE["inverse_primary"],
-        shadow="#000000",
-        scrim="#000000",
-    ),
-    surfaces=ft.ThemeSurfaces.NEUTRAL,
-    text_theme=TEXT_THEME,
-    icon_theme=ICON_THEME,
-    filled_button_theme=FILLED_BUTTON_THEME,
-    text_button_theme=TEXT_BUTTON_THEME,
-    outlined_button_theme=OUTLINED_BUTTON_THEME,
-    list_tile_theme=LIST_TILE_THEME,
-    input_decoration_theme=INPUT_DECORATION_THEME,
-    splash_color=SPLASH_COLOR,
-    highlight_color=HIGHLIGHT_COLOR,
-    hover_color=HOVER_COLOR,
-    focus_color=FOCUS_COLOR,
-    visual_density=ft.VisualDensity.STANDARD,
-)
 
-DARK_THEME = ft.Theme(
-    color_scheme=ft.ColorScheme(
-        primary=DARK_PALETTE["accent_fill"],
-        on_primary=DARK_PALETTE["on_accent"],
-        primary_container=DARK_PALETTE["accent_container"],
-        on_primary_container=DARK_PALETTE["on_accent_container"],
-        secondary=DARK_PALETTE["muted_text"],
-        on_secondary=DARK_PALETTE["card"],
-        secondary_container=DARK_PALETTE["region"],
-        on_secondary_container=DARK_PALETTE["text"],
-        tertiary=DARK_PALETTE["accent_text"],
-        on_tertiary=DARK_PALETTE["page"],
-        error=DARK_PALETTE["error"],
-        on_error=DARK_PALETTE["on_error"],
-        error_container=DARK_PALETTE["error_container"],
-        on_error_container=DARK_PALETTE["on_error_container"],
-        surface=DARK_PALETTE["page"],
-        on_surface=DARK_PALETTE["text"],
-        on_surface_variant=DARK_PALETTE["muted_text"],
-        outline=DARK_PALETTE["control_border"],
-        outline_variant=DARK_PALETTE["border"],
-        surface_container=DARK_PALETTE["region"],
-        surface_container_low=DARK_PALETTE["container"],
-        surface_container_lowest=DARK_PALETTE["card"],
-        surface_container_high=DARK_PALETTE["container_high"],
-        surface_container_highest=DARK_PALETTE["container_highest"],
-        surface_dim=DARK_PALETTE["page_dim"],
-        surface_bright=DARK_PALETTE["page_bright"],
-        inverse_surface=DARK_PALETTE["inverse_surface"],
-        on_inverse_surface=DARK_PALETTE["on_inverse_surface"],
-        inverse_primary=DARK_PALETTE["inverse_primary"],
-        shadow="#000000",
-        scrim="#000000",
-    ),
-    surfaces=ft.ThemeSurfaces.NEUTRAL,
-    text_theme=TEXT_THEME,
-    icon_theme=ICON_THEME,
-    filled_button_theme=FILLED_BUTTON_THEME,
-    text_button_theme=TEXT_BUTTON_THEME,
-    outlined_button_theme=OUTLINED_BUTTON_THEME,
-    list_tile_theme=LIST_TILE_THEME,
-    input_decoration_theme=INPUT_DECORATION_THEME,
-    splash_color=SPLASH_COLOR,
-    highlight_color=HIGHLIGHT_COLOR,
-    hover_color=HOVER_COLOR,
-    focus_color=FOCUS_COLOR,
-    visual_density=ft.VisualDensity.STANDARD,
-)
+class ThemeBuilder:
+    """Build one Flet theme from a complete palette table.
+
+    Notes
+    -----
+    The builder keeps the standard and high-contrast themes on one source of
+    truth. Views keep using the toolkit roles, so a palette swap never needs a
+    per-view branch.
+    """
+
+    @classmethod
+    def build(cls, palette: typing.Mapping[str, str], *, dark: bool) -> ft.Theme:
+        """Build a Flet theme for one palette.
+
+        Parameters
+        ----------
+        palette : typing.Mapping[str, str]
+            Complete role-to-color table.
+        dark : bool
+            Whether the theme is the dark variant.
+
+        Returns
+        -------
+        flet.Theme
+            Theme with the palette color scheme and the shared control themes.
+        """
+        return ft.Theme(
+            color_scheme=cls._color_scheme(palette, dark=dark),
+            surfaces=ft.ThemeSurfaces.NEUTRAL,
+            text_theme=TEXT_THEME,
+            icon_theme=ICON_THEME,
+            filled_button_theme=cls._filled_button_theme(palette),
+            text_button_theme=TEXT_BUTTON_THEME,
+            outlined_button_theme=OUTLINED_BUTTON_THEME,
+            list_tile_theme=LIST_TILE_THEME,
+            input_decoration_theme=INPUT_DECORATION_THEME,
+            splash_color=SPLASH_COLOR,
+            highlight_color=HIGHLIGHT_COLOR,
+            hover_color=HOVER_COLOR,
+            focus_color=FOCUS_COLOR,
+            visual_density=ft.VisualDensity.STANDARD,
+        )
+
+    @classmethod
+    def _color_scheme(cls, palette: typing.Mapping[str, str], *, dark: bool) -> ft.ColorScheme:
+        """Build the Material color scheme for one palette."""
+        return ft.ColorScheme(
+            primary=palette["accent_fill"],
+            on_primary=palette["on_accent"],
+            primary_container=palette["accent_container"],
+            on_primary_container=palette["on_accent_container"],
+            secondary=palette["muted_text"],
+            on_secondary=palette["card"],
+            secondary_container=palette["region"],
+            on_secondary_container=palette["text"],
+            tertiary=palette["accent_text"],
+            on_tertiary=palette["page"] if dark else palette["on_accent"],
+            error=palette["error"],
+            on_error=palette["on_error"],
+            error_container=palette["error_container"],
+            on_error_container=palette["on_error_container"],
+            surface=palette["page"],
+            on_surface=palette["text"],
+            on_surface_variant=palette["muted_text"],
+            outline=palette["control_border"],
+            outline_variant=palette["border"],
+            surface_container=palette["region"],
+            surface_container_low=palette["container"],
+            surface_container_lowest=palette["card"],
+            surface_container_high=palette["container_high"],
+            surface_container_highest=palette["container_highest"],
+            surface_dim=palette["page_dim"],
+            surface_bright=palette["page_bright"],
+            inverse_surface=palette["inverse_surface"],
+            on_inverse_surface=palette["on_inverse_surface"],
+            inverse_primary=palette["inverse_primary"],
+            shadow="#000000",
+            scrim="#000000",
+        )
+
+    @classmethod
+    def _filled_button_theme(cls, palette: typing.Mapping[str, str]) -> ft.FilledButtonTheme:
+        """Build the suggested-action button theme for one palette."""
+        return ft.FilledButtonTheme(
+            style=ft.ButtonStyle(
+                bgcolor={
+                    ft.ControlState.DEFAULT: palette["accent_fill"],
+                    ft.ControlState.DISABLED: DISABLED_FILL_COLOR,
+                },
+                color={
+                    ft.ControlState.DEFAULT: palette["on_accent"],
+                    ft.ControlState.DISABLED: DISABLED_TEXT_COLOR,
+                },
+                shape=BUTTON_SHAPE,
+            )
+        )
+
+
+LIGHT_THEME = ThemeBuilder.build(LIGHT_PALETTE, dark=False)
+DARK_THEME = ThemeBuilder.build(DARK_PALETTE, dark=True)
+HIGH_CONTRAST_LIGHT_THEME = ThemeBuilder.build(HIGH_CONTRAST_LIGHT_PALETTE, dark=False)
+HIGH_CONTRAST_DARK_THEME = ThemeBuilder.build(HIGH_CONTRAST_DARK_PALETTE, dark=True)
 
 ROLE_LINK_TEXT_STYLE = ft.TextStyle(
     size=CAPTION_SIZE,

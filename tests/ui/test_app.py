@@ -9,6 +9,7 @@ from pathlib import Path
 
 import flet as ft
 import pytest
+from flet.controls.services.semantics_service import AccessibilityFeatures
 
 import afanes.__about__
 import afanes.core.localization
@@ -40,6 +41,7 @@ WINDOW_WIDTH = 1100
 WINDOW_HEIGHT = 760
 WIDE_REGION_COUNT = 3
 MEDIUM_REGION_COUNT = 2
+SERVICE_COUNT = 2
 
 
 class FakeWindow:
@@ -66,6 +68,7 @@ class FakePage:
         self.height = WINDOW_HEIGHT
         self.on_resize: Callable[..., None] | None = None
         self.on_keyboard_event: Callable[..., Awaitable[None]] | None = None
+        self.on_app_lifecycle_state_change: Callable[..., Awaitable[None]] | None = None
         self.on_disconnect: Callable[[], None] | None = None
         self.dialogs: list[ft.AlertDialog] = []
 
@@ -90,6 +93,47 @@ class FakePicker:
     async def get_directory_path(self, **_: object) -> str | None:
         self.calls += 1
         return self.selected
+
+
+def _accessibility_features(*, high_contrast: bool) -> AccessibilityFeatures:
+    return AccessibilityFeatures(
+        accessible_navigation=False,
+        bold_text=False,
+        disable_animations=False,
+        high_contrast=high_contrast,
+        invert_colors=False,
+        reduce_motion=False,
+        on_off_switch_labels=False,
+        supports_announcements=True,
+    )
+
+
+def _reply_with_high_contrast(*, high_contrast: bool) -> Callable[[object], Awaitable[AccessibilityFeatures]]:
+    async def reply(_service: object) -> AccessibilityFeatures:
+        return _accessibility_features(high_contrast=high_contrast)
+
+    return reply
+
+
+def _reply_with_dynamic_high_contrast(
+    state: dict[str, bool],
+) -> Callable[[object], Awaitable[AccessibilityFeatures]]:
+    async def reply(_service: object) -> AccessibilityFeatures:
+        return _accessibility_features(high_contrast=state["high_contrast"])
+
+    return reply
+
+
+async def _fail_accessibility(_service: object) -> AccessibilityFeatures:
+    raise RuntimeError
+
+
+def _lifecycle_event(page: FakePage) -> ft.AppLifecycleStateChangeEvent:
+    return ft.AppLifecycleStateChangeEvent(
+        name="app_lifecycle_state_change",
+        control=typing.cast("ft.Page", page),
+        state=ft.AppLifecycleState.RESUME,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -684,7 +728,9 @@ class TestDesktopPresentation:
 
         assert page.window.width == WINDOW_WIDTH
         assert page.window.height == WINDOW_HEIGHT
-        assert len(page.services) == 1
+        assert len(page.services) == SERVICE_COUNT
+        assert isinstance(page.services[0], ft.SemanticsService)
+        assert isinstance(page.services[1], ft.FilePicker)
         assert page.theme_mode is ft.ThemeMode.SYSTEM
         assert page.theme is afanes.ui.theme.LIGHT_THEME
         assert page.dark_theme is afanes.ui.theme.DARK_THEME
@@ -703,6 +749,108 @@ class TestDesktopPresentation:
         assert create.content == afanes.i18n.ui.en.NEW_VAULT_ACTION
 
 
+class TestHighContrast:
+    def test_startup_applies_the_high_contrast_themes(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        monkeypatch.setattr(
+            ft.SemanticsService,
+            "get_accessibility_features",
+            _reply_with_high_contrast(high_contrast=True),
+        )
+        page = FakePage()
+
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
+
+        assert page.theme is afanes.ui.theme.HIGH_CONTRAST_LIGHT_THEME
+        assert page.dark_theme is afanes.ui.theme.HIGH_CONTRAST_DARK_THEME
+
+    def test_startup_keeps_the_standard_themes_when_high_contrast_is_off(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        monkeypatch.setattr(
+            ft.SemanticsService,
+            "get_accessibility_features",
+            _reply_with_high_contrast(high_contrast=False),
+        )
+        page = FakePage()
+
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
+
+        assert page.theme is afanes.ui.theme.LIGHT_THEME
+        assert page.dark_theme is afanes.ui.theme.DARK_THEME
+
+    def test_a_failed_query_keeps_the_standard_themes(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        monkeypatch.setattr(
+            ft.SemanticsService,
+            "get_accessibility_features",
+            _fail_accessibility,
+        )
+        page = FakePage()
+
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
+
+        assert page.theme is afanes.ui.theme.LIGHT_THEME
+        assert page.dark_theme is afanes.ui.theme.DARK_THEME
+
+    def test_resume_re_reads_the_platform_preference(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = {"high_contrast": False}
+        monkeypatch.setattr(
+            ft.SemanticsService,
+            "get_accessibility_features",
+            _reply_with_dynamic_high_contrast(state),
+        )
+        page = FakePage()
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
+        assert page.theme is afanes.ui.theme.LIGHT_THEME
+
+        state["high_contrast"] = True
+        handler = page.on_app_lifecycle_state_change
+        assert handler is not None
+
+        async def scenario() -> None:
+            await handler(_lifecycle_event(page))
+
+        asyncio.run(scenario())
+
+        assert page.theme is afanes.ui.theme.HIGH_CONTRAST_LIGHT_THEME
+        assert page.dark_theme is afanes.ui.theme.HIGH_CONTRAST_DARK_THEME
+
+    def test_web_session_uses_the_platform_preference(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        monkeypatch.setattr(
+            ft.SemanticsService,
+            "get_accessibility_features",
+            _reply_with_high_contrast(high_contrast=True),
+        )
+        page = FakePage(web=True)
+
+        asyncio.run(afanes.ui.app.AppShell.main(typing.cast("ft.Page", page)))
+
+        assert page.theme is afanes.ui.theme.HIGH_CONTRAST_LIGHT_THEME
+        assert page.dark_theme is afanes.ui.theme.HIGH_CONTRAST_DARK_THEME
+
+
 class TestWebPresentation:
     def test_web_session_skips_window_configuration(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
@@ -712,7 +860,8 @@ class TestWebPresentation:
 
         assert page.window.width == 0
         assert page.window.height == 0
-        assert page.services == []
+        assert len(page.services) == 1
+        assert isinstance(page.services[0], ft.SemanticsService)
 
     def test_web_welcome_offers_a_path_field(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
