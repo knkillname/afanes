@@ -600,7 +600,7 @@ Unmanaged files MUST NOT appear in search.
 
 ### Requirement: The workspace exposes the vault and its primary menu
 
-The workspace SHALL show the vault identity in the navigation region and SHALL offer a primary menu above the navigation list. The menu SHALL provide Change Vault…, Create Vault…, Close Vault, and About Afanes. The workspace MUST NOT show a separate status bar for the vault path or vault actions.
+The workspace SHALL show the vault identity in the navigation region and SHALL offer a primary menu above the navigation list. The menu SHALL provide Change Vault…, Create Vault…, Close Vault, Keyboard Shortcuts…, and About Afanes. The workspace MUST NOT show a separate status bar for the vault path or vault actions.
 
 #### Scenario: Vault identity is visible
 
@@ -610,7 +610,7 @@ The workspace SHALL show the vault identity in the navigation region and SHALL o
 #### Scenario: The primary menu offers the app and vault actions
 
 - **WHEN** the user opens the primary menu
-- **THEN** Change Vault…, Create Vault…, Close Vault, and About Afanes are available
+- **THEN** Change Vault…, Create Vault…, Close Vault, Keyboard Shortcuts…, and About Afanes are available
 
 #### Scenario: Change Vault uses the existing flow
 
@@ -627,6 +627,11 @@ The workspace SHALL show the vault identity in the navigation region and SHALL o
 - **WHEN** the user chooses Close Vault
 - **THEN** the workspace closes and the welcome state is shown
 
+#### Scenario: Keyboard Shortcuts opens the sheet
+
+- **WHEN** the user chooses Keyboard Shortcuts…
+- **THEN** the shortcut sheet opens over the workspace
+
 #### Scenario: About names the application
 
 - **WHEN** the user chooses About Afanes
@@ -639,7 +644,7 @@ The workspace SHALL show the vault identity in the navigation region and SHALL o
 
 ### Requirement: Review shows its snapshot queue in the browser
 
-While Review is active, the browser SHALL show the session's snapshot queue in review order as selectable cards and SHALL mark the current item. Selecting a card SHALL make that item current in the detail without reviewing, skipping, or reordering any item. Showing the queue MUST NOT reorder it, add new work to it, or change review records.
+While Review is active, the browser SHALL show the session's snapshot queue in review order as selectable cards and SHALL mark the current item. Selecting a card SHALL make that item current in the detail without reviewing, skipping, or reordering any item. Each card SHALL be reachable by keyboard and SHALL show a visible focus indicator. Showing the queue MUST NOT reorder it, add new work to it, or change review records.
 
 #### Scenario: The queue is shown in order
 
@@ -660,6 +665,16 @@ While Review is active, the browser SHALL show the session's snapshot queue in r
 
 - **WHEN** the user selects a card in the browser queue
 - **THEN** no item is reviewed or skipped and the queue order is unchanged
+
+#### Scenario: A card is reachable by keyboard
+
+- **WHEN** the user tabs through the Review browser
+- **THEN** every queue card receives focus in queue order and shows a visible focus indicator
+
+#### Scenario: Keyboard activation selects the card
+
+- **WHEN** a focused queue card is activated from the keyboard
+- **THEN** the detail shows that item and no review record changes
 
 #### Scenario: New work waits for the next session
 
@@ -700,3 +715,34 @@ Back, the new page SHALL start at the top.
 
 - **WHEN** the user chooses Back while the current page is scrolled
 - **THEN** the previous page starts at the top
+
+### Requirement: Focus returns to the browser after trashing a page
+
+When a page is moved to trash, focus SHALL move to the next visible note row in the browser's current
+order, or to the previous row when none follows. If no note row remains, focus SHALL move to the
+search field. The move MUST NOT change the active destination or clear an active query.
+
+#### Scenario: Focus moves to the next row
+
+- **WHEN** a page is trashed and another note row follows it in the browser
+- **THEN** keyboard focus moves to that next row
+
+#### Scenario: Focus falls back to the previous row
+
+- **WHEN** a page is trashed and no note row follows it
+- **THEN** keyboard focus moves to the previous row
+
+#### Scenario: An empty browser focuses search
+
+- **WHEN** a page is trashed and no note row remains
+- **THEN** keyboard focus moves to the search field
+
+#### Scenario: The destination and query survive
+
+- **WHEN** a page is trashed while a destination or search query is active
+- **THEN** the active destination and query remain unchanged and focus stays in the browser
+
+#### Scenario: Trashing writes only the move
+
+- **WHEN** focus returns to the browser after a trash
+- **THEN** no note other than the trashed page is created, changed, or removed

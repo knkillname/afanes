@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-15
+
+### Added
+
+- **Keyboard and accessibility pass across the workspace.** A shortcut sheet opens from the primary
+  menu or `Ctrl+?`, groups General, Calendar, and Navigation shortcuts, and closes with Esc. The Log
+  calendar takes focus on a day and supports arrows, Page Up/Page Down, Home/End, and Enter with a
+  visible focus ring; Tab leaves the grid. Review cards and browser note rows are focusable and
+  keyboard-activatable, and trashing a page returns focus to the next row, the previous row, or the
+  search field without changing the destination or query. Every interactive control exposes an
+  accessible name through a clean-sheet gate with no baseline. Banners, toasts, and primary inline
+  validation messages are live regions with one announcement per message surface. This implements
+  the `establish-accessibility` OpenSpec change. No new runtime dependency or network call; no public
+  API removal. Resolved runtime dependencies: `flet==1.1.2`, `markdown-it-py==4.3.0`, `PyYAML==6.0.3`,
+  `tzdata==2026.6`, `tzlocal==5.4.5`. README: updated. Docs: updated.
+
+- **Rendered large-text layout gate.** Text-bearing headers, fields, calendar cells, and date-picker
+  periods now use minimum heights and grow with their content. `hatch run render:check` launches the
+  desktop client with a temporary fixture vault, records keyed geometry in every primary view at 100%
+  and 200% text, and compares it with `tests/render/snapshots/linux.json`; `hatch run render:update`
+  rewrites the snapshot after a reviewed pass. The check fails on a missing view, a collapsed region,
+  a text-bearing control that does not grow, missing or extra keys, and geometry outside tolerance.
+  The real GNOME Large Text setting was observed at 1024x600 and 1100 px in light and dark, and the
+  result is recorded in `RELEASE.md`. The snapshot is text; no screenshots are tracked.
+
 ## [0.12.0] - 2026-11-15
 
 ### Added

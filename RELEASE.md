@@ -87,7 +87,9 @@ dark. The passes covered Inbox, Projects, References, Log, Needs Attention,
 Trash, Review, page read and edit, the shortcut sheet, and the day, month, and
 year date-picker modes. No clipped text, overlap, or unreachable action was
 observed. The rendered 100%/200% snapshot remains the automated check; the
-system setting is release evidence and is not simulated by the application.
+system setting is release evidence and is not simulated by the application. The
+`0.13.0` release carries the same application code; only release metadata,
+documentation, and OpenSpec artifacts changed after this check.
 
 ### Advisory nightly builds
 
@@ -145,7 +147,7 @@ time:
 3. Internationalization: English and Spanish.
 4. Note reminders: schema `2`, recurring and one-shot schedules.
 5. HIG wave 5: keyboard and accessibility, covering the localized and reminder
-   interface.
+   interface. Landed in `0.13.0`.
 6. HIG wave 7: identity, the SVG app icon, the final palette, an empty
    conformance baseline, and the residual wave 6 polish.
 7. Packaging and Linux evidence: the GitHub release artifacts, the offline

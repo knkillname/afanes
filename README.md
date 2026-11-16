@@ -52,6 +52,11 @@ language from the welcome state or the workspace primary menu; the choice is sav
 and applies on the next launch. See
 [Workspace and browser](https://github.com/knkillname/afanes/blob/main/docs/guide/workspace.md#language).
 
+Every interactive control exposes an accessible name, banners and toasts are announced to assistive
+technology, and the layout follows the operating system's text scale instead of clipping. Press
+`Ctrl+?` or choose **Keyboard Shortcuts…** from the primary menu to see the grouped shortcut sheet.
+See [Workspace and browser](https://github.com/knkillname/afanes/blob/main/docs/guide/workspace.md).
+
 ## 🚀 First five minutes
 
 1. **Open or create a vault.** A vault is a folder of Markdown files with an `afanes.yaml` settings
