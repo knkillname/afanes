@@ -31,8 +31,14 @@ runs the packaged manual gate on the downloaded artifact.
   native binary from the current release surface. The Linux native build and the
   wheel remain the release artifacts; a nightly workflow can land in a later
   change.
-- Add one `Unreleased` changelog entry. No version bump, no runtime change, no
-  dependency change, and no new capability requirement.
+- Fix the Python 3.13 failures exposed by the runner gates:
+  `afanes.ui.state.navigation` imports `BrowserState` directly instead of
+  resolving the submodule through the partially initialized package, and the
+  frontmatter round-trip strategy formats month-precision dates with an
+  explicit zero-padded year. This restores the supported Python 3.13 runtime
+  and changes no behavior on 3.14.
+- Add one `Unreleased` changelog entry. No version bump, no runtime behavior
+  change, no dependency change, and no new capability requirement.
 
 ## Capabilities
 
@@ -53,7 +59,10 @@ built and how the release evidence is recorded. The change sets
 - `AGENTS.md`, `RELEASE.md`, `docs/develop/releasing.md`,
   `docs/getting-started/install.md`, `docs/develop/setup.md`, `README.md`, and
   `CHANGELOG.md` change.
-- No `src/`, `tests/`, dependency, schema, vault-format, or public API change.
+- `src/afanes/ui/state/navigation.py` changes one import and one annotation to
+  fix the Python 3.13 import order. `tests/core/test_frontmatter.py` formats a
+  generated month-precision date explicitly and gains a leading-zero-year
+  regression. No dependency, schema, vault-format, or public API change.
 - The build uses network access on the runner for the toolchain and Flutter
   dependencies. The packaged application still makes no request at startup.
 - The workflow needs the source and workflow file on GitHub. The local `main`

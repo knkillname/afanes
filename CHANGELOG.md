@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `tar.gz` workflow artifact whose run summary records the commit, version, runner image, tool
   versions, and SHA-256. Release documents now describe the Linux native build and the wheel; the
   unimplemented macOS and Windows native workflow is deferred. This implements the
-  `add-linux-release-workflow` OpenSpec change. No version bump, runtime change, dependency change, or
-  public API change. README: updated. Docs: updated.
+  `add-linux-release-workflow` OpenSpec change. The Python 3.13 state import order and frontmatter
+  round-trip strategy were corrected; Python 3.14 behavior is unchanged. No version bump, dependency
+  change, or public API change. README: updated. Docs: updated.
 
 - **HIG-shaped application icon.** `src/assets/icon.svg` now follows the GNOME app-icon template: a
   128×128 canvas on the 2 px grid, a 104×104 baseplate with a darker 4 px front profile, and only

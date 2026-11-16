@@ -10,13 +10,13 @@ import afanes.core.links
 import afanes.core.names
 import afanes.core.template_cards
 import afanes.core.vault.pages
-import afanes.ui.state.browser
 from afanes.core.errors import AfanesError, InvalidReferenceError, VaultError
 from afanes.core.links import DestinationKind, ReferenceParser
 from afanes.core.vault.snapshot import LinkOutcome, VaultSnapshot
 from afanes.core.vault.trash_catalog import TrashEntry
 from afanes.models.link import NoteReference, ReferenceScheme
 from afanes.models.note import CategoryLabel, NoteDate, NoteType
+from afanes.ui.state.browser import BrowserState
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.pages import PageEditorState
 from afanes.ui.state.session import VaultSession
@@ -55,7 +55,7 @@ class PageNavigator:
         Vault state that owns the scan snapshot.
     pages : PageEditorState
         Editor that owns the open draft.
-    browser : afanes.ui.state.browser.BrowserState
+    browser : BrowserState
         Browser query cleared after a creation.
     status : UiStatus
         Shared banner and busy flags.
@@ -69,7 +69,7 @@ class PageNavigator:
 
     session: VaultSession
     pages: PageEditorState
-    browser: afanes.ui.state.browser.BrowserState
+    browser: BrowserState
     status: UiStatus
     command_lock: CommandLock
     history: tuple[Path, ...] = ()

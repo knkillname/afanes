@@ -747,7 +747,7 @@ class TestSerializeDocument:
         hypothesis.strategies.none(),
         hypothesis.strategies.dates().map(NoteDate.from_date),
         hypothesis.strategies.integers(min_value=1, max_value=9999).map(NoteDate.from_year),
-        hypothesis.strategies.dates().map(lambda value: NoteDate.from_text(value.strftime("%Y-%m"))),
+        hypothesis.strategies.dates().map(lambda value: NoteDate.from_text(f"{value.year:04d}-{value.month:02d}")),
     ),
     unknown=hypothesis.strategies.text(
         alphabet=hypothesis.strategies.characters(blacklist_characters="\x85\u2028\u2029")

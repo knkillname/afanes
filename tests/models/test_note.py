@@ -113,6 +113,9 @@ class TestNoteDate:
     def test_from_year_round_trips(self) -> None:
         assert NoteDate.from_year(2025) == NoteDate.from_text("2025")
 
+    def test_from_year_pads_a_short_year(self) -> None:
+        assert NoteDate.from_year(999) == NoteDate.from_text("0999")
+
     def test_day_precision_writes_a_yaml_date(self) -> None:
         value = NoteDate.from_text("2025-10-12")
         assert value.to_yaml_value() == datetime.date(2025, 10, 12)

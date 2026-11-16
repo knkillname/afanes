@@ -146,6 +146,24 @@ This is build tooling and documentation, not a completed MVP milestone. Keep the
 changelog entry under `Unreleased` and leave the version at `0.14.0`. The
 post-archive release step records the docs status and does not bump.
 
+### D9. Fix the Python 3.13 failures exposed by the gates
+
+The first runner gate on Python 3.13 fails while collecting the UI tests:
+`afanes.ui.state.navigation` annotates `PageNavigator.browser` as
+`afanes.ui.state.browser.BrowserState` and resolves the submodule through the
+partially initialized `afanes.ui` package. Python 3.14 tolerates the lookup in
+the local environment; Python 3.13 raises `AttributeError`. The fix imports
+`BrowserState` directly, matching the project rule for CamelCase types, and
+annotates the field with the imported class. It changes no behavior and adds no
+dependency.
+
+The same run exposes a Hypothesis strategy that formats a generated
+month-precision date with `strftime("%Y-%m")`; Python 3.13 does not zero-pad a
+year below 1000, so the strategy produced `999-01`, which the parser correctly
+rejects. Format the value explicitly as `f"{value.year:04d}-{value.month:02d}"`
+and add a deterministic leading-zero-year regression. Both fixes restore the
+supported Python 3.13 runtime; neither skips or narrows a gate.
+
 ## Risks / Trade-offs
 
 - **The release build depends on GitHub Actions.** Pin the runner, record its
