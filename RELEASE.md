@@ -110,7 +110,9 @@ Attention, Trash, Review, page read and edit, the shortcut sheet, and the day,
 month, and year date-picker modes. No unreadable text, invisible boundary, or
 lost focus was observed. Flet reported `high_contrast=True`; the dark passes
 also reported `brightness=DARK`. The system returned to normal contrast and the
-light appearance after the check.
+light appearance after the check. The `0.14.0` release carries the same
+application code; only release metadata, documentation, and OpenSpec artifacts
+changed after this check.
 
 ### Advisory nightly builds
 
@@ -147,12 +149,12 @@ records the limitation in the release notes.
 - The first development desktop run may fetch the Flet client once as
   provisioning; a packaged build bundles the client and starts offline.
 - There is no cloud sync, account, telemetry, or hidden network call.
-- `0.12.0` is the current version. Intermediate `0.x` releases group completed
+- `0.14.0` is the current version. Intermediate `0.x` releases group completed
   work; no future `0.x` version is named as a checkpoint.
 
 ## Version path
 
-`0.12.0` is the current version. An archive that completes a coherent group of
+`0.14.0` is the current version. An archive that completes a coherent group of
 work is a MINOR release; an archive that completes no milestone keeps its entry
 under `Unreleased` and does not bump the version. `1.0.0` follows only when every
 row in the unified gate is green. The maintainer confirms the transition after
@@ -170,7 +172,7 @@ time:
 5. HIG wave 5: keyboard and accessibility, covering the localized and reminder
    interface. Landed in `0.13.0`.
 6. HIG wave 7: identity, the SVG app icon, the final palette, an empty
-   conformance baseline, and the residual wave 6 polish.
+   conformance baseline, and the residual wave 6 polish. Landed in `0.14.0`.
 7. Packaging and Linux evidence: the GitHub release artifacts, the offline
    wheel check, the Linux manual checks, and `1.0.0`.
 

@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-15
+
+### Added
+
+- **Original application identity icon.** `src/assets/icon.svg` is an original, self-contained SVG
+  with no text, script, external reference, or embedded raster image. Packaged desktop artifacts use
+  it, and its silhouette and colors remain legible from 16 to 256 pixels on light and dark desktops.
+  The interface keeps the toolkit's monochrome symbolic glyphs instead of adopting a custom icon set.
+  This implements part of the `finalize-interface-conformance` OpenSpec change. No new runtime
+  dependency or network call; no public API removal. Resolved runtime dependencies: `flet==1.1.2`,
+  `markdown-it-py==4.3.0`, `PyYAML==6.0.3`, `tzdata==2026.6`, `tzlocal==5.4.5`. README: updated.
+  Docs: updated.
+
+- **Symbolic placeholder pages.** Empty browser destinations, an empty search, empty Trash, and the
+  no-page detail region show one shared symbolic page with a monochrome icon, a heading, optional
+  guidance, and at most one suggested action. Focused flows, open pages, and persistent banners take
+  precedence. The heading and guidance supply the accessible name, and the icon is decorative.
+
+- **High contrast follows the platform.** The interface reads the platform high-contrast
+  accessibility feature at startup and when it resumes and selects a high-contrast light or dark
+  palette. Body text keeps at least 7:1 contrast on page, card, and region surfaces; borders,
+  separators, and the focus ring stay visible; selection, focus, and destructive intent remain
+  distinguishable without hue. The real GNOME High Contrast setting was observed at 1024x600 and
+  1100 px in light and dark, and the result is recorded in `RELEASE.md`.
+
+### Changed
+
+- **Final interface conformance.** The bounded Flet differences table is down from six entries to
+  five after high contrast became a real platform-following palette, and the conformance baseline
+  remains empty. The rendered layout gate now captures the 1024x600 minimum with stable keyed
+  remounts, and the Linux snapshot was regenerated to match.
+
 ## [0.13.0] - 2026-11-15
 
 ### Added
