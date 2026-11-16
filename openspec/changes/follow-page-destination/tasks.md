@@ -33,8 +33,8 @@
 ## 5. Integration checks
 
 - [x] 5.1 Run `hatch check`, `hatch test --cover`, `hatch run docs:build`, `openspec validate --all --strict`, `openspec doctor`, and the vocabulary compliance greps; verify every command passes.
-- [ ] 5.2 Run the desktop app with a fixture vault and verify the owner link, body link, connection, search result, Back, Trash result, and manual destination behaviors by hand.
-- [ ] 5.3 Check keyboard focus after a search result opens; verify focus is not lost and remains on a usable control without changing the destination.
+- [x] 5.2 Run the desktop app with a fixture vault and verify the owner link, body link, connection, search result, Back, Trash result, and manual destination behaviors by hand.
+- [x] 5.3 Check keyboard focus after a search result opens; verify focus is not lost and remains on a usable control without changing the destination.
 
 ## Workflow follow-up
 
