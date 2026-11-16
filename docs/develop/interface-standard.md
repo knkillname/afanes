@@ -432,7 +432,7 @@ WAVE 3  landed: writing style: header capitalization, ellipses, final periods,
         AGENTS.md 4.6
 WAVE 4  landed: feedback: undo over confirmation, toasts for one-time events,
         banners only for persistent states, overlays
-WAVE 5  in progress: keyboard and accessibility: shortcut sheet, Log calendar
+WAVE 5  landed: keyboard and accessibility: shortcut sheet, Log calendar
         keys, focus order, accessible-name gate, live regions, large-text
         robustness and the rendered layout snapshot
 WAVE 6  landed: breakpoints, collapsible navigation, narrow and large-window

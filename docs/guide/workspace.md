@@ -156,6 +156,11 @@ darker than the window, and the navigation is lighter than the window, so a pane
 rather than raised. The browser shares the window surface, and a thin outline keeps the detail visible
 in both modes. The window fits the 1024x600 desktop minimum.
 
+Text scaling follows the operating system. Headers, fields, calendar cells, and date periods grow
+with the text instead of clipping. The [interface standard](../develop/interface-standard.md) records
+the automated 100%/200% rendered layout check that guards this behavior and the real Large Text
+evidence required for a release.
+
 One blue accent marks suggested actions, links, keyboard focus, and log entries. Selection uses a
 neutral row shade, not the accent, matching the GNOME navigation sidebar. Section icons are
 monochrome; the label, icon, and neutral fill identify the active destination without relying on color.
