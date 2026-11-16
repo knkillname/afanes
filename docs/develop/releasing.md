@@ -1,53 +1,72 @@
 # 🚢 Releasing and packaging
 
-A release carries a Linux native build, a Python wheel, and any qualifying experimental macOS or
-Windows native binary. A packaged desktop artifact bundles the interface client, so the application
-starts with no network access. Each native artifact is built on its own operating system; there is no
-cross-platform desktop build.
+A release carries a Linux native build and a Python wheel. A packaged desktop artifact bundles the
+interface client, so the application starts with no network access. The native build runs on a pinned
+Linux runner; there is no cross-platform desktop build.
 
 :::{admonition} tl;dr
 :class: note
 
-Build with `hatch run package <platform> --build-version "$(hatch version)"` on the host OS. The
-`package` script compiles the gettext `.mo` catalogs before invoking `flet build`. Attach the Linux
-build and the wheel to the GitHub release by hand. Linux is the only release gate; run its
-offline-start check before publishing.
+Dispatch `.github/workflows/linux-release.yml` on a pinned `ubuntu-24.04` runner. It runs the
+automated gates, builds with `hatch run package linux --yes --build-version "$(hatch version)"`, and
+uploads the checksummed bundle. Download, verify, and attach the Linux build and the wheel to the
+GitHub release by hand. Linux is the only release gate; run its offline-start check before
+publishing.
 :::
 
-## 📦 Build a desktop app
+## 📦 Build the Linux artifact
 
-Install the Flutter SDK first; `flet build` stops and names the toolchain it needs when one is missing.
-The native build tools are also required: Xcode command line tools on macOS, Visual Studio Build Tools
-on Windows, and `clang`, CMake, Ninja, and the GTK 3 development libraries on Linux.
+The release build runs in GitHub Actions on `ubuntu-24.04`. The workflow installs the Flutter SDK
+through `flet build` and the native toolchain (`clang`, CMake, Ninja, `pkg-config`, and the GTK 3
+development libraries), runs `hatch check` and `hatch test --cover`, and builds with the project
+version:
+
+```console
+gh workflow run linux-release.yml
+gh run watch
+```
+
+Download the workflow artifact, verify its checksum, and extract it into a dedicated directory:
+
+```console
+gh run download <run-id> -n afanes-linux-x64
+sha256sum -c afanes-linux-x64-<version>.tar.gz.sha256
+mkdir afanes-linux-x64
+tar -xzf afanes-linux-x64-<version>.tar.gz -C afanes-linux-x64
+```
+
+The run summary records the commit, version, runner image, tool versions, and SHA-256. The workflow
+artifact is public, short-lived, and not a release asset. The extracted bundle is the tested and
+supported `1.0.0` artifact and the only manual release gate; run the offline-start check on it before
+publishing.
+
+A local build remains the fallback. Install the Flutter SDK first; `flet build` stops and names the
+toolchain it needs when one is missing. The Linux toolchain is `clang`, CMake, Ninja, `pkg-config`,
+and the GTK 3 development libraries. Build only on the host OS:
 
 ```console
 hatch run package linux --build-version "$(hatch version)"
-hatch run package macos --build-version "$(hatch version)"
-hatch run package windows --build-version "$(hatch version)"
 ```
 
-Run only the command for the machine you are on. The artifact is written under `build/<platform>/`.
-`--build-version` records the project version from `hatch version`; the build never carries a second
-version number. The launcher is `src/main.py`, and `[tool.flet.app]` points the build at the `src`
-directory. Build-time dependency resolution is the only network activity; the packaged application
-makes no request at startup.
+The `package` script compiles the gettext `.mo` catalogs before invoking `flet build`. The artifact is
+written under `build/linux/`. `--build-version` records the project version from `hatch version`; the
+build never carries a second version number. The launcher is `src/main.py`, and `[tool.flet.app]`
+points the build at the `src` directory. Build-time dependency resolution is the only network
+activity; the packaged application makes no request at startup.
 
-Build and test the Linux artifact on Linux. That build is the supported `1.0.0` artifact and the only
-manual release gate. The macOS and Windows builds are experiments: a scheduled workflow attempts them,
-and a binary is attached to the release only when that platform's tests and build both pass in the
-same nightly run. An attached binary is untested at runtime, unsigned, and unsupported.
+macOS and Windows use the wheel and `afanes --web`; their local native builds are not release
+artifacts.
 
 ## 🧾 Release artifacts
 
 The GitHub release carries:
 
 - the Linux native build, tested and supported;
-- the Python wheel, installed with `pipx`, for the macOS and Windows browser path;
-- any qualifying experimental macOS or Windows native binary, labeled untested, unsigned, and
-  unsupported.
+- the Python wheel, installed with `pipx`, for the macOS and Windows browser path.
 
-Artifacts are attached by hand for `1.0.0`; there is no automatic publish pipeline. Every artifact is
-unsigned. There is no PyPI publication and no code signing, notarization, or auto-update.
+Native macOS and Windows binaries are not release artifacts. Artifacts are attached by hand for
+`1.0.0`; there is no automatic publish pipeline. Every artifact is unsigned. There is no PyPI
+publication and no code signing, notarization, or auto-update.
 
 The wheel must prove that `afanes --web` starts with networking unavailable. If the Flet web client is
 fetched at startup, bundle it in the wheel or record the limitation in the release notes.
@@ -65,14 +84,6 @@ refresh behavior when a file changes outside the application.
 
 For the wheel, create an isolated environment with `pipx install`, disable networking, run
 `afanes --web`, open the reported address, and confirm the workspace loads and can capture a note.
-
-## 🌙 Nightly advisory builds
-
-A scheduled GitHub Actions workflow runs `hatch check` and `hatch test` on macOS and Windows and
-attempts a native build for each. The workflow is advisory: it is not a required check and never
-blocks a merge, a release, or `1.0.0`. Its artifacts are short-lived workflow artifacts, not release
-assets. A green run is the only source for an experimental release binary, and that binary is attached
-manually.
 
 ## 🏷️ Versioning
 

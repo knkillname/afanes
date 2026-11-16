@@ -55,12 +55,13 @@ until that toolchain produces an artifact.
 
 ## Platform matrix
 
-Linux native is the only `1.0.0` release gate. The maintainer can build and
-check it, so every manual check above runs there.
+Linux native is the only `1.0.0` release gate. The release workflow builds the
+artifact and the maintainer checks it on a Linux desktop, so every manual check
+above runs there.
 
 | Platform | Path | Build | Evidence |
 | --- | --- | --- | --- |
-| Linux | Native desktop build | `hatch run flet build linux --build-version "$(hatch version)"` | Launch `build/linux/` with networking unavailable; run every Linux manual check in the gate checklist; capture a note and compare its bytes with a source run; edit a file externally and confirm the workspace refresh. Verified locally at `0.5.1`; re-verified for each `1.0.0` release |
+| Linux | Native desktop build | `.github/workflows/linux-release.yml` on `ubuntu-24.04`; local fallback `hatch run package linux --build-version "$(hatch version)"` | Download the `afanes-linux-x64` workflow artifact, verify its SHA-256, and extract it. Record the run URL, commit, runner image, and checksum. Launch the bundle with networking unavailable; run every Linux manual check in the gate checklist; capture a note and compare its bytes with a source run; edit a file externally and confirm the workspace refresh. Re-verified for each `1.0.0` release |
 | macOS | GitHub Releases wheel, then `afanes --web` | Built from the released wheel | Documented path, not a release gate; no manual check is required |
 | Windows | GitHub Releases wheel, then `afanes --web` | Built from the released wheel | Documented path, not a release gate; no manual check is required |
 
@@ -118,29 +119,16 @@ light appearance after the check. The `0.14.0` release carries the same
 application code; only release metadata, documentation, and OpenSpec artifacts
 changed after this check.
 
-### Advisory nightly builds
-
-A scheduled GitHub Actions workflow runs `hatch check` and `hatch test` on
-macOS and Windows and attempts `flet build` for each. The workflow is advisory:
-it is not a required check and never blocks a merge, a release, or `1.0.0`.
-
-A platform's native binary may be attached to the GitHub release only when that
-platform's nightly tests and native build both pass in the same run. The binary
-is untested at runtime, unsigned, and unsupported. It is attached manually from
-the latest green run; there is no automatic publish pipeline. A nightly build
-failure removes the artifact, never the release.
-
 ## Release artifacts
 
 The GitHub release carries:
 
 - the Linux native build, which is the tested and supported `1.0.0` artifact;
 - the Python wheel, installed with `pipx`, for the macOS and Windows browser
-  path;
-- any qualifying experimental macOS or Windows native binary, labeled
-  untested, unsigned, and unsupported.
+  path.
 
-Artifacts are attached manually for `1.0.0`. There is no PyPI publication and
+Native macOS and Windows binaries are not release artifacts. Artifacts are
+attached manually for `1.0.0`. There is no PyPI publication and
 no code signing, notarization, or auto-update. The wheel must prove that
 `afanes --web` starts with networking unavailable before the release; if the
 Flet web client is fetched at startup, the packaging change bundles it or
@@ -148,8 +136,8 @@ records the limitation in the release notes.
 
 ## Constraints (not gaps)
 
-- Artifacts are unsigned. macOS and Windows may warn or block an unsigned
-  binary; the wheel and `afanes --web` path is the usable alternative.
+- Artifacts are unsigned. There is no code signing, notarization, or
+  auto-update; macOS and Windows use the wheel and `afanes --web`.
 - The first development desktop run may fetch the Flet client once as
   provisioning; a packaged build bundles the client and starts offline.
 - There is no cloud sync, account, telemetry, or hidden network call.
@@ -177,24 +165,22 @@ time:
    interface. Landed in `0.13.0`.
 6. HIG wave 7: identity, the SVG app icon, the final palette, an empty
    conformance baseline, and the residual wave 6 polish. Landed in `0.14.0`.
-7. Packaging and Linux evidence: the GitHub release artifacts, the offline
+7. Linux release workflow: the pinned GitHub Actions build, the checksummed
+   artifact, and the downloaded-artifact evidence path.
+8. Packaging and Linux evidence: the GitHub release artifacts, the offline
    wheel check, the Linux manual checks, and `1.0.0`.
-
-The advisory nightly workflow starts with the first change and stays advisory.
-The app icon may be produced by its own small change and is a wave 7
-dependency.
 
 ## Not planned
 
 **Non-goals.** Code signing, notarization, auto-update, PyPI publication, and
-native macOS or Windows support guarantees remain outside the project. Nightly
-native binaries are experiments, not support promises. OS-level reminder
+native macOS or Windows support guarantees remain outside the project. Native
+macOS and Windows binaries are not release artifacts. OS-level reminder
 notifications, snooze, and reminder end dates are outside `1.0.0`. Translated
 documentation is out of scope; the documentation stays English.
 
 **Deferred.** Docs-site deployment, versioned documentation, the export
-capability, and a persistent reference cache are deferred; none has a scheduled
-change.
+capability, a persistent reference cache, and the macOS and Windows nightly
+workflow with its native binaries are deferred; none has a scheduled change.
 
 **Reversed.** The SQLite index, `afanes index`, and `afanes doctor` are not
 planned. `AGENTS.md` requires an approved change before any of them is added.

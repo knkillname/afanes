@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- **Linux release workflow.** `.github/workflows/linux-release.yml` builds the Linux bundle on a
+  pinned `ubuntu-24.04` runner, runs `hatch check` and `hatch test --cover`, and uploads a checksummed
+  `tar.gz` workflow artifact whose run summary records the commit, version, runner image, tool
+  versions, and SHA-256. Release documents now describe the Linux native build and the wheel; the
+  unimplemented macOS and Windows native workflow is deferred. This implements the
+  `add-linux-release-workflow` OpenSpec change. No version bump, runtime change, dependency change, or
+  public API change. README: updated. Docs: updated.
+
 - **HIG-shaped application icon.** `src/assets/icon.svg` now follows the GNOME app-icon template: a
   128×128 canvas on the 2 px grid, a 104×104 baseplate with a darker 4 px front profile, and only
   Light 1 and Blue 3, Blue 4, and Blue 5 palette colors. The page, fold, and check remain legible at

@@ -49,9 +49,7 @@ Download the wheel from the [releases page](https://github.com/knkillname/afanes
 its path. The `[web]` extra installs the browser runtime. The server binds loopback only, serves local
 assets, and allows one browser session at a time.
 
-Native macOS and Windows binaries may also appear on the releases page. They are experimental,
-untested at runtime, unsigned, and unsupported; Gatekeeper or SmartScreen may block them. The wheel is
-the supported path.
+The wheel is the supported macOS and Windows path.
 
 ## 🌐 Browser presentation from a checkout
 
@@ -65,18 +63,19 @@ The desktop window stays the default; `--web` is an explicit opt-in.
 
 ## 📦 Build a desktop artifact
 
+Linux release builds run in GitHub Actions on a pinned `ubuntu-24.04` runner; the
+[release guide](../develop/releasing.md) covers the dispatch, download, checksum, and offline-start
+check.
+
+A local build remains the fallback:
+
 ```console
-hatch run flet build <platform> --build-version "$(hatch version)"
+hatch run package linux --build-version "$(hatch version)"
 ```
 
-Run only the command for the host operating system: `linux`, `macos`, or `windows`. The artifact is
-written under `build/<platform>/` and is an unsigned build. Install the Flutter SDK and the native
-build tools first; the [release guide](../develop/releasing.md) lists the per-platform requirements
-and the offline-start check.
-
-Linux is the only release gate. The macOS and Windows builds are experiments from the nightly
-workflow; a binary reaches the release page only when that platform's tests and build both pass, and
-it stays untested and unsupported.
+Install the Flutter SDK and the native build tools first. The artifact is written under `build/linux/`
+and is an unsigned build. macOS and Windows use the released wheel and `afanes --web`; their local
+native builds are not release artifacts.
 
 ## 📡 First-run provisioning
 

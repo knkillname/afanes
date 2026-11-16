@@ -14,7 +14,8 @@ Run `hatch env create`, then `hatch run afanes`. Use `hatch check` for lint, for
 
 - Python 3.13 or newer.
 - [Hatch](https://hatch.pypa.io/) for every developer command.
-- The Flutter SDK and native build tools only when you build a packaged desktop artifact.
+- The Flutter SDK and native build tools only when you build a packaged desktop artifact locally; the
+  Linux release workflow builds its own artifact on GitHub Actions.
 
 Do not create or edit `.venv/` by hand, and do not use `uv`, `pip`, `poetry`, or `conda` as the
 developer interface. `hatch env create` owns the environment.

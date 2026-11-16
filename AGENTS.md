@@ -28,7 +28,7 @@
 
 ## 2. Environment and commands
 
-Hatch is the only developer interface. Do not run `uv`, `pip`, `poetry`, or `conda`, and do not create or edit `.venv/` by hand; `hatch env create` owns it. There is no CI, so run the gates locally.
+Hatch is the only developer interface. Do not run `uv`, `pip`, `poetry`, or `conda`, and do not create or edit `.venv/` by hand; `hatch env create` owns it. GitHub Actions builds the Linux release artifact in `.github/workflows/linux-release.yml`; the local gates and the packaged manual gate remain required before a release.
 
 ```bash
 hatch env create
@@ -45,11 +45,13 @@ hatch test -k "frontmatter and not slow"
 hatch test --all                    # 3.13 + 3.14 + oldest-dependency floor
 hatch run pytest ...                # focused diagnosis only
 hatch run python scripts/scan_benchmark.py --notes 1000 5000 10000 --repeat 5
+gh workflow run linux-release.yml            # Linux release build on ubuntu-24.04
+gh run download <run-id> -n afanes-linux-x64 # download the checksummed bundle
 ```
 
 - Interpreter: `.venv/bin/python` (Windows: `.venv\Scripts\python.exe`).
 - Version: `hatch version`. Bump only through 5.3; never edit `src/afanes/__about__.py`.
-- Build: `hatch run package <linux|macos|windows> --build-version "$(hatch version)"`. The `package` script compiles the gettext catalogs before invoking `flet build`. Build only on the host OS; artifacts land in `build/<platform>/`. `src/main.py` is the packaged launcher.
+- Build: `hatch run package <linux|macos|windows> --build-version "$(hatch version)"`. The `package` script compiles the gettext catalogs before invoking `flet build`. Build only on the host OS; artifacts land in `build/<platform>/`. `src/main.py` is the packaged launcher. The Linux release workflow builds the same bundle on `ubuntu-24.04` and uploads it with a SHA-256 file; the local path remains the fallback, and the packaged manual gate runs on the downloaded artifact.
 - Documentation: `docs/` is the user-facing manual; build it with `hatch run docs:build` and preview it with `hatch run docs:serve`. The `docs` Hatch environment installs Sphinx only for documentation work.
 - OpenSpec: `openspec list --json`, `openspec status --change "<name>" --json`, `openspec instructions apply --change "<name>" --json`, `openspec validate --all --strict`, `openspec doctor`, `openspec archive "<name>"`. Slash commands: `/opsx-propose`, `/opsx-apply`, `/opsx-archive`, and siblings.
 - `rg` is not installed here. Use `grep -r` (see 6.1).
