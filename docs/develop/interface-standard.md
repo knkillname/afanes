@@ -300,6 +300,12 @@ Interface icons use monochrome symbolic or outlined glyphs at `ICON_SIZE` (16) o
 `ICON_SIZE_LARGE` (32). A filled glyph is not used when an outlined variant exists. The toolkit's
 Material icon set stands in for Adwaita's symbolic set; no custom SVG icon set ships.
 
+The application identity icon is `src/assets/icon.svg`, an original framed mark with a page
+silhouette and a check. It is an identity asset, not an interface glyph: the Flet build finds the
+file under the source assets directory and rasterizes it into the platform icon set. The interface
+continues to use the toolkit's symbolic glyphs, so the identity icon never appears as a control
+icon.
+
 ## 🔀 Bounded differences
 
 These six differences are toolkit limits, not design preferences. Adding another one requires a
