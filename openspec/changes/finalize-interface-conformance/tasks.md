@@ -30,11 +30,11 @@
 
 ## 5. Integration checks
 
-- [ ] 5.1 Run `hatch check` and verify lint, formatting, and strict types pass.
-- [ ] 5.2 Run `hatch test --cover` and verify the suite passes at 85% coverage or higher.
-- [ ] 5.3 Run `openspec validate --all --strict` and `openspec doctor`; verify both pass.
-- [ ] 5.4 Run the vocabulary greps, `git diff --check`, and the tracked-`.mo` check; verify no prohibited matches, a clean diff, and no tracked compiled catalogs.
-- [ ] 5.5 Run `hatch run docs:build` and verify the documentation build passes.
+- [x] 5.1 Run `hatch check` and verify lint, formatting, and strict types pass.
+- [x] 5.2 Run `hatch test --cover` and verify the suite passes at 85% coverage or higher.
+- [x] 5.3 Run `openspec validate --all --strict` and `openspec doctor`; verify both pass.
+- [x] 5.4 Run the vocabulary greps, `git diff --check`, and the tracked-`.mo` check; verify no prohibited matches, a clean diff, and no tracked compiled catalogs.
+- [x] 5.5 Run `hatch run docs:build` and verify the documentation build passes.
 
 ## Workflow follow-up
 
