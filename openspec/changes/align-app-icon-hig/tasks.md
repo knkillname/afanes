@@ -29,9 +29,9 @@
 
 ## 3. Integration checks
 
-- [ ] 3.1 Run `hatch check`, `hatch test --cover`, `openspec validate --all --strict`,
+- [x] 3.1 Run `hatch check`, `hatch test --cover`, `openspec validate --all --strict`,
   `openspec doctor`, and the two vocabulary compliance greps. Verify every command passes.
-- [ ] 3.2 Review the final diff with `git status --short` and `git diff --stat`. Verify only the
+- [x] 3.2 Review the final diff with `git status --short` and `git diff --stat`. Verify only the
   icon asset, `tests/test_assets.py`, the interface standard, `RELEASE.md`, `CHANGELOG.md`, and the
   OpenSpec change files changed; no runtime code, vault behavior, dependency, or public API changed.
 

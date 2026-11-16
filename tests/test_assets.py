@@ -21,7 +21,6 @@ LUMINANCE_THRESHOLD = 0.04045
 SHORT_HEX_LENGTH = 4
 LONG_HEX_LENGTH = 7
 COLOR_ATTRIBUTES = ("fill", "stroke", "stop-color")
-GEOMETRY_ELEMENTS = frozenset({"rect", "path", "polygon", "line", "circle"})
 NUMBER_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
 PALETTE_COLORS = frozenset(
     {
