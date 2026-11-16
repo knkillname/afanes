@@ -38,16 +38,20 @@ The HIG wave detail, the bounded Flet differences, and the baseline rule live in
 conformance. The reminder row does not promise snooze, end dates, OS-level
 notifications, or more than one schedule per note.
 
-Application icon evidence during wave 7 development at `0.13.0` on 2026-11-15
-(`Linux tlacoyo x86_64`): `flet_platform_assets.load_source` read the original
+Application icon evidence for `align-app-icon-hig` at `0.14.0` on 2026-11-16
+(`Linux tlacoyo x86_64`): `flet_platform_assets.load_source` read the 128x128
 SVG at 2048x2048 and `render_icons` produced the Linux hicolor set from 16 to
 512 px, the Windows ICO at 16, 32, 48, and 256 px, the macOS app-icon set from
-16 to 1024 px, and the web icon set. Linux, Windows, and web reported no
-warnings; macOS reported that the source already has a shaped, near-square tile
-and kept it as-is instead of applying the icon grid again. This is an
-asset-only check: the native Linux artifact was not built because `clang`,
-`cmake`, `ninja`, and `pkg-config` are absent on this machine. The packaged
-icon remains unverified until that toolchain produces an artifact.
+16 to 1024 px, and the web icon set. The render used `derived=True`, matching
+Flet's generic `icon.svg` path. Linux, Windows, and web reported no warnings;
+macOS reported that the source already has a shaped, near-square tile and kept
+it as-is instead of applying the icon grid again. The Linux 16, 32, 64, 128,
+and 256 px icons were inspected on light (`#F6F5F4`) and dark (`#241F31`)
+backgrounds: the page, fold, and check remain visible at 32 px, and the front
+profile is visible at 128 and 256 px. This is an asset-only check: the native
+Linux artifact was not built because `clang`, `cmake`, `ninja`, and
+`pkg-config` are absent on this machine. The packaged icon remains unverified
+until that toolchain produces an artifact.
 
 ## Platform matrix
 

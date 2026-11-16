@@ -20,10 +20,10 @@
 - [x] 2.1 Update the icon section of `docs/develop/interface-standard.md` to describe the HIG
   template, the top/front depth, the palette-only colors, and the 32 px legibility contract while
   keeping the identity-asset/interface-glyph distinction. Verify `hatch run docs:build` passes.
-- [ ] 2.2 Update the application icon evidence in `RELEASE.md` with the new source, the rendered
+- [x] 2.2 Update the application icon evidence in `RELEASE.md` with the new source, the rendered
   platform sets, the small-size light/dark result, and the existing native-Linux-artifact caveat.
   Verify the recorded version, date, and sizes match the render that was actually run.
-- [ ] 2.3 Add the behavior to `CHANGELOG.md` under `Unreleased` → `Changed`, naming this OpenSpec
+- [x] 2.3 Add the behavior to `CHANGELOG.md` under `Unreleased` → `Changed`, naming this OpenSpec
   change and recording that no runtime dependency or public API changed. Verify the entry renders
   correctly and the `Unreleased` heading remains.
 

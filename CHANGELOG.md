@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- **HIG-shaped application icon.** `src/assets/icon.svg` now follows the GNOME app-icon template: a
+  128×128 canvas on the 2 px grid, a 104×104 baseplate with a darker 4 px front profile, and only
+  Light 1 and Blue 3, Blue 4, and Blue 5 palette colors. The page, fold, and check remain legible at
+  32 px, and the self-contained asset test guards the canvas, safe area, palette, depth, and
+  contrast. This implements the `align-app-icon-hig` OpenSpec change. No new runtime dependency,
+  network call, or public API change. README: no change required. Docs: updated.
+
 - **Page navigation follows the open note.** Opening a page through a body link, role name, connection
   entry, ambiguous-reference choice, search result, Back, or a reference created from a missing role
   name selects the destination that owns the note, so the navigation and browser stay consistent with
