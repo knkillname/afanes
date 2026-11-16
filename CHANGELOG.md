@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+
+- **Page navigation follows the open note.** Opening a page through a body link, role name, connection
+  entry, ambiguous-reference choice, search result, Back, or a reference created from a missing role
+  name selects the destination that owns the note, so the navigation and browser stay consistent with
+  the open page. Selecting a search result leaves search mode. Selecting a destination in the
+  navigation still keeps the open page, and a note the scan could not parse leaves the destination
+  unchanged. The Review flow reuses the shared destination mapping. This implements the
+  `follow-page-destination` OpenSpec change. No new runtime dependency or network call; no public API
+  removal. Resolved runtime dependencies: `flet==1.1.2`, `markdown-it-py==4.3.0`, `PyYAML==6.0.3`,
+  `tzdata==2026.6`, `tzlocal==5.4.5`. README: no change required. Docs: updated.
+
 ## [0.14.0] - 2026-11-15
 
 ### Added
