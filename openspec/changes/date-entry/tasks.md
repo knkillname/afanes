@@ -50,8 +50,8 @@
 - [x] 8.1 Run `hatch check` and fix every lint, format, or strict type diagnostic; verify 0 diagnostics.
 - [x] 8.2 Run `hatch test --cover` and verify the suite passes with coverage at or above 85%.
 - [x] 8.3 Run `openspec validate --all --strict` and `openspec doctor`, then the vocabulary greps, `git diff --check`, and the no-tracked-`.mo` check; verify every command passes.
-- [ ] 8.4 Run `hatch run docs:build`; verify the documentation builds with warnings as errors.
-- [ ] 8.5 Run the manual check under English and Spanish: Page Date day/month/year and clamping, read-mode note date, Log month/year move, Due date, step plan, Processing, Review postpone, reminder one-shot time preservation, keyboard navigation, cancel, the 1024x600 window, large text, the full date range, and no operating-system notification; record the version, date, machine, and result in `RELEASE.md`.
+- [x] 8.4 Run `hatch run docs:build`; verify the documentation builds with warnings as errors.
+- [x] 8.5 Run the manual check under English and Spanish: Page Date day/month/year and clamping, read-mode note date, Log month/year move, Due date, step plan, Processing, Review postpone, reminder one-shot time preservation, keyboard navigation, cancel, the 1024x600 window, large text, the full date range, and no operating-system notification; record the version, date, machine, and result in `RELEASE.md`.
 
 ## Workflow follow-up
 

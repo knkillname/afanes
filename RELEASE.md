@@ -67,6 +67,17 @@ dismissal preserving body and status, live Review count, pause and restore,
 writable schema `1` upgrade, read-only schema `1` browsing with reminders off,
 and removal with Undo checks.
 
+Manual date-entry evidence at `0.11.0` on 2026-11-15 (`Linux tlacoyo x86_64`):
+the source desktop session passed the English and Spanish labels, the
+Monday-first calendar, the Page Date Day, Month, and Year modes with
+day-of-month clamping, the read-mode note date action, Log month and year
+navigation and headings, the Page Due date, step plan, Processing date, Review
+postpone, and reminder one-shot date with the typed time preserved, keyboard
+navigation, Cancel, Esc, and outside click, the 1024x600 window, large text,
+the full date range, and the no-operating-system-notification check. The
+three-click retest passed: the accent contour moves with the clicked day, and
+today uses accent text and a bold weight instead of the contour.
+
 ### Advisory nightly builds
 
 A scheduled GitHub Actions workflow runs `hatch check` and `hatch test` on
