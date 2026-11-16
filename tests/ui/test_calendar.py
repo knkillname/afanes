@@ -12,6 +12,14 @@ import afanes.ui.components.calendar as calendar_component
 import afanes.ui.theme
 
 
+def _day_text(grid: calendar_component.CalendarGrid, day: int) -> ft.Text:
+    content = grid.day_buttons[day].content
+    assert isinstance(content, ft.Column)
+    number = content.controls[0]
+    assert isinstance(number, ft.Text)
+    return number
+
+
 def _month(
     *, day_counts: dict[int, int] | None = None, month_count: int = 0, year_count: int = 0
 ) -> afanes.core.log.CalendarMonth:
@@ -115,7 +123,7 @@ class TestCalendarGrid:
         assert style.bgcolor == afanes.ui.theme.CALENDAR_SELECTED_COLOR
         assert afanes.ui.theme.CALENDAR_SELECTED_COLOR == afanes.ui.theme.SELECTED_ROW_COLOR
 
-    def test_today_uses_an_accent_outline_and_text(self) -> None:
+    def test_today_uses_accent_text_and_a_bold_weight(self) -> None:
         grid = calendar_component.CalendarGrid(
             lambda _day: None,
             today=datetime.date(2025, 10, 13),
@@ -125,8 +133,11 @@ class TestCalendarGrid:
 
         style = grid.day_buttons[13].style
         assert style is not None
-        assert style.side == afanes.ui.theme.CALENDAR_TODAY_SIDE
-        assert style.color == afanes.ui.theme.CALENDAR_TODAY_COLOR
+        assert style.side is None
+        number = _day_text(grid, 13)
+        assert number.style == afanes.ui.theme.CALENDAR_TODAY_TEXT
+        assert afanes.ui.theme.CALENDAR_TODAY_TEXT.color == afanes.ui.theme.CALENDAR_TODAY_COLOR
+        assert afanes.ui.theme.CALENDAR_TODAY_TEXT.weight == ft.FontWeight.W_700
 
     def test_selected_today_keeps_the_neutral_fill(self) -> None:
         today = datetime.date(2025, 10, 12)
@@ -137,7 +148,8 @@ class TestCalendarGrid:
         style = grid.day_buttons[12].style
         assert style is not None
         assert style.bgcolor == afanes.ui.theme.CALENDAR_SELECTED_COLOR
-        assert style.side == afanes.ui.theme.CALENDAR_TODAY_SIDE
+        assert style.side is None
+        assert _day_text(grid, 12).style == afanes.ui.theme.CALENDAR_TODAY_TEXT
 
     def test_set_marks_moves_the_selection_and_today(self) -> None:
         grid = calendar_component.CalendarGrid(lambda _day: None)
@@ -152,9 +164,29 @@ class TestCalendarGrid:
         assert selected_style is not None
         assert today_style is not None
         assert selected_style.bgcolor == afanes.ui.theme.CALENDAR_SELECTED_COLOR
-        assert today_style.side == afanes.ui.theme.CALENDAR_TODAY_SIDE
+        assert today_style.side is None
+        assert _day_text(grid, 21).style == afanes.ui.theme.CALENDAR_TODAY_TEXT
         assert grid.day_buttons[12].style is not None
         assert grid.day_buttons[12].style.bgcolor is None
+
+    def test_the_focus_ring_moves_with_the_focused_day(self) -> None:
+        grid = calendar_component.CalendarGrid(lambda _day: None)
+        grid.build(_month())
+
+        grid.mark_focus(12)
+
+        focused = grid.day_buttons[12].style
+        assert focused is not None
+        assert focused.side == afanes.ui.theme.CALENDAR_FOCUS_SIDE
+
+        grid.mark_focus(13)
+
+        previous = grid.day_buttons[12].style
+        moved = grid.day_buttons[13].style
+        assert previous is not None
+        assert moved is not None
+        assert previous.side is None
+        assert moved.side == afanes.ui.theme.CALENDAR_FOCUS_SIDE
 
     def test_a_custom_tooltip_names_the_day(self) -> None:
         grid = calendar_component.CalendarGrid(

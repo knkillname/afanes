@@ -65,6 +65,7 @@ class CalendarGrid:
         self._day_tooltip = day_tooltip
         self._selected = selected
         self._today = today
+        self._focused_day: int | None = None
         self._month: afanes.core.log.CalendarMonth | None = None
         self.weekdays = ft.Row(
             controls=[
@@ -106,6 +107,7 @@ class CalendarGrid:
             Weekday row and day grid.
         """
         self._month = calendar
+        self._focused_day = None
         self.day_buttons = {}
         cells: list[ft.Control] = [
             ft.Container(expand=True, height=afanes.ui.theme.CALENDAR_CELL_HEIGHT)
@@ -121,6 +123,7 @@ class CalendarGrid:
             ft.Row(controls=cells[index : index + DAYS_PER_WEEK], spacing=afanes.ui.theme.CALENDAR_GRID_SPACING)
             for index in range(0, len(cells), DAYS_PER_WEEK)
         ]
+        self._refresh_styles()
         return self.root
 
     def set_marks(self, selected: datetime.date | None, today: datetime.date | None) -> None:
@@ -131,12 +134,22 @@ class CalendarGrid:
         selected : datetime.date | None
             Date to mark with the neutral selected-row fill.
         today : datetime.date | None
-            Date to mark with the accent outline.
+            Date to mark with accent text and a bold weight.
         """
         self._selected = selected
         self._today = today
-        for day, button in self.day_buttons.items():
-            button.style = self._day_style(day, self._current_count(day))
+        self._refresh_styles()
+
+    def mark_focus(self, day: int) -> None:
+        """Paint the accent focus ring on one day cell.
+
+        Parameters
+        ----------
+        day : int
+            Calendar day that owns focus.
+        """
+        self._focused_day = day
+        self._refresh_styles()
 
     async def focus_day(self, day: int) -> None:
         """Move keyboard focus to one day cell.
@@ -149,6 +162,7 @@ class CalendarGrid:
         button = self.day_buttons.get(day)
         if button is None:
             return
+        self.mark_focus(day)
         try:
             await button.focus()
         except RuntimeError:
@@ -184,18 +198,33 @@ class CalendarGrid:
     def _day_style(self, day: int, count: int) -> ft.ButtonStyle:
         """Build the style for one day cell."""
         selected = self._matches_day(self._selected, day)
-        today = self._matches_day(self._today, day)
+        focused = self._focused_day == day
         bgcolor = afanes.ui.theme.LOG_ENTRY_TINT if count else None
         if selected:
             bgcolor = afanes.ui.theme.CALENDAR_SELECTED_COLOR
         return ft.ButtonStyle(
             bgcolor=bgcolor,
-            side=afanes.ui.theme.CALENDAR_TODAY_SIDE if today else None,
-            color=afanes.ui.theme.CALENDAR_TODAY_COLOR if today and not selected else None,
+            side=afanes.ui.theme.CALENDAR_FOCUS_SIDE if focused else None,
             shape=afanes.ui.theme.CALENDAR_CELL_SHAPE,
             padding=afanes.ui.theme.CALENDAR_CELL_PADDING,
             overlay_color=afanes.ui.theme.FOCUS_COLOR,
         )
+
+    def _refresh_styles(self) -> None:
+        """Paint the selection, today, and focus marks on every day cell."""
+        for day, button in self.day_buttons.items():
+            button.style = self._day_style(day, self._current_count(day))
+            content = button.content
+            if not isinstance(content, ft.Column) or not content.controls:
+                continue
+            number = content.controls[0]
+            if not isinstance(number, ft.Text):
+                continue
+            number.style = (
+                afanes.ui.theme.CALENDAR_TODAY_TEXT
+                if self._matches_day(self._today, day)
+                else afanes.ui.theme.TEXT_ROLES["caption"]
+            )
 
     def _matches_day(self, value: datetime.date | None, day: int) -> bool:
         """Return whether a date falls on the rendered month and day."""
@@ -224,18 +253,23 @@ class CalendarGrid:
         return handle
 
     def _focus_handler(self, day: int) -> Callable[[object], None]:
-        """Bind a cell focus event to the focus callback."""
+        """Move the accent ring to the focused cell."""
 
         def handle(_event: object = None) -> None:
+            self.mark_focus(day)
             if self._on_day_focus is not None:
                 self._on_day_focus(day)
 
         return handle
 
     def _blur_handler(self, day: int) -> Callable[[object], None]:
-        """Bind a cell blur event to the blur callback."""
+        """Clear the accent ring only while that cell still owns focus."""
 
         def handle(_event: object = None) -> None:
+            if self._focused_day != day:
+                return
+            self._focused_day = None
+            self._refresh_styles()
             if self._on_day_blur is not None:
                 self._on_day_blur(day)
 

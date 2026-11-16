@@ -269,6 +269,8 @@ class DatePickerDialog:
         """
         self.anchor = self._with_parts(self.anchor.year, self.anchor.month, day)
         self._grid_focus_key = ("day", day)
+        if self.day_grid is not None:
+            self.day_grid.mark_focus(day)
         self._refresh()
         self._update_view()
         self._schedule_focus()
@@ -511,11 +513,7 @@ class DatePickerDialog:
                 for month in range(1, 13)
             }
             self._visible_month_year = self.anchor.year
-        for month, button in self.month_buttons.items():
-            button.style = self._period_style(
-                selected=self.anchor.month == month,
-                today=self._today.year == self.anchor.year and self._today.month == month,
-            )
+        self._apply_month_styles()
         switched = self._grid_kind != "month"
         if switched:
             self._grid_focus_key = None
@@ -545,11 +543,7 @@ class DatePickerDialog:
                 for year in years
             }
             self._visible_year_start = start
-        for year, button in self.year_buttons.items():
-            button.style = self._period_style(
-                selected=self.anchor.year == year,
-                today=self._today.year == year,
-            )
+        self._apply_year_styles()
         switched = self._grid_kind != "year"
         if switched:
             self._grid_focus_key = None
@@ -576,7 +570,7 @@ class DatePickerDialog:
             content=label,
             height=afanes.ui.theme.DATE_PICKER_PERIOD_HEIGHT,
             expand=True,
-            style=self._period_style(selected=selected, today=today),
+            style=self._period_style(selected=selected, today=today, focused=False),
             on_click=handler,
             on_focus=focus,
             on_blur=blur,
@@ -596,15 +590,35 @@ class DatePickerDialog:
             )
         return rows
 
-    def _period_style(self, *, selected: bool, today: bool) -> ft.ButtonStyle:
+    def _period_style(self, *, selected: bool, today: bool, focused: bool) -> ft.ButtonStyle:
         """Build the style for one month or year cell."""
         return ft.ButtonStyle(
             bgcolor=afanes.ui.theme.CALENDAR_SELECTED_COLOR if selected else None,
-            side=afanes.ui.theme.CALENDAR_TODAY_SIDE if today else None,
+            side=afanes.ui.theme.CALENDAR_FOCUS_SIDE if focused else None,
+            color=afanes.ui.theme.CALENDAR_TODAY_COLOR if today else None,
+            text_style=ft.TextStyle(weight=ft.FontWeight.W_700) if today else None,
             shape=afanes.ui.theme.CALENDAR_CELL_SHAPE,
             padding=afanes.ui.theme.CALENDAR_CELL_PADDING,
             overlay_color=afanes.ui.theme.FOCUS_COLOR,
         )
+
+    def _apply_month_styles(self) -> None:
+        """Paint the selected, today, and focus marks on every month cell."""
+        for month, button in self.month_buttons.items():
+            button.style = self._period_style(
+                selected=self.anchor.month == month,
+                today=self._today.year == self.anchor.year and self._today.month == month,
+                focused=self._grid_focus_key == ("month", month),
+            )
+
+    def _apply_year_styles(self) -> None:
+        """Paint the selected, today, and focus marks on every year cell."""
+        for year, button in self.year_buttons.items():
+            button.style = self._period_style(
+                selected=self.anchor.year == year,
+                today=self._today.year == year,
+                focused=self._grid_focus_key == ("year", year),
+            )
 
     def _mode_style(self, precision: afanes.models.note.DatePrecision) -> ft.ButtonStyle:
         """Build the style for one mode-switch button."""
@@ -765,18 +779,23 @@ class DatePickerDialog:
         return self._copy.locale_format.log_title(value)
 
     async def _focus_selection(self) -> None:
-        """Move keyboard focus to the selected cell of the active grid."""
-        if self._update is None:
-            return
+        """Paint the focus ring and move keyboard focus to the selected cell."""
         if self._precision is afanes.models.note.DatePrecision.DAY:
-            if self.day_grid is not None:
-                await self.day_grid.focus_day(self.anchor.day)
+            if self.day_grid is None:
+                return
+            self.day_grid.mark_focus(self.anchor.day)
+            if self._update is None:
+                return
+            await self.day_grid.focus_day(self.anchor.day)
             return
+        self._grid_focus_key = self._selection_focus_key()
         if self._precision is afanes.models.note.DatePrecision.MONTH:
+            self._apply_month_styles()
             button = self.month_buttons.get(self.anchor.month)
         else:
+            self._apply_year_styles()
             button = self.year_buttons.get(self.anchor.year)
-        if button is None:
+        if button is None or self._update is None:
             return
         try:
             await button.focus()
@@ -906,25 +925,34 @@ class DatePickerDialog:
             self._grid_focus_key = None
 
     def _period_focus_handler(self, kind: str, value: int) -> Callable[[object], None]:
-        """Bind a month or year cell focus to its value."""
+        """Move the accent ring to the focused month or year cell."""
 
         def handle(_event: object = None) -> None:
             self._grid_focus_key = (kind, value)
+            self._apply_period_styles()
 
         return handle
 
     def _period_blur_handler(self, kind: str, value: int) -> Callable[[object], None]:
-        """Clear a month or year focus only while that cell still owns it."""
+        """Clear a month or year ring only while that cell still owns focus."""
 
         def handle(_event: object = None) -> None:
-            if self._grid_focus_key == (kind, value):
-                self._grid_focus_key = None
+            if self._grid_focus_key != (kind, value):
+                return
+            self._grid_focus_key = None
+            self._apply_period_styles()
 
         return handle
+
+    def _apply_period_styles(self) -> None:
+        """Refresh both period grids after a focus or selection change."""
+        self._apply_month_styles()
+        self._apply_year_styles()
 
     def _clear_grid_focus(self, _event: object = None) -> None:
         """Clear the grid-focus record when another control takes focus."""
         self._grid_focus_key = None
+        self._apply_period_styles()
 
     def _selection_focus_key(self) -> tuple[str, int]:
         """Return the focus record for the selected cell of the active mode."""

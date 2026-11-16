@@ -172,8 +172,9 @@ only. Changing modes keeps the day-of-month and clamps it to the month length.
 
 A month or year selection writes the matching ISO precision. The text field stays the source of
 truth: it keeps ISO text and runs its existing validation and save path. The dialog never writes the
-vault. Selection uses the neutral selected-row fill, today uses an accent outline as well as a text
-cue, and focus uses the accent ring.
+vault. Selection uses the neutral selected-row fill, today uses accent text and a bold weight, and
+focus uses the accent ring. The accent contour therefore belongs to focus and moves with it; a late
+blur from the previously focused cell cannot leave the ring behind.
 
 The calendar is a dialog rather than an anchored popover; the bounded-differences table records why.
 

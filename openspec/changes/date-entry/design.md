@@ -189,8 +189,9 @@ read-mode due date action keeps its day-only `pick_date` path; its edit field ge
   Monday-first is a property of the shared grid.
 - The title, open tooltip, mode labels, selected caption, current-period action, navigation tooltips,
   Select, and Cancel come from `UiCopy`.
-- The selected day uses the neutral selected-row fill; today uses an accent outline/text cue plus a
-  non-color shape; focus uses the accent ring.
+- The selected day uses the neutral selected-row fill; today uses accent text and a bold weight;
+  focus uses the accent ring. Today deliberately has no contour, so the blue contour always means
+  focus and moves with the clicked or tabbed cell.
 - `Date and time` becomes a sentence-case field label; **Change Due Date…** joins **Add Due Date…**;
   the stale `2025` hint becomes a format hint.
 - New dimensions live in `theme.py`; no literal enters a view or component.

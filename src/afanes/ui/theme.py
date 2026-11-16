@@ -151,7 +151,6 @@ LOG_ENTRY_TINT = ft.Colors.with_opacity(0.18, ACCENT_FILL)
 LOG_ENTRY_DOT_COLOR = ACCENT_FILL
 CALENDAR_SELECTED_COLOR = SELECTED_ROW_COLOR
 CALENDAR_TODAY_COLOR = ACCENT_TEXT
-CALENDAR_TODAY_SIDE = ft.BorderSide(BORDER_WIDTH, ACCENT_FILL)
 CALENDAR_CELL_SHAPE = ft.RoundedRectangleBorder(radius=CONTROL_RADIUS)
 
 ERROR_COLOR = ft.Colors.ERROR
@@ -176,6 +175,7 @@ FOCUS_COLOR = ft.Colors.with_opacity(0.15, ft.Colors.PRIMARY)
 DISABLED_FILL_COLOR = ft.Colors.with_opacity(0.12, ft.Colors.ON_SURFACE)
 DISABLED_TEXT_COLOR = ft.Colors.with_opacity(0.38, ft.Colors.ON_SURFACE)
 FOCUS_RING_COLOR = ft.Colors.PRIMARY
+CALENDAR_FOCUS_SIDE = ft.BorderSide(FOCUS_RING_WIDTH, FOCUS_RING_COLOR)
 DRAWER_SCRIM_COLOR = ft.Colors.with_opacity(0.14, "#000000")
 DRAWER_SHADOW = ft.BoxShadow(
     blur_radius=28,
@@ -237,6 +237,12 @@ TEXT_ROLES: typing.Mapping[str, ft.TextStyle] = types.MappingProxyType(
     }
 )
 
+CALENDAR_TODAY_TEXT = ft.TextStyle(
+    size=CAPTION_SIZE,
+    weight=ft.FontWeight.W_700,
+    color=ACCENT_TEXT,
+    height=TEXT_ROLES["caption"].height,
+)
 TEXT_THEME = ft.TextTheme(
     display_large=TEXT_ROLES["title-1"],
     display_medium=TEXT_ROLES["title-1"],

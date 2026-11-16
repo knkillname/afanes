@@ -365,7 +365,8 @@ class TestGrids:
 
         style = dialog.year_buttons[2026].style
         assert style is not None
-        assert style.side == afanes.ui.theme.CALENDAR_TODAY_SIDE
+        assert style.side is None
+        assert style.color == afanes.ui.theme.CALENDAR_TODAY_COLOR
 
     def test_the_next_button_pages_the_decade(self) -> None:
         dialog, _confirmed, _cancelled = _dialog(_note("2026-11-14"))
@@ -622,6 +623,33 @@ class TestPointerFocus:
         previous = dialog.day_grid.day_buttons[10].style
         assert previous is not None
         assert previous.bgcolor is None
+
+    def test_three_day_clicks_move_the_focus_ring(self) -> None:
+        dialog, _confirmed, _cancelled = _dialog(_note("2026-11-14"))
+        assert dialog.day_grid is not None
+
+        for day in (10, 11, 12):
+            dialog.select_day(day)
+            style = dialog.day_grid.day_buttons[day].style
+            assert style is not None
+            assert style.side == afanes.ui.theme.CALENDAR_FOCUS_SIDE
+            for other in (10, 11, 12):
+                if other == day:
+                    continue
+                other_style = dialog.day_grid.day_buttons[other].style
+                assert other_style is not None
+                assert other_style.side is None
+
+    def test_the_focused_year_has_the_accent_ring(self) -> None:
+        dialog, _confirmed, _cancelled = _dialog(_note("2026-11-14"), update=_noop)
+        dialog.set_precision(afanes.models.note.DatePrecision.YEAR)
+
+        asyncio.run(dialog.open())
+
+        style = dialog.year_buttons[2026].style
+        assert style is not None
+        assert style.side == afanes.ui.theme.CALENDAR_FOCUS_SIDE
+        assert style.color == afanes.ui.theme.CALENDAR_TODAY_COLOR
 
     def test_three_day_clicks_focus_each_selected_cell(
         self,
