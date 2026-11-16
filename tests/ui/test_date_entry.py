@@ -328,6 +328,26 @@ class TestGrids:
         assert selected is not None
         assert selected.bgcolor == afanes.ui.theme.CALENDAR_SELECTED_COLOR
 
+    def test_switching_back_to_month_keeps_the_month_cells(self) -> None:
+        dialog, _confirmed, _cancelled = _dialog(_note("2026-11-14"))
+
+        dialog.set_precision(afanes.models.note.DatePrecision.MONTH)
+        dialog.set_precision(afanes.models.note.DatePrecision.DAY)
+        dialog.set_precision(afanes.models.note.DatePrecision.MONTH)
+
+        assert list(dialog.month_buttons) == list(range(1, 13))
+        assert dialog.grid_host.controls
+
+    def test_switching_back_to_year_keeps_the_year_cells(self) -> None:
+        dialog, _confirmed, _cancelled = _dialog(_note("2026-11-14"))
+
+        dialog.set_precision(afanes.models.note.DatePrecision.YEAR)
+        dialog.set_precision(afanes.models.note.DatePrecision.DAY)
+        dialog.set_precision(afanes.models.note.DatePrecision.YEAR)
+
+        assert list(dialog.year_buttons) == list(range(2020, 2030))
+        assert dialog.grid_host.controls
+
     def test_the_year_grid_shows_the_decade(self) -> None:
         dialog, _confirmed, _cancelled = _dialog(_note("2026-11-14"))
 
@@ -581,6 +601,64 @@ class TestKeyboard:
         _run(dialog.open())
 
         assert focused == [14]
+
+
+class TestPointerFocus:
+    def test_three_day_clicks_keep_the_cells_and_move_the_selection(self) -> None:
+        dialog, _confirmed, _cancelled = _dialog(_note("2026-11-14"), update=_noop)
+        assert dialog.day_grid is not None
+        cells = {day: dialog.day_grid.day_buttons[day] for day in (10, 11, 12)}
+
+        for day in (10, 11, 12):
+            dialog.select_day(day)
+
+        assert dialog.day_grid.day_buttons[10] is cells[10]
+        assert dialog.day_grid.day_buttons[11] is cells[11]
+        assert dialog.day_grid.day_buttons[12] is cells[12]
+        assert dialog.result == _note("2026-11-12")
+        selected = dialog.day_grid.day_buttons[12].style
+        assert selected is not None
+        assert selected.bgcolor == afanes.ui.theme.CALENDAR_SELECTED_COLOR
+        previous = dialog.day_grid.day_buttons[10].style
+        assert previous is not None
+        assert previous.bgcolor is None
+
+    def test_three_day_clicks_focus_each_selected_cell(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        focused: list[int] = []
+
+        async def scenario() -> None:
+            dialog, _confirmed, _cancelled = _dialog(_note("2026-11-14"), update=_noop)
+            assert dialog.day_grid is not None
+
+            async def fake_focus(day: int) -> None:
+                focused.append(day)
+
+            monkeypatch.setattr(dialog.day_grid, "focus_day", fake_focus)
+            for day in (10, 11, 12):
+                dialog.select_day(day)
+                await asyncio.sleep(0)
+
+        asyncio.run(scenario())
+
+        assert focused == [10, 11, 12]
+
+    def test_a_late_blur_from_the_previous_day_keeps_the_new_focus(self) -> None:
+        dialog, confirmed, _cancelled = _dialog(_note("2026-11-14"))
+        assert dialog.day_grid is not None
+        _focus(dialog.day_grid.day_buttons[10])
+
+        dialog.select_day(11)
+
+        blur = dialog.day_grid.day_buttons[10].on_blur
+        assert blur is not None
+        typing.cast("typing.Callable[[], None]", blur)()
+        handled = _run_bool(dialog.handle_key(_event("Enter")))
+
+        assert handled is True
+        assert confirmed == [_note("2026-11-11")]
 
 
 class TestLocalization:

@@ -9,6 +9,7 @@ through a callback; the caller's existing validation and save command stay
 authoritative. The component performs no vault access.
 """
 
+import asyncio
 import calendar
 import dataclasses
 import datetime
@@ -174,7 +175,12 @@ class DatePickerDialog:
         self._today = datetime.datetime.now(tz=datetime.UTC).astimezone().date() if today is None else today
         self._precision = self._initial_precision(current)
         self.anchor = self._initial_anchor(current)
-        self._grid_focused = False
+        self._grid_focus_key: tuple[str, int] | None = None
+        self._grid_kind: str | None = None
+        self._visible_day_month: tuple[int, int] | None = None
+        self._visible_month_year: int | None = None
+        self._visible_year_start: int | None = None
+        self._focus_task: asyncio.Task[None] | None = None
         self.day_grid: afanes.ui.components.calendar.CalendarGrid | None = None
         self.month_buttons: dict[int, ft.TextButton] = {}
         self.year_buttons: dict[int, ft.TextButton] = {}
@@ -214,10 +220,12 @@ class DatePickerDialog:
 
     async def confirm(self) -> None:
         """Report the pending value."""
+        self._cancel_focus_task()
         await self._on_confirm(self.result)
 
     async def cancel(self) -> None:
         """Report that the dialog was cancelled."""
+        self._cancel_focus_task()
         await self._on_cancel()
 
     async def handle_key(self, event: ft.KeyboardEvent) -> bool:
@@ -240,7 +248,7 @@ class DatePickerDialog:
         if key == "TAB":
             return False
         if key == "ENTER":
-            if self._grid_focused:
+            if self._grid_focus_key is not None:
                 await self.confirm()
                 return True
             return False
@@ -260,8 +268,10 @@ class DatePickerDialog:
             Calendar day from 1 to 31.
         """
         self.anchor = self._with_parts(self.anchor.year, self.anchor.month, day)
+        self._grid_focus_key = ("day", day)
         self._refresh()
         self._update_view()
+        self._schedule_focus()
 
     def select_month(self, month: int) -> None:
         """Select one month in the visible year.
@@ -272,8 +282,10 @@ class DatePickerDialog:
             Calendar month from 1 to 12.
         """
         self.anchor = self._with_parts(self.anchor.year, month, self.anchor.day)
+        self._grid_focus_key = ("month", month)
         self._refresh()
         self._update_view()
+        self._schedule_focus()
 
     def select_year(self, year: int) -> None:
         """Select one year.
@@ -284,8 +296,10 @@ class DatePickerDialog:
             Calendar year to select.
         """
         self.anchor = self._with_parts(year, self.anchor.month, self.anchor.day)
+        self._grid_focus_key = ("year", year)
         self._refresh()
         self._update_view()
+        self._schedule_focus()
 
     def set_precision(self, precision: afanes.models.note.DatePrecision) -> None:
         """Switch the output precision while keeping the anchor date.
@@ -298,8 +312,10 @@ class DatePickerDialog:
         if precision not in self._precisions:
             return
         self._precision = precision
+        self._grid_focus_key = None
         self._refresh()
         self._update_view()
+        self._schedule_focus()
 
     def _build_controls(self) -> None:
         """Build the dialog shell and its stable actions."""
@@ -449,9 +465,14 @@ class DatePickerDialog:
         self.next_button.tooltip = self._copy.DATE_PICKER_NEXT_DECADE
 
     def _build_day_grid(self) -> None:
-        """Render the Monday-first day grid for the anchor month."""
-        self.month_buttons = {}
-        self.year_buttons = {}
+        """Render the Monday-first day grid for the anchor month.
+
+        Notes
+        -----
+        Selection-only updates reuse the existing day cells. Rebuilding them
+        would replace the control that owns pointer focus, and Flet does not
+        move keyboard focus to a button on a pointer tap.
+        """
         if self.day_grid is None:
             self.day_grid = afanes.ui.components.calendar.CalendarGrid(
                 self.select_day,
@@ -463,55 +484,89 @@ class DatePickerDialog:
                 on_day_focus=self._grid_focus,
                 on_day_blur=self._grid_blur,
             )
-        self.day_grid.build(afanes.core.log.CalendarMonth.for_month(self.anchor.year, self.anchor.month))
+        month_key = (self.anchor.year, self.anchor.month)
+        if self._visible_day_month != month_key:
+            self.day_grid.build(afanes.core.log.CalendarMonth.for_month(self.anchor.year, self.anchor.month))
+            self._visible_day_month = month_key
         self.day_grid.set_marks(self.anchor, self._today)
-        self.grid_host.controls = [self.day_grid.root]
+        if self._grid_kind != "day":
+            self.grid_host.controls = [self.day_grid.root]
+            self._grid_kind = "day"
+            self._grid_focus_key = None
 
     def _build_month_grid(self) -> None:
         """Render the twelve-month grid for the anchor year."""
-        self.day_grid = None
-        self.year_buttons = {}
-        self.month_buttons = {
-            month: self._period_button(
-                self._copy.locale_format.month_name(month),
-                f"date-picker-month-{month}",
-                self._month_handler(month),
+        rebuilt = self._visible_month_year != self.anchor.year or not self.month_buttons
+        if rebuilt:
+            self.month_buttons = {
+                month: self._period_button(
+                    self._copy.locale_format.month_name(month),
+                    f"date-picker-month-{month}",
+                    self._month_handler(month),
+                    self._period_focus_handler("month", month),
+                    self._period_blur_handler("month", month),
+                    selected=self.anchor.month == month,
+                    today=self._today.year == self.anchor.year and self._today.month == month,
+                )
+                for month in range(1, 13)
+            }
+            self._visible_month_year = self.anchor.year
+        for month, button in self.month_buttons.items():
+            button.style = self._period_style(
                 selected=self.anchor.month == month,
                 today=self._today.year == self.anchor.year and self._today.month == month,
             )
-            for month in range(1, 13)
-        }
-        self.grid_host.controls = self._period_rows(
-            list(self.month_buttons.values()),
-            afanes.ui.theme.DATE_PICKER_MONTH_COLUMNS,
-        )
+        switched = self._grid_kind != "month"
+        if switched:
+            self._grid_focus_key = None
+        if switched or rebuilt:
+            self.grid_host.controls = self._period_rows(
+                list(self.month_buttons.values()),
+                afanes.ui.theme.DATE_PICKER_MONTH_COLUMNS,
+            )
+            self._grid_kind = "month"
 
     def _build_year_grid(self) -> None:
         """Render the decade year grid around the anchor year."""
-        self.day_grid = None
-        self.month_buttons = {}
         start = self._decade_start()
-        years = list(range(start, min(start + 10, datetime.date.max.year + 1)))
-        self.year_buttons = {
-            year: self._period_button(
-                f"{year:04d}",
-                f"date-picker-year-{year}",
-                self._year_handler(year),
+        rebuilt = self._visible_year_start != start or not self.year_buttons
+        if rebuilt:
+            years = list(range(start, min(start + 10, datetime.date.max.year + 1)))
+            self.year_buttons = {
+                year: self._period_button(
+                    f"{year:04d}",
+                    f"date-picker-year-{year}",
+                    self._year_handler(year),
+                    self._period_focus_handler("year", year),
+                    self._period_blur_handler("year", year),
+                    selected=self.anchor.year == year,
+                    today=self._today.year == year,
+                )
+                for year in years
+            }
+            self._visible_year_start = start
+        for year, button in self.year_buttons.items():
+            button.style = self._period_style(
                 selected=self.anchor.year == year,
                 today=self._today.year == year,
             )
-            for year in years
-        }
-        self.grid_host.controls = self._period_rows(
-            list(self.year_buttons.values()),
-            afanes.ui.theme.DATE_PICKER_YEAR_COLUMNS,
-        )
+        switched = self._grid_kind != "year"
+        if switched:
+            self._grid_focus_key = None
+        if switched or rebuilt:
+            self.grid_host.controls = self._period_rows(
+                list(self.year_buttons.values()),
+                afanes.ui.theme.DATE_PICKER_YEAR_COLUMNS,
+            )
+            self._grid_kind = "year"
 
-    def _period_button(
+    def _period_button(  # noqa: PLR0913
         self,
         label: str,
         key: str,
         handler: Callable[[object], None],
+        focus: Callable[[object], None],
+        blur: Callable[[object], None],
         *,
         selected: bool,
         today: bool,
@@ -523,8 +578,8 @@ class DatePickerDialog:
             expand=True,
             style=self._period_style(selected=selected, today=today),
             on_click=handler,
-            on_focus=self._grid_focus_event,
-            on_blur=self._grid_blur_event,
+            on_focus=focus,
+            on_blur=blur,
             key=key,
         )
 
@@ -734,6 +789,31 @@ class DatePickerDialog:
         if self._update is not None:
             self._update()
 
+    def _schedule_focus(self) -> None:
+        """Request focus on the selected cell after a pointer selection.
+
+        Notes
+        -----
+        Flet buttons do not take keyboard focus on a pointer tap. The selected
+        cell is focused explicitly after the repaint, and a late blur from the
+        previously focused cell is ignored by the focus-record check.
+        """
+        if self._update is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        self._cancel_focus_task()
+        self._focus_task = loop.create_task(self._focus_selection())
+
+    def _cancel_focus_task(self) -> None:
+        """Cancel a pending focus request when the dialog closes."""
+        task = self._focus_task
+        self._focus_task = None
+        if task is not None and not task.done():
+            task.cancel()
+
     def _precision_handler(self, precision: afanes.models.note.DatePrecision) -> Callable[[object], None]:
         """Bind a mode button to its precision."""
 
@@ -766,8 +846,10 @@ class DatePickerDialog:
             self.anchor = self._with_parts(self._today.year, self._today.month, self.anchor.day)
         else:
             self.anchor = self._with_parts(self._today.year, self.anchor.month, self.anchor.day)
+        self._grid_focus_key = self._selection_focus_key()
         self._refresh()
         self._update_view()
+        self._schedule_focus()
 
     def _previous(self, _event: object = None) -> None:
         """Move the visible period back by one unit."""
@@ -793,14 +875,18 @@ class DatePickerDialog:
             self.anchor = self._shift_years(direction)
         else:
             self.anchor = self._shift_years(10 * direction)
+        self._grid_focus_key = self._selection_focus_key()
         self._refresh()
         self._update_view()
+        self._schedule_focus()
 
     def _step_large_navigation(self, direction: int) -> None:
         """Apply the large chevron step in day mode."""
         self.anchor = self._shift_years(direction)
+        self._grid_focus_key = self._selection_focus_key()
         self._refresh()
         self._update_view()
+        self._schedule_focus()
 
     async def _cancel_event(self, _event: object = None) -> None:
         """Cancel from a button click."""
@@ -810,25 +896,43 @@ class DatePickerDialog:
         """Confirm from a button click."""
         await self.confirm()
 
-    def _grid_focus(self, _day: int) -> None:
-        """Mark that a day cell holds focus."""
-        self._grid_focused = True
+    def _grid_focus(self, day: int) -> None:
+        """Record that a day cell holds focus."""
+        self._grid_focus_key = ("day", day)
 
-    def _grid_blur(self, _day: int) -> None:
-        """Mark that a day cell lost focus."""
-        self._grid_focused = False
+    def _grid_blur(self, day: int) -> None:
+        """Clear the day focus only while that cell still owns it."""
+        if self._grid_focus_key == ("day", day):
+            self._grid_focus_key = None
 
-    def _grid_focus_event(self, _event: object = None) -> None:
-        """Mark that a month or year cell holds focus."""
-        self._grid_focused = True
+    def _period_focus_handler(self, kind: str, value: int) -> Callable[[object], None]:
+        """Bind a month or year cell focus to its value."""
 
-    def _grid_blur_event(self, _event: object = None) -> None:
-        """Mark that a month or year cell lost focus."""
-        self._grid_focused = False
+        def handle(_event: object = None) -> None:
+            self._grid_focus_key = (kind, value)
+
+        return handle
+
+    def _period_blur_handler(self, kind: str, value: int) -> Callable[[object], None]:
+        """Clear a month or year focus only while that cell still owns it."""
+
+        def handle(_event: object = None) -> None:
+            if self._grid_focus_key == (kind, value):
+                self._grid_focus_key = None
+
+        return handle
 
     def _clear_grid_focus(self, _event: object = None) -> None:
-        """Clear the grid-focus flag when another control takes focus."""
-        self._grid_focused = False
+        """Clear the grid-focus record when another control takes focus."""
+        self._grid_focus_key = None
+
+    def _selection_focus_key(self) -> tuple[str, int]:
+        """Return the focus record for the selected cell of the active mode."""
+        if self._precision is afanes.models.note.DatePrecision.DAY:
+            return ("day", self.anchor.day)
+        if self._precision is afanes.models.note.DatePrecision.MONTH:
+            return ("month", self.anchor.month)
+        return ("year", self.anchor.year)
 
     def _key_name(self, event: ft.KeyboardEvent) -> str:
         """Return a normalized key name."""
