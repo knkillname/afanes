@@ -122,7 +122,14 @@ Search is a browser filter, never a navigation location: the navigation keeps it
 counts without a Search row. While a query is active, the browser title reads **Search Results** and
 the destination-specific controls (Inbox composer, References action, Log date controls, Review
 queue, Empty Trash) are hidden so one origin-independent result list fills the browser. A Trash result
-appears in its own result group and opens read-only.
+appears in its own result group and opens read-only. Selecting a result clears the query and shows the
+result's destination with the result selected.
+
+Page navigation follows the content. Opening a page from a body link, role name, connection entry,
+ambiguous-reference candidate, search result, or Back selects the destination that owns the note; a
+trashed page selects Trash. Selecting a destination in the navigation is the explicit exception: it
+keeps the open page and shows the chosen destination. A note the scan could not parse keeps the current
+destination because it has no browser group.
 
 The primary menu sits above the navigation list, as required when a window has a sidebar. The
 navigation is a bordered panel with the reference surface radius: structural in the wide layout, and

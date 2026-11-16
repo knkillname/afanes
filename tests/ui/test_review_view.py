@@ -16,6 +16,7 @@ import afanes.i18n.ui
 import afanes.i18n.ui.en
 import afanes.models.note
 import afanes.ui.state
+import afanes.ui.state.browser
 import afanes.ui.views.review
 from afanes.core.frontmatter import NoteDocument
 from afanes.core.steps import StepDocument
@@ -558,6 +559,7 @@ class TestProjectReviewCard:
 
         assert state.pages.page is not None
         assert state.pages.page.path == project
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.PROJECTS
 
     def test_next_advances_the_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

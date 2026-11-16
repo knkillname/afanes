@@ -439,6 +439,32 @@ class TestWorkspaceShell:
         assert isinstance(title, ft.Text)
         assert title.value == "Launch"
 
+    def test_a_manual_destination_keeps_a_reference_page_open(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "projects" / "Launch.md", note_type="project", status="active")
+        reference = _write_note(vault / "reference" / "Ada.md", note_type="reference", body="# Ada")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(reference)
+
+        asyncio.run(scenario())
+        assert state.browser.destination_for(reference) is afanes.ui.state.browser.WorkspaceSection.REFERENCES
+        view = afanes.ui.views.workspace.WorkspaceView(
+            afanes.ui.views.workspace.WorkspaceActions(_noop, _change_vault, _create_vault, _close_vault)
+        )
+
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.PROJECTS])())
+
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.PROJECTS
+        assert state.pages.page is not None
+        assert state.pages.page.path == reference.resolve()
+        assert view.page_view.title.value == "Ada"
+
     def test_section_counts_follow_the_scan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
         _write_note(vault / "inbox" / "One.md")
@@ -483,6 +509,8 @@ class TestWorkspaceShell:
         broken.parent.mkdir(parents=True)
         broken.write_text("---\ntype: refrence\n---\nBody\n", encoding="utf-8")
         view = _open_workspace(tmp_path, monkeypatch)
+        section = afanes.ui.state.browser.WorkspaceSection.REFERENCES
+        asyncio.run(_handler(view.section_tiles[section])())
 
         assert view.failures_column.visible is True
         tile = next(
@@ -494,6 +522,7 @@ class TestWorkspaceShell:
 
         assert afanes.ui.state.app_state.pages.page is not None
         assert afanes.ui.state.app_state.pages.page.mode is DraftMode.RAW
+        assert afanes.ui.state.app_state.browser.active_section is section
         assert view.page_view.raw_panel.visible is True
 
 
@@ -884,6 +913,32 @@ class TestGlobalSearch:
 
         assert afanes.ui.state.app_state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
         assert _row_for(view.browser_list, "Launch") is not None
+
+    def test_opening_a_result_leaves_search_and_shows_its_destination(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        reference = _write_note(
+            vault / "reference" / "Ada.md",
+            note_type="reference",
+            body="# Ada\n\nshared term",
+        )
+        view = _open_workspace(tmp_path, monkeypatch)
+        view.search_field.value = "shared term"
+        asyncio.run(_change_handler(view.search_field)())
+
+        asyncio.run(_handler(_row_for(view.browser_list, "Ada"))())
+
+        state = afanes.ui.state.app_state
+        assert state.browser.query == ""
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
+        assert view.search_field.value == ""
+        assert view.browser_title.value == afanes.i18n.ui.en.WORKSPACE_SECTION_LABELS["references"]
+        selected = _row_for(view.browser_list, "Ada")
+        assert selected.style is not None
+        assert selected.style.bgcolor == afanes.ui.theme.SELECTED_ROW_COLOR
+        assert state.pages.page is not None
+        assert state.pages.page.path == reference.resolve()
 
     def test_navigation_counts_remain_unfiltered_totals(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -1399,6 +1454,7 @@ class TestFocusAfterTrash:
         target = rows[0]
         expected = rows[1].key
         asyncio.run(state.navigation.open_page(typing.cast("Path", target.data["path"])))
+        asyncio.run(state.browser.set_query("a"))
         view.refresh()
         focused = _record_row_focus(monkeypatch)
 
@@ -2070,6 +2126,24 @@ class TestTrashSection:
         assert afanes.i18n.ui.en.TRASH_TITLE + " (1)" in headings
         rows = [control for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
         assert rows[0].title == "Cedar shed"
+
+    def test_opening_a_trash_result_selects_trash_and_clears_the_query(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._entry(tmp_path / "vault", "entry.md", body="# Cedar shed\n")
+        view = _open_workspace(tmp_path, monkeypatch)
+        view.search_field.value = "cedar"
+        asyncio.run(_change_handler(view.search_field)())
+        row = next(control for control in view.browser_list.controls if isinstance(control, ft.ListTile))
+
+        asyncio.run(_handler(row)())
+
+        state = afanes.ui.state.app_state
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.TRASH
+        assert state.browser.query == ""
+        assert view.search_field.value == ""
+        assert view.browser_title.value == afanes.i18n.ui.en.TRASH_TITLE
+        assert state.pages.trash_entry is not None
 
     def test_empty_trash_requires_cancel_or_confirmation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         managed = self._entry(tmp_path / "vault", "entry.md")

@@ -15,10 +15,12 @@ stops if another program changed it.
 
 ## 📖 Reading a page
 
-Read mode renders the display title and the Markdown body. Tapping an internal reference opens its page.
-External links, attachments, and unsafe destinations do nothing. **Back** returns through the pages you
-opened, whether they came from the browser or a link. A page always opens at the top, whether it came
-from the browser, a link, a connection entry, or **Back**.
+Read mode renders the display title and the Markdown body. Tapping an internal reference opens its page
+and selects the destination that owns it, so the navigation and browser follow the page. External
+links, attachments, and unsafe destinations do nothing. **Back** returns through the pages you opened,
+whether they came from the browser or a link, and restores the destination of the page it returns to.
+A page always opens at the top, whether it came from the browser, a link, a connection entry, or
+**Back**.
 
 A project renders as one step-aware body. Prose stays Markdown, and task lists become interactive step
 rows. See [Projects and steps](projects-and-steps.md) for the step actions.
@@ -46,16 +48,17 @@ reveal controls sit in the Connections footer: **Show Completed Steps** reveals 
 and **Show Finished Projects** reveals finished owned and requested projects. The controls remain
 available when a page has only hidden items, so those items stay reachable. The toggles are independent
 and both start hidden; opening another page hides them again. Selecting a linked note or a project opens
-it, while selecting an owned step opens its project at the top.
+it under the destination that owns it, while selecting an owned step opens its project at the top.
 
 Only a name that resolves to exactly one note creates a connection. Missing and ambiguous names
 contribute nothing, and notes under `trash/` never contribute. Edit mode and raw rescue mode hide the
 section. See [Names and links](../reference/names-and-links.md) for the resolution rules.
 
 A project's **Owner** and **Asked by** names and every step owner name are links in read mode. A name
-that resolves opens its page; an ambiguous name lists the candidates and waits for a choice. A missing
-name is shown as a broken link; selecting it asks for a reference category, then creates the note and
-opens it in edit mode. The category field defaults to **person** and suggests every existing category
+that resolves opens its page and selects its destination; an ambiguous name lists the candidates and
+waits for a choice, and the chosen note selects its destination. A missing name is shown as a broken
+link; selecting it asks for a reference category, then creates the note under **References** and opens
+it in edit mode. The category field defaults to **person** and suggests every existing category
 and every template card category; the matching template card supplies the starter body. Cancelling that
 dialog writes nothing. Step owner chips keep their separate
 delete action.

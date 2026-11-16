@@ -686,6 +686,7 @@ class TestCreateReference:
         assert state.pages.page is not None
         assert state.pages.page.path == path.resolve()
         assert state.browser.query == ""
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
 
     def test_empty_uses_the_general_category(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -3231,6 +3232,259 @@ class TestPageSaving:
         assert _notice_message(state) is not None
 
 
+class TestPageDestination:
+    def test_an_inbox_note_selects_inbox(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        note = _write_note(vault / "inbox" / "Buy milk.md", _note_text("# Buy milk\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.ui.state.browser.WorkspaceSection | None:
+            await state.workspace.choose_vault(vault)
+            return state.browser.destination_for(note)
+
+        destination = asyncio.run(scenario())
+
+        assert destination is afanes.ui.state.browser.WorkspaceSection.INBOX
+
+    def test_a_project_selects_projects(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        note = _write_typed_note(vault / "projects" / "Launch.md", "project", status="active")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.ui.state.browser.WorkspaceSection | None:
+            await state.workspace.choose_vault(vault)
+            return state.browser.destination_for(note)
+
+        destination = asyncio.run(scenario())
+
+        assert destination is afanes.ui.state.browser.WorkspaceSection.PROJECTS
+
+    def test_a_reference_selects_references(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        note = _write_note(vault / "reference" / "Ada.md", _typed_note("reference", "# Ada\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.ui.state.browser.WorkspaceSection | None:
+            await state.workspace.choose_vault(vault)
+            return state.browser.destination_for(note)
+
+        destination = asyncio.run(scenario())
+
+        assert destination is afanes.ui.state.browser.WorkspaceSection.REFERENCES
+
+    def test_a_log_entry_selects_log(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        note = _write_note(
+            vault / "log" / "2025" / "10" / "2025-10-12.md",
+            "---\ntype: log\ndate: 2025-10-12\n---\n\n# A quiet Sunday\n",
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.ui.state.browser.WorkspaceSection | None:
+            await state.workspace.choose_vault(vault)
+            return state.browser.destination_for(note)
+
+        destination = asyncio.run(scenario())
+
+        assert destination is afanes.ui.state.browser.WorkspaceSection.LOG
+
+    def test_a_misplaced_note_selects_needs_attention(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        note = _write_note(vault / "notes" / "Loose.md", _note_text("# Loose\n"))
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.ui.state.browser.WorkspaceSection | None:
+            await state.workspace.choose_vault(vault)
+            return state.browser.destination_for(note)
+
+        destination = asyncio.run(scenario())
+
+        assert destination is afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION
+
+    def test_a_path_outside_the_snapshot_has_no_destination(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> afanes.ui.state.browser.WorkspaceSection | None:
+            await state.workspace.choose_vault(vault)
+            return state.browser.destination_for(vault / "reference" / "Missing.md")
+
+        destination = asyncio.run(scenario())
+
+        assert destination is None
+
+    def test_following_a_page_selects_its_destination_and_clears_the_query(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        note = _write_typed_note(vault / "projects" / "Launch.md", "project", status="active")
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[bool, afanes.ui.state.browser.WorkspaceSection, str]:
+            await state.workspace.choose_vault(vault)
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.REFERENCES)
+            await state.browser.set_query("launch")
+            followed = state.browser.follow_page(note)
+            return followed, state.browser.active_section, state.browser.query
+
+        followed, section, query = asyncio.run(scenario())
+
+        assert followed is True
+        assert section is afanes.ui.state.browser.WorkspaceSection.PROJECTS
+        assert query == ""
+
+    def test_following_an_unknown_page_keeps_the_destination(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> tuple[bool, afanes.ui.state.browser.WorkspaceSection]:
+            await state.workspace.choose_vault(vault)
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.REFERENCES)
+            followed = state.browser.follow_page(vault / "reference" / "Missing.md")
+            return followed, state.browser.active_section
+
+        followed, section = asyncio.run(scenario())
+
+        assert followed is False
+        assert section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
+
+
+class TestPageNavigationDestination:
+    def test_opening_a_reference_while_projects_are_active_selects_references(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        project = _write_typed_note(vault / "projects" / "Launch.md", "project", status="active")
+        reference = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", category="person"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.PROJECTS)
+            assert await state.navigation.open_page(project) is True
+            assert await state.navigation.open_page(reference) is True
+
+        asyncio.run(scenario())
+
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
+        assert state.pages.page is not None
+        assert state.pages.page.path == reference.resolve()
+
+    def test_back_restores_the_previous_page_destination(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        project = _write_typed_note(vault / "projects" / "Launch.md", "project", status="active")
+        reference = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", category="person"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(project)
+            await state.navigation.open_page(reference)
+            assert await state.navigation.back() is True
+
+        asyncio.run(scenario())
+
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.PROJECTS
+        assert state.pages.page is not None
+        assert state.pages.page.path == project.resolve()
+
+    def test_back_without_history_keeps_the_current_destination(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        reference = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", category="person"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(reference)
+            assert await state.navigation.back() is True
+
+        asyncio.run(scenario())
+
+        assert state.pages.page is None
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
+
+    def test_back_skips_a_missing_page_without_changing_the_destination(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        project = _write_typed_note(vault / "projects" / "Launch.md", "project", status="active")
+        reference = _write_note(
+            vault / "reference" / "people" / "Ada.md",
+            _typed_note("reference", "# Ada\n", category="person"),
+        )
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.navigation.open_page(project)
+            await state.navigation.open_page(reference)
+            project.unlink()
+            assert await state.navigation.back() is True
+
+        asyncio.run(scenario())
+
+        assert state.pages.page is None
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
+
+    def test_a_new_reference_draft_keeps_the_current_destination(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _versioned(vault)
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        state = afanes.ui.state.app_state
+
+        async def scenario() -> None:
+            await state.workspace.choose_vault(vault)
+            await state.browser.set_section(afanes.ui.state.browser.WorkspaceSection.PROJECTS)
+            await state.navigation.follow_link("note:Quarterly budget")
+
+        asyncio.run(scenario())
+
+        assert state.pages.page is not None
+        assert state.pages.page.is_new
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.PROJECTS
+
+
 class TestPageLinks:
     def test_resolved_link_opens_its_target(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -3251,6 +3505,7 @@ class TestPageLinks:
         assert state.pages.page is not None
         assert state.pages.page.path == person.resolve()
         assert state.navigation.ambiguous == ()
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
 
     def test_ambiguous_link_exposes_the_candidates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -3293,6 +3548,7 @@ class TestPageLinks:
         assert state.navigation.ambiguous == ()
         assert state.pages.page is not None
         assert state.pages.page.path == first.resolve()
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
 
     def test_resolved_role_name_opens_its_page(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -3313,6 +3569,7 @@ class TestPageLinks:
         assert outcome is afanes.ui.state.navigation.RoleFollowOutcome.OPENED
         assert state.pages.page is not None
         assert state.pages.page.path == person.resolve()
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
 
     def test_ambiguous_role_name_exposes_the_candidates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"
@@ -3630,6 +3887,7 @@ class TestCreateRoleReference:
         assert state.pages.page.path == path.resolve()
         assert state.pages.page.labels is not None
         assert state.pages.page.labels.category == CategoryLabel("person")
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
 
     def test_creates_an_uncategorized_reference(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         vault = tmp_path / "vault"

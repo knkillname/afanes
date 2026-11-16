@@ -33,11 +33,15 @@ discarded notes. Search filters the whole vault, not only the active destination
 
 A capture under `inbox/` appears only under **Inbox**. A log entry appears under **Log**. A note under
 `trash/` appears in no active-note group; only a managed entry appears under **Trash**. A file under
-`templates/` is a template card rather than a note. Selecting an entry opens it in the detail region
-without changing the browser destination. In the **Review** destination, the browser shows the snapshot
-queue instead of the note groups. Every queue card is a keyboard-focusable row: **Tab** reaches the
-cards in queue order, the accent ring marks the focused card, and **Enter** or **Space** selects it
-without changing any review record.
+`templates/` is a template card rather than a note. Selecting an entry in the active destination opens
+it in the detail region; the destination stays the same because the note already lives there. Opening
+a page from a body link, a role name, a connection entry, an ambiguous-reference choice, a search
+result, or **Back** selects the destination that owns the opened note, so the navigation and browser
+follow the page. Selecting a destination in the navigation still keeps the open page; the browser then
+shows that destination even when the open page belongs elsewhere. In the **Review** destination, the
+browser shows the snapshot queue instead of the note groups. Every queue card is a keyboard-focusable
+row: **Tab** reaches the cards in queue order, the accent ring marks the focused card, and **Enter** or
+**Space** selects it without changing any review record.
 
 **Trash** lists one row per managed entry. Selecting a row opens the note read-only with its birthplace
 and trashed day. **Restore** returns it to the birthplace, and **Delete Permanently…** sits in the
@@ -103,10 +107,12 @@ The search field sits in its own full-width row beneath the browser header, so i
 every destination without becoming a destination itself. It filters the whole vault by display title,
 identity, prose body text, step text, and role names: a project's `owner`, its `asked_by`, and the
 owners of its steps. Results are grouped by destination, including a separate **Trash** group for
-managed discarded notes; the active destination does not limit them. Selecting a Trash result opens
-the note read-only. The navigation counts stay at each destination's total. Matching ignores case, Unicode form, and
-repeated whitespace. Other step metadata and unknown frontmatter keys are excluded, so a plan date or
-tag inside a comment is not a search result.
+managed discarded notes; the active destination does not limit them. Selecting a result leaves search
+mode: the query clears, and the browser shows the result's destination with the result selected.
+Selecting a Trash result opens the note read-only under **Trash**. The navigation counts stay at each
+destination's total. Matching ignores case, Unicode form, and repeated whitespace. Other step metadata
+and unknown frontmatter keys are excluded, so a plan date or tag inside a comment is not a search
+result.
 
 While a query is active, the browser title reads **Search Results** and the destination's own controls
 step aside: the Inbox composer, the References **New Reference…** action, the Log calendar and date

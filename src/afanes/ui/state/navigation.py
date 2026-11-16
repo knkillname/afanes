@@ -96,8 +96,9 @@ class PageNavigator:
         Notes
         -----
         The current draft is committed first. An untouched new draft is
-        discarded. A dirty draft is written before the page changes. Blocking
-        file I/O runs in a worker thread.
+        discarded. A dirty draft is written before the page changes. The opened
+        page's browser destination becomes active and the query clears.
+        Blocking file I/O runs in a worker thread.
         """
         async with self.command_lock:
             if self.session.vault is None:
@@ -109,6 +110,7 @@ class PageNavigator:
                 previous = self.pages.page.path if self.pages.page is not None else None
                 if not await self.pages.load(path):
                     return False
+                self.browser.follow_page(path)
                 self.ambiguous = ()
                 self._push_history(previous)
                 return True
@@ -263,6 +265,7 @@ class PageNavigator:
                 self.browser.query = ""
                 if not await self.pages.load(path, editing=True):
                     return False
+                self.browser.follow_page(path)
                 self.ambiguous = ()
                 self._push_history(previous)
                 if refresh_error is not None:
@@ -334,6 +337,7 @@ class PageNavigator:
                     self.session.apply_snapshot(snapshot, focus=path)
                 if not await self.pages.load(path, editing=True):
                     return False
+                self.browser.follow_page(path)
                 self.ambiguous = ()
                 self._push_history(previous)
                 if refresh_error is not None:
@@ -394,7 +398,8 @@ class PageNavigator:
         Notes
         -----
         The current draft is committed or discarded before moving. History
-        entries whose files disappeared are skipped.
+        entries whose files disappeared are skipped. The destination of the
+        restored page becomes active.
         """
         async with self.command_lock:
             self.status.set_busy(busy=True)
@@ -405,6 +410,7 @@ class PageNavigator:
                     path = self.history[-1]
                     self.history = self.history[:-1]
                     if await self.pages.load(path):
+                        self.browser.follow_page(path)
                         self.ambiguous = ()
                         return True
                 self.pages.clear()

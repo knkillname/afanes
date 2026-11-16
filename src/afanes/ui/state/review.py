@@ -19,7 +19,7 @@ from afanes.core.search import (
     ReviewItemKind,
 )
 from afanes.core.vault.service import Vault
-from afanes.models.note import NoteType, Status
+from afanes.models.note import Status
 from afanes.ui.state.browser import BrowserState, WorkspaceSection
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.navigation import PageNavigator
@@ -428,10 +428,7 @@ class ReviewState:
         item = self._current_review_step() or self._current_review_project()
         if item is None:
             return False
-        if not await self.navigation.open_page(item.path):
-            return False
-        await self.browser.set_section(WorkspaceSection.PROJECTS)
-        return True
+        return await self.navigation.open_page(item.path)
 
     async def mark_project_done(self) -> bool:
         """Mark the current review project ``done`` after confirmation.
@@ -471,12 +468,7 @@ class ReviewState:
         item = self._current_reminder()
         if item is None:
             return False
-        if not await self.navigation.open_page(item.path):
-            return False
-        section = self._reminder_section(item.path)
-        if section is not None:
-            await self.browser.set_section(section)
-        return True
+        return await self.navigation.open_page(item.path)
 
     async def dismiss_reminder(self) -> bool:
         """Record the current reminder occurrence and advance the queue.
@@ -529,22 +521,6 @@ class ReviewState:
         if item is None or item.kind is not ReviewItemKind.REMINDER or item.occurrence is None:
             return None
         return item
-
-    def _reminder_section(self, path: Path) -> WorkspaceSection | None:
-        """Return the browser destination for a reminder note."""
-        snapshot = self.session.snapshot
-        if snapshot is None:
-            return None
-        note = next((value for value in snapshot.notes if value.path == path), None)
-        if note is None:
-            return None
-        sections = {
-            NoteType.PROJECT: WorkspaceSection.PROJECTS,
-            NoteType.REFERENCE: WorkspaceSection.REFERENCES,
-            NoteType.LOG: WorkspaceSection.LOG,
-            NoteType.NOTE: WorkspaceSection.NEEDS_ATTENTION,
-        }
-        return sections.get(note.note_type)
 
     def _current_review_project(self) -> ReviewItem | None:
         """Return the current project review item, or ``None``."""

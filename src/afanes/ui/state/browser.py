@@ -24,6 +24,7 @@ from afanes.core.search import (
     BrowserSection,
     ProjectGroup,
 )
+from afanes.core.vault.note import VaultNote
 from afanes.models.note import CategoryLabel, NoteType
 from afanes.ui.state.lock import CommandLock
 from afanes.ui.state.session import VaultSession
@@ -123,12 +124,65 @@ class BrowserState:
             Destination to show.
         """
         async with self.command_lock:
-            self.active_section = section
-            self.query = ""
+            self._select_section(section)
             if section is WorkspaceSection.TRASH:
                 vault = self.session.vault
                 if vault is not None:
                     await self.session.maintain_trash(vault.today())
+
+    def destination_for(self, path: Path) -> WorkspaceSection | None:
+        """Return the sidebar destination that owns one scanned note.
+
+        Parameters
+        ----------
+        path : Path
+            Note path, relative or absolute, inside the active vault.
+
+        Returns
+        -------
+        WorkspaceSection | None
+            Destination whose browser content lists the note, or ``None`` when
+            the path is not a parsed note in the current snapshot.
+
+        Notes
+        -----
+        The inbox check runs first, matching the browser's grouping precedence.
+        Managed trashed entries and unreadable files are not scanned notes and
+        have no destination here.
+        """
+        snapshot = self.session.snapshot
+        if snapshot is None:
+            return None
+        note = snapshot.find_note(path)
+        if note is None:
+            return None
+        return self._destination_for_note(note)
+
+    def follow_page(self, path: Path) -> bool:
+        """Select the destination that owns an opened page.
+
+        Parameters
+        ----------
+        path : Path
+            Page path that was just loaded.
+
+        Returns
+        -------
+        bool
+            ``True`` when a destination was selected; ``False`` when the path
+            has no destination and the current selection stays unchanged.
+
+        Notes
+        -----
+        The query clears with the selection, so opening a search result leaves
+        search mode. Page navigation already holds the command lock, so this
+        method performs no locking.
+        """
+        section = self.destination_for(path)
+        if section is None:
+            return False
+        self._select_section(section)
+        return True
 
     async def set_query(self, query: str) -> None:
         """Filter browser entries by display title or identity.
@@ -345,6 +399,24 @@ class BrowserState:
             Selected entry path, or ``None`` to clear the selection.
         """
         self.log_selected = path
+
+    def _select_section(self, section: WorkspaceSection) -> None:
+        """Show one destination and clear the browser query."""
+        self.active_section = section
+        self.query = ""
+
+    @staticmethod
+    def _destination_for_note(note: VaultNote) -> WorkspaceSection:
+        """Return the destination that lists one parsed note."""
+        if note.is_inbox:
+            return WorkspaceSection.INBOX
+        if note.note_type is NoteType.PROJECT:
+            return WorkspaceSection.PROJECTS
+        if note.note_type is NoteType.REFERENCE:
+            return WorkspaceSection.REFERENCES
+        if note.note_type is NoteType.LOG:
+            return WorkspaceSection.LOG
+        return WorkspaceSection.NEEDS_ATTENTION
 
     def reset(self) -> None:
         """Return the browser to the Inbox with no query or Log selection."""

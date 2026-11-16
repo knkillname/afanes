@@ -1861,6 +1861,9 @@ class TestConnections:
 
         assert scrolls == [0]
         assert view.title.value == "Call"
+        assert (
+            afanes.ui.state.app_state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION
+        )
 
     def test_selecting_an_owned_step_opens_its_project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
@@ -1887,6 +1890,7 @@ class TestConnections:
 
         assert view.title.value == "Home"
         assert scrolls == [0]
+        assert afanes.ui.state.app_state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.PROJECTS
 
     def test_selecting_an_owned_project_opens_it(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self._open_person(tmp_path, monkeypatch)
