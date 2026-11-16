@@ -1,7 +1,7 @@
 """Tests for the bundled application identity assets."""
 
-import xml.etree.ElementTree as ElementTree
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 ASSET_ROOT = Path(__file__).resolve().parents[1] / "src" / "assets"
 ICON_PATH = ASSET_ROOT / "icon.svg"
@@ -10,13 +10,14 @@ XLINK_NAMESPACE = "http://www.w3.org/1999/xlink"
 FORBIDDEN_ELEMENTS = frozenset({"text", "tspan", "textPath", "script", "image", "foreignObject"})
 EXTERNAL_SCHEMES = ("http://", "https://", "//", "data:")
 REFERENCE_ATTRIBUTES = frozenset({"href", "src"})
+VIEW_BOX_PARTS = 4
 
 
 def _local_name(value: str) -> str:
     return value.rsplit("}", 1)[-1]
 
 
-def _attribute_violations(element: ElementTree.Element) -> list[str]:
+def _attribute_violations(element: ET.Element) -> list[str]:
     violations: list[str] = []
     for name, value in element.attrib.items():
         local = _local_name(name)
@@ -43,8 +44,8 @@ def svg_violations(source: str) -> list[str]:
     if "<!DOCTYPE" in source or "<!ENTITY" in source:
         return ["external document type or entity declaration"]
     try:
-        root = ElementTree.fromstring(source)
-    except ElementTree.ParseError as error:
+        root = ET.fromstring(source)  # noqa: S314 - the source is a tracked project asset
+    except ET.ParseError as error:
         return [f"invalid SVG: {error}"]
     violations: list[str] = []
     if _local_name(root.tag) != "svg" or root.tag not in ("svg", f"{{{SVG_NAMESPACE}}}svg"):
@@ -54,7 +55,9 @@ def svg_violations(source: str) -> list[str]:
         violations.append("missing viewBox")
     else:
         parts = view_box.replace(",", " ").split()
-        if len(parts) != 4 or any(not part.replace(".", "", 1).replace("-", "", 1).isdigit() for part in parts):
+        if len(parts) != VIEW_BOX_PARTS or any(
+            not part.replace(".", "", 1).replace("-", "", 1).isdigit() for part in parts
+        ):
             violations.append(f"invalid viewBox {view_box!r}")
     for element in root.iter():
         local = _local_name(element.tag)
@@ -70,10 +73,7 @@ class TestApplicationIcon:
         assert svg_violations(ICON_PATH.read_text(encoding="utf-8")) == []
 
     def test_an_external_reference_fails_the_gate(self) -> None:
-        source = (
-            f'<svg xmlns="{SVG_NAMESPACE}" viewBox="0 0 16 16">'
-            '<use href="https://example.test/icon.svg"/></svg>'
-        )
+        source = f'<svg xmlns="{SVG_NAMESPACE}" viewBox="0 0 16 16"><use href="https://example.test/icon.svg"/></svg>'
 
         assert any("external reference" in finding for finding in svg_violations(source))
 

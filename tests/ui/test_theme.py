@@ -317,7 +317,7 @@ class TestTheme:
             assert filled.style is not None
             bgcolor = filled.style.bgcolor
             assert isinstance(bgcolor, dict)
-            assert bgcolor[ft.ControlState.DEFAULT] == afanes.ui.theme.ACCENT_FILL
+            assert bgcolor[ft.ControlState.DEFAULT] == afanes.ui.theme.LIGHT_PALETTE["accent_fill"]
             assert tiles is not None
             assert tiles.selected_tile_color == afanes.ui.theme.SELECTED_ROW_COLOR
 
@@ -329,7 +329,9 @@ class TestTheme:
         assert bgcolor[ft.ControlState.DEFAULT] == ft.Colors.ERROR
 
     def test_disabled_actions_look_insensitive(self) -> None:
-        filled = afanes.ui.theme.FILLED_BUTTON_THEME.style
+        theme = afanes.ui.theme.LIGHT_THEME.filled_button_theme
+        assert theme is not None
+        filled = theme.style
         destructive = afanes.ui.theme.DESTRUCTIVE_BUTTON_STYLE
         assert filled is not None
         filled_bgcolor = filled.bgcolor
@@ -344,7 +346,9 @@ class TestTheme:
         assert destructive_bgcolor[ft.ControlState.DISABLED] == afanes.ui.theme.DISABLED_FILL_COLOR
 
     def test_controls_take_the_reference_corner_radius(self) -> None:
-        filled = afanes.ui.theme.FILLED_BUTTON_THEME.style
+        theme = afanes.ui.theme.LIGHT_THEME.filled_button_theme
+        assert theme is not None
+        filled = theme.style
         text = afanes.ui.theme.TEXT_BUTTON_THEME.style
         border = afanes.ui.theme.INPUT_DECORATION_THEME.border
 
@@ -454,7 +458,10 @@ class TestTheme:
 
     def test_selection_is_a_neutral_ten_percent_shade(self) -> None:
         assert ft.Colors.with_opacity(SELECTION_TINT, ft.Colors.ON_SURFACE) == (afanes.ui.theme.SELECTED_ROW_COLOR)
-        assert ft.Colors.with_opacity(0.15, afanes.ui.theme.ACCENT_FILL) != afanes.ui.theme.SELECTED_ROW_COLOR
+        assert (
+            ft.Colors.with_opacity(0.15, afanes.ui.theme.LIGHT_PALETTE["accent_fill"])
+            != afanes.ui.theme.SELECTED_ROW_COLOR
+        )
 
     def test_no_per_section_hue_remains(self) -> None:
         for name in (

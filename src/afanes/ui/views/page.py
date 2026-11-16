@@ -340,6 +340,7 @@ class PageView:
             ft.Icons.DESCRIPTION_OUTLINED,
             self._state.status.copy.PLACEHOLDER_PAGE_TITLE,
             body=self._state.status.copy.PLACEHOLDER_PAGE_BODY,
+            key=None,
         ).build()
         self.read_body = ft.Markdown(
             value="",

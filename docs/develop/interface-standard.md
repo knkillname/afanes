@@ -414,11 +414,12 @@ content word in the middle of an English label remains a manual-review catch.
 
 ### 🖥️ The rendered layout gate
 
-`hatch run render:check` launches the cached Flet desktop client with a temporary fixture vault. It
-tours every primary view at 100% and 200% text, records keyed control geometry, and compares the
-result with the text snapshot in `tests/render/snapshots/linux.json`. It fails on a missing view, a
-collapsed region, a text-bearing control that does not grow, a missing or extra keyed control, or
-geometry outside a small pixel tolerance.
+`hatch run render:check` launches the cached Flet desktop client at the 1024x600 minimum window size
+with a temporary fixture vault. It tours every primary view at 100% and 200% text, records keyed
+control geometry, and compares the result with the text snapshot in
+`tests/render/snapshots/linux.json`. It fails on a missing view, a collapsed region, a text-bearing
+control that does not grow, a missing or extra keyed control, or geometry outside a small pixel
+tolerance.
 
 The command needs a desktop display and is not part of `hatch test`. It does not add a user-visible
 text-size control, a runtime dependency, or a tracked screenshot: the snapshot is JSON, and any
@@ -454,7 +455,8 @@ WAVE 5  landed: keyboard and accessibility: shortcut sheet, Log calendar
         robustness and the rendered layout snapshot
 WAVE 6  landed: breakpoints, collapsible navigation, narrow and large-window
         behavior; the remaining adaptivity work is per-view polish
-WAVE 7  identity: app icon, placeholder pages, final palette pass, empty
+WAVE 7  landed: identity: the original SVG app icon, symbolic placeholder
+        pages, platform high contrast, the final palette pass, and an empty
         baseline
 ```
 

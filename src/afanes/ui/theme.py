@@ -189,9 +189,7 @@ HIGH_CONTRAST_DARK_PALETTE = {
     "inverse_primary": "#005A9C",
 }
 
-ACCENT_FILL = LIGHT_PALETTE["accent_fill"]
 ACCENT_TEXT = ft.Colors.TERTIARY
-ON_ACCENT = LIGHT_PALETTE["on_accent"]
 DESTRUCTIVE = ft.Colors.ERROR
 
 PAGE_SURFACE_COLOR = ft.Colors.SURFACE
@@ -323,19 +321,6 @@ TEXT_THEME = ft.TextTheme(
 
 BUTTON_SHAPE = ft.RoundedRectangleBorder(radius=CONTROL_RADIUS)
 
-FILLED_BUTTON_THEME = ft.FilledButtonTheme(
-    style=ft.ButtonStyle(
-        bgcolor={
-            ft.ControlState.DEFAULT: ACCENT_FILL,
-            ft.ControlState.DISABLED: DISABLED_FILL_COLOR,
-        },
-        color={
-            ft.ControlState.DEFAULT: ON_ACCENT,
-            ft.ControlState.DISABLED: DISABLED_TEXT_COLOR,
-        },
-        shape=BUTTON_SHAPE,
-    ),
-)
 TEXT_BUTTON_THEME = ft.TextButtonTheme(style=ft.ButtonStyle(shape=BUTTON_SHAPE))
 OUTLINED_BUTTON_THEME = ft.OutlinedButtonTheme(style=ft.ButtonStyle(shape=BUTTON_SHAPE))
 DESTRUCTIVE_BUTTON_STYLE = ft.ButtonStyle(

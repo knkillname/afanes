@@ -416,7 +416,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 153.0,
+          "height": 33.0,
           "width": 353.0
         },
         "browser-search": {
@@ -436,15 +436,15 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 514.0,
-          "width": 837.0
+          "height": 394.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 56.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-capture-actions": {
@@ -464,12 +464,12 @@
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 56.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -484,8 +484,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "low": {
@@ -494,7 +494,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 339.0,
+          "height": 219.0,
           "width": 353.0
         },
         "browser-search": {
@@ -514,15 +514,15 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 541.0,
-          "width": 837.0
+          "height": 421.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 40.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-capture-actions": {
@@ -542,12 +542,12 @@
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 48.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -562,8 +562,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "markers": [
@@ -583,7 +583,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 382.0,
+          "height": 262.0,
           "width": 353.0
         },
         "browser-search": {
@@ -763,24 +763,24 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 514.0,
-          "width": 837.0
+          "height": 394.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 56.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 56.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -794,6 +794,10 @@
           "height": 40.0,
           "width": 40.0
         },
+        "workspace-view": {
+          "height": 552.0,
+          "width": 976.0
+        },
         "year:2026:create": {
           "height": 40.0,
           "width": 40.0
@@ -805,7 +809,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 485.0,
+          "height": 365.0,
           "width": 353.0
         },
         "browser-search": {
@@ -985,24 +989,24 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 541.0,
-          "width": 837.0
+          "height": 421.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 40.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 48.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -1015,6 +1019,10 @@
         "workspace-refresh": {
           "height": 40.0,
           "width": 40.0
+        },
+        "workspace-view": {
+          "height": 552.0,
+          "width": 976.0
         },
         "year:2026:create": {
           "height": 40.0,
@@ -1069,7 +1077,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 382.0,
+          "height": 262.0,
           "width": 353.0
         },
         "browser-search": {
@@ -1089,24 +1097,24 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 514.0,
-          "width": 837.0
+          "height": 394.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 56.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 56.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -1119,6 +1127,10 @@
         "workspace-refresh": {
           "height": 40.0,
           "width": 40.0
+        },
+        "workspace-view": {
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "low": {
@@ -1127,7 +1139,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 485.0,
+          "height": 365.0,
           "width": 353.0
         },
         "browser-search": {
@@ -1147,24 +1159,24 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 541.0,
-          "width": 837.0
+          "height": 421.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 40.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 48.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -1177,6 +1189,10 @@
         "workspace-refresh": {
           "height": 40.0,
           "width": 40.0
+        },
+        "workspace-view": {
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "markers": [
@@ -1194,7 +1210,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 153.0,
+          "height": 33.0,
           "width": 353.0
         },
         "browser-search": {
@@ -1222,19 +1238,19 @@
           "width": 119.5
         },
         "page-edit-form": {
-          "height": 520.0,
-          "width": 837.0
+          "height": 400.0,
+          "width": 581.0
         },
         "page-mode-host": {
-          "height": 520.0,
-          "width": 837.0
+          "height": 400.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 56.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-capture-actions": {
@@ -1254,12 +1270,12 @@
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 56.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -1274,8 +1290,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "low": {
@@ -1284,7 +1300,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 339.0,
+          "height": 219.0,
           "width": 353.0
         },
         "browser-search": {
@@ -1312,19 +1328,19 @@
           "width": 102.5
         },
         "page-edit-form": {
-          "height": 545.0,
-          "width": 837.0
+          "height": 425.0,
+          "width": 581.0
         },
         "page-mode-host": {
-          "height": 545.0,
-          "width": 837.0
+          "height": 425.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 40.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-capture-actions": {
@@ -1344,12 +1360,12 @@
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 48.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -1364,8 +1380,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "markers": [
@@ -1387,7 +1403,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 153.0,
+          "height": 33.0,
           "width": 353.0
         },
         "browser-search": {
@@ -1411,19 +1427,19 @@
           "width": 119.5
         },
         "page-mode-host": {
-          "height": 520.0,
-          "width": 837.0
+          "height": 400.0,
+          "width": 581.0
         },
         "page-raw-panel": {
-          "height": 520.0,
-          "width": 837.0
+          "height": 400.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 56.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-capture-actions": {
@@ -1443,12 +1459,12 @@
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 56.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -1463,8 +1479,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "low": {
@@ -1473,7 +1489,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 339.0,
+          "height": 219.0,
           "width": 353.0
         },
         "browser-search": {
@@ -1497,19 +1513,19 @@
           "width": 102.5
         },
         "page-mode-host": {
-          "height": 545.0,
-          "width": 837.0
+          "height": 425.0,
+          "width": 581.0
         },
         "page-raw-panel": {
-          "height": 545.0,
-          "width": 837.0
+          "height": 425.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 40.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-capture-actions": {
@@ -1529,12 +1545,12 @@
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 48.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -1549,8 +1565,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "markers": [
@@ -1572,7 +1588,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 153.0,
+          "height": 33.0,
           "width": 353.0
         },
         "browser-search": {
@@ -1605,15 +1621,15 @@
         },
         "page-meta": {
           "height": 40.0,
-          "width": 837.0
+          "width": 581.0
         },
         "page-mode-host": {
-          "height": 413.0,
-          "width": 837.0
+          "height": 293.0,
+          "width": 581.0
         },
         "page-reminder": {
           "height": 43.0,
-          "width": 837.0
+          "width": 581.0
         },
         "page-reminder-action": {
           "height": 43.0,
@@ -1621,10 +1637,10 @@
         },
         "page-toolbar": {
           "height": 56.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-capture-actions": {
@@ -1644,12 +1660,12 @@
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 56.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -1664,8 +1680,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "low": {
@@ -1674,7 +1690,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 339.0,
+          "height": 219.0,
           "width": 353.0
         },
         "browser-search": {
@@ -1707,15 +1723,15 @@
         },
         "page-meta": {
           "height": 40.0,
-          "width": 837.0
+          "width": 581.0
         },
         "page-mode-host": {
-          "height": 441.0,
-          "width": 837.0
+          "height": 321.0,
+          "width": 581.0
         },
         "page-reminder": {
           "height": 40.0,
-          "width": 837.0
+          "width": 581.0
         },
         "page-reminder-action": {
           "height": 40.0,
@@ -1723,10 +1739,10 @@
         },
         "page-toolbar": {
           "height": 40.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-capture-actions": {
@@ -1746,12 +1762,12 @@
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 48.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -1766,8 +1782,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "markers": [
@@ -1790,7 +1806,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 153.0,
+          "height": 33.0,
           "width": 353.0
         },
         "browser-search": {
@@ -1814,11 +1830,11 @@
           "width": 109.0
         },
         "processing-view": {
-          "height": 604.0,
-          "width": 863.0
+          "height": 484.0,
+          "width": 607.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-capture-actions": {
@@ -1838,12 +1854,12 @@
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 56.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -1858,8 +1874,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "low": {
@@ -1868,7 +1884,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 339.0,
+          "height": 219.0,
           "width": 353.0
         },
         "browser-search": {
@@ -1892,11 +1908,11 @@
           "width": 71.0
         },
         "processing-view": {
-          "height": 612.0,
-          "width": 863.0
+          "height": 492.0,
+          "width": 607.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-capture-actions": {
@@ -1916,12 +1932,12 @@
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 48.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -1936,8 +1952,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "markers": [
@@ -1958,7 +1974,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 382.0,
+          "height": 262.0,
           "width": 353.0
         },
         "browser-search": {
@@ -1974,12 +1990,12 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 514.0,
-          "width": 837.0
+          "height": 394.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 56.0,
-          "width": 811.0
+          "width": 555.0
         },
         "project-group-active": {
           "height": 207.0,
@@ -2010,16 +2026,16 @@
           "width": 353.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 56.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -2032,6 +2048,10 @@
         "workspace-refresh": {
           "height": 40.0,
           "width": 40.0
+        },
+        "workspace-view": {
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "low": {
@@ -2040,7 +2060,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 485.0,
+          "height": 365.0,
           "width": 353.0
         },
         "browser-search": {
@@ -2056,12 +2076,12 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 541.0,
-          "width": 837.0
+          "height": 421.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 40.0,
-          "width": 811.0
+          "width": 555.0
         },
         "project-group-active": {
           "height": 126.0,
@@ -2092,16 +2112,16 @@
           "width": 353.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 48.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -2114,6 +2134,10 @@
         "workspace-refresh": {
           "height": 40.0,
           "width": 40.0
+        },
+        "workspace-view": {
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "markers": [
@@ -2131,7 +2155,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 382.0,
+          "height": 262.0,
           "width": 353.0
         },
         "browser-new-reference": {
@@ -2155,24 +2179,24 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 514.0,
-          "width": 837.0
+          "height": 394.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 56.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 56.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -2185,6 +2209,10 @@
         "workspace-refresh": {
           "height": 40.0,
           "width": 40.0
+        },
+        "workspace-view": {
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "low": {
@@ -2193,7 +2221,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 485.0,
+          "height": 365.0,
           "width": 353.0
         },
         "browser-new-reference": {
@@ -2217,24 +2245,24 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 541.0,
-          "width": 837.0
+          "height": 421.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 40.0,
-          "width": 811.0
+          "width": 555.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 48.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -2247,6 +2275,10 @@
         "workspace-refresh": {
           "height": 40.0,
           "width": 40.0
+        },
+        "workspace-view": {
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "markers": [
@@ -2264,7 +2296,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 382.0,
+          "height": 262.0,
           "width": 353.0
         },
         "browser-search": {
@@ -2284,8 +2316,8 @@
           "width": 109.0
         },
         "processing-view": {
-          "height": 604.0,
-          "width": 863.0
+          "height": 484.0,
+          "width": 607.0
         },
         "review-card-0": {
           "height": 102.0,
@@ -2304,16 +2336,16 @@
           "width": 353.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 56.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -2328,8 +2360,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "low": {
@@ -2338,7 +2370,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 485.0,
+          "height": 365.0,
           "width": 353.0
         },
         "browser-search": {
@@ -2358,8 +2390,8 @@
           "width": 71.0
         },
         "processing-view": {
-          "height": 612.0,
-          "width": 863.0
+          "height": 492.0,
+          "width": 607.0
         },
         "review-card-0": {
           "height": 63.0,
@@ -2378,16 +2410,16 @@
           "width": 353.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 48.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -2402,8 +2434,8 @@
           "width": 40.0
         },
         "workspace-view": {
-          "height": 672.0,
-          "width": 1232.0
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "markers": [
@@ -2468,7 +2500,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 382.0,
+          "height": 262.0,
           "width": 353.0
         },
         "browser-search": {
@@ -2484,12 +2516,12 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 514.0,
-          "width": 837.0
+          "height": 394.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 56.0,
-          "width": 811.0
+          "width": 555.0
         },
         "trash-empty-action": {
           "height": 43.0,
@@ -2500,16 +2532,16 @@
           "width": 353.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 56.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -2522,6 +2554,10 @@
         "workspace-refresh": {
           "height": 40.0,
           "width": 40.0
+        },
+        "workspace-view": {
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "low": {
@@ -2530,7 +2566,7 @@
           "width": 353.0
         },
         "browser-list": {
-          "height": 485.0,
+          "height": 365.0,
           "width": 353.0
         },
         "browser-search": {
@@ -2546,12 +2582,12 @@
           "width": 353.0
         },
         "page-mode-host": {
-          "height": 541.0,
-          "width": 837.0
+          "height": 421.0,
+          "width": 581.0
         },
         "page-toolbar": {
           "height": 40.0,
-          "width": 811.0
+          "width": 555.0
         },
         "trash-empty-action": {
           "height": 40.0,
@@ -2562,16 +2598,16 @@
           "width": 353.0
         },
         "workspace-browser": {
-          "height": 672.0,
+          "height": 552.0,
           "width": 353.0
         },
         "workspace-detail": {
-          "height": 672.0,
-          "width": 863.0
+          "height": 552.0,
+          "width": 607.0
         },
         "workspace-detail-toolbar": {
           "height": 48.0,
-          "width": 863.0
+          "width": 607.0
         },
         "workspace-navigation-toggle": {
           "height": 40.0,
@@ -2584,6 +2620,10 @@
         "workspace-refresh": {
           "height": 40.0,
           "width": 40.0
+        },
+        "workspace-view": {
+          "height": 552.0,
+          "width": 976.0
         }
       },
       "markers": [

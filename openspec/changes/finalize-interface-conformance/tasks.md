@@ -24,9 +24,9 @@
 
 ## 4. Final conformance and evidence
 
-- [ ] 4.1 Run the real GNOME high-contrast setting at 1024x600 and 1100 px, in light and dark, across the destinations, page states, shortcut sheet, and date picker; record only observed results in `RELEASE.md` and leave the task open without that evidence.
-- [ ] 4.2 Update the HIG wave 7 status, app icon row, placeholder-page behavior, and reduced bounded-differences list in `README.md`, `RELEASE.md`, and `docs/develop/interface-standard.md`; verify `hatch run docs:build` passes.
-- [ ] 4.3 Run `hatch run render:check` and verify the standard 100%/200% layout still matches the snapshot after the placeholder and theme changes.
+- [x] 4.1 Run the real GNOME high-contrast setting at 1024x600 and 1100 px, in light and dark, across the destinations, page states, shortcut sheet, and date picker; record only observed results in `RELEASE.md` and leave the task open without that evidence.
+- [x] 4.2 Update the HIG wave 7 status, app icon row, placeholder-page behavior, and reduced bounded-differences list in `README.md`, `RELEASE.md`, and `docs/develop/interface-standard.md`; verify `hatch run docs:build` passes.
+- [x] 4.3 Run `hatch run render:check` and verify the standard 100%/200% layout still matches the snapshot after the placeholder and theme changes.
 
 ## 5. Integration checks
 

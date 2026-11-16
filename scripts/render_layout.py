@@ -46,7 +46,7 @@ SNAPSHOT_PATH = ROOT / "tests" / "render" / "snapshots" / "linux.json"
 REPORT_PATH = Path(tempfile.gettempdir()) / "afanes-render-layout.json"
 WINDOW_WIDTH = 1024
 WINDOW_HEIGHT = 600
-SETTLE_ROUNDS = 4
+SETTLE_ROUNDS = 6
 SETTLE_SECONDS = 0.15
 TEXT_SCALE = 2.0
 SCHEMA_VERSION = 1
@@ -120,7 +120,10 @@ class LayoutRenderer:
                 self.issues.append("the workspace did not render")
                 await page.window.close()
                 return
+            page.window.width = WINDOW_WIDTH
+            page.window.height = WINDOW_HEIGHT
             page.update()
+            await asyncio.sleep(SETTLE_SECONDS)
             self._workspace.resize(WINDOW_WIDTH)
             await self._tour("100")
             self._apply_text_scale(TEXT_SCALE)
@@ -303,10 +306,16 @@ class LayoutRenderer:
         self._attach(workspace.root, token)
         page = self._require_page()
         page.controls.clear()
+        page.update()
+        await asyncio.sleep(SETTLE_SECONDS)
         page.add(workspace.build())
         page.update()
-        await self._force_measure()
-        await self._settle()
+        required = set(markers) | {"workspace-view"}
+        for _ in range(3):
+            await self._force_measure()
+            await self._settle()
+            if required <= self._current.keys():
+                break
         self._store(scale, name, markers, self._current, self._text_keys)
 
     def _store_dialog(self, scale: str, name: str, markers: list[str]) -> None:

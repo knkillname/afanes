@@ -21,6 +21,8 @@ class PlaceholderPage:
         Optional guidance line below the heading.
     action : flet.Control | None
         Optional suggested action control.
+    key : str | None
+        Optional control key, used when a rendered gate records geometry.
 
     Notes
     -----
@@ -36,6 +38,7 @@ class PlaceholderPage:
         *,
         body: str | None = None,
         action: ft.Control | None = None,
+        key: str | None = "placeholder-page",
     ) -> None:
         """Store the placeholder parts.
 
@@ -49,11 +52,14 @@ class PlaceholderPage:
             Optional guidance line below the heading.
         action : flet.Control | None
             Optional suggested action control.
+        key : str | None
+            Optional control key, used when a rendered gate records geometry.
         """
         self._icon = icon
         self._title = title
         self._body = body
         self._action = action
+        self._key = key
 
     def build(self) -> ft.Control:
         """Build the placeholder page.
@@ -100,5 +106,5 @@ class PlaceholderPage:
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 tight=True,
             ),
-            key="placeholder-page",
+            key=self._key,
         )
