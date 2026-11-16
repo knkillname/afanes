@@ -32,7 +32,7 @@ from tests.support import constant, ensure_vault, versioned
 
 Handler = Callable[[], Coroutine[typing.Any, typing.Any, None]]
 SECTION_COUNT = 6
-PRIMARY_MENU_ITEM_COUNT = 4
+PRIMARY_MENU_ITEM_COUNT = 5
 OWNED_BANNER_COUNT = 4
 TWO_ENTRIES = 2
 FIRST_DAY = 1
@@ -159,6 +159,30 @@ class TestWorkspaceShell:
         assert len(view.change_button.items) == PRIMARY_MENU_ITEM_COUNT
         assert all(item.content not in (afanes.i18n.ui.en.CLOSE_ACTION, "Done") for item in view.change_button.items)
 
+    def test_the_primary_menu_opens_the_shortcut_sheet(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        opened: list[bool] = []
+
+        async def on_shortcuts() -> None:
+            opened.append(True)
+
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        view = afanes.ui.views.workspace.WorkspaceView(
+            afanes.ui.views.workspace.WorkspaceActions(
+                _noop,
+                _change_vault,
+                _create_vault,
+                _close_vault,
+                on_shortcuts=on_shortcuts,
+            )
+        )
+        item = next(item for item in view.change_button.items if item.key == "workspace-shortcuts")
+
+        assert item.content == afanes.i18n.ui.en.SHORTCUTS_ACTION
+        asyncio.run(_handler(item)())
+
+        assert opened == [True]
+
     def test_shell_renders_the_owned_banners(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = _open_workspace(tmp_path, monkeypatch)
         state = afanes.ui.state.app_state
@@ -236,12 +260,14 @@ class TestWorkspaceShell:
             "workspace-change-open",
             "workspace-change-create",
             "workspace-close-vault",
+            "workspace-shortcuts",
             "workspace-about",
         ]
         assert view.change_button.items[0].content == afanes.i18n.ui.en.CHANGE_VAULT_OPEN
         assert view.change_button.items[1].content == afanes.i18n.ui.en.CHANGE_VAULT_CREATE
         assert view.change_button.items[2].content == afanes.i18n.ui.en.CLOSE_VAULT_ACTION
-        assert view.change_button.items[3].content == afanes.i18n.ui.en.ABOUT_ACTION
+        assert view.change_button.items[3].content == afanes.i18n.ui.en.SHORTCUTS_ACTION
+        assert view.change_button.items[4].content == afanes.i18n.ui.en.ABOUT_ACTION
 
         asyncio.run(_handler(view.change_button.items[2])())
 
@@ -269,7 +295,7 @@ class TestWorkspaceShell:
             )
         )
 
-        asyncio.run(_handler(view.change_button.items[3])())
+        asyncio.run(_handler(view.change_button.items[4])())
 
         assert calls == ["about"]
 

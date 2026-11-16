@@ -212,6 +212,141 @@ msgctxt "ABOUT_LICENSE"
 msgid "Licensed under the GNU Affero General Public License, version 3 or later"
 msgstr "Con licencia GNU Affero General Public License, versión 3 o posterior"
 
+#: src/afanes/i18n/ui/en.py SHORTCUTS_ACTION
+msgctxt "SHORTCUTS_ACTION"
+msgid "Keyboard Shortcuts…"
+msgstr "Atajos de teclado…"
+
+#: src/afanes/i18n/ui/en.py SHORTCUTS_TITLE
+msgctxt "SHORTCUTS_TITLE"
+msgid "Keyboard Shortcuts"
+msgstr "Atajos de teclado"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_GROUP_LABELS.general
+msgctxt "SHORTCUT_GROUP_LABELS.general"
+msgid "General"
+msgstr "General"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_GROUP_LABELS.calendar
+msgctxt "SHORTCUT_GROUP_LABELS.calendar"
+msgid "Calendar"
+msgstr "Calendario"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_GROUP_LABELS.navigation
+msgctxt "SHORTCUT_GROUP_LABELS.navigation"
+msgid "Navigation"
+msgstr "Navegación"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_KEYS.search
+msgctxt "SHORTCUT_KEYS.search"
+msgid "Ctrl+F"
+msgstr "Ctrl+F"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_KEYS.capture
+msgctxt "SHORTCUT_KEYS.capture"
+msgid "Ctrl+N"
+msgstr "Ctrl+N"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_KEYS.shortcuts
+msgctxt "SHORTCUT_KEYS.shortcuts"
+msgid "Ctrl+?"
+msgstr "Ctrl+?"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_KEYS.close
+msgctxt "SHORTCUT_KEYS.close"
+msgid "Esc"
+msgstr "Esc"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_KEYS.day
+msgctxt "SHORTCUT_KEYS.day"
+msgid "← / →"
+msgstr "← / →"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_KEYS.week
+msgctxt "SHORTCUT_KEYS.week"
+msgid "↑ / ↓"
+msgstr "↑ / ↓"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_KEYS.month
+msgctxt "SHORTCUT_KEYS.month"
+msgid "Page Up / Page Down"
+msgstr "Page Up / Page Down"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_KEYS.week_bounds
+msgctxt "SHORTCUT_KEYS.week_bounds"
+msgid "Home / End"
+msgstr "Home / End"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_KEYS.open_day
+msgctxt "SHORTCUT_KEYS.open_day"
+msgid "Enter"
+msgstr "Intro"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_KEYS.next_control
+msgctxt "SHORTCUT_KEYS.next_control"
+msgid "Tab"
+msgstr "Tab"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_KEYS.previous_control
+msgctxt "SHORTCUT_KEYS.previous_control"
+msgid "Shift+Tab"
+msgstr "Mayús+Tab"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_LABELS.search
+msgctxt "SHORTCUT_LABELS.search"
+msgid "Search notes"
+msgstr "Buscar notas"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_LABELS.capture
+msgctxt "SHORTCUT_LABELS.capture"
+msgid "New capture"
+msgstr "Nueva captura"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_LABELS.shortcuts
+msgctxt "SHORTCUT_LABELS.shortcuts"
+msgid "Keyboard shortcuts"
+msgstr "Atajos de teclado"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_LABELS.close
+msgctxt "SHORTCUT_LABELS.close"
+msgid "Clear search or close the navigation drawer"
+msgstr "Borrar la búsqueda o cerrar el panel de navegación"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_LABELS.day
+msgctxt "SHORTCUT_LABELS.day"
+msgid "Previous or next day"
+msgstr "Día anterior o siguiente"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_LABELS.week
+msgctxt "SHORTCUT_LABELS.week"
+msgid "Previous or next week"
+msgstr "Semana anterior o siguiente"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_LABELS.month
+msgctxt "SHORTCUT_LABELS.month"
+msgid "Previous or next month"
+msgstr "Mes anterior o siguiente"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_LABELS.week_bounds
+msgctxt "SHORTCUT_LABELS.week_bounds"
+msgid "First or last day of the week"
+msgstr "Primer o último día de la semana"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_LABELS.open_day
+msgctxt "SHORTCUT_LABELS.open_day"
+msgid "Open the focused day"
+msgstr "Abrir el día enfocado"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_LABELS.next_control
+msgctxt "SHORTCUT_LABELS.next_control"
+msgid "Move to the next control"
+msgstr "Pasar al control siguiente"
+
+#: src/afanes/i18n/ui/en.py SHORTCUT_LABELS.previous_control
+msgctxt "SHORTCUT_LABELS.previous_control"
+msgid "Move to the previous control"
+msgstr "Pasar al control anterior"
+
 #: src/afanes/i18n/ui/en.py VAULT_CLOSE_NOT_FORGOTTEN
 msgctxt "VAULT_CLOSE_NOT_FORGOTTEN"
 msgid "The vault was closed, but it could not be forgotten and may reopen next launch: {detail}"

@@ -61,13 +61,29 @@ raw rescue mode so the text is never lost.
 ## 🧭 Navigation and the primary menu
 
 The navigation region names the vault. Hovering the name shows its full folder path, so no status bar is
-needed. The primary menu above the destinations offers **Open Another Vault…**, **Create a New Vault…**, **Close Vault**, and **About Afanes**. **About Afanes** shows the application name, version, and license.
+needed. The primary menu above the destinations offers **Open Another Vault…**, **Create a New Vault…**, **Close Vault**, **Keyboard Shortcuts…**, and **About Afanes**. **Keyboard Shortcuts…** opens the grouped reference sheet. **About Afanes** shows the application name, version, and license.
 
 On a window narrower than 1100 pixels, the navigation moves behind a toggle in the browser header. A
 narrow browser presentation shows one region at a time: the browser comes first, and **Back** returns
 from a note to the browser. The window cannot shrink below 1024x600. On wider windows the browser
 keeps a share of the space beside the navigation and the detail takes the rest; both grow with the
 window, and page content fills the detail card instead of stopping at a fixed reading width.
+
+## ⌨️ Keyboard shortcuts
+
+**Keyboard Shortcuts…** in the primary menu, or **Ctrl+?**, opens one reference sheet. The sheet groups
+every workspace shortcut by context:
+
+| Group | Shortcuts |
+| --- | --- |
+| **General** | **Ctrl+F** search, **Ctrl+N** new capture, **Ctrl+?** shortcuts, **Esc** clear search or close the navigation drawer |
+| **Calendar** | Arrows move by day or week, **Page Up** / **Page Down** by month, **Home** / **End** to the week bounds, **Enter** opens the focused day |
+| **Navigation** | **Tab** and **Shift+Tab** move between controls |
+
+The sheet closes with **Close** or **Esc** and applies no command. Shortcuts are defined for the desktop
+window. In the browser presentation, the browser may intercept **Ctrl+F**, **Ctrl+N**, or **Ctrl+?**
+before the interface receives them; the primary menu remains the universal path to the shortcut
+reference and the browser's own find action stays authoritative.
 
 ## 🔍 Search
 

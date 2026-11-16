@@ -18,6 +18,7 @@ import afanes.core.preferences
 import afanes.core.vault.service
 import afanes.i18n.ui
 import afanes.ui.components.date_entry
+import afanes.ui.components.shortcuts
 import afanes.ui.components.toast
 import afanes.ui.state
 import afanes.ui.state.session
@@ -102,6 +103,7 @@ class AppShell:
         self.picker: ft.FilePicker | None = None
         self.workspace: afanes.ui.views.workspace.WorkspaceView | None = None
         self.date_dialog: afanes.ui.components.date_entry.DatePickerDialog | None = None
+        self.shortcut_sheet: afanes.ui.components.shortcuts.ShortcutSheet | None = None
         self.toast = afanes.ui.components.toast.ToastPresenter(page, self._handle_notice_action, copy=self.copy)
         self.refresh_task: asyncio.Task[None] | None = None
 
@@ -244,16 +246,35 @@ class AppShell:
         if self.date_dialog is not None:
             await self.date_dialog.handle_key(event)
             return
+        if self.shortcut_sheet is not None:
+            self._close_shortcut_for_key(event)
+            return
         key = (event.key or "").upper()
         if key == "ESCAPE":
-            if self.workspace is not None:
-                if await self.workspace.clear_search():
-                    return
-                self.workspace.close_drawer()
+            await self._handle_escape()
             return
+        await self._handle_global_shortcut(event, key)
+
+    def _close_shortcut_for_key(self, event: ft.KeyboardEvent) -> None:
+        """Close the shortcut sheet when the key is Esc."""
+        if (event.key or "").upper() == "ESCAPE":
+            self._close_shortcuts()
+
+    async def _handle_escape(self) -> None:
+        """Clear the search query, or close the navigation drawer."""
+        if self.workspace is None:
+            return
+        if await self.workspace.clear_search():
+            return
+        self.workspace.close_drawer()
+
+    async def _handle_global_shortcut(self, event: ft.KeyboardEvent, key: str) -> None:
+        """Run one global control or capture shortcut."""
         if not event.ctrl or self.workspace is None:
             return
-        if key == "F":
+        if key in {"?", "/"}:
+            await self.show_shortcuts()
+        elif key == "F":
             await self.workspace.focus_search()
         elif key == "N":
             await self.workspace.start_capture()
@@ -289,6 +310,27 @@ class AppShell:
                 on_dismiss=self._dialog_dismissed,
             ),
         )
+        self.page.update()
+
+    async def show_shortcuts(self) -> None:
+        """Show the grouped keyboard shortcut sheet."""
+        if self.shortcut_sheet is not None:
+            return
+        sheet = afanes.ui.components.shortcuts.ShortcutSheet(self._close_shortcuts, copy=self.copy)
+        sheet.dialog.on_dismiss = self._shortcuts_dismissed
+        self.shortcut_sheet = sheet
+        self.page.show_dialog(sheet.dialog)
+        self.page.update()
+
+    def _close_shortcuts(self) -> None:
+        """Close the shortcut sheet without applying a command."""
+        self.shortcut_sheet = None
+        self.page.pop_dialog()
+        self.page.update()
+
+    def _shortcuts_dismissed(self, _event: object = None) -> None:
+        """Forget a sheet closed by the dialog barrier or the window manager."""
+        self.shortcut_sheet = None
         self.page.update()
 
     async def _handle_notice_action(self, action: afanes.ui.state.status.NoticeAction) -> None:
@@ -389,6 +431,7 @@ class AppShell:
                     on_missing_role=self.show_role_reference_dialog,
                     pick_role=self.pick_role,
                     on_about=self.show_about_dialog,
+                    on_shortcuts=self.show_shortcuts,
                     on_notice=self.toast.show,
                     on_language=self.set_language,
                 )

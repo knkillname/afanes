@@ -1757,6 +1757,65 @@ class TestAdaptiveShell:
 
         assert calls == ["capture", "search"]
 
+    def test_ctrl_question_opens_the_shortcut_sheet_without_changing_the_destination(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        page = FakePage()
+        state = afanes.ui.state.app_state
+        section = state.browser.active_section
+
+        async def scenario() -> None:
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
+            assert page.on_keyboard_event is not None
+            await page.on_keyboard_event(_keyboard("?", ctrl=True))
+
+        asyncio.run(scenario())
+
+        assert state.browser.active_section is section
+        assert page.dialogs[-1].key == "shortcuts-dialog"
+        assert _find_by_key(page.dialogs[-1], "shortcuts-close") is not None
+
+    def test_the_shifted_slash_form_opens_the_shortcut_sheet(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        page = FakePage()
+
+        async def scenario() -> None:
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
+            assert page.on_keyboard_event is not None
+            await page.on_keyboard_event(_keyboard("/", ctrl=True))
+
+        asyncio.run(scenario())
+
+        assert page.dialogs[-1].key == "shortcuts-dialog"
+
+    def test_escape_closes_the_shortcut_sheet(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _use_settings_file(monkeypatch, tmp_path / "settings.json")
+        asyncio.run(afanes.ui.state.app_state.workspace.choose_vault(versioned(tmp_path / "vault")))
+        page = FakePage()
+
+        async def scenario() -> None:
+            await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
+            assert page.on_keyboard_event is not None
+            await page.on_keyboard_event(_keyboard("?", ctrl=True))
+            await page.on_keyboard_event(_keyboard("Escape", ctrl=False))
+
+        asyncio.run(scenario())
+
+        assert page.dialogs == []
+
     def test_escape_closes_the_navigation_drawer(
         self,
         tmp_path: Path,

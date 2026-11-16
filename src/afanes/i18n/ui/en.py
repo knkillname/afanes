@@ -57,6 +57,45 @@ ABOUT_ACTION = "About Afanes"
 ABOUT_TITLE = "About Afanes"
 ABOUT_VERSION = "Version {version}"
 ABOUT_LICENSE = "Licensed under the GNU Affero General Public License, version 3 or later"
+SHORTCUTS_ACTION = "Keyboard Shortcuts…"
+SHORTCUTS_TITLE = "Keyboard Shortcuts"
+SHORTCUT_GROUP_LABELS = MappingProxyType(
+    {
+        "general": "General",
+        "calendar": "Calendar",
+        "navigation": "Navigation",
+    }
+)
+SHORTCUT_KEYS = MappingProxyType(
+    {
+        "search": "Ctrl+F",
+        "capture": "Ctrl+N",
+        "shortcuts": "Ctrl+?",
+        "close": "Esc",
+        "day": "← / →",
+        "week": "↑ / ↓",
+        "month": "Page Up / Page Down",
+        "week_bounds": "Home / End",
+        "open_day": "Enter",
+        "next_control": "Tab",
+        "previous_control": "Shift+Tab",
+    }
+)
+SHORTCUT_LABELS = MappingProxyType(
+    {
+        "search": "Search notes",
+        "capture": "New capture",
+        "shortcuts": "Keyboard shortcuts",
+        "close": "Clear search or close the navigation drawer",
+        "day": "Previous or next day",
+        "week": "Previous or next week",
+        "month": "Previous or next month",
+        "week_bounds": "First or last day of the week",
+        "open_day": "Open the focused day",
+        "next_control": "Move to the next control",
+        "previous_control": "Move to the previous control",
+    }
+)
 VAULT_CLOSE_NOT_FORGOTTEN = "The vault was closed, but it could not be forgotten and may reopen next launch: {detail}"
 VAULT_SCHEMA_ADOPT_TITLE = "This Folder Can Be Adopted"
 VAULT_SCHEMA_ADOPT_BODY = (

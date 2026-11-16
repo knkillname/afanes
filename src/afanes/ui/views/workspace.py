@@ -79,6 +79,8 @@ class WorkspaceActions:
         Command that asks for an owner or requester name in read mode.
     on_about : collections.abc.Callable[[], collections.abc.Awaitable[None]] | None
         Command that shows the About dialog.
+    on_shortcuts : collections.abc.Callable[[], collections.abc.Awaitable[None]] | None
+        Command that shows the keyboard shortcut sheet.
     on_notice : collections.abc.Callable[[afanes.ui.state.status.Notice], None] | None
         Command that shows one transient notice, or ``None`` when the view is
         used without a toast presenter.
@@ -97,6 +99,7 @@ class WorkspaceActions:
     on_missing_role: Callable[[str], Awaitable[None]] | None = None
     pick_role: afanes.ui.views.page.PickRole | None = None
     on_about: Callable[[], Awaitable[None]] | None = None
+    on_shortcuts: Callable[[], Awaitable[None]] | None = None
     on_notice: Callable[[afanes.ui.state.status.Notice], None] | None = None
     on_language: Callable[[str | None], Awaitable[None] | None] | None = None
     pick_note_date: afanes.ui.components.date_entry.PickNoteDate | None = None
@@ -127,6 +130,7 @@ class WorkspaceView:
         self._on_new_reference = actions.on_new_reference
         self._on_log_entry = actions.on_log_entry
         self._on_about = actions.on_about
+        self._on_shortcuts = actions.on_shortcuts
         self._pick_date = actions.pick_date
         self._pick_note_date = actions.pick_note_date
         self._on_missing_role = actions.on_missing_role
@@ -196,6 +200,11 @@ class WorkspaceView:
                 content=self._state.status.copy.CLOSE_VAULT_ACTION,
                 on_click=self._close_vault,
                 key="workspace-close-vault",
+            ),
+            ft.PopupMenuItem(
+                content=self._state.status.copy.SHORTCUTS_ACTION,
+                on_click=self._shortcuts,
+                key="workspace-shortcuts",
             ),
             ft.PopupMenuItem(
                 content=self._state.status.copy.ABOUT_ACTION,
@@ -712,6 +721,12 @@ class WorkspaceView:
         if self._on_about is None:
             return
         await self._on_about()
+
+    async def _shortcuts(self) -> None:
+        """Show the keyboard shortcut sheet through the application shell."""
+        if self._on_shortcuts is None:
+            return
+        await self._on_shortcuts()
 
     async def start_capture(self) -> None:
         """Switch to the Inbox and focus the capture composer."""
