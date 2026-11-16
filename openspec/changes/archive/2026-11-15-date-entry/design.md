@@ -147,10 +147,13 @@ dialog and routes keys while it is open:
 - Year mode: arrows by year/row, PageUp/PageDown by decade, Home/End to the page ends.
 - Esc cancels; Enter confirms only while a grid cell is focused.
 
-The dialog tracks whether a grid cell has focus through the cells' `on_focus`/`on_blur`. The mode
-switch, header, and actions clear that flag, so Enter on those controls performs their own action.
-Tab reaches the mode switch, header, grid, and actions; arrows are the primary movement, so a
-31-tab walk is not required.
+The dialog tracks the focused cell as a `(kind, value)` record through the cells'
+`on_focus`/`on_blur`. The mode switch, header, and actions clear that record, so Enter on those
+controls performs their own action. Flet buttons do not take keyboard focus on a pointer tap, so a
+day, month, or year click records the clicked cell and explicitly focuses it after the repaint. Day
+and period cells are reused for selection-only updates, and a late blur from the previously focused
+cell is ignored unless the record still names it. Tab reaches the mode switch, header, grid, and
+actions; arrows are the primary movement, so a 31-tab walk is not required.
 
 ### D9: Field integration and write ownership
 
@@ -240,7 +243,8 @@ of the dialog.
 - `_anchor: datetime.date` — the selected date, including the hidden day used across modes.
 - `_precision: DatePrecision` — the mode and the output precision.
 - `_visible_year`, `_visible_month` — the rendered month grid.
-- `_grid_focused: bool` — whether Enter should confirm.
+- `_grid_focus_key: tuple[str, int] | None` — the focused cell's kind and value, or `None` when
+  Enter belongs to another control.
 - `_today: datetime.date` — a plain value, injectable for tests.
 - `_first_date`, `_last_date` — `date.min`/`date.max` by default.
 

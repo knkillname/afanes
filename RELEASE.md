@@ -76,7 +76,9 @@ postpone, and reminder one-shot date with the typed time preserved, keyboard
 navigation, Cancel, Esc, and outside click, the 1024x600 window, large text,
 the full date range, and the no-operating-system-notification check. The
 three-click retest passed: the accent contour moves with the clicked day, and
-today uses accent text and a bold weight instead of the contour.
+today uses accent text and a bold weight instead of the contour. The `0.12.0`
+release carries the same application code; only release metadata,
+documentation, and OpenSpec artifacts changed after this check.
 
 ### Advisory nightly builds
 
@@ -113,12 +115,12 @@ records the limitation in the release notes.
 - The first development desktop run may fetch the Flet client once as
   provisioning; a packaged build bundles the client and starts offline.
 - There is no cloud sync, account, telemetry, or hidden network call.
-- `0.11.0` is the current version. Intermediate `0.x` releases group completed
+- `0.12.0` is the current version. Intermediate `0.x` releases group completed
   work; no future `0.x` version is named as a checkpoint.
 
 ## Version path
 
-`0.11.0` is the current version. An archive that completes a coherent group of
+`0.12.0` is the current version. An archive that completes a coherent group of
 work is a MINOR release; an archive that completes no milestone keeps its entry
 under `Unreleased` and does not bump the version. `1.0.0` follows only when every
 row in the unified gate is green. The maintainer confirms the transition after

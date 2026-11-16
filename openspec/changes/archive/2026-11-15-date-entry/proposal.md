@@ -29,8 +29,8 @@ where it appears, with a picker that cannot meet the interface standard.
 - Localization: month names, weekday labels, the selected caption, the mode switch, and the
   current-period action follow the active locale; the calendar is Monday-first in both languages;
   the chosen date is locale-independent.
-- Theme: tokens only, neutral selected day, accent today and focus, and an outlined **Select**
-  action. No new conformance baseline entries.
+- Theme: tokens only, neutral selected day, accent today text, a focus ring, and an outlined
+  **Select** action. No new conformance baseline entries.
 - Record the picker dialog as a bounded difference: Flet exposes no anchored popover or anchor
   geometry, so the calendar is a dialog rather than a reference popover.
 - Keep ISO in the fields; typed ISO remains valid. The picker only supplies a value; the existing

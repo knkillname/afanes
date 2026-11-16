@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-15
+
+### Added
+
+- **One shared date picker across every date field.** The Page Date, Page Due, Processing due,
+  Review postpone, and reminder one-shot fields now embed the same calendar action, and the
+  read-mode note date, project due date, and step plan use the same dialog. The unthemed Material
+  `DatePicker` is gone. The Page Date supports Day, Month, and Year precision with day-of-month
+  clamping; every other date field is day-only. The picker is Monday-first in English and Spanish,
+  supports the full `datetime.date` range, and offers keyboard navigation, a selected caption,
+  Cancel and Select, and an outside-click discard. The read-mode note date gains its **Add Date…**
+  and **Change Date…** action. Selection uses the neutral selected-row fill, today uses accent text
+  and a bold weight, and focus uses the accent ring. The calendar is a dialog because Flet exposes
+  no anchored popover; the interface standard records it as the sixth bounded difference. Typed ISO
+  remains valid and the picker only supplies the value, so the existing validation, save, rename,
+  and move paths stay authoritative. No new dependency, network call, operating-system
+  notification, schema change, or public API removal; `AppShell.pick_note_date` is additive and
+  `AppShell.pick_date` keeps its signature. This implements the `date-entry` OpenSpec change.
+  Resolved runtime dependencies: `flet==1.1.2`, `markdown-it-py==4.3.0`, `PyYAML==6.0.3`,
+  `tzdata==2026.6`, `tzlocal==5.4.5`. README: updated. Docs: updated.
+
 ## [0.11.0] - 2026-11-14
 
 ### Added

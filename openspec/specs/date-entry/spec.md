@@ -1,11 +1,11 @@
-# Spec Delta
+# date-entry Specification
 
 ## Purpose
 
 A shared, localized, keyboard-accessible date entry and calendar dialog used by every date input in
 the interface.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Every date input offers the shared calendar action
 
@@ -236,20 +236,20 @@ Monday-first in both languages. The chosen `NoteDate` SHALL be locale-independen
 ### Requirement: The picker follows the visual standard and stays offline
 
 The picker SHALL use interface tokens, the neutral selected-row fill for the selected cell, accent
-focus and today cues, and an outlined Select action. It SHALL add no conformance baseline entry, no
-network call, and no operating-system notification. The dialog SHALL be recorded as the bounded
-dialog-versus-popover difference.
+text and a bold weight for today, the accent ring for focus, and an outlined Select action. It SHALL
+add no conformance baseline entry, no network call, and no operating-system notification. The dialog
+SHALL be recorded as the bounded dialog-versus-popover difference.
 
 #### Scenario: Values come from the tokens
 
 - **WHEN** the picker renders
 - **THEN** its colors, spacing, radii, sizes, and widths come from the interface token module
 
-#### Scenario: Selection and today do not rely on hue
+#### Scenario: Selection, today, and focus do not rely on hue
 
-- **WHEN** the selected day and today are shown
-- **THEN** selection uses the neutral selected-row fill and today uses an outline or other non-color
-  cue in addition to the accent
+- **WHEN** the selected day, today, and a focused day are shown
+- **THEN** selection uses the neutral selected-row fill, today uses accent text and a bold weight,
+  and focus uses the accent ring
 
 #### Scenario: The baseline does not grow
 

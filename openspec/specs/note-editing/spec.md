@@ -246,6 +246,25 @@ the selected type. An invalid label value SHALL block the save and show an inlin
 - **WHEN** the Date field contains a malformed value
 - **THEN** the warning from `note-model` is shown and the save is blocked until it is valid
 
+#### Scenario: The Date field offers the precision-aware calendar action
+
+- **WHEN** a note, reference, project, or log is edited
+- **THEN** the Date field embeds the calendar action and the shared picker offers day, month, and year
+  precision
+
+#### Scenario: The Due date field offers the day-only calendar action
+
+- **WHEN** a project is edited
+- **THEN** the Due date field embeds the calendar action and the shared picker offers day precision
+  only
+
+#### Scenario: A picked date follows the existing save path
+
+- **WHEN** the user confirms a Date or Due date value in the picker
+- **THEN** the field runs its existing validation and save command
+- **AND WHEN** the user cancels the picker
+- **THEN** no label value changes
+
 ### Requirement: The label form flows and fills the page pane
 
 Edit mode SHALL lay out every visible label control, including the **Starter** control of a new log draft, in one adaptive flow. Visible controls SHALL share the available row width and grow to fill it. Controls SHALL wrap onto another row only when the pane cannot fit their minimum widths, without horizontal scrolling. The body field SHALL fill the remaining width and height below the label flow.
@@ -700,7 +719,10 @@ Step row text SHALL render inline Markdown, including internal references. A tap
 
 ### Requirement: Step rows expose plan and owner actions
 
-Every step row SHALL expose a calendar action and a person action. The calendar action SHALL set or clear the step's plan date. The person action SHALL manage the complete owner list. Both actions SHALL be present but muted at rest, SHALL become emphasized on hover or keyboard focus, and SHALL remain reachable on touch devices.
+Every step row SHALL expose a calendar action and a person action. The calendar action SHALL set or
+clear the step's plan date. The calendar action SHALL open the shared day-only date picker. The
+person action SHALL manage the complete owner list. Both actions SHALL be present but muted at rest,
+SHALL become emphasized on hover or keyboard focus, and SHALL remain reachable on touch devices.
 
 #### Scenario: The plan date is set
 
@@ -737,9 +759,14 @@ Every step row SHALL expose a calendar action and a person action. The calendar 
 - **WHEN** a plan or owner write fails
 - **THEN** the page reports the failure and the step keeps its previous metadata
 
+#### Scenario: The calendar action opens the day-only picker
+
+- **WHEN** the user activates a step's calendar action
+- **THEN** the shared picker opens with the step's plan date and day precision only
+
 ### Requirement: Project page shows status and due date
 
-Read mode SHALL show a project meta row under the page title with its status and optional due date. The due date SHALL expose a calendar action that sets or clears it. The action SHALL be present but muted at rest and emphasized on hover or keyboard focus. The due-date field SHALL remain available in edit mode.
+Read mode SHALL show a project meta row under the page title with its status and optional due date. The due date SHALL expose a calendar action that sets or clears it. The action SHALL be present but muted at rest and emphasized on hover or keyboard focus. The due-date field SHALL remain available in edit mode. The edit-mode due-date field SHALL offer the same day-only calendar action.
 
 #### Scenario: The due date is shown
 
@@ -770,6 +797,17 @@ Read mode SHALL show a project meta row under the page title with its status and
 
 - **WHEN** a note or reference is open in read mode
 - **THEN** no project status or due-date control is shown
+
+#### Scenario: The due date edit field offers the day-only picker
+
+- **WHEN** a project is edited
+- **THEN** the Due date field embeds the calendar action and the shared picker offers day precision
+  only
+
+#### Scenario: Read and edit modes share the due-date picker
+
+- **WHEN** either the read-mode due-date action or the edit-mode field action opens
+- **THEN** the same day-only picker opens with the current due date
 
 ### Requirement: The project meta row shows the requester
 
@@ -1016,8 +1054,9 @@ While a page is open, a change made to its file outside the application SHALL be
 ### Requirement: Read mode shows the note date
 
 Read mode SHALL show the note's `date` in the page meta row for every note. A project SHALL also show
-its `due_date` as a separate value. A missing date SHALL show an add-date action, and a malformed
-date SHALL show the warning defined by `note-model`.
+its `due_date` as a separate value. A missing date SHALL show a calendar add-date action, and a dated
+note SHALL show a calendar change-date action. The action SHALL open the shared precision-aware date
+picker. A malformed date SHALL show the warning defined by `note-model`.
 
 #### Scenario: A dated note shows its date
 
@@ -1038,6 +1077,23 @@ date SHALL show the warning defined by `note-model`.
 
 - **WHEN** a note declares `date: last Tuesday`
 - **THEN** the meta row reports the invalid value
+
+#### Scenario: A dated note offers the change action
+
+- **WHEN** a note declares a valid `date`
+- **THEN** the meta row shows the change-date action
+
+#### Scenario: The note date action opens the precision-aware picker
+
+- **WHEN** the user activates the add-date or change-date action
+- **THEN** the shared picker opens with the current date and day, month, and year precision
+
+#### Scenario: A picked note date follows the existing save path
+
+- **WHEN** the user confirms a date from the note date picker
+- **THEN** the existing date save, rename, and move path runs
+- **AND WHEN** the user cancels the picker
+- **THEN** the note date and the vault are unchanged
 
 ### Requirement: Read mode ends with the Connections section
 

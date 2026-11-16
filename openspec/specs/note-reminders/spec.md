@@ -391,6 +391,26 @@ suggest the last-day or last-weekday choice. Cancelling SHALL write nothing.
 - **WHEN** the user cancels the reminder editor
 - **THEN** no file is created, changed, or removed
 
+#### Scenario: The one-shot date offers the day-only picker
+
+- **WHEN** the user edits the date portion of a one-shot reminder
+- **THEN** the field embeds the calendar action and the shared picker offers day precision only
+
+#### Scenario: The date picker preserves the typed time
+
+- **WHEN** the user confirms a day from the one-shot picker
+- **THEN** the one-shot date changes and the previously typed time is preserved
+
+#### Scenario: A typed one-shot remains valid
+
+- **WHEN** the user types a valid one-shot value into the field
+- **THEN** the existing save path runs without opening the picker
+
+#### Scenario: Cancelling the one-shot picker writes nothing
+
+- **WHEN** the user cancels the one-shot picker
+- **THEN** the one-shot field and the page are unchanged
+
 ### Requirement: A reminder can be removed with Undo
 
 Removing a reminder SHALL take effect immediately and SHALL offer Undo in a toast. Undo SHALL

@@ -34,6 +34,7 @@ Processing SHALL operate only on a note under `inbox/` and SHALL require an expl
 
 - **WHEN** processing targets a note outside `inbox/`
 - **THEN** the application reports an error and changes no file
+
 ### Requirement: The outcome set is fixed
 
 A processed capture SHALL become exactly one of Trash, Later, Reference, Project, Log entry, Append
@@ -133,7 +134,7 @@ When the user marks a capture non-actionable, it SHALL become Trash, Later, or R
 
 ### Requirement: Project metadata and steps
 
-A project outcome SHALL become `type: project` with a status and an optional due date. Its steps are checkbox items in its body. Processing SHALL preserve any task list item carried by the capture and MUST NOT create steps in another note unless the user chooses Append step.
+A project outcome SHALL become `type: project` with a status and an optional due date. Its steps are checkbox items in its body. Processing SHALL preserve any task list item carried by the capture and MUST NOT create steps in another note unless the user chooses Append step. The optional due date SHALL offer the shared day-only calendar action, and its typed ISO field SHALL remain valid.
 
 #### Scenario: Project is filed flat
 
@@ -159,6 +160,23 @@ A project outcome SHALL become `type: project` with a status and an optional due
 
 - **WHEN** a project note is written
 - **THEN** it does not declare a `project` key
+
+#### Scenario: The due date offers the day-only picker
+
+- **WHEN** a project outcome shows its optional due date field
+- **THEN** the field embeds the calendar action and the shared picker offers day precision only
+
+#### Scenario: A picked due date fills the processing field
+
+- **WHEN** the user confirms a day from the due date picker
+- **THEN** the due date field receives that ISO day and the existing preview and apply path uses it
+- **AND WHEN** the user cancels the picker
+- **THEN** the due date field and the capture are unchanged
+
+#### Scenario: A typed due date remains valid
+
+- **WHEN** the user types a valid ISO day into the due date field
+- **THEN** the existing preview and apply validation runs without opening the picker
 
 ### Requirement: Project outcomes accept role names
 

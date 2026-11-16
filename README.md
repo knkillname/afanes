@@ -90,6 +90,7 @@ The full walkthrough is in
 - [Pages, editing, and reminders](https://github.com/knkillname/afanes/blob/main/docs/guide/pages-and-editing.md)
 - [Review](https://github.com/knkillname/afanes/blob/main/docs/guide/review.md)
 - [Log](https://github.com/knkillname/afanes/blob/main/docs/guide/log.md)
+- [Dates](https://github.com/knkillname/afanes/blob/main/docs/guide/dates.md)
 - [Vault format](https://github.com/knkillname/afanes/blob/main/docs/reference/vault-format.md)
 - [Command line](https://github.com/knkillname/afanes/blob/main/docs/guide/command-line.md)
 - [Browser mode](https://github.com/knkillname/afanes/blob/main/docs/guide/browser-mode.md)
