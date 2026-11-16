@@ -35,13 +35,19 @@ A capture under `inbox/` appears only under **Inbox**. A log entry appears under
 `trash/` appears in no active-note group; only a managed entry appears under **Trash**. A file under
 `templates/` is a template card rather than a note. Selecting an entry opens it in the detail region
 without changing the browser destination. In the **Review** destination, the browser shows the snapshot
-queue instead of the note groups.
+queue instead of the note groups. Every queue card is a keyboard-focusable row: **Tab** reaches the
+cards in queue order, the accent ring marks the focused card, and **Enter** or **Space** selects it
+without changing any review record.
 
 **Trash** lists one row per managed entry. Selecting a row opens the note read-only with its birthplace
 and trashed day. **Restore** returns it to the birthplace, and **Delete Permanently…** sits in the
 secondary menu. When managed entries exist, **Empty Trash…** appears in the browser header. Both delete
 actions ask for confirmation and place Cancel first. The Trash destination remains usable in a
 read-only vault; maintenance failures appear in a persistent banner.
+
+Moving a page to Trash keeps the keyboard in the browser. Focus moves to the next visible note row, or
+to the previous row when none follows; when the browser has no rows left, focus moves to the search
+field. The active destination and any search query stay unchanged.
 
 The **Log** section offers a calendar and a collapsed date tree instead of a flat list. **Entries** shows
 only log notes; **Everything** is a date lens over every parsed note. **Today’s Entry** opens today's

@@ -604,7 +604,7 @@ class TestBrowserSearch:
         view.search_field.value = "countess"
         asyncio.run(_change_handler(view.search_field)())
 
-        titles = [control.title for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        titles = _active_titles(view)
         assert titles == ["Ada, Countess of Lovelace"]
 
     def test_filters_by_identity_and_ignores_whitespace(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -617,7 +617,7 @@ class TestBrowserSearch:
         asyncio.run(_change_handler(view.search_field)())
 
         assert afanes.ui.state.app_state.browser.query == "Ada,   Lovelace"
-        titles = [control.title for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        titles = _active_titles(view)
         assert titles == ["A person"]
 
     def test_body_only_term_lists_the_note(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -865,7 +865,7 @@ class TestGlobalSearch:
         view.search_field.value = "shared term"
         asyncio.run(_change_handler(view.search_field)())
 
-        titles = [control.title for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        titles = _active_titles(view)
         assert set(titles) == {"Buy milk", "Launch", "Ada"}
         headings = _texts(view.browser_list)
         assert "Inbox (1)" in headings
@@ -975,7 +975,7 @@ class TestGlobalSearch:
         view.search_field.value = ""
         asyncio.run(_change_handler(view.search_field)())
 
-        titles = [control.title for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        titles = _active_titles(view)
         assert titles == ["Two", "One"]
 
     def test_switching_destinations_clears_the_query(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1115,6 +1115,33 @@ class TestReviewQueue:
     def _queue_titles(self, view: afanes.ui.views.workspace.WorkspaceView) -> list[str]:
         return [_texts(card)[0] for card in self._queue_cards(view)]
 
+    def _card_button(self, card: ft.Container) -> ft.TextButton:
+        button = card.content
+        assert isinstance(button, ft.TextButton)
+        return button
+
+    def test_every_card_is_a_focusable_button_in_queue_order(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        view = self._open_review(tmp_path, monkeypatch)
+        cards = self._queue_cards(view)
+
+        buttons = [self._card_button(card) for card in cards]
+
+        assert [button.key for button in buttons] == [f"review-card-{index}" for index in range(len(cards))]
+        assert all(button.content is not None for button in buttons)
+
+    def test_focus_and_blur_paint_the_card_ring(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        view = self._open_review(tmp_path, monkeypatch)
+        card = self._queue_cards(view)[0]
+        button = self._card_button(card)
+
+        asyncio.run(typing.cast("Callable[[object], Coroutine[typing.Any, typing.Any, None]]", button.on_focus)(None))
+        assert card.border == ft.Border.all(afanes.ui.theme.FOCUS_RING_WIDTH, afanes.ui.theme.FOCUS_RING_COLOR)
+
+        asyncio.run(typing.cast("Callable[[object], Coroutine[typing.Any, typing.Any, None]]", button.on_blur)(None))
+        assert card.border == ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR)
+
     def test_the_queue_follows_the_session_order(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         view = self._open_review(tmp_path, monkeypatch)
         session = afanes.ui.state.app_state.review.review_session
@@ -1155,7 +1182,7 @@ class TestReviewQueue:
         state = afanes.ui.state.app_state
         cards = self._queue_cards(view)
 
-        asyncio.run(_handler(cards[1])())
+        asyncio.run(_handler(self._card_button(cards[1]))())
 
         session = state.review.review_session
         assert session is not None
@@ -1209,6 +1236,121 @@ class TestReviewQueue:
             None,
         )
         return note.title if note is not None else item.path.stem
+
+
+def _note_rows(view: afanes.ui.views.workspace.WorkspaceView) -> list[ft.TextButton]:
+    return [
+        control
+        for control in view.browser_list.controls
+        if isinstance(control, ft.TextButton)
+        and isinstance(control.data, dict)
+        and isinstance(control.data.get("path"), Path)
+    ]
+
+
+def _record_row_focus(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    focused: list[str] = []
+
+    async def record(row: ft.TextButton) -> None:
+        focused.append(str(row.key or ""))
+
+    monkeypatch.setattr(ft.TextButton, "focus", record)
+    return focused
+
+
+class TestFocusAfterTrash:
+    def test_focus_moves_to_the_next_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        for name in ("Alpha", "Beta", "Gamma"):
+            _write_note(vault / "inbox" / f"{name}.md", body=f"# {name}")
+        view = _open_workspace(tmp_path, monkeypatch)
+        rows = _note_rows(view)
+        target = rows[1]
+        expected = rows[2].key
+        asyncio.run(afanes.ui.state.app_state.navigation.open_page(typing.cast("Path", target.data["path"])))
+        view.refresh()
+        focused = _record_row_focus(monkeypatch)
+
+        asyncio.run(view.page_view.trash_page())
+
+        assert focused == [expected]
+        assert afanes.ui.state.app_state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
+
+    def test_focus_falls_back_to_the_previous_row(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        for name in ("Alpha", "Beta", "Gamma"):
+            _write_note(vault / "inbox" / f"{name}.md", body=f"# {name}")
+        view = _open_workspace(tmp_path, monkeypatch)
+        rows = _note_rows(view)
+        target = rows[-1]
+        expected = rows[-2].key
+        asyncio.run(afanes.ui.state.app_state.navigation.open_page(typing.cast("Path", target.data["path"])))
+        view.refresh()
+        focused = _record_row_focus(monkeypatch)
+
+        asyncio.run(view.page_view.trash_page())
+
+        assert focused == [expected]
+
+    def test_an_empty_browser_focuses_search(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "inbox" / "Only.md", body="# Only")
+        view = _open_workspace(tmp_path, monkeypatch)
+        target = _note_rows(view)[0]
+        asyncio.run(afanes.ui.state.app_state.navigation.open_page(typing.cast("Path", target.data["path"])))
+        view.refresh()
+        focused: list[str] = []
+
+        async def record(field: ft.TextField) -> None:
+            focused.append(str(field.key or ""))
+
+        monkeypatch.setattr(ft.TextField, "focus", record)
+
+        asyncio.run(view.page_view.trash_page())
+
+        assert focused == ["browser-search"]
+        assert _note_rows(view) == []
+
+    def test_an_active_query_and_destination_survive(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        vault = tmp_path / "vault"
+        for name in ("Alpha", "Beta", "Gamma"):
+            _write_note(vault / "inbox" / f"{name}.md", body=f"# {name}")
+        view = _open_workspace(tmp_path, monkeypatch)
+        state = afanes.ui.state.app_state
+        asyncio.run(state.browser.set_query("a"))
+        view.refresh()
+        rows = _note_rows(view)
+        target = rows[0]
+        expected = rows[1].key
+        asyncio.run(state.navigation.open_page(typing.cast("Path", target.data["path"])))
+        view.refresh()
+        focused = _record_row_focus(monkeypatch)
+
+        asyncio.run(view.page_view.trash_page())
+
+        assert focused == [expected]
+        assert state.browser.query == "a"
+        assert state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.INBOX
+
+    def test_a_grouped_browser_falls_back_within_the_rendered_order(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vault = tmp_path / "vault"
+        _write_note(vault / "reference" / "Ada.md", note_type="reference", category="people", body="# Ada")
+        _write_note(vault / "reference" / "Paris.md", note_type="reference", category="places", body="# Paris")
+        view = _open_workspace(tmp_path, monkeypatch)
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.REFERENCES])())
+        rows = _note_rows(view)
+        target = rows[-1]
+        expected = rows[-2].key
+        asyncio.run(afanes.ui.state.app_state.navigation.open_page(typing.cast("Path", target.data["path"])))
+        view.refresh()
+        focused = _record_row_focus(monkeypatch)
+
+        asyncio.run(view.page_view.trash_page())
+
+        assert focused == [expected]
+        assert afanes.ui.state.app_state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REFERENCES
 
 
 class TestAdaptiveLayout:
@@ -1400,8 +1542,30 @@ class TestAdaptiveLayout:
         assert view.root.controls == [view.shell_column]
 
 
-def _row_for(browser: ft.ListView, title: str) -> ft.ListTile:
-    return next(control for control in browser.controls if isinstance(control, ft.ListTile) and control.title == title)
+def _row_for(browser: ft.ListView, title: str) -> ft.TextButton:
+    return next(
+        control
+        for control in browser.controls
+        if isinstance(control, ft.TextButton) and isinstance(control.data, dict) and control.data.get("title") == title
+    )
+
+
+def _active_titles(view: afanes.ui.views.workspace.WorkspaceView) -> list[str]:
+    return [
+        str(control.data["title"])
+        for control in view.browser_list.controls
+        if isinstance(control, ft.TextButton) and isinstance(control.data, dict) and "title" in control.data
+    ]
+
+
+def _visible_titles(view: afanes.ui.views.workspace.WorkspaceView) -> list[str]:
+    titles: list[str] = []
+    for control in view.browser_list.controls:
+        if isinstance(control, ft.TextButton) and isinstance(control.data, dict) and "title" in control.data:
+            titles.append(str(control.data["title"]))
+        elif isinstance(control, ft.ListTile) and isinstance(control.title, str):
+            titles.append(control.title)
+    return titles
 
 
 def _texts(control: ft.Control) -> list[str]:
@@ -1903,7 +2067,7 @@ class TestTrashPageNavigation:
         ]
         assert afanes.i18n.ui.en.WORKSPACE_SECTION_LABELS["references"] + " (1)" in headings
         assert afanes.i18n.ui.en.TRASH_TITLE + " (1)" in headings
-        titles = [control.title for control in view.browser_list.controls if isinstance(control, ft.ListTile)]
+        titles = _visible_titles(view)
         assert titles == ["Active cedar", "Trashed cedar"]
 
 

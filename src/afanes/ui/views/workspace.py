@@ -418,6 +418,7 @@ class WorkspaceView:
                 on_missing_role=self._on_missing_role,
                 pick_role=self._pick_role,
                 on_back=self._back_to_browser_if_empty,
+                on_trash=self._trash_open_page,
             )
         )
         self.detail_title = ft.Text(
@@ -624,6 +625,63 @@ class WorkspaceView:
             await self._back_to_browser()
             return True
         return False
+
+    async def _trash_open_page(self) -> None:
+        """Trash the open page and restore focus to the browser.
+
+        Notes
+        -----
+        The browser order is recorded before the move so focus can land on the
+        row that takes the removed row's place. No destination, query, or note
+        other than the trashed page is changed.
+        """
+        page = self._state.pages.page
+        path = page.path if page is not None else None
+        rows = self._note_rows()
+        index = next((index for index, row in enumerate(rows) if self._row_path(row) == path), None)
+        moved = await self._state.dialogs.trash_page()
+        if not moved:
+            self._on_page_update()
+            return
+        self._show_detail = False
+        self._render_shell()
+        self._refresh_dynamic()
+        self._update()
+        if index is not None:
+            await self._focus_after_trash(index)
+
+    def _note_rows(self) -> list[ft.TextButton]:
+        """Return the visible note rows in browser order."""
+        return [
+            control
+            for control in self.browser_list.controls
+            if isinstance(control, ft.TextButton) and self._row_path(control) is not None
+        ]
+
+    @staticmethod
+    def _row_path(row: ft.Control) -> Path | None:
+        """Return the note path carried by one browser row."""
+        data = row.data
+        if not isinstance(data, dict):
+            return None
+        path = data.get("path")
+        return path if isinstance(path, Path) else None
+
+    async def _focus_after_trash(self, index: int) -> None:
+        """Focus the next row, the previous row, or the search field."""
+        rows = self._note_rows()
+        target = None
+        if index < len(rows):
+            target = rows[index]
+        elif index > 0 and rows:
+            target = rows[index - 1]
+        if target is not None:
+            try:
+                await target.focus()
+            except RuntimeError:
+                return
+            return
+        await self._focus(self.search_field)
 
     def build(self) -> ft.Control:
         """Return the root control for the workspace.
@@ -1232,13 +1290,13 @@ class WorkspaceView:
                     style=afanes.ui.theme.TEXT_ROLES["caption-heading"],
                 )
             )
-        return ft.Container(
+        row = ft.Container(
             key=f"review-queue-{index}",
             bgcolor=afanes.ui.theme.SELECTED_ROW_COLOR if current else afanes.ui.theme.SURFACE_CONTAINER_COLOR,
             border=ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR),
             border_radius=afanes.ui.theme.SURFACE_RADIUS,
-            padding=afanes.ui.theme.ITEM_GAP,
-            on_click=self._review_select_handler(index),
+        )
+        row.content = ft.TextButton(
             content=ft.Column(
                 controls=[
                     ft.Text(self._review_item_title(item), style=afanes.ui.theme.TEXT_ROLES["heading"]),
@@ -1249,8 +1307,42 @@ class WorkspaceView:
                     ),
                 ],
                 spacing=afanes.ui.theme.BORDER_WIDTH,
+                expand=True,
             ),
+            style=ft.ButtonStyle(
+                padding=afanes.ui.theme.ITEM_GAP,
+                alignment=ft.Alignment.CENTER_LEFT,
+                shape=ft.RoundedRectangleBorder(radius=afanes.ui.theme.SURFACE_RADIUS),
+                overlay_color={
+                    ft.ControlState.FOCUSED: afanes.ui.theme.TRANSPARENT_COLOR,
+                    ft.ControlState.HOVERED: afanes.ui.theme.HOVER_COLOR,
+                    ft.ControlState.PRESSED: afanes.ui.theme.SPLASH_COLOR,
+                },
+            ),
+            on_focus=self._review_focus_handler(row),
+            on_blur=self._review_blur_handler(row),
+            on_click=self._review_select_handler(index),
+            key=f"review-card-{index}",
         )
+        return row
+
+    def _review_focus_handler(self, row: ft.Container) -> Callable[[object], Awaitable[None]]:
+        """Bind the accent focus ring to one review card."""
+
+        async def handle(_event: object = None) -> None:
+            row.border = ft.Border.all(afanes.ui.theme.FOCUS_RING_WIDTH, afanes.ui.theme.FOCUS_RING_COLOR)
+            self._update()
+
+        return handle
+
+    def _review_blur_handler(self, row: ft.Container) -> Callable[[object], Awaitable[None]]:
+        """Clear the accent focus ring when a review card loses focus."""
+
+        async def handle(_event: object = None) -> None:
+            row.border = ft.Border.all(afanes.ui.theme.BORDER_WIDTH, afanes.ui.theme.BORDER_COLOR)
+            self._update()
+
+        return handle
 
     def _review_select_handler(self, index: int) -> Callable[[], Awaitable[None]]:
         """Bind a no-argument async handler that makes one queue item current."""
@@ -1542,16 +1634,74 @@ class WorkspaceView:
             await self.log_calendar.focus_date(target)
 
     def _note_row(self, note: VaultNote) -> ft.Control:
-        """Build one clickable browser entry."""
+        """Build one focusable browser entry."""
         page = self._state.pages.page
         selected = page is not None and page.path == note.path
-        return ft.ListTile(
-            title=note.title,
-            subtitle=note.relative_path.as_posix(),
-            leading=ft.Icons.DESCRIPTION_OUTLINED,
-            selected=selected,
+        button = ft.TextButton(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.DESCRIPTION_OUTLINED),
+                    ft.Column(
+                        controls=[
+                            ft.Text(note.title, style=afanes.ui.theme.TEXT_ROLES["heading"]),
+                            ft.Text(note.relative_path.as_posix(), style=afanes.ui.theme.TEXT_ROLES["caption"]),
+                        ],
+                        spacing=0,
+                        expand=True,
+                    ),
+                ],
+                spacing=afanes.ui.theme.ITEM_GAP,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            style=self._note_row_style(selected=selected, focused=False),
             on_click=self._select_handler(note.path),
+            data={"path": note.path, "title": note.title},
+            key=f"note-row-{note.relative_path.as_posix()}",
         )
+        button.on_focus = self._note_focus_handler(button, selected=selected)
+        button.on_blur = self._note_blur_handler(button, selected=selected)
+        return button
+
+    @staticmethod
+    def _note_row_style(*, selected: bool, focused: bool) -> ft.ButtonStyle:
+        """Build the browser row style with the selected and focus marks."""
+        return ft.ButtonStyle(
+            bgcolor=afanes.ui.theme.SELECTED_ROW_COLOR if selected else afanes.ui.theme.TRANSPARENT_COLOR,
+            side=(
+                afanes.ui.theme.CALENDAR_FOCUS_SIDE
+                if focused
+                else ft.BorderSide(afanes.ui.theme.FOCUS_RING_WIDTH, afanes.ui.theme.TRANSPARENT_COLOR)
+            ),
+            padding=ft.Padding.symmetric(
+                horizontal=afanes.ui.theme.ITEM_GAP,
+                vertical=afanes.ui.theme.ITEM_GAP,
+            ),
+            alignment=ft.Alignment.CENTER_LEFT,
+            shape=ft.RoundedRectangleBorder(radius=afanes.ui.theme.CONTROL_RADIUS),
+            overlay_color={
+                ft.ControlState.FOCUSED: afanes.ui.theme.TRANSPARENT_COLOR,
+                ft.ControlState.HOVERED: afanes.ui.theme.HOVER_COLOR,
+                ft.ControlState.PRESSED: afanes.ui.theme.SPLASH_COLOR,
+            },
+        )
+
+    def _note_focus_handler(self, button: ft.TextButton, *, selected: bool) -> Callable[[object], Awaitable[None]]:
+        """Bind the accent ring to one browser row."""
+
+        async def handle(_event: object = None) -> None:
+            button.style = self._note_row_style(selected=selected, focused=True)
+            self._update()
+
+        return handle
+
+    def _note_blur_handler(self, button: ft.TextButton, *, selected: bool) -> Callable[[object], Awaitable[None]]:
+        """Clear the accent ring when a browser row loses focus."""
+
+        async def handle(_event: object = None) -> None:
+            button.style = self._note_row_style(selected=selected, focused=False)
+            self._update()
+
+        return handle
 
     def _select_handler(self, path: Path) -> Callable[[], Awaitable[None]]:
         """Bind a no-argument async handler to one note path."""

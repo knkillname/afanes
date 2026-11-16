@@ -15,9 +15,9 @@
 
 ## 3. Review cards and focus after trash
 
-- [ ] 3.1 Replace the pointer-only Review card with the focusable row pattern, including the visible focus ring and keyboard activation; verify Review tests cover focus order, activation, current-item marking, and unchanged review records.
-- [ ] 3.2 Record the browser’s visible note order before a trash, then focus the next row, previous row, or search field after the move; verify tests cover next, previous, empty, grouped, and active-query cases without changing the destination or query.
-- [ ] 3.3 Document Review-card keyboard access and the post-trash focus rule in `docs/guide/workspace.md`; verify `hatch run docs:build` passes.
+- [x] 3.1 Replace the pointer-only Review card with the focusable row pattern, including the visible focus ring and keyboard activation; verify Review tests cover focus order, activation, current-item marking, and unchanged review records.
+- [x] 3.2 Record the browser’s visible note order before a trash, then focus the next row, previous row, or search field after the move; verify tests cover next, previous, empty, grouped, and active-query cases without changing the destination or query.
+- [x] 3.3 Document Review-card keyboard access and the post-trash focus rule in `docs/guide/workspace.md`; verify `hatch run docs:build` passes.
 
 ## 4. Accessible names and live regions
 

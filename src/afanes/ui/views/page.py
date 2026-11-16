@@ -66,6 +66,8 @@ class PageActions:
     on_back : collections.abc.Callable[[], collections.abc.Awaitable[bool]] | None
         Optional fallback tried before the page history. It returns ``True``
         when the host handled the back request itself.
+    on_trash : collections.abc.Callable[[], collections.abc.Awaitable[None]] | None
+        Command that moves the open page to Trash and restores browser focus.
     pick_note_date : afanes.ui.components.date_entry.PickNoteDate | None
         Command that opens the precision-aware date picker, or ``None`` when
         the host does not provide one.
@@ -78,6 +80,7 @@ class PageActions:
     pick_role: PickRole | None = None
     on_back: Callable[[], Awaitable[bool]] | None = None
     pick_note_date: afanes.ui.components.date_entry.PickNoteDate | None = None
+    on_trash: Callable[[], Awaitable[None]] | None = None
 
 
 class PageView:
@@ -105,6 +108,7 @@ class PageView:
         self._on_missing_role = actions.on_missing_role
         self._pick_role = actions.pick_role
         self._on_back = actions.on_back
+        self._on_trash = actions.on_trash
         self._rename_open = False
         self._rename_error: str | None = None
         self._starter_task: asyncio.Task[None] | None = None
@@ -1960,6 +1964,9 @@ class PageView:
 
     async def trash_page(self) -> None:
         """Move the open page to trash and offer its undo."""
+        if self._on_trash is not None:
+            await self._on_trash()
+            return
         await self._state.dialogs.trash_page()
         self.refresh()
         self._update()
