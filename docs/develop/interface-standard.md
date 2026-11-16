@@ -307,11 +307,14 @@ Interface icons use monochrome symbolic or outlined glyphs at `ICON_SIZE` (16) o
 `ICON_SIZE_LARGE` (32). A filled glyph is not used when an outlined variant exists. The toolkit's
 Material icon set stands in for Adwaita's symbolic set; no custom SVG icon set ships.
 
-The application identity icon is `src/assets/icon.svg`, an original framed mark with a page
-silhouette and a check. It is an identity asset, not an interface glyph: the Flet build finds the
-file under the source assets directory and rasterizes it into the platform icon set. The interface
-continues to use the toolkit's symbolic glyphs, so the identity icon never appears as a control
-icon.
+The application identity icon is `src/assets/icon.svg`, an original 128×128 mark drawn on the
+GNOME app-icon template. It uses the template's 2 px grid, safe area, and bottom baseline. A
+104×104 baseplate carries a 4 px darker front profile, so the mark has the reference top-and-front
+depth rather than a flat, full-bleed tile. The page-and-check mark uses only Light 1 and Blue 3,
+Blue 4, and Blue 5; the check and fold keep at least 3:1 against the page and remain visible at
+32 px. It is an identity asset, not an interface glyph: the Flet build finds the file under the
+source assets directory and rasterizes it into the platform icon set. The interface continues to use
+the toolkit's symbolic glyphs, so the identity icon never appears as a control icon.
 
 ## 🪧 Empty states
 

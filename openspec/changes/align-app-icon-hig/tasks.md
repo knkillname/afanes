@@ -10,14 +10,14 @@
   front-darker-than-top, and fold/check contrast checks, plus synthetic failures for a full-bleed
   tile, an odd coordinate, a non-palette color, and a too-light fold. Verify
   `hatch test tests/test_assets.py` passes.
-- [ ] 1.3 Load the new SVG through `flet_platform_assets.load_source` at 2048 px and render the
+- [x] 1.3 Load the new SVG through `flet_platform_assets.load_source` at 2048 px and render the
   Linux, Windows, macOS, and web sets. Verify there are no unexpected warnings, then inspect the
   rendered icon at 16, 32, 64, 128, and 256 px on light and dark backgrounds; confirm the page,
   fold, and check remain visible at 32 px and the front profile is visible at 128 and 256 px.
 
 ## 2. Documentation
 
-- [ ] 2.1 Update the icon section of `docs/develop/interface-standard.md` to describe the HIG
+- [x] 2.1 Update the icon section of `docs/develop/interface-standard.md` to describe the HIG
   template, the top/front depth, the palette-only colors, and the 32 px legibility contract while
   keeping the identity-asset/interface-glyph distinction. Verify `hatch run docs:build` passes.
 - [ ] 2.2 Update the application icon evidence in `RELEASE.md` with the new source, the rendered
