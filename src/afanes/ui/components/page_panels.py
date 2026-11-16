@@ -12,6 +12,7 @@ from collections.abc import Awaitable, Callable
 import flet as ft
 
 import afanes.i18n.ui
+import afanes.ui.components.live
 import afanes.ui.theme
 from afanes.ui.components.panel import Panel
 
@@ -336,7 +337,7 @@ class RenamePanel:
                 controls=[
                     ft.Text(copy.PAGE_RENAME_TITLE, style=afanes.ui.theme.TEXT_ROLES["title-4"]),
                     self.field,
-                    self.error,
+                    afanes.ui.components.live.LiveRegion(self.error).build(),
                     self.preview_text,
                     ft.Row(
                         controls=[self.cancel, self.preview, self.confirm],

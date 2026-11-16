@@ -330,7 +330,24 @@ are documented rather than hidden:
   6.1:1, and the action is identified by its label and shape as well as its fill.
 
 High-contrast mode and access keys cannot be exercised through Flet today; both are declared
-limits above. Large-text robustness and accessible names are tracked in wave 5.
+limits above. Wave 5 adds the keyboard and accessibility contract:
+
+- every workspace shortcut has one discoverable reference, opened from the primary menu or
+  `Ctrl+?` and grouped as General, Calendar, and Navigation;
+- the Log calendar shares the date picker's day-view keys, and a month-boundary move keeps focus on
+  the selected day;
+- Review cards and browser note rows are focusable buttons; trashing a page moves focus to the next
+  row, the previous row, or the search field;
+- `tests/ui/test_accessibility.py` scans every interactive control for an accessible name and fails
+  on a pointer-only container, with no baseline or exception ledger;
+- banners, toasts, and primary inline validation surfaces are `Semantics` live regions;
+- large-text layout is checked by the automated rendered snapshot added by this wave, while the real
+  operating-system Large Text switch remains observed release evidence.
+
+The accessible-name gate accepts visible content, a tooltip, an explicit semantics label, or a list
+title. Decorative icons and non-interactive containers are exempt by rule rather than by allowlist.
+Live regions announce only a new message; a background refresh that changes data without showing a
+message stays silent.
 
 ## 🚦 The conformance gate
 
@@ -397,8 +414,9 @@ WAVE 3  landed: writing style: header capitalization, ellipses, final periods,
         AGENTS.md 4.6
 WAVE 4  landed: feedback: undo over confirmation, toasts for one-time events,
         banners only for persistent states, overlays
-WAVE 5  keyboard and accessibility: shortcut map, focus order, semantics
-        labels, large-text robustness
+WAVE 5  in progress: keyboard and accessibility: shortcut sheet, Log calendar
+        keys, focus order, accessible-name gate, live regions, large-text
+        robustness and the rendered layout snapshot
 WAVE 6  landed: breakpoints, collapsible navigation, narrow and large-window
         behavior; the remaining adaptivity work is per-view polish
 WAVE 7  identity: app icon, placeholder pages, final palette pass, empty

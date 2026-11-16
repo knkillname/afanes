@@ -13,6 +13,7 @@ from collections.abc import Awaitable, Callable, Sequence
 import flet as ft
 
 import afanes.i18n.ui
+import afanes.ui.components.live
 import afanes.ui.theme
 from afanes.models.note import CategoryLabel
 
@@ -99,7 +100,7 @@ class RoleReferenceDialog:
                 controls=[
                     ft.Text(self._copy.ROLE_REFERENCE_BODY.format(name=name)),
                     self.category_field,
-                    self.error,
+                    afanes.ui.components.live.LiveRegion(self.error).build(),
                 ],
                 tight=True,
             ),

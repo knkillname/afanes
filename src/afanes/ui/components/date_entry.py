@@ -333,21 +333,25 @@ class DatePickerDialog:
             ft.Icons.KEYBOARD_DOUBLE_ARROW_LEFT_OUTLINED,
             self._previous_large,
             "date-picker-previous-large",
+            self._copy.DATE_PICKER_PREVIOUS_YEAR,
         )
         self.previous_button = self._nav_button(
             ft.Icons.CHEVRON_LEFT_OUTLINED,
             self._previous,
             "date-picker-previous",
+            self._copy.LOG_PREVIOUS_MONTH,
         )
         self.next_button = self._nav_button(
             ft.Icons.CHEVRON_RIGHT_OUTLINED,
             self._next,
             "date-picker-next",
+            self._copy.LOG_NEXT_MONTH,
         )
         self.next_large_button = self._nav_button(
             ft.Icons.KEYBOARD_DOUBLE_ARROW_RIGHT_OUTLINED,
             self._next_large,
             "date-picker-next-large",
+            self._copy.DATE_PICKER_NEXT_YEAR,
         )
         self.nav_row = ft.Row(
             controls=[
@@ -416,10 +420,17 @@ class DatePickerDialog:
             key=f"date-picker-mode-{precision.value}",
         )
 
-    def _nav_button(self, icon: ft.IconData, handler: Callable[[object], None], key: str) -> ft.IconButton:
-        """Build one navigation chevron."""
+    def _nav_button(
+        self,
+        icon: ft.IconData,
+        handler: Callable[[object], None],
+        key: str,
+        tooltip: str,
+    ) -> ft.IconButton:
+        """Build one navigation chevron with its accessible name."""
         return ft.IconButton(
             icon=icon,
+            tooltip=tooltip,
             on_click=handler,
             on_focus=self._clear_grid_focus,
             key=key,

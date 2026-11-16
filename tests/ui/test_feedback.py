@@ -8,6 +8,7 @@ import pytest
 
 import afanes.i18n.ui
 import afanes.i18n.ui.en
+import afanes.ui.components.banner
 import afanes.ui.components.toast
 import afanes.ui.state
 import afanes.ui.state.status
@@ -57,8 +58,12 @@ class TestToastPresenter:
         assert snackbar.bgcolor == afanes.ui.theme.TOAST_SURFACE_COLOR
         assert snackbar.margin == afanes.ui.theme.TOAST_MARGIN
         assert snackbar.padding == afanes.ui.theme.TOAST_PADDING
-        assert isinstance(snackbar.content, ft.Text)
-        assert snackbar.content.color == afanes.ui.theme.TOAST_TEXT_COLOR
+        assert isinstance(snackbar.content, ft.Semantics)
+        assert snackbar.content.live_region is True
+        message = snackbar.content.content
+        assert isinstance(message, ft.Text)
+        assert message.value == "Moved to Trash"
+        assert message.color == afanes.ui.theme.TOAST_TEXT_COLOR
         action = snackbar.action
         assert isinstance(action, ft.SnackBarAction)
         assert action.label == afanes.i18n.ui.en.UNDO_ACTION
@@ -213,6 +218,19 @@ class TestWorkspaceNotice:
 
 
 class TestOwnedBanners:
+    def test_a_banner_message_is_a_live_region(self) -> None:
+        control = afanes.ui.components.banner.Banner("Refresh failed").build()
+
+        assert isinstance(control, ft.Container)
+        region = control.content
+        assert isinstance(region, ft.Semantics)
+        assert region.live_region is True
+        row = region.content
+        assert isinstance(row, ft.Row)
+        message = row.controls[1]
+        assert isinstance(message, ft.Text)
+        assert message.value == "Refresh failed"
+
     def test_each_owner_keeps_its_own_banner(self) -> None:
         state = afanes.ui.state.app_state
 

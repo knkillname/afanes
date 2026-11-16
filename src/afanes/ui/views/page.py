@@ -23,6 +23,7 @@ import afanes.core.vault.snapshot
 import afanes.models.note
 import afanes.ui.components.date_entry
 import afanes.ui.components.field_flow
+import afanes.ui.components.live
 import afanes.ui.components.page_panels
 import afanes.ui.state
 import afanes.ui.theme
@@ -497,9 +498,9 @@ class PageView:
                 self.identity_text,
                 self.form_fields.column,
                 self.name_suggestions,
-                self.category_error,
-                self.date_error,
-                self.due_error,
+                afanes.ui.components.live.LiveRegion(self.category_error).build(),
+                afanes.ui.components.live.LiveRegion(self.date_error).build(),
+                afanes.ui.components.live.LiveRegion(self.due_error).build(),
                 self.log_starter_panel,
                 self.body_field,
             ],
@@ -529,7 +530,11 @@ class PageView:
             on_click=self.save_raw,
         )
         self.raw_panel = ft.Column(
-            controls=[self.raw_warning, self.raw_field, self.raw_save_button],
+            controls=[
+                afanes.ui.components.live.LiveRegion(self.raw_warning).build(),
+                self.raw_field,
+                self.raw_save_button,
+            ],
             spacing=afanes.ui.theme.ITEM_GAP,
             expand=True,
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,

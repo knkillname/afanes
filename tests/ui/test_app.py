@@ -147,6 +147,23 @@ def _typed[T: ft.Control](control: ft.Control | None, expected: type[T]) -> T:
     return control
 
 
+def _live_region_for(control: ft.Control, target: ft.Control) -> ft.Semantics | None:
+    if isinstance(control, ft.Semantics) and control.live_region is True and control.content is target:
+        return control
+    for child in getattr(control, "controls", []) or []:
+        found = _live_region_for(child, target)
+        if found is not None:
+            return found
+    for child in getattr(control, "actions", []) or []:
+        found = _live_region_for(child, target)
+        if found is not None:
+            return found
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        return _live_region_for(content, target)
+    return None
+
+
 def _find_span(control: ft.Control, text: str) -> ft.TextSpan | None:
     if isinstance(control, ft.Text):
         for span in control.spans or []:
@@ -383,7 +400,9 @@ class TestLocaleStartup:
         assert state.status.copy.locale.language == "en"
         snackbar = page.dialogs[-1]
         assert isinstance(snackbar, ft.SnackBar)
-        content = typing.cast("ft.Text", snackbar.content)
+        region = typing.cast("ft.Semantics", snackbar.content)
+        assert region.live_region is True
+        content = typing.cast("ft.Text", region.content)
         assert content.value == afanes.i18n.ui.en.LANGUAGE_RESTART
 
     def test_the_date_dialog_receives_the_active_locale(
@@ -1191,7 +1210,7 @@ class TestCreation:
         error = _typed(_find_by_key(page.dialogs[0], "create-vault-error"), ft.Text)
         assert error.visible is True
         assert error.value == afanes.i18n.ui.en.VAULT_NOT_EMPTY
-        assert error.value == afanes.i18n.ui.en.VAULT_NOT_EMPTY
+        assert _live_region_for(page.dialogs[0], error) is not None
 
     def test_web_creation_dialog_previews_and_creates_the_vault(
         self,

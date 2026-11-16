@@ -16,6 +16,7 @@ import flet as ft
 import afanes.core.vault.snapshot
 import afanes.models.note
 import afanes.ui.components.date_entry
+import afanes.ui.components.live
 import afanes.ui.state
 import afanes.ui.theme
 from afanes.core.editing import DraftMode
@@ -121,7 +122,7 @@ class ProjectBodyView:
             return
         blocks = state.pages.page_body_blocks
         self._keep_owner_panel(blocks)
-        controls: list[ft.Control] = [self._error]
+        controls: list[ft.Control] = [afanes.ui.components.live.LiveRegion(self._error).build()]
         controls.extend(self._block_control(block) for block in blocks)
         if not blocks:
             controls.append(

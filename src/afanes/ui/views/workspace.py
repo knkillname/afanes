@@ -584,11 +584,14 @@ class WorkspaceView:
         """Return the transient navigation overlay with its scrim."""
         return ft.Stack(
             controls=[
-                ft.Container(
-                    expand=True,
-                    bgcolor=afanes.ui.theme.DRAWER_SCRIM_COLOR,
-                    on_click=self._close_drawer,
-                    key="workspace-drawer-scrim",
+                ft.Semantics(
+                    label=self._state.status.copy.CLOSE_NAVIGATION,
+                    on_tap=self._close_drawer,
+                    content=ft.Container(
+                        expand=True,
+                        bgcolor=afanes.ui.theme.DRAWER_SCRIM_COLOR,
+                        key="workspace-drawer-scrim",
+                    ),
                 ),
                 self.navigation,
             ],

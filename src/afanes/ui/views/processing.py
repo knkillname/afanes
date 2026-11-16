@@ -11,6 +11,7 @@ import flet as ft
 import afanes.core.vault.processing
 import afanes.models.note
 import afanes.ui.components.date_entry
+import afanes.ui.components.live
 import afanes.ui.state
 import afanes.ui.theme
 from afanes.core.processing import AppendStepPlan, ProcessingOutcome, ProcessingPlan
@@ -225,7 +226,7 @@ class ProcessingView:
                 ),
                 self.role_suggestions,
                 self.project_suggestions,
-                self.form_error,
+                afanes.ui.components.live.LiveRegion(self.form_error).build(),
                 self.preview_button,
             ],
             spacing=afanes.ui.theme.ITEM_GAP,

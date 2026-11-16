@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable
 import flet as ft
 
 import afanes.i18n.ui
+import afanes.ui.components.live
 import afanes.ui.theme
 from afanes.ui.state.status import Notice, NoticeAction
 
@@ -67,11 +68,13 @@ class ToastPresenter:
         """
         self.close()
         snackbar = ft.SnackBar(
-            content=ft.Text(
-                notice.message,
-                color=afanes.ui.theme.TOAST_TEXT_COLOR,
-                selectable=True,
-            ),
+            content=afanes.ui.components.live.LiveRegion(
+                ft.Text(
+                    notice.message,
+                    color=afanes.ui.theme.TOAST_TEXT_COLOR,
+                    selectable=True,
+                )
+            ).build(),
             behavior=ft.SnackBarBehavior.FLOATING,
             show_close_icon=True,
             close_icon_color=afanes.ui.theme.TOAST_ACTION_COLOR,

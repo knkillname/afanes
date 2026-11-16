@@ -17,6 +17,7 @@ import flet as ft
 import afanes.core.search
 import afanes.models.note
 import afanes.ui.components.date_entry
+import afanes.ui.components.live
 import afanes.ui.state
 import afanes.ui.theme
 from afanes.core.search import ProjectSummary, ReviewItem
@@ -468,7 +469,7 @@ class ReviewView:
         return ft.Column(
             controls=[
                 field,
-                error,
+                afanes.ui.components.live.LiveRegion(error).build(),
                 ft.Row(
                     controls=[
                         self._form_submit,

@@ -18,6 +18,7 @@ import afanes.core.preferences
 import afanes.core.vault.service
 import afanes.i18n.ui
 import afanes.ui.components.date_entry
+import afanes.ui.components.live
 import afanes.ui.components.shortcuts
 import afanes.ui.components.toast
 import afanes.ui.state
@@ -813,7 +814,7 @@ class AppShell:
                         selector,
                         unavailable,
                         preview,
-                        error,
+                        afanes.ui.components.live.LiveRegion(error).build(),
                     ],
                     tight=True,
                 ),
@@ -924,7 +925,7 @@ class AppShell:
                         picker.dropdown,
                         picker.description,
                         picker.warning,
-                        error,
+                        afanes.ui.components.live.LiveRegion(error).build(),
                     ],
                     tight=True,
                 ),

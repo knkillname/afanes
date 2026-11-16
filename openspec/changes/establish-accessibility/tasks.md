@@ -21,10 +21,10 @@
 
 ## 4. Accessible names and live regions
 
-- [ ] 4.1 Add the clean-sheet accessibility gate in `tests/ui/test_accessibility.py` for buttons, menu actions, icon-only controls, and pointer-only containers; verify it passes the current tree and fails a synthetic unnamed control.
-- [ ] 4.2 Audit and fix every interactive control the gate reports, adding tooltips, semantics labels, or focusable button wrappers; verify the gate reports zero violations and existing UI tests still pass.
-- [ ] 4.3 Wrap banners, toasts, and primary inline validation messages in live regions without announcing duplicate copies; verify feedback, banner, and form tests cover the live-region semantics.
-- [ ] 4.4 Update the accessibility notes and wave 5 status in `docs/develop/interface-standard.md`; verify `hatch run docs:build` passes.
+- [x] 4.1 Add the clean-sheet accessibility gate in `tests/ui/test_accessibility.py` for buttons, menu actions, icon-only controls, and pointer-only containers; verify it passes the current tree and fails a synthetic unnamed control.
+- [x] 4.2 Audit and fix every interactive control the gate reports, adding tooltips, semantics labels, or focusable button wrappers; verify the gate reports zero violations and existing UI tests still pass.
+- [x] 4.3 Wrap banners, toasts, and primary inline validation messages in live regions without announcing duplicate copies; verify feedback, banner, and form tests cover the live-region semantics.
+- [x] 4.4 Update the accessibility notes and wave 5 status in `docs/develop/interface-standard.md`; verify `hatch run docs:build` passes.
 
 ## 5. Large text and rendered layout snapshot
 

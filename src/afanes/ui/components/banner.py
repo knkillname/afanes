@@ -5,6 +5,7 @@
 
 import flet as ft
 
+import afanes.ui.components.live
 import afanes.ui.theme
 
 
@@ -39,17 +40,19 @@ class Banner:
             bgcolor=afanes.ui.theme.ERROR_CONTAINER_COLOR,
             padding=afanes.ui.theme.BANNER_PADDING,
             border_radius=afanes.ui.theme.SURFACE_RADIUS,
-            content=ft.Row(
-                controls=[
-                    ft.Icon(ft.Icons.ERROR_OUTLINE, color=afanes.ui.theme.ERROR_TEXT_COLOR),
-                    ft.Text(
-                        self._message,
-                        color=afanes.ui.theme.ERROR_TEXT_COLOR,
-                        selectable=True,
-                        expand=True,
-                    ),
-                ],
-                spacing=afanes.ui.theme.ITEM_GAP,
-                vertical_alignment=ft.CrossAxisAlignment.START,
-            ),
+            content=afanes.ui.components.live.LiveRegion(
+                ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.ERROR_OUTLINE, color=afanes.ui.theme.ERROR_TEXT_COLOR),
+                        ft.Text(
+                            self._message,
+                            color=afanes.ui.theme.ERROR_TEXT_COLOR,
+                            selectable=True,
+                            expand=True,
+                        ),
+                    ],
+                    spacing=afanes.ui.theme.ITEM_GAP,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
+                )
+            ).build(),
         )

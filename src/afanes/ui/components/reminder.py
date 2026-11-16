@@ -17,6 +17,7 @@ import tzlocal
 
 import afanes.i18n.ui
 import afanes.models.note
+import afanes.ui.components.live
 import afanes.ui.theme
 from afanes.models.reminder import ClockTime, OneShot, Recurrence, Reminder, ReminderKind, Weekday
 from afanes.ui.components.date_entry import DatePickerActions, DatePickerButton, PickDate
@@ -99,7 +100,7 @@ class ReminderEditor:
                     self.once_group,
                     self.zone_field,
                     self.warning_text,
-                    self.error_text,
+                    afanes.ui.components.live.LiveRegion(self.error_text).build(),
                 ],
                 spacing=afanes.ui.theme.ITEM_GAP,
                 scroll=ft.ScrollMode.AUTO,
