@@ -227,7 +227,7 @@ class TestWorkspaceShell:
         assert view.capture_field.hint_text == afanes.i18n.ui.en.COMPOSER_HINT
         assert len(view.section_tiles) == SECTION_COUNT
         assert view.review_tile.title == afanes.i18n.ui.en.REVIEW_TITLE
-        assert view.page_view.empty_text.visible is True
+        assert view.page_view.empty_placeholder.visible is True
         assert view.navigation.key == "workspace-navigation"
         assert view.browser_region.key == "workspace-browser"
         assert view.detail_region.key == "workspace-detail"
@@ -467,9 +467,8 @@ class TestWorkspaceShell:
 
         empty = view.browser_list.controls[0]
         assert isinstance(empty, ft.Container)
-        content = empty.content
-        assert isinstance(content, ft.Text)
-        assert content.value == afanes.i18n.ui.en.BROWSER_EMPTY
+        assert afanes.i18n.ui.en.PLACEHOLDER_ATTENTION_TITLE in _texts(empty)
+        assert afanes.i18n.ui.en.PLACEHOLDER_ATTENTION_BODY in _texts(empty)
         assert state.browser.listing() is not None
         listing = state.browser.listing()
         assert listing is not None
@@ -997,7 +996,7 @@ class TestGlobalSearch:
         asyncio.run(_change_handler(view.search_field)())
 
         assert any("absent" in text for text in _texts(view.browser_list))
-        assert afanes.i18n.ui.en.BROWSER_NO_MATCH_QUERY.format(query="absent") in _texts(view.browser_list)
+        assert afanes.i18n.ui.en.PLACEHOLDER_SEARCH_TITLE.format(query="absent") in _texts(view.browser_list)
 
 
 class TestCapturePlacement:
@@ -1081,6 +1080,83 @@ class TestCapturePlacement:
         asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.LOG])())
         assert view.log_today_button is not None
         assert not isinstance(view.log_today_button, ft.FilledButton)
+
+
+class TestPlaceholderPages:
+    def test_each_empty_destination_uses_its_own_placeholder(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        expected = {
+            afanes.ui.state.browser.WorkspaceSection.INBOX: (
+                afanes.i18n.ui.en.PLACEHOLDER_INBOX_TITLE,
+                afanes.i18n.ui.en.PLACEHOLDER_INBOX_BODY,
+            ),
+            afanes.ui.state.browser.WorkspaceSection.PROJECTS: (
+                afanes.i18n.ui.en.PLACEHOLDER_PROJECTS_TITLE,
+                afanes.i18n.ui.en.PLACEHOLDER_PROJECTS_BODY,
+            ),
+            afanes.ui.state.browser.WorkspaceSection.REFERENCES: (
+                afanes.i18n.ui.en.PLACEHOLDER_REFERENCES_TITLE,
+                afanes.i18n.ui.en.PLACEHOLDER_REFERENCES_BODY,
+            ),
+            afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION: (
+                afanes.i18n.ui.en.PLACEHOLDER_ATTENTION_TITLE,
+                afanes.i18n.ui.en.PLACEHOLDER_ATTENTION_BODY,
+            ),
+            afanes.ui.state.browser.WorkspaceSection.TRASH: (
+                afanes.i18n.ui.en.PLACEHOLDER_TRASH_TITLE,
+                afanes.i18n.ui.en.PLACEHOLDER_TRASH_BODY,
+            ),
+        }
+
+        for section, (title, body) in expected.items():
+            asyncio.run(_handler(view.section_tiles[section])())
+            texts = _texts(view.browser_list)
+            assert title in texts, section
+            assert body in texts, section
+
+    def test_the_placeholder_does_not_repeat_a_header_action(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        asyncio.run(_handler(view.section_tiles[afanes.ui.state.browser.WorkspaceSection.REFERENCES])())
+
+        placeholder = view.browser_list.controls[0]
+        assert view.new_reference_button.visible is True
+        assert afanes.i18n.ui.en.PLACEHOLDER_REFERENCES_TITLE in _texts(placeholder)
+        assert not any(
+            isinstance(control, ft.TextButton | ft.FilledButton | ft.OutlinedButton)
+            for control in _descendants(placeholder)
+        )
+
+    def test_a_focused_flow_replaces_the_detail_placeholder(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        asyncio.run(_handler(view.review_tile)())
+
+        assert view.detail_title.value == afanes.i18n.ui.en.REVIEW_TITLE
+        assert afanes.i18n.ui.en.PLACEHOLDER_PAGE_TITLE not in _texts(view.main_host)
+
+    def test_a_page_banner_suppresses_the_detail_placeholder(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        view = _open_workspace(tmp_path, monkeypatch)
+        afanes.ui.state.app_state.pages.blocking_message = "A page condition"
+
+        view.page_view.refresh()
+
+        assert view.page_view.empty_placeholder.visible is False
+        assert view.page_view.banners.visible is True
 
 
 class TestReviewQueue:
@@ -1568,6 +1644,16 @@ def _visible_titles(view: afanes.ui.views.workspace.WorkspaceView) -> list[str]:
     return titles
 
 
+def _descendants(control: ft.Control) -> list[ft.Control]:
+    found = [control]
+    for child in getattr(control, "controls", []) or []:
+        found.extend(_descendants(child))
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        found.extend(_descendants(content))
+    return found
+
+
 def _texts(control: ft.Control) -> list[str]:
     values: list[str] = []
     if isinstance(control, ft.Text):
@@ -1936,12 +2022,8 @@ class TestTrashSection:
         asyncio.run(_handler(view.section_tiles[section])())
 
         assert view.empty_trash_button.visible is False
-        assert any(
-            isinstance(control, ft.Container)
-            and isinstance(control.content, ft.Text)
-            and control.content.value == afanes.i18n.ui.en.TRASH_EMPTY
-            for control in view.browser_list.controls
-        )
+        assert afanes.i18n.ui.en.PLACEHOLDER_TRASH_TITLE in _texts(view.browser_list)
+        assert afanes.i18n.ui.en.PLACEHOLDER_TRASH_BODY in _texts(view.browser_list)
 
     def test_selecting_a_trash_row_opens_the_read_only_page(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -2082,7 +2164,7 @@ class TestSpanishWorkspace:
         assert view.capture_label.value == copy.COMPOSER_LABEL
         texts = _texts(view.root)
         assert copy.WORKSPACE_SECTION_LABELS["inbox"] in texts
-        assert copy.BROWSER_EMPTY in _texts(view.browser_list)
+        assert copy.PLACEHOLDER_INBOX_TITLE in _texts(view.browser_list)
         assert afanes.i18n.ui.en.COMPOSER_LABEL not in texts
 
     def test_uncategorized_references_use_the_spanish_group_heading(

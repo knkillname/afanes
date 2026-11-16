@@ -25,6 +25,7 @@ import afanes.ui.components.date_entry
 import afanes.ui.components.field_flow
 import afanes.ui.components.live
 import afanes.ui.components.page_panels
+import afanes.ui.components.placeholder
 import afanes.ui.state
 import afanes.ui.theme
 from afanes.core.editing import DraftMode, NormalDraft, PageDraft
@@ -335,10 +336,11 @@ class PageView:
     def _build_read_content(self) -> None:
         """Build the read-mode content and connections panel."""
         self.banners = ft.Column(controls=[], spacing=afanes.ui.theme.ITEM_GAP)
-        self.empty_text = ft.Text(
-            self._state.status.copy.PAGE_EMPTY,
-            color=afanes.ui.theme.MUTED_TEXT_COLOR,
-        )
+        self.empty_placeholder = afanes.ui.components.placeholder.PlaceholderPage(
+            ft.Icons.DESCRIPTION_OUTLINED,
+            self._state.status.copy.PLACEHOLDER_PAGE_TITLE,
+            body=self._state.status.copy.PLACEHOLDER_PAGE_BODY,
+        ).build()
         self.read_body = ft.Markdown(
             value="",
             selectable=True,
@@ -637,7 +639,7 @@ class PageView:
     def _build_layout(self) -> None:
         """Assemble the page surface."""
         self.content = ft.Column(
-            controls=[self.empty_text, self.project_body.build(), self.read_body, self.connections_panel],
+            controls=[self.empty_placeholder, self.project_body.build(), self.read_body, self.connections_panel],
             spacing=afanes.ui.theme.ITEM_GAP,
             scroll=ft.ScrollMode.AUTO,
             expand=True,
@@ -898,7 +900,7 @@ class PageView:
         labels = state.pages.page_labels if page is not None else None
         is_project = labels is not None and labels.note_type is NoteType.PROJECT and state.pages.trash_entry is None
         visible = page is not None and not editing
-        self.empty_text.visible = page is None
+        self.empty_placeholder.visible = page is None and state.pages.banner is None
         self.read_body.visible = visible and not is_project
         self.project_body.refresh()
         if visible and page is not None and not is_project:

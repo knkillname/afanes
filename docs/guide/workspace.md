@@ -49,6 +49,12 @@ Moving a page to Trash keeps the keyboard in the browser. Focus moves to the nex
 to the previous row when none follows; when the browser has no rows left, focus moves to the search
 field. The active destination and any search query stay unchanged.
 
+An empty destination, a search with no matches, and an empty **Trash** show a symbolic placeholder
+page with a heading and a short guidance line. The placeholder names the empty state and offers at
+most one suggested action, never a second copy of an action already in the browser header. When no
+page is open, the detail region shows the same kind of placeholder and asks for a note to be selected.
+A focused flow, an open page, or a persistent banner takes precedence over a placeholder.
+
 The **Log** section offers a calendar and a collapsed date tree instead of a flat list. **Entries** shows
 only log notes; **Everything** is a date lens over every parsed note. **Today’s Entry** opens today's
 entry in read mode, or an unsaved draft when the day is free. The three controls share one row above

@@ -857,20 +857,80 @@ msgctxt "BROWSER_SEARCH_CLEAR"
 msgid "Clear Search"
 msgstr "Borrar búsqueda"
 
-#: src/afanes/i18n/ui/en.py BROWSER_EMPTY
-msgctxt "BROWSER_EMPTY"
-msgid "No notes in this section"
-msgstr "No hay notas en esta sección"
-
 #: src/afanes/i18n/ui/en.py BROWSER_NO_MATCH
 msgctxt "BROWSER_NO_MATCH"
 msgid "No notes match this search"
 msgstr "Ninguna nota coincide con esta búsqueda"
 
-#: src/afanes/i18n/ui/en.py BROWSER_NO_MATCH_QUERY
-msgctxt "BROWSER_NO_MATCH_QUERY"
-msgid "No notes match “{query}”"
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_INBOX_TITLE
+msgctxt "PLACEHOLDER_INBOX_TITLE"
+msgid "Inbox Is Empty"
+msgstr "La bandeja de entrada está vacía"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_INBOX_BODY
+msgctxt "PLACEHOLDER_INBOX_BODY"
+msgid "Captures appear here after they are written"
+msgstr "Las capturas aparecen aquí después de escribirlas"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_PROJECTS_TITLE
+msgctxt "PLACEHOLDER_PROJECTS_TITLE"
+msgid "No Projects Yet"
+msgstr "Aún no hay proyectos"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_PROJECTS_BODY
+msgctxt "PLACEHOLDER_PROJECTS_BODY"
+msgid "A new project starts with one step and a next action"
+msgstr "Un proyecto nuevo empieza con un paso y una próxima acción"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_REFERENCES_TITLE
+msgctxt "PLACEHOLDER_REFERENCES_TITLE"
+msgid "No References Yet"
+msgstr "Aún no hay referencias"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_REFERENCES_BODY
+msgctxt "PLACEHOLDER_REFERENCES_BODY"
+msgid "A new reference keeps a page within reach"
+msgstr "Una referencia nueva mantiene una página a mano"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_ATTENTION_TITLE
+msgctxt "PLACEHOLDER_ATTENTION_TITLE"
+msgid "Nothing Needs Attention"
+msgstr "Nada requiere atención"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_ATTENTION_BODY
+msgctxt "PLACEHOLDER_ATTENTION_BODY"
+msgid "Captures outside the Inbox appear here when they need a next step"
+msgstr "Las capturas fuera de la bandeja de entrada aparecen aquí cuando necesitan un paso siguiente"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_SEARCH_TITLE
+msgctxt "PLACEHOLDER_SEARCH_TITLE"
+msgid "No Notes Match “{query}”"
 msgstr "Ninguna nota coincide con “{query}”"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_SEARCH_BODY
+msgctxt "PLACEHOLDER_SEARCH_BODY"
+msgid "Try a different word or clear the search"
+msgstr "Prueba otra palabra o borra la búsqueda"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_TRASH_TITLE
+msgctxt "PLACEHOLDER_TRASH_TITLE"
+msgid "Trash Is Empty"
+msgstr "La papelera está vacía"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_TRASH_BODY
+msgctxt "PLACEHOLDER_TRASH_BODY"
+msgid "Notes moved to Trash appear here until they are restored or deleted"
+msgstr "Las notas movidas a la papelera aparecen aquí hasta que se restauran o se eliminan"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_PAGE_TITLE
+msgctxt "PLACEHOLDER_PAGE_TITLE"
+msgid "No Page Open"
+msgstr "No hay ninguna página abierta"
+
+#: src/afanes/i18n/ui/en.py PLACEHOLDER_PAGE_BODY
+msgctxt "PLACEHOLDER_PAGE_BODY"
+msgid "Select a note from the browser to read it"
+msgstr "Selecciona una nota del navegador para leerla"
 
 #: src/afanes/i18n/ui/en.py BROWSER_FAILURES
 msgctxt "BROWSER_FAILURES"
@@ -1447,11 +1507,6 @@ msgctxt "PAGE_TRASH"
 msgid "Move to Trash"
 msgstr "Mover a la papelera"
 
-#: src/afanes/i18n/ui/en.py PAGE_EMPTY
-msgctxt "PAGE_EMPTY"
-msgid "Select a note to open it"
-msgstr "Selecciona una nota para abrirla"
-
 #: src/afanes/i18n/ui/en.py PAGE_IDENTITY_LABEL
 msgctxt "PAGE_IDENTITY_LABEL"
 msgid "Identity"
@@ -1876,11 +1931,6 @@ msgstr "No se pudo restaurar esta página: {detail}"
 msgctxt "TRASH_TITLE"
 msgid "Trash"
 msgstr "Papelera"
-
-#: src/afanes/i18n/ui/en.py TRASH_EMPTY
-msgctxt "TRASH_EMPTY"
-msgid "Trash is empty"
-msgstr "La papelera está vacía"
 
 #: src/afanes/i18n/ui/en.py TRASH_ROW_FROM
 msgctxt "TRASH_ROW_FROM"

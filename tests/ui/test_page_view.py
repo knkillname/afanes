@@ -100,13 +100,16 @@ class TestReadMode:
         assert view.read_body.value == "# Ada\n\nBody.\n"
         assert view.edit_form.visible is False
         assert view.raw_panel.visible is False
+        assert view.empty_placeholder.visible is False
         assert view.edit_button.visible is True
         assert view.done_button.visible is False
 
     def test_empty_page_shows_the_placeholder(self) -> None:
         view = PageView(PageActions(update=lambda: None))
 
-        assert view.empty_text.visible is True
+        assert view.empty_placeholder.visible is True
+        assert afanes.i18n.ui.en.PLACEHOLDER_PAGE_TITLE in _texts(view.empty_placeholder)
+        assert afanes.i18n.ui.en.PLACEHOLDER_PAGE_BODY in _texts(view.empty_placeholder)
         assert view.read_body.visible is False
         assert view.edit_form.visible is False
         assert view.raw_panel.visible is False
@@ -2899,9 +2902,10 @@ class TestSpanishPage:
 
         view = PageView(PageActions(update=lambda: None))
 
-        assert view.empty_text.value == copy.PAGE_EMPTY
+        assert copy.PLACEHOLDER_PAGE_TITLE in _texts(view.empty_placeholder)
+        assert copy.PLACEHOLDER_PAGE_BODY in _texts(view.empty_placeholder)
         assert view.edit_button.content == copy.PAGE_EDIT
-        assert view.empty_text.value != afanes.i18n.ui.en.PAGE_EMPTY
+        assert afanes.i18n.ui.en.PLACEHOLDER_PAGE_TITLE not in _texts(view.empty_placeholder)
 
     def test_meta_dates_render_spanish_while_editable_values_stay_iso(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

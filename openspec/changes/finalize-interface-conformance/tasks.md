@@ -9,11 +9,11 @@
 
 ## 2. Symbolic placeholder pages
 
-- [ ] 2.1 Add placeholder heading and guidance copy for an empty destination, empty search, empty Trash, and no-page detail to the English catalog and Spanish `.po`; classify each constant and verify `hatch test tests/i18n/test_copy.py` passes.
-- [ ] 2.2 Add `ui/components/placeholder.py` with one monochrome icon, heading, optional guidance, and at most one suggested action; verify component tests cover structure, decorative icon, optional action, and accessible text.
-- [ ] 2.3 Replace the workspace plain empty messages with the placeholder for an empty destination, no search matches, and empty Trash; verify workspace tests cover each heading, no duplicate header action, and hidden placeholders during a focused flow or owned banner.
-- [ ] 2.4 Replace `PageView`'s no-page text with the placeholder and verify page tests cover the heading, guidance, and open-page suppression.
-- [ ] 2.5 Update the workspace and interface-standard guidance for placeholder pages; verify `hatch run docs:build` passes.
+- [x] 2.1 Add placeholder heading and guidance copy for an empty destination, empty search, empty Trash, and no-page detail to the English catalog and Spanish `.po`; classify each constant and verify `hatch test tests/i18n/test_copy.py` passes.
+- [x] 2.2 Add `ui/components/placeholder.py` with one monochrome icon, heading, optional guidance, and at most one suggested action; verify component tests cover structure, decorative icon, optional action, and accessible text.
+- [x] 2.3 Replace the workspace plain empty messages with the placeholder for an empty destination, no search matches, and empty Trash; verify workspace tests cover each heading, no duplicate header action, and hidden placeholders during a focused flow or owned banner.
+- [x] 2.4 Replace `PageView`'s no-page text with the placeholder and verify page tests cover the heading, guidance, and open-page suppression.
+- [x] 2.5 Update the workspace and interface-standard guidance for placeholder pages; verify `hatch run docs:build` passes.
 
 ## 3. Platform high contrast
 

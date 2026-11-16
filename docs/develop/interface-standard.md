@@ -306,6 +306,16 @@ file under the source assets directory and rasterizes it into the platform icon 
 continues to use the toolkit's symbolic glyphs, so the identity icon never appears as a control
 icon.
 
+## 🪧 Empty states
+
+A region that normally holds content but is empty uses the shared symbolic placeholder page: one
+monochrome outlined icon at `ICON_SIZE_LARGE`, a `title-4` heading, optional body-weight guidance, and
+at most one suggested action. The icon is decorative, so its semantics subtree is excluded and the
+heading and guidance carry the accessible text. Empty destinations, an empty search, empty Trash, and
+the detail region with no open page use the component. A focused flow, an open page, or a persistent
+banner takes precedence, and the placeholder never repeats an action already present in the region
+header.
+
 ## 🔀 Bounded differences
 
 These six differences are toolkit limits, not design preferences. Adding another one requires a

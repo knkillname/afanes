@@ -27,6 +27,7 @@ import afanes.ui.components.frozen
 import afanes.ui.components.language
 import afanes.ui.components.log_tree
 import afanes.ui.components.page_panels
+import afanes.ui.components.placeholder
 import afanes.ui.state
 import afanes.ui.state.browser
 import afanes.ui.state.status
@@ -1047,15 +1048,22 @@ class WorkspaceView:
         if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.REVIEW:
             return self._review_queue_controls()
         if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.PROJECTS:
-            if self._projects_view is None:
-                self._projects_view = afanes.ui.views.projects.ProjectsView(self._update, self._select)
-            self._projects_view.refresh()
-            return [self._projects_view.root]
+            return self._project_controls()
         if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.LOG:
             return self._log_controls()
         if state.browser.active_section is afanes.ui.state.browser.WorkspaceSection.TRASH:
             return self._trash_controls()
         return self._section_controls(state.browser.active_section, listing)
+
+    def _project_controls(self) -> list[ft.Control]:
+        """Build the project groups or their empty placeholder."""
+        state = self._state
+        if self._projects_view is None:
+            self._projects_view = afanes.ui.views.projects.ProjectsView(self._update, self._select)
+        self._projects_view.refresh()
+        if not any(group.projects for group in state.browser.project_groups()):
+            return [self._placeholder_for_section(state.browser.active_section).build()]
+        return [self._projects_view.root]
 
     def _section_controls(
         self,
@@ -1067,10 +1075,63 @@ class WorkspaceView:
         if listing is None or section is None:
             return []
         if section is afanes.core.search.BrowserSection.REFERENCES:
-            return self._reference_controls(listing.groups_for(section))
-        return self._flat_controls(listing.groups_for(section))
+            return self._reference_controls(listing.groups_for(section), active_section)
+        return self._flat_controls(listing.groups_for(section), active_section)
 
-    def _reference_controls(self, groups: tuple[afanes.core.search.BrowserGroup, ...]) -> list[ft.Control]:
+    def _placeholder_for_section(
+        self,
+        section: afanes.ui.state.browser.WorkspaceSection,
+    ) -> afanes.ui.components.placeholder.PlaceholderPage:
+        """Build the symbolic empty state for one browser destination.
+
+        Parameters
+        ----------
+        section : afanes.ui.state.browser.WorkspaceSection
+            Destination whose empty state is shown.
+
+        Returns
+        -------
+        afanes.ui.components.placeholder.PlaceholderPage
+            Placeholder with the destination heading and guidance.
+        """
+        copy = self._state.status.copy
+        content = {
+            afanes.ui.state.browser.WorkspaceSection.INBOX: (
+                copy.PLACEHOLDER_INBOX_TITLE,
+                copy.PLACEHOLDER_INBOX_BODY,
+            ),
+            afanes.ui.state.browser.WorkspaceSection.PROJECTS: (
+                copy.PLACEHOLDER_PROJECTS_TITLE,
+                copy.PLACEHOLDER_PROJECTS_BODY,
+            ),
+            afanes.ui.state.browser.WorkspaceSection.REFERENCES: (
+                copy.PLACEHOLDER_REFERENCES_TITLE,
+                copy.PLACEHOLDER_REFERENCES_BODY,
+            ),
+            afanes.ui.state.browser.WorkspaceSection.NEEDS_ATTENTION: (
+                copy.PLACEHOLDER_ATTENTION_TITLE,
+                copy.PLACEHOLDER_ATTENTION_BODY,
+            ),
+            afanes.ui.state.browser.WorkspaceSection.TRASH: (
+                copy.PLACEHOLDER_TRASH_TITLE,
+                copy.PLACEHOLDER_TRASH_BODY,
+            ),
+        }
+        title, body = content.get(
+            section,
+            (copy.PLACEHOLDER_INBOX_TITLE, copy.PLACEHOLDER_INBOX_BODY),
+        )
+        return afanes.ui.components.placeholder.PlaceholderPage(
+            _SECTION_ICONS.get(section, ft.Icons.FOLDER_OPEN_OUTLINED),
+            title,
+            body=body,
+        )
+
+    def _reference_controls(
+        self,
+        groups: tuple[afanes.core.search.BrowserGroup, ...],
+        active_section: afanes.ui.state.browser.WorkspaceSection,
+    ) -> list[ft.Control]:
         """Build the categorized reference list for the References section."""
         controls: list[ft.Control] = []
         for group in groups:
@@ -1090,22 +1151,19 @@ class WorkspaceView:
             )
             controls.extend(self._note_row(note) for note in group.notes)
         if not controls:
-            controls.append(self._empty_message(self._state.status.copy.BROWSER_EMPTY))
+            controls.append(self._placeholder_for_section(active_section).build())
         return controls
 
-    def _flat_controls(self, groups: tuple[afanes.core.search.BrowserGroup, ...]) -> list[ft.Control]:
+    def _flat_controls(
+        self,
+        groups: tuple[afanes.core.search.BrowserGroup, ...],
+        active_section: afanes.ui.state.browser.WorkspaceSection,
+    ) -> list[ft.Control]:
         """Build the flat note list for Inbox or Needs attention."""
         notes = groups[0].notes if groups else ()
         if not notes:
-            return [self._empty_message(self._state.status.copy.BROWSER_EMPTY)]
+            return [self._placeholder_for_section(active_section).build()]
         return [self._note_row(note) for note in notes]
-
-    def _empty_message(self, message: str) -> ft.Control:
-        """Build one muted empty-state message."""
-        return ft.Container(
-            padding=afanes.ui.theme.ITEM_GAP,
-            content=ft.Text(message, color=afanes.ui.theme.MUTED_TEXT_COLOR, selectable=True),
-        )
 
     def _search_controls(
         self,
@@ -1162,9 +1220,11 @@ class WorkspaceView:
             controls.extend(self._trash_row(entry) for entry in trashed)
         if not matched:
             return [
-                self._empty_message(
-                    self._state.status.copy.BROWSER_NO_MATCH_QUERY.format(query=state.browser.query.strip())
-                )
+                afanes.ui.components.placeholder.PlaceholderPage(
+                    ft.Icons.SEARCH_OFF_OUTLINED,
+                    self._state.status.copy.PLACEHOLDER_SEARCH_TITLE.format(query=state.browser.query.strip()),
+                    body=self._state.status.copy.PLACEHOLDER_SEARCH_BODY,
+                ).build()
             ]
         return controls
 
@@ -1183,7 +1243,7 @@ class WorkspaceView:
         """Build the managed-entry rows for the Trash destination."""
         entries = self._state.browser.trash_entries()
         if not entries:
-            return [self._empty_message(self._state.status.copy.TRASH_EMPTY)]
+            return [self._placeholder_for_section(afanes.ui.state.browser.WorkspaceSection.TRASH).build()]
         return [self._trash_row(entry) for entry in entries]
 
     def _trash_row(self, entry: afanes.core.vault.trash_catalog.TrashEntry) -> ft.Control:
