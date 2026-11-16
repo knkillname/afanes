@@ -6,7 +6,7 @@
   a 104×104 baseplate with a 4 px darker front profile, the page-and-check mark, and only GNOME
   palette colors. Verify the SVG parses as XML and its `viewBox` is `0 0 128 128`, with every
   coordinate on the 2 px grid inside `12…116`.
-- [ ] 1.2 Extend `tests/test_assets.py` with the canvas, safe-area, 2 px-grid, palette-membership,
+- [x] 1.2 Extend `tests/test_assets.py` with the canvas, safe-area, 2 px-grid, palette-membership,
   front-darker-than-top, and fold/check contrast checks, plus synthetic failures for a full-bleed
   tile, an odd coordinate, a non-palette color, and a too-light fold. Verify
   `hatch test tests/test_assets.py` passes.
