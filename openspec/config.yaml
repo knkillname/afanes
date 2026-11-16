@@ -18,9 +18,9 @@ context: |
 operations:
   archive:
     guidance:
-      - "After the archive succeeds, run the post-archive release workflow in AGENTS.md section 5.3 before reporting completion."
-      - "Bump the version only when the archive completes a coherent milestone: 1.0.0 is reserved for the first MVP, and incompatible changes to unreleased APIs are MINOR or PATCH bumps. Use hatch version patch, hatch version minor, or hatch version major; never edit src/afanes/__about__.py by hand."
-      - "Update CHANGELOG.md following Keep a Changelog: move Unreleased entries under the new version and date, add a fresh Unreleased section, and omit comparison links unless release tags exist."
+      - "After the archive succeeds, run the post-archive close-out in AGENTS.md section 5.3 before reporting completion."
+      - "Do not bump the version, create a tag, or publish a release on archive. Keep the change's entry under Unreleased; a release is a deliberate act that bumps the version with hatch version patch|minor|major, moves the Unreleased entries under the released heading, and pushes the tag that publishes it. Never edit src/afanes/__about__.py by hand."
+      - "Update CHANGELOG.md following Keep a Changelog: archive entries stay under Unreleased, and cutting a release moves them under the released heading with a fresh Unreleased section. Omit comparison links unless release tags exist."
       - "Review README.md and docs/ and update them when the change affects installation, usage, features, platforms, configuration, or documented behavior. Record README: no change required and Docs: no change required when neither changed."
       - "Run hatch run docs:build and the docs style test when docs/ or the documented examples change."
       - "Run hatch check, hatch test --cover, openspec validate --all --strict, openspec doctor, and the vocabulary compliance check before committing."

@@ -24,16 +24,18 @@ hatch run afanes --web
 ```
 
 The first desktop run downloads and caches the Flet client once under `~/.flet/client/`. The running
-application makes no network request. The Linux release workflow builds the packaged artifact on a
-pinned `ubuntu-24.04` runner; the
+application makes no network request. The release workflow builds the packaged Linux artifact and the
+wheel on a pinned `ubuntu-24.04` runner and publishes them when a release tag is pushed; the
 [release guide](https://github.com/knkillname/afanes/blob/main/docs/develop/releasing.md) covers the
-workflow and the local fallback. A packaged build bundles the client.
+pipeline and the local fallback. A packaged build bundles the client.
 
 ## 🖥️ Platform support
 
 - **Linux.** Native desktop builds are supported and tested, and Linux is the only `1.0.0` release
-  gate. GitHub Actions builds the artifact on a pinned `ubuntu-24.04` runner. Download it from the
-  [releases page](https://github.com/knkillname/afanes/releases).
+  gate. GitHub Actions builds the artifact on a pinned `ubuntu-24.04` runner. Download
+  `afanes-linux-x64-<version>.tar.gz` from the
+  [releases page](https://github.com/knkillname/afanes/releases), verify it against
+  `afanes-<version>-checksums.txt`, and run the extracted `afanes` binary.
 - **macOS and Windows.** Install the released wheel with `pipx` and start the browser presentation:
 
   ```console
@@ -41,8 +43,8 @@ workflow and the local fallback. A packaged build bundles the client.
   afanes --web
   ```
 
-  Download the wheel from the releases page first and pass its path. The wheel is the supported macOS
-  and Windows path.
+  Download `afanes-<version>-py3-none-any.whl` from the releases page and pass its path; verify it
+  against `afanes-<version>-checksums.txt` first. The wheel is the supported macOS and Windows path.
 
 Only Linux carries release evidence. The browser presentation binds loopback only, serves local
 assets, and allows one session at a time; see the

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- **Automated release publishing.** `.github/workflows/release.yml` replaces the Linux-only workflow:
+  a `v*` tag push verifies the tag against `hatch version` and the changelog, runs the gates, builds
+  the Linux bundle and the Python wheel, and publishes a GitHub release with
+  `afanes-<version>-checksums.txt`. A published release is immutable, a failed upload removes the
+  draft it created, and a manual dispatch only builds and uploads. Archiving a change no longer bumps
+  the version or creates a tag: entries stay under `Unreleased` until a release is cut deliberately.
+  This implements the `automate-release-publishing` OpenSpec change and delivers the `1.0.0` release
+  path. No runtime code, dependency, schema, or public API change; the application remains offline at
+  startup. README: updated. Docs: updated.
+
 - **Linux release workflow.** `.github/workflows/linux-release.yml` builds the Linux bundle on a
   pinned `ubuntu-24.04` runner, runs `hatch check` and `hatch test --cover`, and uploads a checksummed
   `tar.gz` workflow artifact whose run summary records the commit, version, runner image, tool

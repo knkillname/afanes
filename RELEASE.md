@@ -61,9 +61,9 @@ above runs there.
 
 | Platform | Path | Build | Evidence |
 | --- | --- | --- | --- |
-| Linux | Native desktop build | `.github/workflows/linux-release.yml` on `ubuntu-24.04`; local fallback `hatch run package linux --build-version "$(hatch version)"` | Download the `afanes-linux-x64` workflow artifact, verify its SHA-256, and extract it. Record the run URL, commit, runner image, and checksum. Launch the bundle with networking unavailable; run every Linux manual check in the gate checklist; capture a note and compare its bytes with a source run; edit a file externally and confirm the workspace refresh. Re-verified for each `1.0.0` release |
-| macOS | GitHub Releases wheel, then `afanes --web` | Built from the released wheel | Documented path, not a release gate; no manual check is required |
-| Windows | GitHub Releases wheel, then `afanes --web` | Built from the released wheel | Documented path, not a release gate; no manual check is required |
+| Linux | Native desktop build | `.github/workflows/release.yml` on `ubuntu-24.04`; local fallback `hatch run package linux --build-version "$(hatch version)"` | Download the `afanes-release` dispatch artifact for the `1.0.0` commit before the tag, verify its SHA-256, and extract it. Record the run URL, commit, runner image, and checksum. Launch the bundle with networking unavailable; run every Linux manual check in the gate checklist; capture a note and compare its bytes with a source run; edit a file externally and confirm the workspace refresh. After the tag publishes, verify the release assets and their checksums. Re-verified for each release |
+| macOS | GitHub Releases wheel, then `afanes --web` | Built by `.github/workflows/release.yml` | Documented path, not a release gate; no manual check is required |
+| Windows | GitHub Releases wheel, then `afanes --web` | Built by `.github/workflows/release.yml` | Documented path, not a release gate; no manual check is required |
 
 Record each manual result with the version, date, and machine. A check that has
 not run stays pending; it never becomes a silent assumption.
@@ -121,18 +121,25 @@ changed after this check.
 
 ## Release artifacts
 
-The GitHub release carries:
+A `v<major>.<minor>.<patch>` tag push publishes the GitHub release; the workflow
+attaches every asset. The release carries:
 
 - the Linux native build, which is the tested and supported `1.0.0` artifact;
 - the Python wheel, installed with `pipx`, for the macOS and Windows browser
-  path.
+  path;
+- `afanes-<version>-checksums.txt`, a SHA-256 entry for each artifact, also
+  reproduced in the release notes.
 
-Native macOS and Windows binaries are not release artifacts. Artifacts are
-attached manually for `1.0.0`. There is no PyPI publication and
-no code signing, notarization, or auto-update. The wheel must prove that
-`afanes --web` starts with networking unavailable before the release; if the
-Flet web client is fetched at startup, the packaging change bundles it or
-records the limitation in the release notes.
+Native macOS and Windows binaries are not release artifacts. Publication runs
+only after the preflight check, the automated gates, and the artifact checksum
+verification pass, and the pipeline deletes an unpublished draft when a step
+fails. A published release is immutable: a re-run for the same tag fails and
+names the existing release. Rollback for a bad release deletes the release,
+keeps the tag, and ships a patch version. There is no PyPI publication and no
+code signing, notarization, or auto-update. The wheel must prove that
+`afanes --web` starts with networking unavailable before the tag; if the Flet
+web client is fetched at startup, the packaging work bundles it or records the
+limitation in the release notes.
 
 ## Constraints (not gaps)
 
@@ -141,16 +148,17 @@ records the limitation in the release notes.
 - The first development desktop run may fetch the Flet client once as
   provisioning; a packaged build bundles the client and starts offline.
 - There is no cloud sync, account, telemetry, or hidden network call.
-- `0.14.0` is the current version. Intermediate `0.x` releases group completed
-  work; no future `0.x` version is named as a checkpoint.
+- `0.14.0` is the current version. Archived changes stay under `Unreleased`;
+  versions move only when a release is cut deliberately.
 
 ## Version path
 
-`0.14.0` is the current version. An archive that completes a coherent group of
-work is a MINOR release; an archive that completes no milestone keeps its entry
-under `Unreleased` and does not bump the version. `1.0.0` follows only when every
-row in the unified gate is green. The maintainer confirms the transition after
-reviewing the recorded evidence in this file.
+`0.14.0` is the current version. Archiving a change does not bump the version or
+create a tag; its entry stays under `Unreleased`. A release is a deliberate act:
+bump with `hatch version patch|minor|major`, move the `Unreleased` entries under
+the released heading, and push the tag, which publishes it. `1.0.0` follows only
+when every row in the unified gate is green. The maintainer confirms the
+transition after reviewing the recorded evidence in this file.
 
 ## Work sequence
 
@@ -166,9 +174,10 @@ time:
 6. HIG wave 7: identity, the SVG app icon, the final palette, an empty
    conformance baseline, and the residual wave 6 polish. Landed in `0.14.0`.
 7. Linux release workflow: the pinned GitHub Actions build, the checksummed
-   artifact, and the downloaded-artifact evidence path.
-8. Packaging and Linux evidence: the GitHub release artifacts, the offline
-   wheel check, the Linux manual checks, and `1.0.0`.
+   artifact, and the downloaded-artifact evidence path. Landed in `0.14.0`.
+8. Automated release publishing and the `1.0.0` release: the tag-triggered
+   pipeline, the wheel release asset, the packaged Linux evidence, and the first
+   published release. Delivered by this change.
 
 ## Not planned
 

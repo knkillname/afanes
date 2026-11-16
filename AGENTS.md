@@ -28,7 +28,7 @@
 
 ## 2. Environment and commands
 
-Hatch is the only developer interface. Do not run `uv`, `pip`, `poetry`, or `conda`, and do not create or edit `.venv/` by hand; `hatch env create` owns it. GitHub Actions builds the Linux release artifact in `.github/workflows/linux-release.yml`; the local gates and the packaged manual gate remain required before a release.
+Hatch is the only developer interface. Do not run `uv`, `pip`, `poetry`, or `conda`, and do not create or edit `.venv/` by hand; `hatch env create` owns it. GitHub Actions builds and publishes the release artifacts in `.github/workflows/release.yml`; the local gates and the packaged manual gate remain required before a release tag.
 
 ```bash
 hatch env create
@@ -45,13 +45,14 @@ hatch test -k "frontmatter and not slow"
 hatch test --all                    # 3.13 + 3.14 + oldest-dependency floor
 hatch run pytest ...                # focused diagnosis only
 hatch run python scripts/scan_benchmark.py --notes 1000 5000 10000 --repeat 5
-gh workflow run linux-release.yml            # Linux release build on ubuntu-24.04
-gh run download <run-id> -n afanes-linux-x64 # download the checksummed bundle
+gh workflow run release.yml                  # dry run: build and upload, no release
+gh run download <run-id> -n afanes-release   # download the checksummed artifacts
+git push origin vX.Y.Z                       # push a release tag; the workflow publishes it
 ```
 
 - Interpreter: `.venv/bin/python` (Windows: `.venv\Scripts\python.exe`).
 - Version: `hatch version`. Bump only through 5.3; never edit `src/afanes/__about__.py`.
-- Build: `hatch run package <linux|macos|windows> --build-version "$(hatch version)"`. The `package` script compiles the gettext catalogs before invoking `flet build`. Build only on the host OS; artifacts land in `build/<platform>/`. `src/main.py` is the packaged launcher. The Linux release workflow builds the same bundle on `ubuntu-24.04` and uploads it with a SHA-256 file; the local path remains the fallback, and the packaged manual gate runs on the downloaded artifact.
+- Build: `hatch run package <linux|macos|windows> --build-version "$(hatch version)"`. The `package` script compiles the gettext catalogs before invoking `flet build`. Build only on the host OS; artifacts land in `build/<platform>/`. `src/main.py` is the packaged launcher. `.github/workflows/release.yml` builds the same bundle plus the Python wheel on `ubuntu-24.04`, and a `v*` tag push publishes both; a manual dispatch only builds and uploads. The local path remains the fallback, and the packaged manual gate runs on the downloaded artifact before the tag.
 - Documentation: `docs/` is the user-facing manual; build it with `hatch run docs:build` and preview it with `hatch run docs:serve`. The `docs` Hatch environment installs Sphinx only for documentation work.
 - OpenSpec: `openspec list --json`, `openspec status --change "<name>" --json`, `openspec instructions apply --change "<name>" --json`, `openspec validate --all --strict`, `openspec doctor`, `openspec archive "<name>"`. Slash commands: `/opsx-propose`, `/opsx-apply`, `/opsx-archive`, and siblings.
 - `rg` is not installed here. Use `grep -r` (see 6.1).
@@ -211,16 +212,16 @@ A propose workflow stops after presenting artifacts. Do not start implementation
 
 Archive only after approval and completion. `openspec archive` updates `openspec/specs/`; do not copy deltas by hand. Use `--skip-specs` only for genuine no-behavior changes.
 
-### 5.3 Post-archive release
+### 5.3 Post-archive close-out
 
-Every successful archive, including `--skip-specs`, ends with a release step.
+Every successful archive, including `--skip-specs`, ends with a close-out step. An archive does not bump the version, tag the repository, or publish a release.
 
-1. **Bump only when the archive completes a coherent milestone.** `1.0.0` is reserved for the first usable MVP (open a vault, capture, clarify, browse, review without hand-editing files); the checklist, platform evidence, and version path live in `RELEASE.md`. Incompatible changes to unreleased APIs are MINOR or PATCH, never MAJOR. If no milestone completes, keep the entry under `Unreleased` and skip the bump. Never edit `src/afanes/__about__.py`; use `hatch version patch|minor|major`.
-2. **CHANGELOG.md** (Keep a Changelog 1.1.0, SemVer): move `Unreleased` entries under `## [X.Y.Z] - YYYY-MM-DD`, leave a fresh empty `Unreleased`, use only Added/Changed/Deprecated/Removed/Fixed/Security, write observable outcomes, name the change, record resolved runtime dependency versions, and list moved or removed public APIs with replacements. Update comparison links only when release tags exist; never rewrite a released entry.
+1. **Version and changelog.** Keep the change's entry under `Unreleased` in `CHANGELOG.md` and leave the version unchanged. A release is a deliberate act: `hatch version patch|minor|major`, move the `Unreleased` entries under `## [X.Y.Z] - YYYY-MM-DD`, and push the `vX.Y.Z` tag, which publishes the release. `1.0.0` is reserved for the first usable MVP; the checklist, platform evidence, and version path live in `RELEASE.md`. Incompatible changes to unreleased APIs are MINOR or PATCH, never MAJOR. Never edit `src/afanes/__about__.py`.
+2. **CHANGELOG.md** (Keep a Changelog 1.1.0, SemVer): archive entries stay under `Unreleased`; when cutting a release, move them under the released heading and leave a fresh empty `Unreleased`. Use only Added/Changed/Deprecated/Removed/Fixed/Security, write observable outcomes, name the change, and list moved or removed public APIs with replacements. Record resolved runtime dependency versions in the release entry. Update comparison links only when release tags exist; never rewrite a released entry.
 3. **README.md and docs/**: update the landing page for installation, quick start, features, platforms, configuration, CLI, or stale behavior, and update the affected docs pages. Record `README: no change required` and `Docs: no change required` when neither changed.
 4. **Gates**: `hatch check`, `hatch test --cover`, `openspec validate --all --strict`, `openspec doctor`, and the 6.1 compliance check.
-5. **Commit** the archive move, synced specs, and release artifacts together. The subject names the delivered behavior; the body contains `Archived OpenSpec change: <name>` and, when bumped, `Release: vX.Y.Z`. Do not tag, push, or publish unless asked.
-6. **Report** the previous/new version, bump rationale, changelog section, README status, docs status, and commit hash.
+5. **Commit** the archive move, synced specs, and close-out artifacts together. The subject names the delivered behavior; the body contains `Archived OpenSpec change: <name>`. No tag, push of a tag, or release follows an archive; push a `v*` tag only to cut a release, and never overwrite a published release.
+6. **Report** the version (unchanged, or the release version when the change is the release), changelog section, README status, docs status, and commit hash.
 
 If the archive succeeds but the release step fails, leave the work in the tree, report the failure, and do not create a partial release commit.
 

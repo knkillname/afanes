@@ -16,7 +16,8 @@ session at a time.
 ## 🚀 Install and start
 
 On macOS and Windows, download the wheel from the
-[releases page](https://github.com/knkillname/afanes/releases) and install it with the browser extra:
+[releases page](https://github.com/knkillname/afanes/releases), verify it against
+`afanes-<version>-checksums.txt`, and install it with the browser extra:
 
 ```console
 pipx install "/path/to/afanes-<version>-py3-none-any.whl[web]"

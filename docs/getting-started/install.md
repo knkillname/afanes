@@ -32,9 +32,10 @@ development run downloads and caches the Flet client under `~/.flet/client/`. Th
 provisioning, not application behavior: the running app never fetches a package or calls a service.
 
 A packaged desktop build bundles the client and starts with no network access. Linux builds are
-supported and tested; download one from the
-[releases page](https://github.com/knkillname/afanes/releases) instead of building your own. The
-release guide covers the build path.
+supported and tested; download `afanes-linux-x64-<version>.tar.gz` from the
+[releases page](https://github.com/knkillname/afanes/releases), verify it against
+`afanes-<version>-checksums.txt`, and run the extracted `afanes` binary instead of building your own.
+The release guide covers the pipeline.
 
 ## 🖥️ macOS and Windows: wheel and browser
 
@@ -45,9 +46,10 @@ pipx install "/path/to/afanes-<version>-py3-none-any.whl[web]"
 afanes --web
 ```
 
-Download the wheel from the [releases page](https://github.com/knkillname/afanes/releases) and pass
-its path. The `[web]` extra installs the browser runtime. The server binds loopback only, serves local
-assets, and allows one browser session at a time.
+Download `afanes-<version>-py3-none-any.whl` from the
+[releases page](https://github.com/knkillname/afanes/releases) and pass its path; verify it against
+`afanes-<version>-checksums.txt` first. The `[web]` extra installs the browser runtime. The server
+binds loopback only, serves local assets, and allows one browser session at a time.
 
 The wheel is the supported macOS and Windows path.
 
@@ -63,9 +65,9 @@ The desktop window stays the default; `--web` is an explicit opt-in.
 
 ## 📦 Build a desktop artifact
 
-Linux release builds run in GitHub Actions on a pinned `ubuntu-24.04` runner; the
-[release guide](../develop/releasing.md) covers the dispatch, download, checksum, and offline-start
-check.
+Linux release builds and the wheel run in GitHub Actions on a pinned `ubuntu-24.04` runner. A `v*` tag
+push publishes the release; a manual dispatch only builds and uploads. The
+[release guide](../develop/releasing.md) covers the pipeline, checksums, and offline-start check.
 
 A local build remains the fallback:
 
