@@ -148,7 +148,12 @@ def _typed[T: ft.Control](control: ft.Control | None, expected: type[T]) -> T:
 
 
 def _live_region_for(control: ft.Control, target: ft.Control) -> ft.Semantics | None:
-    if isinstance(control, ft.Semantics) and control.live_region is True and control.content is target:
+    content = getattr(control, "content", None)
+    if (
+        isinstance(control, ft.Semantics)
+        and control.live_region is True
+        and (content is target or (isinstance(content, ft.Control) and _contains_control(content, target)))
+    ):
         return control
     for child in getattr(control, "controls", []) or []:
         found = _live_region_for(child, target)
@@ -158,10 +163,19 @@ def _live_region_for(control: ft.Control, target: ft.Control) -> ft.Semantics | 
         found = _live_region_for(child, target)
         if found is not None:
             return found
-    content = getattr(control, "content", None)
     if isinstance(content, ft.Control):
         return _live_region_for(content, target)
     return None
+
+
+def _contains_control(control: ft.Control, target: ft.Control) -> bool:
+    if control is target:
+        return True
+    for child in getattr(control, "controls", []) or []:
+        if _contains_control(child, target):
+            return True
+    content = getattr(control, "content", None)
+    return isinstance(content, ft.Control) and _contains_control(content, target)
 
 
 def _find_span(control: ft.Control, text: str) -> ft.TextSpan | None:
@@ -402,7 +416,8 @@ class TestLocaleStartup:
         assert isinstance(snackbar, ft.SnackBar)
         region = typing.cast("ft.Semantics", snackbar.content)
         assert region.live_region is True
-        content = typing.cast("ft.Text", region.content)
+        surface = typing.cast("ft.Container", region.content)
+        content = typing.cast("ft.Text", surface.content)
         assert content.value == afanes.i18n.ui.en.LANGUAGE_RESTART
 
     def test_the_date_dialog_receives_the_active_locale(

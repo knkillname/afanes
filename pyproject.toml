@@ -95,6 +95,13 @@ package = [
   "flet build {args}",
 ]
 
+[tool.hatch.envs.render]
+template = "default"
+
+[tool.hatch.envs.render.scripts]
+check = "python scripts/render_layout.py --check"
+update = "python scripts/render_layout.py --update"
+
 [tool.hatch.envs.docs]
 path = ".venv-docs"
 installer = "uv"
@@ -150,6 +157,7 @@ convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "docs/conf.py" = ["A001", "INP001"]
+"scripts/render_layout.py" = ["E402"]
 "tests/**/*.py" = ["D100", "D101", "D102", "D103", "D104", "PLR0913", "S101"]
 
 [tool.pyrefly]

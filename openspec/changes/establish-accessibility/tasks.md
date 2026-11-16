@@ -28,10 +28,10 @@
 
 ## 5. Large text and rendered layout snapshot
 
-- [ ] 5.1 Replace fixed heights on text-bearing headers, fields, calendar cells, and date-picker periods with minimum heights and content growth; verify existing UI tests and new large-text layout tests pass.
-- [ ] 5.2 Add a test-only 200% theme scale and `scripts/render_layout.py` to launch the cached Flet desktop client with a temporary fixture vault, record keyed control geometry at 100% and 200%, and close the window; verify the command runs and writes a temporary JSON report.
-- [ ] 5.3 Add the JSON snapshot comparator and Linux snapshot, failing on missing views, collapsed regions, non-growing text controls, and geometry outside tolerance; verify pass, non-growing, missing-view, and tolerance cases, with no tracked screenshots.
-- [ ] 5.4 Add the `hatch run render:check` and `hatch run render:update` commands and document the display prerequisite and snapshot review rule; verify both commands are documented and `hatch run render:check` passes.
+- [x] 5.1 Replace fixed heights on text-bearing headers, fields, calendar cells, and date-picker periods with minimum heights and content growth; verify existing UI tests and new large-text layout tests pass.
+- [x] 5.2 Add a test-only 200% theme scale and `scripts/render_layout.py` to launch the cached Flet desktop client with a temporary fixture vault, record keyed control geometry at 100% and 200%, and close the window; verify the command runs and writes a temporary JSON report.
+- [x] 5.3 Add the JSON snapshot comparator and Linux snapshot, failing on missing views, collapsed regions, non-growing text controls, and geometry outside tolerance; verify pass, non-growing, missing-view, and tolerance cases, with no tracked screenshots.
+- [x] 5.4 Add the `hatch run render:check` and `hatch run render:update` commands and document the display prerequisite and snapshot review rule; verify both commands are documented and `hatch run render:check` passes.
 - [ ] 5.5 Run the real GNOME Large Text pass at 1024x600, the 1100 px breakpoint, light and dark, across every primary view; record the observed result in `RELEASE.md` and do not mark this task complete without evidence.
 - [ ] 5.6 Update the wave 5 evidence and HIG row in `RELEASE.md` and the guide references to the automated layout check; verify `hatch run docs:build` passes.
 

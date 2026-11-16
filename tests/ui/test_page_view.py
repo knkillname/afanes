@@ -475,9 +475,9 @@ class TestEditMode:
         assert view.due_field.visible is True
         assert view.due_field.value == "2026-01-02"
         assert "Call" in view.identity_text.value
-        assert view.type_dropdown.height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
-        assert view.date_field.height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
-        assert view.owner_field.height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
+        assert view.type_dropdown.min_height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
+        assert view.date_field.min_height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
+        assert view.owner_field.min_height == afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT
         assert view.edit_form.spacing == afanes.ui.theme.SECTION_GAP
         assert view.form_fields.column.spacing == afanes.ui.theme.ITEM_GAP
         assert view.form_fields.controls == [

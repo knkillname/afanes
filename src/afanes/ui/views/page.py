@@ -415,7 +415,7 @@ class PageView:
                 for note_type in NoteType
             ],
             on_select=self.change_type,
-            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
+            min_height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.category_field = ft.Dropdown(
             label=self._state.status.copy.PAGE_CATEGORY_LABEL,
@@ -425,7 +425,7 @@ class PageView:
             enable_filter=True,
             on_select=self.change_category,
             on_blur=self._commit_category_on_blur,
-            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
+            min_height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.category_error = ft.Text(
             "",
@@ -438,20 +438,20 @@ class PageView:
             label=self._state.status.copy.PAGE_STATUS_LABEL,
             options=[],
             on_select=self.change_status,
-            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
+            min_height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.due_field = ft.TextField(
             label=self._state.status.copy.PAGE_DUE_DATE_LABEL,
             hint_text=self._state.status.copy.DATE_HINT,
             on_change=self.change_due_date,
-            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
+            min_height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.date_field = ft.TextField(
             label=self._state.status.copy.PAGE_DATE_LABEL,
             hint_text=self._state.status.copy.DATE_HINT,
             on_blur=self.commit_date,
             on_submit=self.commit_date,
-            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
+            min_height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self._attach_date_field_actions()
         self.date_error = ft.Text(
@@ -465,13 +465,13 @@ class PageView:
             label=self._state.status.copy.PAGE_ASKED_BY_LABEL,
             hint_text=self._state.status.copy.PAGE_ASKED_BY_HINT,
             on_change=self.change_asked_by,
-            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
+            min_height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.owner_field = ft.TextField(
             label=self._state.status.copy.PAGE_OWNER_LABEL,
             hint_text=self._state.status.copy.PAGE_OWNER_HINT,
             on_change=self.change_owner,
-            height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
+            min_height=afanes.ui.theme.PAGE_FORM_FIELD_HEIGHT,
         )
         self.name_suggestions = ft.Column(controls=[], spacing=0, visible=False)
         self.due_error = ft.Text(
@@ -508,6 +508,7 @@ class PageView:
             expand=True,
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             visible=False,
+            key="page-edit-form",
         )
 
     def _build_raw_panel(self) -> None:
@@ -530,6 +531,7 @@ class PageView:
             on_click=self.save_raw,
         )
         self.raw_panel = ft.Column(
+            key="page-raw-panel",
             controls=[
                 afanes.ui.components.live.LiveRegion(self.raw_warning).build(),
                 self.raw_field,

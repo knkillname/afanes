@@ -133,7 +133,7 @@ class CalendarGrid:
         self._focused_day = None
         self.day_buttons = {}
         cells: list[ft.Control] = [
-            ft.Container(expand=True, height=afanes.ui.theme.CALENDAR_CELL_HEIGHT)
+            ft.Container(expand=True, min_height=afanes.ui.theme.CALENDAR_CELL_HEIGHT)
             for _ in range(calendar.first_weekday)
         ]
         for cell in calendar.days:
@@ -141,7 +141,7 @@ class CalendarGrid:
             self.day_buttons[cell.day] = button
             cells.append(button)
         while len(cells) % DAYS_PER_WEEK:
-            cells.append(ft.Container(expand=True, height=afanes.ui.theme.CALENDAR_CELL_HEIGHT))
+            cells.append(ft.Container(expand=True, min_height=afanes.ui.theme.CALENDAR_CELL_HEIGHT))
         self.grid.controls = [
             ft.Row(controls=cells[index : index + DAYS_PER_WEEK], spacing=afanes.ui.theme.CALENDAR_GRID_SPACING)
             for index in range(0, len(cells), DAYS_PER_WEEK)
@@ -210,7 +210,7 @@ class CalendarGrid:
             data={"day": cell.day, "count": cell.count},
             tooltip=self._tooltip(cell),
             style=self._day_style(cell.day, cell.count),
-            height=afanes.ui.theme.CALENDAR_CELL_HEIGHT,
+            min_height=afanes.ui.theme.CALENDAR_CELL_HEIGHT,
             expand=True,
             key=f"{self._key_prefix}-day-{cell.day}",
             on_click=self._select_handler(cell.day),

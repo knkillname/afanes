@@ -31,6 +31,12 @@ class LiveRegion:
         Returns
         -------
         ft.Semantics
-            Live region carrying the visible message.
+            Live region carrying the message surface.
+
+        Notes
+        -----
+        The region content is a visible container even while an inline message
+        is hidden. Flet rejects hidden content directly under ``Semantics``; the
+        container keeps the region present so a message can appear in place.
         """
-        return ft.Semantics(live_region=True, content=self._content)
+        return ft.Semantics(live_region=True, content=ft.Container(content=self._content))

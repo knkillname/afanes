@@ -395,6 +395,24 @@ The gate has no baseline: a copy violation is either fixed or the change is not 
 header-capitalization check cannot identify short nouns and verbs, so a lowercase three-letter
 content word in the middle of an English label remains a manual-review catch.
 
+### 🖥️ The rendered layout gate
+
+`hatch run render:check` launches the cached Flet desktop client with a temporary fixture vault. It
+tours every primary view at 100% and 200% text, records keyed control geometry, and compares the
+result with the text snapshot in `tests/render/snapshots/linux.json`. It fails on a missing view, a
+collapsed region, a text-bearing control that does not grow, a missing or extra keyed control, or
+geometry outside a small pixel tolerance.
+
+The command needs a desktop display and is not part of `hatch test`. It does not add a user-visible
+text-size control, a runtime dependency, or a tracked screenshot: the snapshot is JSON, and any
+diagnostic report is written to the temporary directory. `hatch run render:update` rewrites the
+snapshot and may only run after a reviewed large-text pass has confirmed that the new geometry is
+the intended layout. The Linux snapshot is required for the `1.0.0` gate; other platforms may add
+their own snapshot filename later.
+
+The real operating-system **Large Text** setting remains observed release evidence. The rendered
+snapshot proves the doubled-text layout; it cannot prove that the desktop switch reaches the app.
+
 ## 🧭 Migration waves
 
 Wave 0 landed with the change that introduced this standard. Later waves are separate changes with

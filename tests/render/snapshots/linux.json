@@ -1,0 +1,2603 @@
+{
+  "platform": "linux",
+  "schema": 1,
+  "views": {
+    "date-dialog": {
+      "high": {
+        "date-picker-body": {
+          "height": 454.0,
+          "width": 360.0
+        },
+        "date-picker-cancel": {
+          "height": 43.0,
+          "width": 109.0
+        },
+        "date-picker-caption": {
+          "height": 34.0,
+          "width": 332.5
+        },
+        "date-picker-current": {
+          "height": 43.0,
+          "width": 99.5
+        },
+        "date-picker-day-1": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-10": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-11": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-12": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-13": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-14": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-15": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-16": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-17": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-18": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-19": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-2": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-20": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-21": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-22": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-23": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-24": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-25": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-26": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-27": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-28": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-29": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-3": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-30": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-4": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-5": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-6": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-7": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-8": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-day-9": {
+          "height": 46.0,
+          "width": 51.5
+        },
+        "date-picker-grid": {
+          "height": 276.0,
+          "width": 360.0
+        },
+        "date-picker-grid-host": {
+          "height": 312.0,
+          "width": 360.0
+        },
+        "date-picker-grid-root": {
+          "height": 312.0,
+          "width": 360.0
+        },
+        "date-picker-navigation": {
+          "height": 84.0,
+          "width": 360.0
+        },
+        "date-picker-next": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "date-picker-next-large": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "date-picker-period": {
+          "height": 84.0,
+          "width": 184.0
+        },
+        "date-picker-previous": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "date-picker-previous-large": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "date-picker-select": {
+          "height": 43.0,
+          "width": 111.0
+        },
+        "date-picker-weekdays": {
+          "height": 34.0,
+          "width": 360.0
+        }
+      },
+      "low": {
+        "date-picker-body": {
+          "height": 340.0,
+          "width": 360.0
+        },
+        "date-picker-cancel": {
+          "height": 40.0,
+          "width": 71.0
+        },
+        "date-picker-caption": {
+          "height": 17.0,
+          "width": 169.5
+        },
+        "date-picker-current": {
+          "height": 40.0,
+          "width": 66.0
+        },
+        "date-picker-day-1": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-10": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-11": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-12": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-13": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-14": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-15": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-16": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-17": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-18": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-19": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-2": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-20": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-21": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-22": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-23": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-24": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-25": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-26": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-27": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-28": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-29": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-3": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-30": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-4": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-5": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-6": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-7": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-8": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-day-9": {
+          "height": 40.0,
+          "width": 51.5
+        },
+        "date-picker-grid": {
+          "height": 240.0,
+          "width": 360.0
+        },
+        "date-picker-grid-host": {
+          "height": 259.0,
+          "width": 360.0
+        },
+        "date-picker-grid-root": {
+          "height": 259.0,
+          "width": 360.0
+        },
+        "date-picker-navigation": {
+          "height": 40.0,
+          "width": 360.0
+        },
+        "date-picker-next": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "date-picker-next-large": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "date-picker-period": {
+          "height": 21.0,
+          "width": 184.0
+        },
+        "date-picker-previous": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "date-picker-previous-large": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "date-picker-select": {
+          "height": 40.0,
+          "width": 91.0
+        },
+        "date-picker-weekdays": {
+          "height": 17.0,
+          "width": 360.0
+        }
+      },
+      "markers": [
+        "date-picker-body",
+        "date-picker-grid-host"
+      ],
+      "text_keys": [
+        "date-picker-cancel",
+        "date-picker-caption",
+        "date-picker-current",
+        "date-picker-day-1",
+        "date-picker-day-10",
+        "date-picker-day-11",
+        "date-picker-day-12",
+        "date-picker-day-13",
+        "date-picker-day-14",
+        "date-picker-day-15",
+        "date-picker-day-16",
+        "date-picker-day-17",
+        "date-picker-day-18",
+        "date-picker-day-19",
+        "date-picker-day-2",
+        "date-picker-day-20",
+        "date-picker-day-21",
+        "date-picker-day-22",
+        "date-picker-day-23",
+        "date-picker-day-24",
+        "date-picker-day-25",
+        "date-picker-day-26",
+        "date-picker-day-27",
+        "date-picker-day-28",
+        "date-picker-day-29",
+        "date-picker-day-3",
+        "date-picker-day-30",
+        "date-picker-day-4",
+        "date-picker-day-5",
+        "date-picker-day-6",
+        "date-picker-day-7",
+        "date-picker-day-8",
+        "date-picker-day-9",
+        "date-picker-period",
+        "date-picker-select"
+      ]
+    },
+    "inbox": {
+      "high": {
+        "browser-header": {
+          "height": 50.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 153.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 125.0,
+          "width": 353.0
+        },
+        "note-row-inbox/Capture.md": {
+          "height": 101.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 514.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 56.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-capture-actions": {
+          "height": 43.0,
+          "width": 353.0
+        },
+        "workspace-capture-button": {
+          "height": 43.0,
+          "width": 136.5
+        },
+        "workspace-capture-field": {
+          "height": 116.0,
+          "width": 353.0
+        },
+        "workspace-capture-section": {
+          "height": 217.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 56.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "low": {
+        "browser-header": {
+          "height": 48.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 339.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 102.0,
+          "width": 353.0
+        },
+        "note-row-inbox/Capture.md": {
+          "height": 62.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 541.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 40.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-capture-actions": {
+          "height": 40.0,
+          "width": 353.0
+        },
+        "workspace-capture-button": {
+          "height": 40.0,
+          "width": 103.5
+        },
+        "workspace-capture-field": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "workspace-capture-section": {
+          "height": 134.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 48.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "markers": [
+        "browser-list"
+      ],
+      "text_keys": [
+        "browser-search",
+        "note-row-inbox/Capture.md",
+        "workspace-capture-button",
+        "workspace-capture-field"
+      ]
+    },
+    "log": {
+      "high": {
+        "browser-header": {
+          "height": 50.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 382.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 125.0,
+          "width": 353.0
+        },
+        "log-calendar": {
+          "height": 359.0,
+          "width": 329.0
+        },
+        "log-calendar-day-1": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-10": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-11": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-12": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-13": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-14": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-15": {
+          "height": 51.0,
+          "width": 47.0
+        },
+        "log-calendar-day-16": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-17": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-18": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-19": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-2": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-20": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-21": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-22": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-23": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-24": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-25": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-26": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-27": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-28": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-29": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-3": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-30": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-4": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-5": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-6": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-7": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-8": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-day-9": {
+          "height": 46.0,
+          "width": 47.0
+        },
+        "log-calendar-grid": {
+          "height": 281.0,
+          "width": 329.0
+        },
+        "log-calendar-grid-root": {
+          "height": 317.0,
+          "width": 329.0
+        },
+        "log-calendar-next": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "log-calendar-previous": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "log-calendar-weekdays": {
+          "height": 34.0,
+          "width": 329.0
+        },
+        "log-mode-entries": {
+          "height": 43.0,
+          "width": 116.0
+        },
+        "log-mode-everything": {
+          "height": 43.0,
+          "width": 170.0
+        },
+        "log-today-entry": {
+          "height": 43.0,
+          "width": 205.0
+        },
+        "log-tree": {
+          "height": 60.0,
+          "width": 353.0
+        },
+        "log-year-2026": {
+          "height": 60.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 514.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 56.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 56.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "year:2026:create": {
+          "height": 40.0,
+          "width": 40.0
+        }
+      },
+      "low": {
+        "browser-header": {
+          "height": 48.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 485.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 102.0,
+          "width": 353.0
+        },
+        "log-calendar": {
+          "height": 301.0,
+          "width": 329.0
+        },
+        "log-calendar-day-1": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-10": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-11": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-12": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-13": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-14": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-15": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-16": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-17": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-18": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-19": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-2": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-20": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-21": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-22": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-23": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-24": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-25": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-26": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-27": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-28": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-29": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-3": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-30": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-4": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-5": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-6": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-7": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-8": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-day-9": {
+          "height": 40.0,
+          "width": 47.0
+        },
+        "log-calendar-grid": {
+          "height": 240.0,
+          "width": 329.0
+        },
+        "log-calendar-grid-root": {
+          "height": 259.0,
+          "width": 329.0
+        },
+        "log-calendar-next": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "log-calendar-previous": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "log-calendar-weekdays": {
+          "height": 17.0,
+          "width": 329.0
+        },
+        "log-mode-entries": {
+          "height": 40.0,
+          "width": 74.5
+        },
+        "log-mode-everything": {
+          "height": 40.0,
+          "width": 101.5
+        },
+        "log-today-entry": {
+          "height": 40.0,
+          "width": 119.0
+        },
+        "log-tree": {
+          "height": 58.0,
+          "width": 353.0
+        },
+        "log-year-2026": {
+          "height": 58.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 541.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 40.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 48.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "year:2026:create": {
+          "height": 40.0,
+          "width": 40.0
+        }
+      },
+      "markers": [
+        "log-calendar",
+        "log-calendar-grid"
+      ],
+      "text_keys": [
+        "browser-search",
+        "log-calendar-day-1",
+        "log-calendar-day-10",
+        "log-calendar-day-11",
+        "log-calendar-day-12",
+        "log-calendar-day-13",
+        "log-calendar-day-14",
+        "log-calendar-day-15",
+        "log-calendar-day-16",
+        "log-calendar-day-17",
+        "log-calendar-day-18",
+        "log-calendar-day-19",
+        "log-calendar-day-2",
+        "log-calendar-day-20",
+        "log-calendar-day-21",
+        "log-calendar-day-22",
+        "log-calendar-day-23",
+        "log-calendar-day-24",
+        "log-calendar-day-25",
+        "log-calendar-day-26",
+        "log-calendar-day-27",
+        "log-calendar-day-28",
+        "log-calendar-day-29",
+        "log-calendar-day-3",
+        "log-calendar-day-30",
+        "log-calendar-day-4",
+        "log-calendar-day-5",
+        "log-calendar-day-6",
+        "log-calendar-day-7",
+        "log-calendar-day-8",
+        "log-calendar-day-9",
+        "log-mode-entries",
+        "log-mode-everything",
+        "log-today-entry"
+      ]
+    },
+    "needs-attention": {
+      "high": {
+        "browser-header": {
+          "height": 50.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 382.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 125.0,
+          "width": 353.0
+        },
+        "note-row-notes/Misplaced.md": {
+          "height": 101.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 514.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 56.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 56.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        }
+      },
+      "low": {
+        "browser-header": {
+          "height": 48.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 485.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 102.0,
+          "width": 353.0
+        },
+        "note-row-notes/Misplaced.md": {
+          "height": 62.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 541.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 40.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 48.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        }
+      },
+      "markers": [
+        "browser-list"
+      ],
+      "text_keys": [
+        "browser-search",
+        "note-row-notes/Misplaced.md"
+      ]
+    },
+    "page-edit": {
+      "high": {
+        "browser-header": {
+          "height": 50.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 153.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 125.0,
+          "width": 353.0
+        },
+        "date-picker-open": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "note-row-inbox/Capture.md": {
+          "height": 101.0,
+          "width": 353.0
+        },
+        "page-done-action": {
+          "height": 43.0,
+          "width": 119.5
+        },
+        "page-edit-form": {
+          "height": 520.0,
+          "width": 837.0
+        },
+        "page-mode-host": {
+          "height": 520.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 56.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-capture-actions": {
+          "height": 43.0,
+          "width": 353.0
+        },
+        "workspace-capture-button": {
+          "height": 43.0,
+          "width": 136.5
+        },
+        "workspace-capture-field": {
+          "height": 116.0,
+          "width": 353.0
+        },
+        "workspace-capture-section": {
+          "height": 217.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 56.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "low": {
+        "browser-header": {
+          "height": 48.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 339.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 102.0,
+          "width": 353.0
+        },
+        "date-picker-open": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "note-row-inbox/Capture.md": {
+          "height": 62.0,
+          "width": 353.0
+        },
+        "page-done-action": {
+          "height": 40.0,
+          "width": 102.5
+        },
+        "page-edit-form": {
+          "height": 545.0,
+          "width": 837.0
+        },
+        "page-mode-host": {
+          "height": 545.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 40.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-capture-actions": {
+          "height": 40.0,
+          "width": 353.0
+        },
+        "workspace-capture-button": {
+          "height": 40.0,
+          "width": 103.5
+        },
+        "workspace-capture-field": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "workspace-capture-section": {
+          "height": 134.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 48.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "markers": [
+        "page-toolbar",
+        "page-edit-form"
+      ],
+      "text_keys": [
+        "browser-search",
+        "note-row-inbox/Capture.md",
+        "page-done-action",
+        "workspace-capture-button",
+        "workspace-capture-field"
+      ]
+    },
+    "page-raw": {
+      "high": {
+        "browser-header": {
+          "height": 50.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 153.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 125.0,
+          "width": 353.0
+        },
+        "note-row-inbox/Capture.md": {
+          "height": 101.0,
+          "width": 353.0
+        },
+        "page-done-action": {
+          "height": 43.0,
+          "width": 119.5
+        },
+        "page-mode-host": {
+          "height": 520.0,
+          "width": 837.0
+        },
+        "page-raw-panel": {
+          "height": 520.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 56.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-capture-actions": {
+          "height": 43.0,
+          "width": 353.0
+        },
+        "workspace-capture-button": {
+          "height": 43.0,
+          "width": 136.5
+        },
+        "workspace-capture-field": {
+          "height": 116.0,
+          "width": 353.0
+        },
+        "workspace-capture-section": {
+          "height": 217.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 56.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "low": {
+        "browser-header": {
+          "height": 48.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 339.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 102.0,
+          "width": 353.0
+        },
+        "note-row-inbox/Capture.md": {
+          "height": 62.0,
+          "width": 353.0
+        },
+        "page-done-action": {
+          "height": 40.0,
+          "width": 102.5
+        },
+        "page-mode-host": {
+          "height": 545.0,
+          "width": 837.0
+        },
+        "page-raw-panel": {
+          "height": 545.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 40.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-capture-actions": {
+          "height": 40.0,
+          "width": 353.0
+        },
+        "workspace-capture-button": {
+          "height": 40.0,
+          "width": 103.5
+        },
+        "workspace-capture-field": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "workspace-capture-section": {
+          "height": 134.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 48.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "markers": [
+        "page-toolbar",
+        "page-raw-panel"
+      ],
+      "text_keys": [
+        "browser-search",
+        "note-row-inbox/Capture.md",
+        "page-done-action",
+        "workspace-capture-button",
+        "workspace-capture-field"
+      ]
+    },
+    "page-read": {
+      "high": {
+        "browser-header": {
+          "height": 50.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 153.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 125.0,
+          "width": 353.0
+        },
+        "note-row-inbox/Capture.md": {
+          "height": 101.0,
+          "width": 353.0
+        },
+        "page-date-action": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "page-edit-action": {
+          "height": 43.0,
+          "width": 101.5
+        },
+        "page-menu": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "page-meta": {
+          "height": 40.0,
+          "width": 837.0
+        },
+        "page-mode-host": {
+          "height": 413.0,
+          "width": 837.0
+        },
+        "page-reminder": {
+          "height": 43.0,
+          "width": 837.0
+        },
+        "page-reminder-action": {
+          "height": 43.0,
+          "width": 206.0
+        },
+        "page-toolbar": {
+          "height": 56.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-capture-actions": {
+          "height": 43.0,
+          "width": 353.0
+        },
+        "workspace-capture-button": {
+          "height": 43.0,
+          "width": 136.5
+        },
+        "workspace-capture-field": {
+          "height": 116.0,
+          "width": 353.0
+        },
+        "workspace-capture-section": {
+          "height": 217.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 56.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "low": {
+        "browser-header": {
+          "height": 48.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 339.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 102.0,
+          "width": 353.0
+        },
+        "note-row-inbox/Capture.md": {
+          "height": 62.0,
+          "width": 353.0
+        },
+        "page-date-action": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "page-edit-action": {
+          "height": 40.0,
+          "width": 93.5
+        },
+        "page-menu": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "page-meta": {
+          "height": 40.0,
+          "width": 837.0
+        },
+        "page-mode-host": {
+          "height": 441.0,
+          "width": 837.0
+        },
+        "page-reminder": {
+          "height": 40.0,
+          "width": 837.0
+        },
+        "page-reminder-action": {
+          "height": 40.0,
+          "width": 119.5
+        },
+        "page-toolbar": {
+          "height": 40.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-capture-actions": {
+          "height": 40.0,
+          "width": 353.0
+        },
+        "workspace-capture-button": {
+          "height": 40.0,
+          "width": 103.5
+        },
+        "workspace-capture-field": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "workspace-capture-section": {
+          "height": 134.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 48.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "markers": [
+        "page-toolbar",
+        "page-mode-host"
+      ],
+      "text_keys": [
+        "browser-search",
+        "note-row-inbox/Capture.md",
+        "page-edit-action",
+        "page-reminder-action",
+        "workspace-capture-button",
+        "workspace-capture-field"
+      ]
+    },
+    "processing": {
+      "high": {
+        "browser-header": {
+          "height": 50.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 153.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 125.0,
+          "width": 353.0
+        },
+        "note-row-inbox/Capture.md": {
+          "height": 101.0,
+          "width": 353.0
+        },
+        "processing-cancel": {
+          "height": 43.0,
+          "width": 109.0
+        },
+        "processing-view": {
+          "height": 604.0,
+          "width": 863.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-capture-actions": {
+          "height": 43.0,
+          "width": 353.0
+        },
+        "workspace-capture-button": {
+          "height": 43.0,
+          "width": 136.5
+        },
+        "workspace-capture-field": {
+          "height": 116.0,
+          "width": 353.0
+        },
+        "workspace-capture-section": {
+          "height": 217.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 56.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "low": {
+        "browser-header": {
+          "height": 48.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 339.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 102.0,
+          "width": 353.0
+        },
+        "note-row-inbox/Capture.md": {
+          "height": 62.0,
+          "width": 353.0
+        },
+        "processing-cancel": {
+          "height": 40.0,
+          "width": 71.0
+        },
+        "processing-view": {
+          "height": 612.0,
+          "width": 863.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-capture-actions": {
+          "height": 40.0,
+          "width": 353.0
+        },
+        "workspace-capture-button": {
+          "height": 40.0,
+          "width": 103.5
+        },
+        "workspace-capture-field": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "workspace-capture-section": {
+          "height": 134.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 48.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "markers": [
+        "processing-view"
+      ],
+      "text_keys": [
+        "browser-search",
+        "note-row-inbox/Capture.md",
+        "processing-cancel",
+        "workspace-capture-button",
+        "workspace-capture-field"
+      ]
+    },
+    "projects": {
+      "high": {
+        "browser-header": {
+          "height": 50.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 382.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 125.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 514.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 56.0,
+          "width": 811.0
+        },
+        "project-group-active": {
+          "height": 207.0,
+          "width": 353.0
+        },
+        "project-group-closed": {
+          "height": 60.0,
+          "width": 353.0
+        },
+        "project-group-later": {
+          "height": 60.0,
+          "width": 353.0
+        },
+        "project-group-waiting": {
+          "height": 60.0,
+          "width": 353.0
+        },
+        "project-projects/Launch.md": {
+          "height": 143.0,
+          "width": 349.0
+        },
+        "project-row-projects/Launch.md": {
+          "height": 147.0,
+          "width": 353.0
+        },
+        "projects-view": {
+          "height": 387.0,
+          "width": 353.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 56.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        }
+      },
+      "low": {
+        "browser-header": {
+          "height": 48.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 485.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 102.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 541.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 40.0,
+          "width": 811.0
+        },
+        "project-group-active": {
+          "height": 126.0,
+          "width": 353.0
+        },
+        "project-group-closed": {
+          "height": 39.0,
+          "width": 353.0
+        },
+        "project-group-later": {
+          "height": 39.0,
+          "width": 353.0
+        },
+        "project-group-waiting": {
+          "height": 39.0,
+          "width": 353.0
+        },
+        "project-projects/Launch.md": {
+          "height": 83.0,
+          "width": 349.0
+        },
+        "project-row-projects/Launch.md": {
+          "height": 87.0,
+          "width": 353.0
+        },
+        "projects-view": {
+          "height": 243.0,
+          "width": 353.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 48.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        }
+      },
+      "markers": [
+        "browser-list"
+      ],
+      "text_keys": [
+        "browser-search",
+        "project-projects/Launch.md"
+      ]
+    },
+    "references": {
+      "high": {
+        "browser-header": {
+          "height": 50.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 382.0,
+          "width": 353.0
+        },
+        "browser-new-reference": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "browser-search": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 125.0,
+          "width": 353.0
+        },
+        "note-row-reference/Ada.md": {
+          "height": 101.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 514.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 56.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 56.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        }
+      },
+      "low": {
+        "browser-header": {
+          "height": 48.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 485.0,
+          "width": 353.0
+        },
+        "browser-new-reference": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "browser-search": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 102.0,
+          "width": 353.0
+        },
+        "note-row-reference/Ada.md": {
+          "height": 62.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 541.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 40.0,
+          "width": 811.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 48.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        }
+      },
+      "markers": [
+        "browser-list"
+      ],
+      "text_keys": [
+        "browser-search",
+        "note-row-reference/Ada.md"
+      ]
+    },
+    "review": {
+      "high": {
+        "browser-header": {
+          "height": 50.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 382.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 125.0,
+          "width": 353.0
+        },
+        "processing-cancel": {
+          "height": 43.0,
+          "width": 109.0
+        },
+        "processing-view": {
+          "height": 604.0,
+          "width": 863.0
+        },
+        "review-card-0": {
+          "height": 102.0,
+          "width": 351.0
+        },
+        "review-card-1": {
+          "height": 102.0,
+          "width": 351.0
+        },
+        "review-queue-0": {
+          "height": 104.0,
+          "width": 353.0
+        },
+        "review-queue-1": {
+          "height": 104.0,
+          "width": 353.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 56.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "low": {
+        "browser-header": {
+          "height": 48.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 485.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 102.0,
+          "width": 353.0
+        },
+        "processing-cancel": {
+          "height": 40.0,
+          "width": 71.0
+        },
+        "processing-view": {
+          "height": 612.0,
+          "width": 863.0
+        },
+        "review-card-0": {
+          "height": 63.0,
+          "width": 351.0
+        },
+        "review-card-1": {
+          "height": 63.0,
+          "width": 351.0
+        },
+        "review-queue-0": {
+          "height": 65.0,
+          "width": 353.0
+        },
+        "review-queue-1": {
+          "height": 65.0,
+          "width": 353.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 48.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-view": {
+          "height": 672.0,
+          "width": 1232.0
+        }
+      },
+      "markers": [
+        "review-queue-0"
+      ],
+      "text_keys": [
+        "browser-search",
+        "processing-cancel",
+        "review-card-0",
+        "review-card-1"
+      ]
+    },
+    "shortcuts-dialog": {
+      "high": {
+        "shortcuts-close": {
+          "height": 43.0,
+          "width": 93.0
+        },
+        "shortcuts-group-calendar": {
+          "height": 282.0,
+          "width": 780.5
+        },
+        "shortcuts-group-general": {
+          "height": 234.0,
+          "width": 780.5
+        },
+        "shortcuts-group-navigation": {
+          "height": 142.0,
+          "width": 780.5
+        }
+      },
+      "low": {
+        "shortcuts-close": {
+          "height": 40.0,
+          "width": 64.0
+        },
+        "shortcuts-group-calendar": {
+          "height": 150.0,
+          "width": 491.5
+        },
+        "shortcuts-group-general": {
+          "height": 125.0,
+          "width": 491.5
+        },
+        "shortcuts-group-navigation": {
+          "height": 75.0,
+          "width": 491.5
+        }
+      },
+      "markers": [
+        "shortcuts-close",
+        "shortcuts-group-general"
+      ],
+      "text_keys": [
+        "shortcuts-close"
+      ]
+    },
+    "trash": {
+      "high": {
+        "browser-header": {
+          "height": 50.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 382.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 74.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 125.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 514.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 56.0,
+          "width": 811.0
+        },
+        "trash-empty-action": {
+          "height": 43.0,
+          "width": 227.5
+        },
+        "trash-row-Old": {
+          "height": 100.0,
+          "width": 353.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 56.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        }
+      },
+      "low": {
+        "browser-header": {
+          "height": 48.0,
+          "width": 353.0
+        },
+        "browser-list": {
+          "height": 485.0,
+          "width": 353.0
+        },
+        "browser-search": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-search-bar": {
+          "height": 53.0,
+          "width": 353.0
+        },
+        "browser-top": {
+          "height": 102.0,
+          "width": 353.0
+        },
+        "page-mode-host": {
+          "height": 541.0,
+          "width": 837.0
+        },
+        "page-toolbar": {
+          "height": 40.0,
+          "width": 811.0
+        },
+        "trash-empty-action": {
+          "height": 40.0,
+          "width": 149.5
+        },
+        "trash-row-Old": {
+          "height": 58.0,
+          "width": 353.0
+        },
+        "workspace-browser": {
+          "height": 672.0,
+          "width": 353.0
+        },
+        "workspace-detail": {
+          "height": 672.0,
+          "width": 863.0
+        },
+        "workspace-detail-toolbar": {
+          "height": 48.0,
+          "width": 863.0
+        },
+        "workspace-navigation-toggle": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-new-capture": {
+          "height": 40.0,
+          "width": 40.0
+        },
+        "workspace-refresh": {
+          "height": 40.0,
+          "width": 40.0
+        }
+      },
+      "markers": [
+        "browser-list"
+      ],
+      "text_keys": [
+        "browser-search",
+        "trash-empty-action",
+        "trash-row-Old"
+      ]
+    }
+  },
+  "window": {
+    "height": 600,
+    "width": 1024
+  }
+}

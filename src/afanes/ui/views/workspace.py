@@ -161,8 +161,8 @@ class WorkspaceView:
     def _build_header(self) -> None:
         """Build the toolbar, capture bar, and primary menu."""
         self.progress = ft.ProgressRing(
-            width=16,
-            height=16,
+            width=afanes.ui.theme.ICON_SIZE,
+            height=afanes.ui.theme.ICON_SIZE,
             visible=False,
             semantics_label=self._state.status.copy.WORKING,
         )
@@ -290,7 +290,7 @@ class WorkspaceView:
             self.section_edges[section] = ft.Container(content=tile, border_radius=afanes.ui.theme.SURFACE_RADIUS)
 
         self.navigation_header = ft.Container(
-            height=afanes.ui.theme.HEADER_HEIGHT,
+            min_height=afanes.ui.theme.HEADER_HEIGHT,
             content=ft.Row(
                 controls=[self.vault_text, self.change_button, self.drawer_close_button],
                 spacing=afanes.ui.theme.ITEM_GAP,
@@ -330,7 +330,7 @@ class WorkspaceView:
             key="browser-search-clear",
         )
         self.browser_search_bar = ft.Container(
-            height=afanes.ui.theme.HEADER_HEIGHT,
+            min_height=afanes.ui.theme.HEADER_HEIGHT,
             content=ft.Row(
                 controls=[self.search_field, self.browser_search_clear],
                 spacing=afanes.ui.theme.ITEM_GAP,
@@ -361,7 +361,7 @@ class WorkspaceView:
             key="trash-empty-action",
         )
         self.browser_header = ft.Container(
-            height=afanes.ui.theme.HEADER_HEIGHT,
+            min_height=afanes.ui.theme.HEADER_HEIGHT,
             content=ft.Row(
                 controls=[
                     self.nav_toggle,
@@ -442,7 +442,7 @@ class WorkspaceView:
         )
         self.detail_host = ft.Container(expand=True)
         self.detail_bar = ft.Container(
-            height=afanes.ui.theme.HEADER_HEIGHT,
+            min_height=afanes.ui.theme.HEADER_HEIGHT,
             content=ft.Row(
                 controls=[self.detail_host, self.new_capture_button],
                 spacing=afanes.ui.theme.ITEM_GAP,

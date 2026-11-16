@@ -9,6 +9,7 @@ import pytest
 import afanes.i18n.ui
 import afanes.i18n.ui.en
 import afanes.ui.components.banner
+import afanes.ui.components.live
 import afanes.ui.components.toast
 import afanes.ui.state
 import afanes.ui.state.status
@@ -60,7 +61,9 @@ class TestToastPresenter:
         assert snackbar.padding == afanes.ui.theme.TOAST_PADDING
         assert isinstance(snackbar.content, ft.Semantics)
         assert snackbar.content.live_region is True
-        message = snackbar.content.content
+        surface = snackbar.content.content
+        assert isinstance(surface, ft.Container)
+        message = surface.content
         assert isinstance(message, ft.Text)
         assert message.value == "Moved to Trash"
         assert message.color == afanes.ui.theme.TOAST_TEXT_COLOR
@@ -153,6 +156,29 @@ class TestToastPresenter:
         assert page.pops == 0
 
 
+class TestLiveRegion:
+    def test_a_hidden_inline_error_keeps_a_visible_region(self) -> None:
+        error = ft.Text("", visible=False)
+
+        region = afanes.ui.components.live.LiveRegion(error).build()
+
+        surface = region.content
+        assert isinstance(surface, ft.Container)
+        assert surface.visible is True
+        assert surface.content is error
+        assert error.visible is False
+
+    def test_the_visible_message_supplies_the_region_text(self) -> None:
+        message = ft.Text("Refresh failed")
+
+        region = afanes.ui.components.live.LiveRegion(message).build()
+
+        assert region.live_region is True
+        surface = region.content
+        assert isinstance(surface, ft.Container)
+        assert surface.content is message
+
+
 class TestNoticeLifecycle:
     def test_a_second_notice_replaces_the_first(self) -> None:
         status = afanes.ui.state.status.UiStatus()
@@ -225,7 +251,9 @@ class TestOwnedBanners:
         region = control.content
         assert isinstance(region, ft.Semantics)
         assert region.live_region is True
-        row = region.content
+        surface = region.content
+        assert isinstance(surface, ft.Container)
+        row = surface.content
         assert isinstance(row, ft.Row)
         message = row.controls[1]
         assert isinstance(message, ft.Text)

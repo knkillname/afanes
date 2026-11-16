@@ -412,7 +412,7 @@ class DatePickerDialog:
         """Build one mode-switch button."""
         return ft.TextButton(
             content=self._mode_label(precision),
-            height=afanes.ui.theme.DATE_PICKER_PERIOD_HEIGHT,
+            min_height=afanes.ui.theme.DATE_PICKER_PERIOD_HEIGHT,
             expand=True,
             style=self._mode_style(precision),
             on_click=self._precision_handler(precision),
@@ -579,7 +579,7 @@ class DatePickerDialog:
         """Build one month or year cell."""
         return ft.TextButton(
             content=label,
-            height=afanes.ui.theme.DATE_PICKER_PERIOD_HEIGHT,
+            min_height=afanes.ui.theme.DATE_PICKER_PERIOD_HEIGHT,
             expand=True,
             style=self._period_style(selected=selected, today=today, focused=False),
             on_click=handler,
