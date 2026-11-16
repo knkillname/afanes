@@ -21,8 +21,8 @@
 ## 3. Pipeline verification
 
 - [x] 3.1 Run `hatch check`, `hatch test --cover`, `hatch run docs:build`, `openspec validate --all --strict`, `openspec doctor`, and both vocabulary greps from `AGENTS.md` section 6.1. Verify every command passes and no gate output changes source files.
-- [ ] 3.2 Dispatch `release.yml` by hand on the current commit and confirm the dry-run contract: gates run, the workflow uploads the bundle, wheel, and checksum file, and `gh release list --repo <owner>/afanes` still shows no release. Verify the run summary records the commit, version, runner image, tool versions, and checksums, and that the publish job reads `skipped`.
-- [ ] 3.3 Download the dry-run artifact and re-verify it: `sha256sum -c` passes for both entries in the checksum file, extracting the `tar.gz` yields an executable `afanes`, and `pipx install "…/afanes-<version>-py3-none-any.whl[web]"` in a scratch environment starts `afanes --web` with networking unavailable. Verify the About version matches `hatch version` and the browser session serves local assets.
+- [x] 3.2 Dispatch `release.yml` by hand on the current commit and confirm the dry-run contract: gates run, the workflow uploads the bundle, wheel, and checksum file, and `gh release list --repo <owner>/afanes` still shows no release. Verify the run summary records the commit, version, runner image, tool versions, and checksums, and that the publish job reads `skipped`.
+- [x] 3.3 Download the dry-run artifact and re-verify it: `sha256sum -c` passes for both entries in the checksum file, extracting the `tar.gz` yields an executable `afanes`, and `pipx install "…/afanes-<version>-py3-none-any.whl[web]"` in a scratch environment starts `afanes --web` with networking unavailable. Verify the About version matches `hatch version` and the browser session serves local assets.
 
 ## 4. The `1.0.0` release
 
