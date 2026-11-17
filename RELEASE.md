@@ -86,6 +86,26 @@ the HIG row remains backed by the `0.12.0` Large Text, `0.13.0` high-contrast,
 and `0.14.0` icon records above with the empty conformance baseline. The complete
 gate is re-run on the `1.0.0` artifact before the tag.
 
+Packaged `1.0.0` gate evidence on 2026-11-16 (`Linux tlacoyo x86_64`): the
+dispatch artifact from run `44019056366` at commit
+`e80dc9e828690bbf2c1b6f15c390b90772cac11e`, built on the `ubuntu-24.04`
+runner image `20261111.370.1`, matched its checksum file. The bundle
+`afanes-linux-x64-1.0.0.tar.gz` has SHA-256
+`8a4d1e44349b1365ab9fecae6e07c1cb5eca21ef536a45af5e950f69d8d84966` and the
+wheel `afanes-1.0.0-py3-none-any.whl` has SHA-256
+`303ce01df0770da89259cb85ee08d96c61d6c5997ce265bb7c6cb71f96faaaec`; the
+bundle's `version.json` reports `1.0.0`. Launched under `unshare -rn` with
+networking unavailable, it opened the versioned vault, captured a thought
+whose Markdown body matched the typed text, clarified a capture into a
+project and added its step, opened a browser search result, and completed a
+due review step while the pending count dropped from 3 to 2. The maintainer
+confirmed the external-edit conflict from the earlier packaged pass,
+accepted the `0.10.0` reminder record and the `0.12.0` Large Text and
+`0.13.0` high-contrast records for this release because the only application
+change since `0.14.0` is the language-menu fix, and confirmed adoption on
+the fixed `0.14.0` artifact (`44015988044`), which carries the same
+application code. The tag pipeline rebuilds and publishes this commit.
+
 Packaging evidence at `0.10.0` on 2026-11-14 (`Linux tlacoyo x86_64`): the
 wheel metadata declares `tzdata>=2026.6,<2027` and `tzlocal>=5.4.5,<6`, and an
 offline reminder calculation resolves `America/Mexico_City` from the packaged
