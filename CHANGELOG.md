@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-16
+
 ### Changed
 
 - **Automated release publishing.** `.github/workflows/release.yml` replaces the Linux-only workflow:
@@ -17,7 +19,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   the version or creates a tag: entries stay under `Unreleased` until a release is cut deliberately.
   This implements the `automate-release-publishing` OpenSpec change and delivers the `1.0.0` release
   path. No runtime code, dependency, schema, or public API change; the application remains offline at
-  startup. README: updated. Docs: updated.
+  startup. Resolved runtime dependencies: `flet==1.1.2`, `markdown-it-py==4.3.0`, `PyYAML==6.0.3`,
+  `tzdata==2026.6`, `tzlocal==5.4.5`. README: updated. Docs: updated.
 
 - **Linux release workflow.** `.github/workflows/linux-release.yml` builds the Linux bundle on a
   pinned `ubuntu-24.04` runner, runs `hatch check` and `hatch test --cover`, and uploads a checksummed
