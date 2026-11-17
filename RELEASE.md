@@ -106,6 +106,22 @@ change since `0.14.0` is the language-menu fix, and confirmed adoption on
 the fixed `0.14.0` artifact (`44015988044`), which carries the same
 application code. The tag pipeline rebuilds and publishes this commit.
 
+Published `1.0.0` release on 2026-11-16: tag `v1.0.0` at commit
+`1612b0a167e94d6f52aa18ec6089d8405f18cc5c` published run `44021432705`
+(<https://github.com/knkillname/afanes/releases/tag/v1.0.0>) with the Linux
+bundle, the wheel, and `afanes-1.0.0-checksums.txt`; the dispatch run created no
+release. The notes name the version, commit, run URL, runner image (`ubuntu24`
+`20261111.127.1`), and both checksums, and `sha256sum -c` passes on the
+downloaded assets. The published bundle has SHA-256
+`5317957450dd89652c7cb5706ad50614603840b9004fa9defaca4181a68e7da8` and the
+wheel `303ce01df0770da89259cb85ee08d96c61d6c5997ce265bb7c6cb71f96faaaec`;
+the wheel is identical to the tested dispatch wheel, while the bundle is a
+rebuild of the same code, so its hash differs from the dispatch bundle. The
+published bundle started offline from the download. A re-run of the pipeline for
+`v1.0.0` (`44022228730`) failed at “Release v1.0.0 already exists; published
+assets are immutable” and left all three assets unchanged. The installation
+links in `README.md` and `docs/` resolve to the releases page.
+
 Packaging evidence at `0.10.0` on 2026-11-14 (`Linux tlacoyo x86_64`): the
 wheel metadata declares `tzdata>=2026.6,<2027` and `tzlocal>=5.4.5,<6`, and an
 offline reminder calculation resolves `America/Mexico_City` from the packaged
@@ -186,17 +202,19 @@ limitation in the release notes.
 - The first development desktop run may fetch the Flet client once as
   provisioning; a packaged build bundles the client and starts offline.
 - There is no cloud sync, account, telemetry, or hidden network call.
-- `0.14.0` is the current version. Archived changes stay under `Unreleased`;
-  versions move only when a release is cut deliberately.
+- `1.0.0` is the current released version. Archived changes stay under
+  `Unreleased`; versions move only when a release is cut deliberately.
 
 ## Version path
 
-`0.14.0` is the current version. Archiving a change does not bump the version or
-create a tag; its entry stays under `Unreleased`. A release is a deliberate act:
-bump with `hatch version patch|minor|major`, move the `Unreleased` entries under
-the released heading, and push the tag, which publishes it. `1.0.0` follows only
-when every row in the unified gate is green. The maintainer confirms the
-transition after reviewing the recorded evidence in this file.
+`1.0.0` is the current released version. Archiving a change does not bump the
+version or create a tag; its entry stays under `Unreleased`. A release is a
+deliberate act: bump with `hatch version patch|minor|major`, move the
+`Unreleased` entries under the released heading, and push the tag, which
+publishes it. `1.0.0` was published from tag `v1.0.0` on 2026-11-16. The next
+release follows the same path when every row in the unified gate is green; the
+maintainer confirms the transition after reviewing the recorded evidence in this
+file.
 
 ## Work sequence
 
