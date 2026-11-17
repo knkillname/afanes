@@ -9,8 +9,14 @@
 
 ## 2. Packaged verification
 
-- [ ] 2.1 With maintainer approval, push the fix to `main` and dispatch `release.yml` as a dry run. Download the new `afanes-release` artifact, verify its checksums, extract the bundle, and run it: choose **English**, confirm the restart toast, confirm `~/.config/afanes/settings.json` gains `"language": "en"`, restart and confirm the interface starts in English, then choose **System Language** and confirm the key clears. Verify the run is green, the publish job is skipped, and no release is created.
-- [ ] 2.2 Record the packaged run URL and result for the language row, then report the new artifact to the `automate-release-publishing` change. Verify the language row can be marked green and that the release change still requires the full packaged gate on the final `1.0.0` artifact, because this fix changes interface code after the earlier pass.
+- [x] 2.1 With maintainer approval, push the fix to `main` and dispatch `release.yml` as a dry run. Download the new `afanes-release` artifact, verify its checksums, extract the bundle, and run it: choose **English**, confirm the restart toast, confirm `~/.config/afanes/settings.json` gains `"language": "en"`, restart and confirm the interface starts in English, then choose **System Language** and confirm the key clears. Verify the run is green, the publish job is skipped, and no release is created.
+- [x] 2.2 Record the packaged run URL and result for the language row, then report the new artifact to the `automate-release-publishing` change. Verify the language row can be marked green and that the release change still requires the full packaged gate on the final `1.0.0` artifact, because this fix changes interface code after the earlier pass.
+
+## Verification record
+
+- Dry run `44015988044` on `8de4fb9`: green, the publish job was skipped, and no release was created. The `afanes-release` artifact checksums verified.
+- On the extracted bundle, **English** wrote `{"version": 1, "language": "en"}` and the relaunch started in English; **System Language** wrote `{"version": 1, "language": null}` and the relaunch returned to the system Spanish locale. The running session kept its language until each restart.
+- No "never awaited" warning appears in any packaged run of the fixed build.
 
 ## Workflow follow-up
 
