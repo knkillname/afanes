@@ -2,6 +2,7 @@
 
 import asyncio
 import datetime
+import inspect
 import json
 import typing
 from collections.abc import Awaitable, Callable
@@ -435,10 +436,20 @@ class TestLocaleStartup:
         assert any("Trabajo - Resultados compartidos" in text for text in texts)
         assert all("Life administration" not in text for text in texts)
 
-    def test_choosing_spanish_saves_the_preference_and_keeps_the_session(
+    @pytest.mark.parametrize(
+        ("item_key", "expected"),
+        [
+            ("welcome-language-en", Preferences(language="en")),
+            ("welcome-language-es", Preferences(language="es")),
+            ("welcome-language-system", Preferences(language=None)),
+        ],
+    )
+    def test_each_language_choice_is_a_coroutine_that_saves_the_preference(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
+        item_key: str,
+        expected: Preferences,
     ) -> None:
         _use_settings_file(monkeypatch, tmp_path / "settings.json")
         page = FakePage()
@@ -447,14 +458,13 @@ class TestLocaleStartup:
         async def scenario() -> None:
             await afanes.ui.app.AppShell.main(typing.cast("ft.Page", page))
             menu = _typed(_find_by_key(page.controls[0], "welcome-language"), ft.PopupMenuButton)
-            spanish = next(
-                item for item in menu.items if isinstance(item, ft.PopupMenuItem) and item.key == "welcome-language-es"
-            )
-            await typing.cast("Handler", spanish.on_click)()
+            item = next(item for item in menu.items if isinstance(item, ft.PopupMenuItem) and item.key == item_key)
+            assert inspect.iscoroutinefunction(item.on_click)
+            await typing.cast("Handler", item.on_click)()
 
         asyncio.run(scenario())
 
-        assert PreferencesStore(tmp_path / "preferences.json").load().preferences == Preferences(language="es")
+        assert PreferencesStore(tmp_path / "preferences.json").load().preferences == expected
         assert state.status.copy.locale.language == "en"
         snackbar = page.dialogs[-1]
         assert isinstance(snackbar, ft.SnackBar)

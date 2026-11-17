@@ -19,15 +19,16 @@ class LanguageMenu:
     ----------
     copy : afanes.i18n.ui.UiCopy
         Active catalog used for the control label and system choice.
-    on_select : collections.abc.Callable[[str | None], collections.abc.Awaitable[None] | None]
-        Command that stores the chosen language, or ``None`` for the system
-        choice.
+    on_select : collections.abc.Callable[[str | None], collections.abc.Awaitable[None]]
+        Coroutine that stores the chosen language, or ``None`` for the system
+        choice. The callable MUST be a coroutine function so the interface
+        toolkit awaits it.
     prefix : str
         Control key prefix. The menu and item keys use this prefix.
     """
 
     copy: afanes.i18n.ui.UiCopy
-    on_select: Callable[[str | None], Awaitable[None] | None]
+    on_select: Callable[[str | None], Awaitable[None]]
     prefix: str = "language"
 
     def items(self) -> list[ft.PopupMenuItem]:
@@ -71,14 +72,14 @@ class LanguageMenu:
             key=f"{self.prefix}-language",
         )
 
-    def _choose_english(self) -> Awaitable[None] | None:
+    async def _choose_english(self) -> None:
         """Store English as the preferred language."""
-        return self.on_select("en")
+        await self.on_select("en")
 
-    def _choose_spanish(self) -> Awaitable[None] | None:
+    async def _choose_spanish(self) -> None:
         """Store Spanish as the preferred language."""
-        return self.on_select("es")
+        await self.on_select("es")
 
-    def _choose_system(self) -> Awaitable[None] | None:
+    async def _choose_system(self) -> None:
         """Clear the preference and use the system language."""
-        return self.on_select(None)
+        await self.on_select(None)

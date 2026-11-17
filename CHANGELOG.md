@@ -45,6 +45,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   removal. Resolved runtime dependencies: `flet==1.1.2`, `markdown-it-py==4.3.0`, `PyYAML==6.0.3`,
   `tzdata==2026.6`, `tzlocal==5.4.5`. README: no change required. Docs: updated.
 
+### Fixed
+
+- **The language menu writes the preference.** Choosing English, Español, or System Language now
+  saves the preference and shows the restart notice in the packaged build. The menu handlers were
+  synchronous wrappers that returned a coroutine, which the interface toolkit discards, so the choice
+  never took effect. The handlers are now coroutine functions, the callback contract requires an
+  awaitable, and a regression test pins the dispatch rule. This implements the
+  `fix-language-menu-await` OpenSpec change. No runtime dependency, vault-format, or public API
+  change. README: no change required. Docs: no change required.
+
 ## [0.14.0] - 2026-11-15
 
 ### Added

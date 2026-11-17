@@ -102,7 +102,7 @@ class WorkspaceActions:
     on_about: Callable[[], Awaitable[None]] | None = None
     on_shortcuts: Callable[[], Awaitable[None]] | None = None
     on_notice: Callable[[afanes.ui.state.status.Notice], None] | None = None
-    on_language: Callable[[str | None], Awaitable[None] | None] | None = None
+    on_language: Callable[[str | None], Awaitable[None]] | None = None
     pick_note_date: afanes.ui.components.date_entry.PickNoteDate | None = None
 
 

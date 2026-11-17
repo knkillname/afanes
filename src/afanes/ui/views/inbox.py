@@ -48,7 +48,7 @@ class WelcomeView:
         on_choose: Callable[[], Awaitable[None]] | None = None,
         on_open_path: Callable[[str], Awaitable[None]] | None = None,
         on_create: Callable[[], Awaitable[None]] | None = None,
-        on_language: Callable[[str | None], Awaitable[None] | None] | None = None,
+        on_language: Callable[[str | None], Awaitable[None]] | None = None,
         *,
         copy: afanes.i18n.ui.UiCopy | None = None,
     ) -> None:
