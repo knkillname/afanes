@@ -26,7 +26,7 @@
 
 ## 4. The `1.0.0` release
 
-- [ ] 4.1 Confirm every row of the `RELEASE.md` unified gate has recorded automated and manual evidence; if any row is not green, stop and report it instead of bumping. Verify the checklist has no pending row and `RELEASE.md` names the evidence for each flow.
+- [x] 4.1 Confirm every row of the `RELEASE.md` unified gate has recorded automated and manual evidence; if any row is not green, stop and report it instead of bumping. Verify the checklist has no pending row and `RELEASE.md` names the evidence for each flow.
 - [ ] 4.2 Run `hatch version major` and confirm `0.14.0` becomes `1.0.0` without touching `src/afanes/__about__.py` by hand. Verify `hatch version` prints `1.0.0`, `git diff --stat` shows only the version source file, and `grep -n '__version__' src/afanes/__about__.py` reports `1.0.0`.
 - [ ] 4.3 Move the `Unreleased` entries under `## [1.0.0] - <release date>` in `CHANGELOG.md`, leave a fresh `Unreleased` section, and record the resolved runtime dependency versions. Verify the heading matches the changelog convention, `git diff CHANGELOG.md` shows the move, and no released entry was rewritten.
 - [ ] 4.4 Commit the pipeline, documentation, version, and changelog changes, then dispatch `release.yml` at `1.0.0` for the pre-tag build. Verify the run is green, names the commit that will be tagged, and creates no release.

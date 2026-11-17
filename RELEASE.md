@@ -68,6 +68,24 @@ above runs there.
 Record each manual result with the version, date, and machine. A check that has
 not run stays pending; it never becomes a silent assumption.
 
+Manual MVP flow evidence at `0.14.0` on 2026-11-16 (`Linux tlacoyo x86_64`):
+the packaged dispatch artifact from run `43930562650` opened the versioned gate
+vault and remembered it after a restart, captured a thought with a byte-identical
+Markdown body, clarified one capture into a project whose body contains its step,
+completed a due step and postponed another in Review while the pending count
+dropped, and stopped an external edit with the conflict banner while the reload
+kept the external line. The fixed artifact from run `44015988044` opened a
+browser search result, adopted a legacy folder with the five default folders by
+adding only `afanes.yaml` (`schema_version: 2`) and opening it, and remembered
+the adopted folder; the same build applied an English interface override only
+after restart, returned to the system Spanish locale when the override was
+cleared, and rendered the command-line help in both Spanish and English. The
+`0.9.0` localization review above remains the evidence for Spanish starter
+content, the `0.10.0` reminder record above remains the reminder evidence, and
+the HIG row remains backed by the `0.12.0` Large Text, `0.13.0` high-contrast,
+and `0.14.0` icon records above with the empty conformance baseline. The complete
+gate is re-run on the `1.0.0` artifact before the tag.
+
 Packaging evidence at `0.10.0` on 2026-11-14 (`Linux tlacoyo x86_64`): the
 wheel metadata declares `tzdata>=2026.6,<2027` and `tzlocal>=5.4.5,<6`, and an
 offline reminder calculation resolves `America/Mexico_City` from the packaged
